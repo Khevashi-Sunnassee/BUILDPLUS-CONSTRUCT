@@ -4,12 +4,13 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems } from "@shared/schema";
+import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems, jobTypes } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import { emailService } from "../services/email.service";
 import { buildBrandedEmail } from "../lib/email-template";
+import OpenAI from "openai";
 
 const router = Router();
 
@@ -1266,15 +1267,25 @@ router.get("/api/tenders/:id/members", requireAuth, requirePermission("tenders",
           id: suppliers.id,
           name: suppliers.name,
           email: suppliers.email,
+          phone: suppliers.phone,
+          keyContact: suppliers.keyContact,
+          defaultCostCodeId: suppliers.defaultCostCodeId,
+        },
+        costCode: {
+          id: costCodes.id,
+          code: costCodes.code,
+          name: costCodes.name,
         },
       })
       .from(tenderMembers)
       .leftJoin(suppliers, eq(tenderMembers.supplierId, suppliers.id))
+      .leftJoin(costCodes, eq(suppliers.defaultCostCodeId, costCodes.id))
       .where(and(eq(tenderMembers.tenderId, req.params.id), eq(tenderMembers.companyId, companyId)));
 
     const mapped = results.map((row) => ({
       ...row.member,
       supplier: row.supplier,
+      costCode: row.costCode?.id ? row.costCode : null,
     }));
 
     res.json(mapped);
@@ -1639,6 +1650,247 @@ router.post("/api/tenders/:id/duplicate-package", requireAuth, requirePermission
     }
     logger.error("Error duplicating tender package:", error);
     res.status(500).json({ message: "Failed to update tender package", code: "INTERNAL_ERROR" });
+  }
+});
+
+router.post("/api/tenders/:id/find-suppliers", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const tenderId = req.params.id;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, tenderId))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    const schema = z.object({
+      costCodeIds: z.array(z.string()).min(1, "At least one cost code is required"),
+    });
+    const data = schema.parse(req.body);
+
+    const [tender] = await db
+      .select({
+        id: tenders.id,
+        title: tenders.title,
+        jobId: tenders.jobId,
+      })
+      .from(tenders)
+      .where(and(eq(tenders.id, tenderId), eq(tenders.companyId, companyId)));
+
+    const [job] = await db
+      .select({
+        id: jobs.id,
+        name: jobs.name,
+        address: jobs.address,
+        city: jobs.city,
+        state: jobs.state,
+        estimatedValue: jobs.estimatedValue,
+        jobTypeId: jobs.jobTypeId,
+      })
+      .from(jobs)
+      .where(and(eq(jobs.id, tender.jobId), eq(jobs.companyId, companyId)));
+
+    let jobTypeName = "Construction";
+    if (job?.jobTypeId) {
+      const [jt] = await db
+        .select({ name: jobTypes.name })
+        .from(jobTypes)
+        .where(eq(jobTypes.id, job.jobTypeId));
+      if (jt) jobTypeName = jt.name;
+    }
+
+    const selectedCodes = await db
+      .select({ id: costCodes.id, code: costCodes.code, name: costCodes.name })
+      .from(costCodes)
+      .where(and(inArray(costCodes.id, data.costCodeIds), eq(costCodes.companyId, companyId)));
+
+    const costCodeNames = selectedCodes.map(c => `${c.code} - ${c.name}`).join(", ");
+    const location = [job?.address, job?.city, job?.state].filter(Boolean).join(", ") || "Australia";
+    const projectValue = job?.estimatedValue ? `$${parseFloat(job.estimatedValue).toLocaleString()}` : "Not specified";
+
+    const openai = new OpenAI();
+
+    const prompt = `You are a construction industry procurement assistant for Australia. Find real suppliers/subcontractors for the following tender requirements.
+
+Project Details:
+- Project Type: ${jobTypeName}
+- Project Name: ${job?.name || tender.title}
+- Location: ${location}
+- Estimated Value: ${projectValue}
+- Trade Categories Needed: ${costCodeNames}
+
+Find 8-12 real Australian suppliers/subcontractors that would be relevant for these trade categories in or near the specified location. For each supplier, provide realistic business details.
+
+IMPORTANT: Return ONLY a valid JSON array. No markdown, no explanation. Each object must have these exact fields:
+[
+  {
+    "companyName": "string - company/business name",
+    "contactName": "string - key contact person name",
+    "email": "string - business email address",
+    "phone": "string - Australian phone number",
+    "specialty": "string - brief description of their specialty/trade",
+    "location": "string - city/suburb and state"
+  }
+]
+
+Return between 8 and 12 suppliers. Make sure they are realistic for the ${location} area and relevant to the trade categories: ${costCodeNames}.`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: "You are a construction procurement assistant. Always respond with valid JSON arrays only. No markdown formatting." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 3000,
+    });
+
+    const responseText = completion.choices[0]?.message?.content?.trim() || "[]";
+
+    let foundSuppliers: Array<{
+      companyName: string;
+      contactName: string;
+      email: string;
+      phone: string;
+      specialty: string;
+      location: string;
+    }> = [];
+
+    try {
+      const cleaned = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      foundSuppliers = JSON.parse(cleaned);
+      if (!Array.isArray(foundSuppliers)) foundSuppliers = [];
+    } catch {
+      logger.warn("Failed to parse AI supplier response:", responseText.substring(0, 200));
+      foundSuppliers = [];
+    }
+
+    res.json({
+      suppliers: foundSuppliers,
+      context: {
+        costCodes: costCodeNames,
+        location,
+        projectType: jobTypeName,
+        projectValue,
+      },
+    });
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
+    }
+    logger.error("Error finding suppliers via AI:", error);
+    res.status(500).json({ message: "Failed to find suppliers", code: "INTERNAL_ERROR" });
+  }
+});
+
+router.post("/api/tenders/:id/add-found-suppliers", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const userId = req.session.userId!;
+    const tenderId = req.params.id;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, tenderId))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    const supplierSchema = z.object({
+      companyName: z.string().min(1),
+      contactName: z.string().optional().default(""),
+      email: z.string().optional().default(""),
+      phone: z.string().optional().default(""),
+      specialty: z.string().optional().default(""),
+      location: z.string().optional().default(""),
+      costCodeId: z.string().nullable().optional(),
+    });
+
+    const schema = z.object({
+      suppliers: z.array(supplierSchema).min(1, "At least one supplier is required"),
+      defaultCostCodeId: z.string().nullable().optional(),
+    });
+
+    const data = schema.parse(req.body);
+
+    const addedSuppliers: Array<{ supplierId: string; name: string; memberId: string }> = [];
+    const skipped: Array<{ name: string; reason: string }> = [];
+
+    for (const s of data.suppliers) {
+      try {
+        const existing = await db
+          .select({ id: suppliers.id })
+          .from(suppliers)
+          .where(and(
+            eq(suppliers.companyId, companyId),
+            eq(suppliers.name, s.companyName),
+          ))
+          .limit(1);
+
+        let supplierId: string;
+
+        if (existing.length > 0) {
+          supplierId = existing[0].id;
+        } else {
+          const [newSupplier] = await db
+            .insert(suppliers)
+            .values({
+              companyId,
+              name: s.companyName,
+              keyContact: s.contactName || null,
+              email: s.email || null,
+              phone: s.phone || null,
+              notes: s.specialty ? `Specialty: ${s.specialty}. Location: ${s.location}` : null,
+              defaultCostCodeId: s.costCodeId || data.defaultCostCodeId || null,
+              isActive: true,
+              availableForTender: true,
+            })
+            .returning({ id: suppliers.id });
+          supplierId = newSupplier.id;
+        }
+
+        const existingMember = await db
+          .select({ id: tenderMembers.id })
+          .from(tenderMembers)
+          .where(and(
+            eq(tenderMembers.tenderId, tenderId),
+            eq(tenderMembers.supplierId, supplierId),
+            eq(tenderMembers.companyId, companyId),
+          ))
+          .limit(1);
+
+        if (existingMember.length > 0) {
+          skipped.push({ name: s.companyName, reason: "Already a member of this tender" });
+          continue;
+        }
+
+        const [member] = await db
+          .insert(tenderMembers)
+          .values({
+            companyId,
+            tenderId,
+            supplierId,
+            status: "PENDING",
+          })
+          .returning({ id: tenderMembers.id });
+
+        addedSuppliers.push({ supplierId, name: s.companyName, memberId: member.id });
+      } catch (innerError: unknown) {
+        logger.warn({ err: innerError, supplier: s.companyName }, "Failed to add individual supplier");
+        skipped.push({ name: s.companyName, reason: "Failed to create" });
+      }
+    }
+
+    res.json({
+      added: addedSuppliers.length,
+      skipped: skipped.length,
+      addedSuppliers,
+      skippedSuppliers: skipped,
+    });
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
+    }
+    logger.error("Error adding found suppliers:", error);
+    res.status(500).json({ message: "Failed to add suppliers", code: "INTERNAL_ERROR" });
   }
 });
 

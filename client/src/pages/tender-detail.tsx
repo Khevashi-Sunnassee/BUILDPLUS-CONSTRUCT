@@ -17,9 +17,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, FileText, Eye, Pencil, Plus, Loader2, ChevronDown, ChevronRight,
   DollarSign, Users, Mail, Package, Layers, Link2, Unlink, AlertTriangle, Download, Search, X,
+  Sparkles, UserPlus, Phone, Building2,
 } from "lucide-react";
 
 interface TenderDetail {
@@ -33,9 +35,44 @@ interface TenderDetail {
   dueDate: string | null;
   notes: string | null;
   createdAt: string;
+  jobId: string;
   job: { id: string; name: string; jobNumber: string } | null;
   createdBy: { id: string; name: string } | null;
   members?: Array<{ id: string; supplierId: string; status: string; supplier: { id: string; name: string; email: string | null } }>;
+}
+
+interface TenderMemberWithDetails {
+  id: string;
+  tenderId: string;
+  supplierId: string;
+  status: string;
+  invitedAt: string | null;
+  sentAt: string | null;
+  supplier: {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    keyContact: string | null;
+    defaultCostCodeId: string | null;
+  } | null;
+  costCode: { id: string; code: string; name: string } | null;
+}
+
+interface CostCodeOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
+interface FoundSupplier {
+  companyName: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  specialty: string;
+  location: string;
+  selected?: boolean;
 }
 
 interface SubmissionWithDetails {
@@ -365,7 +402,7 @@ export default function TenderDetailPage() {
   const tenderId = params?.id || "";
   const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = useState("submissions");
+  const [activeTab, setActiveTab] = useState("invitations");
   const [submissionFormOpen, setSubmissionFormOpen] = useState(false);
   const [linkScopeOpen, setLinkScopeOpen] = useState(false);
 
@@ -379,6 +416,13 @@ export default function TenderDetailPage() {
 
   const [linkScopeId, setLinkScopeId] = useState("");
   const [scopeSearch, setScopeSearch] = useState("");
+
+  const [findSuppliersOpen, setFindSuppliersOpen] = useState(false);
+  const [findSuppliersStep, setFindSuppliersStep] = useState<"select-codes" | "searching" | "results">("select-codes");
+  const [selectedCostCodeIds, setSelectedCostCodeIds] = useState<string[]>([]);
+  const [foundSuppliers, setFoundSuppliers] = useState<FoundSupplier[]>([]);
+  const [selectedFoundSuppliers, setSelectedFoundSuppliers] = useState<Set<number>>(new Set());
+  const [searchContext, setSearchContext] = useState<{ costCodes: string; location: string; projectType: string } | null>(null);
 
   const { data: tender, isLoading, error } = useQuery<TenderDetail>({
     queryKey: ["/api/tenders", tenderId],
@@ -401,6 +445,18 @@ export default function TenderDetailPage() {
     queryKey: ["/api/tenders", tenderId, "scopes"],
     enabled: !!tenderId,
   });
+
+  const { data: tenderMembers = [], isLoading: loadingMembers } = useQuery<TenderMemberWithDetails[]>({
+    queryKey: ["/api/tenders", tenderId, "members"],
+    enabled: !!tenderId,
+  });
+
+  const { data: rawCostCodes = [] } = useQuery<Array<CostCodeOption & { children?: CostCodeOption[] }>>({
+    queryKey: ["/api/cost-codes-with-children"],
+    enabled: findSuppliersOpen,
+  });
+
+  const costCodesData: CostCodeOption[] = rawCostCodes.map(({ id, code, name }) => ({ id, code, name }));
 
   const { data: suppliers = [] } = useQuery<SupplierOption[]>({
     queryKey: ["/api/procurement/suppliers"],
@@ -439,6 +495,96 @@ export default function TenderDetailPage() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const findSuppliersMutation = useMutation({
+    mutationFn: async (costCodeIds: string[]) => {
+      const res = await apiRequest("POST", `/api/tenders/${tenderId}/find-suppliers`, { costCodeIds });
+      return res.json();
+    },
+    onSuccess: (data: { suppliers: FoundSupplier[]; context: { costCodes: string; location: string; projectType: string } }) => {
+      setFoundSuppliers(data.suppliers);
+      setSelectedFoundSuppliers(new Set(data.suppliers.map((_, i) => i)));
+      setSearchContext(data.context);
+      setFindSuppliersStep("results");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Search failed", description: error.message, variant: "destructive" });
+      setFindSuppliersStep("select-codes");
+    },
+  });
+
+  const addFoundSuppliersMutation = useMutation({
+    mutationFn: async (selectedSuppliers: FoundSupplier[]) => {
+      const res = await apiRequest("POST", `/api/tenders/${tenderId}/add-found-suppliers`, {
+        suppliers: selectedSuppliers,
+        defaultCostCodeId: selectedCostCodeIds.length === 1 ? selectedCostCodeIds[0] : null,
+      });
+      return res.json();
+    },
+    onSuccess: (data: { added: number; skipped: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenders", tenderId, "members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/suppliers"] });
+      toast({
+        title: `${data.added} supplier(s) added`,
+        description: data.skipped > 0 ? `${data.skipped} skipped (already exist)` : undefined,
+      });
+      closeFindSuppliersDialog();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to add suppliers", description: error.message, variant: "destructive" });
+    },
+  });
+
+  function openFindSuppliersDialog() {
+    setFindSuppliersOpen(true);
+    setFindSuppliersStep("select-codes");
+    setSelectedCostCodeIds([]);
+    setFoundSuppliers([]);
+    setSelectedFoundSuppliers(new Set());
+    setSearchContext(null);
+  }
+
+  function closeFindSuppliersDialog() {
+    setFindSuppliersOpen(false);
+    setFindSuppliersStep("select-codes");
+    setSelectedCostCodeIds([]);
+    setFoundSuppliers([]);
+    setSelectedFoundSuppliers(new Set());
+    setSearchContext(null);
+  }
+
+  function handleFindSuppliers() {
+    if (selectedCostCodeIds.length === 0) {
+      toast({ title: "Please select at least one trade category", variant: "destructive" });
+      return;
+    }
+    setFindSuppliersStep("searching");
+    findSuppliersMutation.mutate(selectedCostCodeIds);
+  }
+
+  function handleAddSelectedSuppliers() {
+    const selected = foundSuppliers.filter((_, i) => selectedFoundSuppliers.has(i));
+    if (selected.length === 0) {
+      toast({ title: "Please select at least one supplier to add", variant: "destructive" });
+      return;
+    }
+    addFoundSuppliersMutation.mutate(selected);
+  }
+
+  function toggleFoundSupplier(index: number) {
+    setSelectedFoundSuppliers(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
+
+  function toggleCostCode(id: string) {
+    setSelectedCostCodeIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  }
 
   function closeSubmissionForm() {
     setSubmissionFormOpen(false);
@@ -612,6 +758,10 @@ export default function TenderDetailPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} data-testid="tabs-tender-detail">
         <TabsList>
+          <TabsTrigger value="invitations" data-testid="tab-invitations">
+            <UserPlus className="h-4 w-4 mr-1" />
+            Invitations ({tenderMembers.length})
+          </TabsTrigger>
           <TabsTrigger value="submissions" data-testid="tab-submissions">
             <DollarSign className="h-4 w-4 mr-1" />
             Submissions ({submissions.length})
@@ -625,6 +775,93 @@ export default function TenderDetailPage() {
             Scopes ({linkedScopes.length})
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="invitations" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h3 className="text-lg font-semibold" data-testid="text-invitations-heading">Invitations</h3>
+            <Button onClick={openFindSuppliersDialog} data-testid="button-find-suppliers">
+              <Sparkles className="h-4 w-4 mr-2" />
+              Find Suppliers (AI)
+            </Button>
+          </div>
+          {loadingMembers ? (
+            <Skeleton className="h-32 w-full" />
+          ) : tenderMembers.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground" data-testid="text-no-invitations">
+              <Users className="h-12 w-12 mx-auto mb-3 opacity-40" />
+              <p className="font-medium">No suppliers invited yet</p>
+              <p className="text-sm mt-1">Use AI-powered search to find and invite suppliers to this tender.</p>
+            </div>
+          ) : (
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Trade Category</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tenderMembers.map((member) => (
+                    <TableRow key={member.id} data-testid={`row-invitation-${member.id}`}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <div className="font-medium" data-testid={`text-supplier-name-${member.id}`}>
+                              {member.supplier?.name || "Unknown"}
+                            </div>
+                            {member.supplier?.email && (
+                              <div className="text-sm text-muted-foreground flex items-center gap-1">
+                                <Mail className="h-3 w-3" />
+                                {member.supplier.email}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-0.5">
+                          {member.supplier?.keyContact && (
+                            <div className="text-sm">{member.supplier.keyContact}</div>
+                          )}
+                          {member.supplier?.phone && (
+                            <div className="text-sm text-muted-foreground flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {member.supplier.phone}
+                            </div>
+                          )}
+                          {!member.supplier?.keyContact && !member.supplier?.phone && (
+                            <span className="text-sm text-muted-foreground">--</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {member.costCode ? (
+                          <Badge variant="outline" data-testid={`badge-cost-code-${member.id}`}>
+                            {member.costCode.code} - {member.costCode.name}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">--</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={member.status === "SENT" ? "default" : member.status === "DECLINED" ? "destructive" : "secondary"}
+                          data-testid={`badge-status-${member.id}`}
+                        >
+                          {member.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+        </TabsContent>
 
         <TabsContent value="submissions" className="mt-4 space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -919,6 +1156,176 @@ export default function TenderDetailPage() {
               Link Scope
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={findSuppliersOpen} onOpenChange={(open) => { if (!open) closeFindSuppliersDialog(); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              {findSuppliersStep === "select-codes" && "Find Suppliers"}
+              {findSuppliersStep === "searching" && "Searching for Suppliers..."}
+              {findSuppliersStep === "results" && "AI-Found Suppliers"}
+            </DialogTitle>
+            <DialogDescription>
+              {findSuppliersStep === "select-codes" && "Select trade categories to search for relevant suppliers in your project area."}
+              {findSuppliersStep === "searching" && "AI is searching for suppliers matching your trade categories and project location."}
+              {findSuppliersStep === "results" && (
+                <>Found {foundSuppliers.length} suppliers. Select which ones to add to this tender.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {findSuppliersStep === "select-codes" && (
+            <div className="space-y-4">
+              <Label>Trade Categories</Label>
+              <div className="max-h-72 overflow-y-auto border rounded-md p-3 space-y-2">
+                {costCodesData.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No cost codes configured. Add cost codes in Settings first.</p>
+                ) : (
+                  costCodesData.map((cc) => (
+                    <div key={cc.id} className="flex items-center gap-3 py-1" data-testid={`checkbox-cost-code-${cc.id}`}>
+                      <Checkbox
+                        id={`cc-${cc.id}`}
+                        checked={selectedCostCodeIds.includes(cc.id)}
+                        onCheckedChange={() => toggleCostCode(cc.id)}
+                      />
+                      <label htmlFor={`cc-${cc.id}`} className="text-sm cursor-pointer flex-1">
+                        <span className="font-medium">{cc.code}</span> - {cc.name}
+                      </label>
+                    </div>
+                  ))
+                )}
+              </div>
+              {selectedCostCodeIds.length > 0 && (
+                <p className="text-sm text-muted-foreground">{selectedCostCodeIds.length} categories selected</p>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={closeFindSuppliersDialog} data-testid="button-cancel-find-suppliers">Cancel</Button>
+                <Button
+                  onClick={handleFindSuppliers}
+                  disabled={selectedCostCodeIds.length === 0}
+                  data-testid="button-search-suppliers"
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  Search Suppliers
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {findSuppliersStep === "searching" && (
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+              <p className="text-muted-foreground text-sm">AI is analyzing your project details and searching for relevant suppliers...</p>
+              <p className="text-xs text-muted-foreground">This may take 10-20 seconds</p>
+            </div>
+          )}
+
+          {findSuppliersStep === "results" && (
+            <div className="space-y-4">
+              {searchContext && (
+                <div className="bg-muted/50 rounded-md p-3 text-sm space-y-1">
+                  <div><span className="font-medium">Location:</span> {searchContext.location}</div>
+                  <div><span className="font-medium">Categories:</span> {searchContext.costCodes}</div>
+                  <div><span className="font-medium">Project Type:</span> {searchContext.projectType}</div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-2">
+                <Label>Select Suppliers to Add</Label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedFoundSuppliers(new Set(foundSuppliers.map((_, i) => i)))}
+                    data-testid="button-select-all-suppliers"
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedFoundSuppliers(new Set())}
+                    data-testid="button-deselect-all-suppliers"
+                  >
+                    Deselect All
+                  </Button>
+                </div>
+              </div>
+
+              {foundSuppliers.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No suppliers found. Try different trade categories.</p>
+                </div>
+              ) : (
+                <div className="max-h-80 overflow-y-auto space-y-2">
+                  {foundSuppliers.map((supplier, index) => (
+                    <div
+                      key={index}
+                      className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                        selectedFoundSuppliers.has(index) ? "border-primary bg-primary/5" : "hover-elevate"
+                      }`}
+                      onClick={() => toggleFoundSupplier(index)}
+                      data-testid={`card-found-supplier-${index}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={selectedFoundSuppliers.has(index)}
+                          onCheckedChange={() => toggleFoundSupplier(index)}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium" data-testid={`text-found-name-${index}`}>{supplier.companyName}</span>
+                            {supplier.location && (
+                              <Badge variant="outline" className="text-xs">{supplier.location}</Badge>
+                            )}
+                          </div>
+                          {supplier.specialty && (
+                            <p className="text-sm text-muted-foreground mt-0.5">{supplier.specialty}</p>
+                          )}
+                          <div className="flex items-center gap-4 mt-1 flex-wrap">
+                            {supplier.contactName && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Users className="h-3 w-3" /> {supplier.contactName}
+                              </span>
+                            )}
+                            {supplier.email && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Mail className="h-3 w-3" /> {supplier.email}
+                              </span>
+                            )}
+                            {supplier.phone && (
+                              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Phone className="h-3 w-3" /> {supplier.phone}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <DialogFooter className="flex items-center justify-between gap-2">
+                <Button variant="outline" onClick={() => setFindSuppliersStep("select-codes")} data-testid="button-back-to-codes">
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Back
+                </Button>
+                <Button
+                  onClick={handleAddSelectedSuppliers}
+                  disabled={selectedFoundSuppliers.size === 0 || addFoundSuppliersMutation.isPending}
+                  data-testid="button-add-selected-suppliers"
+                >
+                  {addFoundSuppliersMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Add {selectedFoundSuppliers.size} Supplier{selectedFoundSuppliers.size !== 1 ? "s" : ""} to Tender
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
