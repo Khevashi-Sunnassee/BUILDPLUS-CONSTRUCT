@@ -123,6 +123,13 @@ router.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW
     const loadDate = date.toISOString().split('T')[0];
     const loadTime = date.toTimeString().split(' ')[0].substring(0, 5);
     
+    if (data.jobId && req.companyId) {
+      const job = await storage.getJob(data.jobId);
+      if (!job || job.companyId !== req.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
     const loadList = await storage.createLoadList({
       ...data,
       loadNumber,
@@ -132,7 +139,7 @@ router.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW
     }, panelIds || []);
     if (panelIds && panelIds.length > 0) {
       for (const panelId of panelIds) {
-        advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.ON_LOAD_LIST, "Added to load list", req.session.userId, { loadListId: loadList.id });
+        await advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.ON_LOAD_LIST, "Added to load list", req.session.userId, { loadListId: loadList.id });
       }
     }
     res.json(loadList);
