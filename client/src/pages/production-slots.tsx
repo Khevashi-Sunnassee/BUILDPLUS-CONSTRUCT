@@ -735,13 +735,13 @@ export default function ProductionSlotsPage() {
   const [dateToFilter, setDateToFilter] = useState<string>("");
 
   useEffect(() => {
-    if (!factoryFilterInitialized && userSettings) {
-      if (userSettings.defaultFactoryId) {
+    if (!factoryFilterInitialized && userSettings && factories) {
+      if (userSettings.defaultFactoryId && factories.some(f => f.id === userSettings.defaultFactoryId)) {
         setFactoryFilter(userSettings.defaultFactoryId);
       }
       setFactoryFilterInitialized(true);
     }
-  }, [userSettings, factoryFilterInitialized]);
+  }, [userSettings, factoryFilterInitialized, factories]);
   const [groupBy, setGroupBy] = useState<GroupBy>("week");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   

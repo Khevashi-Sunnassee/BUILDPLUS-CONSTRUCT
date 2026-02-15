@@ -220,13 +220,13 @@ export default function AdminPanelsPage() {
   });
 
   useEffect(() => {
-    if (!factoryFilterInitialized && userSettings) {
-      if (userSettings.defaultFactoryId) {
+    if (!factoryFilterInitialized && userSettings && factories) {
+      if (userSettings.defaultFactoryId && factories.some(f => f.id === userSettings.defaultFactoryId)) {
         setFactoryFilter(userSettings.defaultFactoryId);
       }
       setFactoryFilterInitialized(true);
     }
-  }, [userSettings, factoryFilterInitialized]);
+  }, [userSettings, factoryFilterInitialized, factories]);
 
   const { data: panelTypes } = useQuery<PanelTypeConfig[]>({
     queryKey: [PANEL_TYPES_ROUTES.LIST],

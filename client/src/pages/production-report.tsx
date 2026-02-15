@@ -103,13 +103,13 @@ export default function ProductionReportPage() {
   });
 
   useEffect(() => {
-    if (!factoryFilterInitialized && userSettings) {
-      if (userSettings.defaultFactoryId) {
+    if (!factoryFilterInitialized && userSettings && factories) {
+      if (userSettings.defaultFactoryId && factories.some(f => f.id === userSettings.defaultFactoryId)) {
         setFactoryFilter(userSettings.defaultFactoryId);
       }
       setFactoryFilterInitialized(true);
     }
-  }, [userSettings, factoryFilterInitialized]);
+  }, [userSettings, factoryFilterInitialized, factories]);
 
   const deleteProductionDayMutation = useMutation({
     mutationFn: async ({ date, factory }: { date: string; factory: string }) => {
