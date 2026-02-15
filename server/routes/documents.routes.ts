@@ -186,14 +186,15 @@ router.get("/api/document-types/:id", requireAuth, async (req, res) => {
 
 router.post("/api/document-types", requireRole("ADMIN"), async (req, res) => {
   try {
-    const parsed = insertDocumentTypeSchema.safeParse(req.body);
+    const companyId = req.companyId as string;
+    const parsed = insertDocumentTypeSchema.safeParse({ ...req.body, companyId });
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
     const type = await storage.createDocumentType(parsed.data);
     
     await storage.createDocumentTypeStatus({
-      companyId: parsed.data.companyId,
+      companyId,
       typeId: type.id,
       statusName: "DRAFT",
       color: "#EF4444",
@@ -202,7 +203,7 @@ router.post("/api/document-types", requireRole("ADMIN"), async (req, res) => {
       isActive: true,
     });
     await storage.createDocumentTypeStatus({
-      companyId: parsed.data.companyId,
+      companyId,
       typeId: type.id,
       statusName: "FINAL",
       color: "#22C55E",
@@ -257,8 +258,10 @@ router.get("/api/document-types/:typeId/statuses", requireAuth, async (req, res)
 
 router.post("/api/document-types/:typeId/statuses", requireRole("ADMIN"), async (req, res) => {
   try {
+    const companyId = req.companyId as string;
     const data = {
       ...req.body,
+      companyId,
       typeId: String(req.params.typeId),
     };
     const parsed = insertDocumentTypeStatusSchema.safeParse(data);
@@ -333,7 +336,8 @@ router.get("/api/document-disciplines/:id", requireAuth, async (req, res) => {
 
 router.post("/api/document-disciplines", requireRole("ADMIN"), async (req, res) => {
   try {
-    const parsed = insertDocumentDisciplineSchema.safeParse(req.body);
+    const companyId = req.companyId as string;
+    const parsed = insertDocumentDisciplineSchema.safeParse({ ...req.body, companyId });
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
@@ -405,7 +409,8 @@ router.get("/api/document-categories/:id", requireAuth, async (req, res) => {
 
 router.post("/api/document-categories", requireRole("ADMIN"), async (req, res) => {
   try {
-    const parsed = insertDocumentCategorySchema.safeParse(req.body);
+    const companyId = req.companyId as string;
+    const parsed = insertDocumentCategorySchema.safeParse({ ...req.body, companyId });
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
