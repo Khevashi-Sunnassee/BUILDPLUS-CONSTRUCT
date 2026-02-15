@@ -315,6 +315,10 @@ export default function TenderCenterPage() {
       toast({ title: "Job and Title are required", variant: "destructive" });
       return;
     }
+    if (formOpenDate && formClosedDate && new Date(formClosedDate) < new Date(formOpenDate)) {
+      toast({ title: "Closed Date cannot be before Open Date", variant: "destructive" });
+      return;
+    }
     const data: Record<string, any> = {
       jobId: formJobId,
       title: formTitle.trim(),

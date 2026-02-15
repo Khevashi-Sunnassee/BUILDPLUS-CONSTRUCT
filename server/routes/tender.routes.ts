@@ -238,6 +238,10 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
     let attempt = 0;
     let result: Record<string, unknown> | null = null;
 
+    if (data.openDate && data.closedDate && new Date(data.closedDate) < new Date(data.openDate)) {
+      return res.status(400).json({ message: "Closed Date cannot be before Open Date" });
+    }
+
     while (attempt < maxRetries) {
       attempt++;
       try {
@@ -365,6 +369,12 @@ router.patch("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW
       if (!allowed.includes(data.status)) {
         return res.status(400).json({ message: `Cannot transition from ${currentTender.status} to ${data.status}`, code: "STATUS_LOCKED" });
       }
+    }
+
+    const effectiveOpenDate = data.openDate !== undefined ? data.openDate : (currentTender.openDate ? currentTender.openDate.toISOString() : null);
+    const effectiveClosedDate = data.closedDate !== undefined ? data.closedDate : (currentTender.closedDate ? currentTender.closedDate.toISOString() : null);
+    if (effectiveOpenDate && effectiveClosedDate && new Date(effectiveClosedDate) < new Date(effectiveOpenDate)) {
+      return res.status(400).json({ message: "Closed Date cannot be before Open Date" });
     }
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
