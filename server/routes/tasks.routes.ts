@@ -691,6 +691,7 @@ router.post("/api/tasks/send-email", requireAuth, async (req, res) => {
       subtitle: `Sent by ${senderName}`,
       body: data.message.replace(/\n/g, "<br>"),
       footerNote: "If you have any questions, reply directly to this email.",
+      companyId: req.session.companyId,
     });
 
     const result = await emailService.sendEmailWithAttachment({

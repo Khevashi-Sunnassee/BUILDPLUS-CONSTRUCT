@@ -898,6 +898,7 @@ router.post("/purchase-orders/:id/send-with-pdf", requireAuth, async (req, res) 
       subtitle: `Sent by ${senderName}`,
       body: message.replace(/\n/g, "<br>"),
       footerNote: "Please review the attached purchase order. If you have any questions, reply directly to this email.",
+      companyId,
     });
 
     const result = await emailService.sendEmailWithAttachment({
@@ -987,6 +988,7 @@ router.post("/api/purchase-orders/:id/send-email", requireAuth, async (req, res)
       subtitle: `Sent by ${senderName}`,
       body: message.replace(/\n/g, "<br>"),
       footerNote: "Please review the attached purchase order. If you have any questions, reply directly to this email.",
+      companyId,
     });
 
     const result = await emailService.sendEmailWithAttachment({

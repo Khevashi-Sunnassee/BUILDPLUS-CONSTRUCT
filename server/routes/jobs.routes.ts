@@ -11,6 +11,7 @@ import { JOB_PHASES, PHASE_ALLOWED_STATUSES, isValidStatusForPhase, canAdvanceTo
 import type { JobPhase, JobStatus } from "@shared/job-phases";
 import { logJobChange, logJobPhaseChange, logJobStatusChange } from "../services/job-audit.service";
 import { emailService } from "../services/email.service";
+import { buildBrandedEmail } from "../lib/email-template";
 import { getAllowedJobIds, isJobMember } from "../lib/job-membership";
 
 async function resolveUserName(req: Request): Promise<string | null> {
@@ -1576,31 +1577,26 @@ router.post("/api/admin/jobs/:id/members", requireRole("ADMIN", "MANAGER"), asyn
     if (invitedUser.email && emailService.isConfigured()) {
       const inviterName = req.session.name || "A team member";
       const subject = `You've been added to Job: ${job.jobNumber} - ${job.name}`;
-      const body = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: #1e40af; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-            <h2 style="margin: 0;">Job Invitation</h2>
-          </div>
-          <div style="padding: 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
-            <p>Hi ${invitedUser.name || invitedUser.email},</p>
-            <p><strong>${inviterName}</strong> has added you to the following job:</p>
-            <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-              <tr>
-                <td style="padding: 8px 12px; background: #e2e8f0; font-weight: bold; width: 140px;">Job Number</td>
-                <td style="padding: 8px 12px; background: white;">${job.jobNumber}</td>
-              </tr>
-              <tr>
-                <td style="padding: 8px 12px; background: #e2e8f0; font-weight: bold;">Job Name</td>
-                <td style="padding: 8px 12px; background: white;">${job.name}</td>
-              </tr>
-              ${job.address ? `<tr><td style="padding: 8px 12px; background: #e2e8f0; font-weight: bold;">Address</td><td style="padding: 8px 12px; background: white;">${job.address}</td></tr>` : ""}
-              ${job.client ? `<tr><td style="padding: 8px 12px; background: #e2e8f0; font-weight: bold;">Client</td><td style="padding: 8px 12px; background: white;">${job.client}</td></tr>` : ""}
-            </table>
-            <p>You now have access to documents and files associated with this job.</p>
-            <p style="color: #64748b; font-size: 12px; margin-top: 24px;">This is an automated notification from your project management system.</p>
-          </div>
-        </div>
-      `;
+      const companyId = req.session.companyId;
+      const body = await buildBrandedEmail({
+        title: "Job Invitation",
+        recipientName: invitedUser.name || invitedUser.email,
+        body: `<p><strong>${inviterName}</strong> has added you to the following job:</p>
+          <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+            <tr>
+              <td style="padding: 8px 12px; background: #e2e8f0; font-weight: bold; width: 140px;">Job Number</td>
+              <td style="padding: 8px 12px; background: white;">${job.jobNumber}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 12px; background: #e2e8f0; font-weight: bold;">Job Name</td>
+              <td style="padding: 8px 12px; background: white;">${job.name}</td>
+            </tr>
+            ${job.address ? `<tr><td style="padding: 8px 12px; background: #e2e8f0; font-weight: bold;">Address</td><td style="padding: 8px 12px; background: white;">${job.address}</td></tr>` : ""}
+            ${job.client ? `<tr><td style="padding: 8px 12px; background: #e2e8f0; font-weight: bold;">Client</td><td style="padding: 8px 12px; background: white;">${job.client}</td></tr>` : ""}
+          </table>
+          <p>You now have access to documents and files associated with this job.</p>`,
+        companyId,
+      });
       emailService.sendEmail(invitedUser.email, subject, body).catch((err) => {
         logger.error({ err, userId, jobId }, "Failed to send job invitation email");
       });

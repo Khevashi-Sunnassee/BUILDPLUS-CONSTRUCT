@@ -6,6 +6,7 @@ import { db } from "../db";
 import { hireBookings, employees, suppliers, jobs, assets, users, companies, factories, ASSET_CATEGORIES } from "@shared/schema";
 import { eq, and, desc, sql, ilike, or } from "drizzle-orm";
 import { emailService } from "../services/email.service";
+import { buildBrandedEmail } from "../lib/email-template";
 import { format } from "date-fns";
 
 const router = Router();
@@ -539,115 +540,87 @@ router.delete("/api/hire-bookings/:id", requireAuth, requireRole("ADMIN"), async
   }
 });
 
-function buildHireBookingHtml(booking: Record<string, any>, supplier: Record<string, any> | null, job: Record<string, any> | null, requestedBy: Record<string, any> | null, companyName: string): string {
+function buildHireBookingDetailsHtml(booking: Record<string, any>, supplier: Record<string, any> | null, job: Record<string, any> | null, requestedBy: Record<string, any> | null): string {
   const fmtDate = (d: string | Date | null | undefined) => d ? format(new Date(d as string | Date), "dd/MM/yyyy") : "-";
   const fmtCurrency = (v: string | number | null | undefined) => v ? `$${parseFloat(String(v)).toFixed(2)}` : "-";
   const rateLabels: Record<string, string> = { day: "Per Day", week: "Per Week", month: "Per Month", custom: "Custom" };
   const chargeLabels: Record<string, string> = { calendar_days: "Calendar Days", business_days: "Business Days", minimum_days: "Minimum Days" };
 
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-<style>
-  body { font-family: Arial, Helvetica, sans-serif; color: #333; margin: 0; padding: 20px; }
-  .header { background: #1e3a5f; color: white; padding: 24px; margin: -20px -20px 20px -20px; }
-  .header h1 { margin: 0 0 4px 0; font-size: 22px; }
-  .header p { margin: 0; font-size: 14px; opacity: 0.9; }
-  .section { margin-bottom: 20px; }
-  .section-title { font-size: 14px; font-weight: bold; color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 4px; margin-bottom: 12px; }
-  table { width: 100%; border-collapse: collapse; }
-  table td { padding: 6px 8px; vertical-align: top; font-size: 13px; }
-  table td:first-child { font-weight: 600; color: #555; width: 180px; }
-  .status-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; }
-  .footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 11px; color: #999; }
-  @media print {
-    body { padding: 0; }
-    .header { margin: 0 0 20px 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  }
-</style>
-</head>
-<body>
-  <div class="header">
-    <h1>${companyName}</h1>
-    <p>Equipment Hire Booking - ${booking.bookingNumber}</p>
-  </div>
+  const sectionStyle = "margin-bottom: 20px;";
+  const sectionTitleStyle = "font-size: 14px; font-weight: bold; color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 4px; margin-bottom: 12px;";
+  const tdStyle = "padding: 6px 8px; vertical-align: top; font-size: 13px;";
+  const tdLabelStyle = `${tdStyle} font-weight: 600; color: #555; width: 180px;`;
 
-  <div class="section">
-    <div class="section-title">Booking Details</div>
-    <table>
-      <tr><td>Booking Number</td><td>${booking.bookingNumber}</td></tr>
-      <tr><td>Status</td><td>${String(booking.status || "").replace(/_/g, " ")}</td></tr>
-      <tr><td>Equipment Source</td><td>${booking.hireSource === "external" ? "External (Hire Company)" : "Internal"}</td></tr>
-      <tr><td>Equipment Description</td><td>${booking.equipmentDescription}</td></tr>
-      <tr><td>Asset Category</td><td>${ASSET_CATEGORIES[Number(booking.assetCategoryIndex)] || "Unknown"}</td></tr>
-      <tr><td>Quantity</td><td>${booking.quantity || 1}</td></tr>
+  return `
+  <div style="${sectionStyle}">
+    <div style="${sectionTitleStyle}">Booking Details</div>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="${tdLabelStyle}">Booking Number</td><td style="${tdStyle}">${booking.bookingNumber}</td></tr>
+      <tr><td style="${tdLabelStyle}">Status</td><td style="${tdStyle}">${String(booking.status || "").replace(/_/g, " ")}</td></tr>
+      <tr><td style="${tdLabelStyle}">Equipment Source</td><td style="${tdStyle}">${booking.hireSource === "external" ? "External (Hire Company)" : "Internal"}</td></tr>
+      <tr><td style="${tdLabelStyle}">Equipment Description</td><td style="${tdStyle}">${booking.equipmentDescription}</td></tr>
+      <tr><td style="${tdLabelStyle}">Asset Category</td><td style="${tdStyle}">${ASSET_CATEGORIES[Number(booking.assetCategoryIndex)] || "Unknown"}</td></tr>
+      <tr><td style="${tdLabelStyle}">Quantity</td><td style="${tdStyle}">${booking.quantity || 1}</td></tr>
     </table>
   </div>
 
   ${supplier && supplier.id ? `
-  <div class="section">
-    <div class="section-title">Supplier / Hire Company</div>
-    <table>
-      <tr><td>Company</td><td>${supplier.name || "-"}</td></tr>
-      <tr><td>Contact</td><td>${supplier.keyContact || "-"}</td></tr>
-      <tr><td>Email</td><td>${supplier.email || "-"}</td></tr>
-      <tr><td>Phone</td><td>${supplier.phone || "-"}</td></tr>
-      ${supplier.addressLine1 ? `<tr><td>Address</td><td>${[supplier.addressLine1, supplier.addressLine2, supplier.city, supplier.state, supplier.postcode].filter(Boolean).join(", ")}</td></tr>` : ""}
-      ${booking.supplierReference ? `<tr><td>Supplier Reference</td><td>${booking.supplierReference}</td></tr>` : ""}
+  <div style="${sectionStyle}">
+    <div style="${sectionTitleStyle}">Supplier / Hire Company</div>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="${tdLabelStyle}">Company</td><td style="${tdStyle}">${supplier.name || "-"}</td></tr>
+      <tr><td style="${tdLabelStyle}">Contact</td><td style="${tdStyle}">${supplier.keyContact || "-"}</td></tr>
+      <tr><td style="${tdLabelStyle}">Email</td><td style="${tdStyle}">${supplier.email || "-"}</td></tr>
+      <tr><td style="${tdLabelStyle}">Phone</td><td style="${tdStyle}">${supplier.phone || "-"}</td></tr>
+      ${supplier.addressLine1 ? `<tr><td style="${tdLabelStyle}">Address</td><td style="${tdStyle}">${[supplier.addressLine1, supplier.addressLine2, supplier.city, supplier.state, supplier.postcode].filter(Boolean).join(", ")}</td></tr>` : ""}
+      ${booking.supplierReference ? `<tr><td style="${tdLabelStyle}">Supplier Reference</td><td style="${tdStyle}">${booking.supplierReference}</td></tr>` : ""}
     </table>
   </div>
   ` : ""}
 
-  <div class="section">
-    <div class="section-title">Job Details</div>
-    <table>
-      <tr><td>Job</td><td>${job ? `${job.jobNumber} - ${job.name}` : "-"}</td></tr>
-      <tr><td>Requested By</td><td>${requestedBy ? `${requestedBy.firstName} ${requestedBy.lastName}` : "-"}</td></tr>
-      ${booking.costCode ? `<tr><td>Cost Code</td><td>${booking.costCode}</td></tr>` : ""}
+  <div style="${sectionStyle}">
+    <div style="${sectionTitleStyle}">Job Details</div>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="${tdLabelStyle}">Job</td><td style="${tdStyle}">${job ? `${job.jobNumber} - ${job.name}` : "-"}</td></tr>
+      <tr><td style="${tdLabelStyle}">Requested By</td><td style="${tdStyle}">${requestedBy ? `${requestedBy.firstName} ${requestedBy.lastName}` : "-"}</td></tr>
+      ${booking.costCode ? `<tr><td style="${tdLabelStyle}">Cost Code</td><td style="${tdStyle}">${booking.costCode}</td></tr>` : ""}
     </table>
   </div>
 
-  <div class="section">
-    <div class="section-title">Hire Period & Rates</div>
-    <table>
-      <tr><td>Start Date</td><td>${fmtDate(booking.hireStartDate as string | null)}</td></tr>
-      <tr><td>End Date</td><td>${fmtDate(booking.hireEndDate as string | null)}</td></tr>
-      ${booking.expectedReturnDate ? `<tr><td>Expected Return</td><td>${fmtDate(booking.expectedReturnDate as string | null)}</td></tr>` : ""}
-      <tr><td>Rate</td><td>${fmtCurrency(booking.rateAmount as string | number | null)} ${rateLabels[String(booking.rateType)] || booking.rateType}</td></tr>
-      <tr><td>Charge Rule</td><td>${chargeLabels[String(booking.chargeRule)] || booking.chargeRule}</td></tr>
+  <div style="${sectionStyle}">
+    <div style="${sectionTitleStyle}">Hire Period & Rates</div>
+    <table style="width: 100%; border-collapse: collapse;">
+      <tr><td style="${tdLabelStyle}">Start Date</td><td style="${tdStyle}">${fmtDate(booking.hireStartDate as string | null)}</td></tr>
+      <tr><td style="${tdLabelStyle}">End Date</td><td style="${tdStyle}">${fmtDate(booking.hireEndDate as string | null)}</td></tr>
+      ${booking.expectedReturnDate ? `<tr><td style="${tdLabelStyle}">Expected Return</td><td style="${tdStyle}">${fmtDate(booking.expectedReturnDate as string | null)}</td></tr>` : ""}
+      <tr><td style="${tdLabelStyle}">Rate</td><td style="${tdStyle}">${fmtCurrency(booking.rateAmount as string | number | null)} ${rateLabels[String(booking.rateType)] || booking.rateType}</td></tr>
+      <tr><td style="${tdLabelStyle}">Charge Rule</td><td style="${tdStyle}">${chargeLabels[String(booking.chargeRule)] || booking.chargeRule}</td></tr>
     </table>
   </div>
 
   ${booking.deliveryRequired || booking.pickupRequired ? `
-  <div class="section">
-    <div class="section-title">Logistics</div>
-    <table>
+  <div style="${sectionStyle}">
+    <div style="${sectionTitleStyle}">Logistics</div>
+    <table style="width: 100%; border-collapse: collapse;">
       ${booking.deliveryRequired ? `
-        <tr><td>Delivery Required</td><td>Yes</td></tr>
-        ${booking.deliveryAddress ? `<tr><td>Delivery Address</td><td>${booking.deliveryAddress}</td></tr>` : ""}
-        ${booking.deliveryCost ? `<tr><td>Delivery Cost</td><td>${fmtCurrency(booking.deliveryCost as string | number | null)}</td></tr>` : ""}
+        <tr><td style="${tdLabelStyle}">Delivery Required</td><td style="${tdStyle}">Yes</td></tr>
+        ${booking.deliveryAddress ? `<tr><td style="${tdLabelStyle}">Delivery Address</td><td style="${tdStyle}">${booking.deliveryAddress}</td></tr>` : ""}
+        ${booking.deliveryCost ? `<tr><td style="${tdLabelStyle}">Delivery Cost</td><td style="${tdStyle}">${fmtCurrency(booking.deliveryCost as string | number | null)}</td></tr>` : ""}
       ` : ""}
       ${booking.pickupRequired ? `
-        <tr><td>Pickup Required</td><td>Yes</td></tr>
-        ${booking.pickupCost ? `<tr><td>Pickup Cost</td><td>${fmtCurrency(booking.pickupCost as string | number | null)}</td></tr>` : ""}
+        <tr><td style="${tdLabelStyle}">Pickup Required</td><td style="${tdStyle}">Yes</td></tr>
+        ${booking.pickupCost ? `<tr><td style="${tdLabelStyle}">Pickup Cost</td><td style="${tdStyle}">${fmtCurrency(booking.pickupCost as string | number | null)}</td></tr>` : ""}
       ` : ""}
     </table>
   </div>
   ` : ""}
 
   ${booking.notes ? `
-  <div class="section">
-    <div class="section-title">Notes</div>
+  <div style="${sectionStyle}">
+    <div style="${sectionTitleStyle}">Notes</div>
     <p style="font-size: 13px; white-space: pre-wrap;">${booking.notes}</p>
   </div>
-  ` : ""}
-
-  <div class="footer">
-    Generated by ${companyName} on ${format(new Date(), "dd/MM/yyyy 'at' HH:mm")}
-  </div>
-</body>
-</html>`;
+  ` : ""}`;
 }
 
 router.post("/api/hire-bookings/:id/send-email", requireAuth, async (req: Request, res: Response) => {
@@ -704,13 +677,17 @@ router.post("/api/hire-bookings/:id/send-email", requireAuth, async (req: Reques
     const companyName = company?.name || "BuildPlus Ai";
 
     const subject = emailSubject || `Equipment Hire Booking ${row.booking.bookingNumber}`;
-    const htmlContent = buildHireBookingHtml(row.booking, row.supplier, row.job, row.requestedBy, companyName);
+    const hireDetailsHtml = buildHireBookingDetailsHtml(row.booking, row.supplier, row.job, row.requestedBy);
 
-    const introMessage = emailMessage
-      ? `<div style="font-family: Arial, sans-serif; padding: 16px; font-size: 14px; color: #333; border-bottom: 1px solid #ddd; margin-bottom: 16px;">${emailMessage.replace(/\n/g, "<br>")}</div>`
+    const introHtml = emailMessage
+      ? `<div style="margin-bottom: 16px;">${emailMessage.replace(/\n/g, "<br>")}</div>`
       : "";
 
-    const fullHtml = introMessage + htmlContent;
+    const fullHtml = await buildBrandedEmail({
+      title: `Equipment Hire Booking - ${row.booking.bookingNumber}`,
+      body: `${introHtml}${hireDetailsHtml}`,
+      companyId,
+    });
 
     const emailResult = await emailService.sendEmailWithAttachment({
       to: emailTo,

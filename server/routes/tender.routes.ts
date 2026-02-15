@@ -9,6 +9,7 @@ import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import { emailService } from "../services/email.service";
+import { buildBrandedEmail } from "../lib/email-template";
 
 const router = Router();
 
@@ -1458,16 +1459,15 @@ router.post("/api/tenders/:id/send-invitations", requireAuth, requirePermission(
             </div>`;
         }
 
-        const htmlBody = `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="margin-bottom: 24px;">
+        const htmlBody = await buildBrandedEmail({
+          title: "Tender Invitation",
+          recipientName: row.supplier?.name || undefined,
+          body: `<div style="margin-bottom: 24px;">
               ${data.message.replace(/\n/g, "<br>")}
             </div>
-            ${bundleSection}
-            <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999;">
-              <p>This is an automated tender invitation email. Please do not reply directly to this email.</p>
-            </div>
-          </div>`;
+            ${bundleSection}`,
+          companyId,
+        });
 
         await emailService.sendEmailWithAttachment({ to: email, subject: data.subject, body: htmlBody });
 
@@ -1541,16 +1541,14 @@ router.post("/api/tenders/:id/notify-doc-updates", requireAuth, requirePermissio
       if (!email) { failed++; results.push({ supplierName: row.supplier?.name || null, status: "failed", error: "No email" }); continue; }
 
       try {
-        const htmlBody = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #1a56db;">Document Update Notice</h2>
-          <p>Dear ${row.supplier?.name || "Supplier"},</p>
-          <p>Please be advised that the following documents have been updated for tender <strong>${tender.tenderNumber} - ${tender.title}</strong>:</p>
+        const htmlBody = await buildBrandedEmail({
+          title: "Document Update Notice",
+          recipientName: row.supplier?.name || "Supplier",
+          body: `<p>Please be advised that the following documents have been updated for tender <strong>${tender.tenderNumber} - ${tender.title}</strong>:</p>
           <ul>${docListHtml}</ul>
-          <p>Please ensure you are referencing the latest versions when preparing your submission.</p>
-          <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999;">
-            <p>This is an automated notification. Please do not reply directly to this email.</p>
-          </div>
-        </div>`;
+          <p>Please ensure you are referencing the latest versions when preparing your submission.</p>`,
+          companyId,
+        });
 
         await emailService.sendEmailWithAttachment({ to: email, subject: `Document Update - Tender ${tender.tenderNumber}: ${tender.title}`, body: htmlBody });
         sent++;

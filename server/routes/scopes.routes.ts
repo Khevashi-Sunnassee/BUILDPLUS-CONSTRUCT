@@ -8,6 +8,7 @@ import { scopeTrades, scopes, scopeItems, tenderScopes, jobTypes, tenders, users
 import { eq, and, desc, asc, sql, ilike, or, inArray, count } from "drizzle-orm";
 import OpenAI from "openai";
 import { emailService } from "../services/email.service";
+import { buildBrandedEmail } from "../lib/email-template";
 
 const router = Router();
 const openai = new OpenAI();
@@ -1071,7 +1072,7 @@ router.post("/api/scopes/email", requireAuth, requirePermission("scopes", "VIEW"
       return res.status(404).json({ message: "No scopes found" });
     }
 
-    let htmlContent = `<h2>Scope of Works</h2>`;
+    let scopeBodyHtml = "";
 
     for (const row of scopeResults) {
       const items = await db
@@ -1080,7 +1081,7 @@ router.post("/api/scopes/email", requireAuth, requirePermission("scopes", "VIEW"
         .where(and(eq(scopeItems.scopeId, row.scope.id), eq(scopeItems.companyId, companyId)))
         .orderBy(asc(scopeItems.sortOrder));
 
-      htmlContent += `
+      scopeBodyHtml += `
         <h3>${row.scope.name} - ${row.tradeName || "Unknown Trade"}</h3>
         <p>${row.scope.description || ""}</p>
         <p><strong>Status:</strong> ${row.scope.status}</p>
@@ -1106,6 +1107,12 @@ router.post("/api/scopes/email", requireAuth, requirePermission("scopes", "VIEW"
         </table>
       `;
     }
+
+    const htmlContent = await buildBrandedEmail({
+      title: "Scope of Works",
+      body: scopeBodyHtml,
+      companyId,
+    });
 
     await emailService.sendEmail(
       recipientEmail,

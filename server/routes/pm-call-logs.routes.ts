@@ -15,6 +15,7 @@ import {
 import { eq, and, desc, gte, asc, sql } from "drizzle-orm";
 import { PM_CALL_LOGS_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 import { emailService } from "../services/email.service";
+import { buildBrandedEmail } from "../lib/email-template";
 import { twilioService } from "../services/twilio.service";
 
 function escapeHtml(str: string): string {
@@ -385,27 +386,21 @@ router.post(PM_CALL_LOGS_ROUTES.LIST, requireAuth, async (req: Request, res: Res
           logisticsSection += `</ul>`;
         }
 
-        const htmlBody = `
-          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-            <div style="background:#1e40af;color:white;padding:16px 24px;border-radius:8px 8px 0 0;">
-              <h2 style="margin:0;">PM Call Log — ${jobName}</h2>
-            </div>
-            <div style="padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
-              <p><strong>Call Date:</strong> ${new Date(logData.callDateTime).toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" })}</p>
+        const companyId = String(req.session.companyId);
+        const htmlBody = await buildBrandedEmail({
+          title: `PM Call Log — ${jobName}`,
+          body: `<p><strong>Call Date:</strong> ${new Date(logData.callDateTime).toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" })}</p>
               <p><strong>Contact:</strong> ${escapeHtml(logData.contactName)}${logData.contactPhone ? ` (${escapeHtml(logData.contactPhone)})` : ""}</p>
               <p><strong>Logged By:</strong> ${callerName}</p>
               <p><strong>Notification Sent To:</strong> ${notifyTypes.join(", ")}</p>
-
               ${lateSection}
               ${issuesSection}
               ${logisticsSection}
-
               ${logData.notes ? `<h3 style="margin-top:20px;">Notes</h3><p>${escapeHtml(logData.notes)}</p>` : ""}
-
               ${logData.updateProductionSchedule ? `<p style="margin-top:16px;padding:8px 12px;background:#fef3c7;border-radius:4px;"><strong>Production schedule has been updated</strong> based on reported delays.</p>` : ""}
-              ${logData.updateDraftingSchedule ? `<p style="padding:8px 12px;background:#fef3c7;border-radius:4px;"><strong>Drafting schedule has been updated</strong> based on reported delays.</p>` : ""}
-            </div>
-          </div>`;
+              ${logData.updateDraftingSchedule ? `<p style="padding:8px 12px;background:#fef3c7;border-radius:4px;"><strong>Drafting schedule has been updated</strong> based on reported delays.</p>` : ""}`,
+          companyId,
+        });
 
         const subject = `PM Call Log: ${jobName} — ${new Date(logData.callDateTime).toLocaleDateString("en-AU")}${lateLevels.length > 0 ? ` [${lateLevels.length} LATE]` : ""}`;
 

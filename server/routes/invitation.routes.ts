@@ -3,6 +3,7 @@ import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { emailService } from "../services/email.service";
+import { buildBrandedEmail } from "../lib/email-template";
 import { permissionMethods } from "../storage/permissions";
 import logger from "../lib/logger";
 
@@ -55,15 +56,10 @@ router.post("/api/admin/invitations", requireRole("ADMIN"), async (req, res) => 
 
     if (emailService.isConfigured()) {
       try {
-        const htmlBody = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #1a1a1a; margin-bottom: 16px;">You've been invited to BuildPlus Ai</h2>
-            <p style="color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-              ${inviterName} has invited you to join <strong>${company.name}</strong> on the BuildPlus Ai Management System.
-            </p>
-            <p style="color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-              Click the button below to set up your account. This link will expire in 7 days.
-            </p>
+        const htmlBody = await buildBrandedEmail({
+          title: "You've Been Invited",
+          body: `<p>${inviterName} has invited you to join <strong>${company.name}</strong> on the BuildPlus Ai Management System.</p>
+            <p>Click the button below to set up your account. This link will expire in 7 days.</p>
             <div style="text-align: center; margin: 32px 0;">
               <a href="${registrationLink}" 
                  style="display: inline-block; background-color: #2563eb; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600;">
@@ -73,14 +69,10 @@ router.post("/api/admin/invitations", requireRole("ADMIN"), async (req, res) => 
             <p style="color: #888; font-size: 13px; line-height: 1.5;">
               If the button doesn't work, copy and paste this link into your browser:<br/>
               <a href="${registrationLink}" style="color: #2563eb;">${registrationLink}</a>
-            </p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
-            <p style="color: #888; font-size: 12px;">
-              You're receiving this email because ${inviterName} invited you to join ${company.name}. 
-              If you weren't expecting this invitation, you can safely ignore this email.
-            </p>
-          </div>
-        `;
+            </p>`,
+          footerNote: `You're receiving this email because ${inviterName} invited you to join ${company.name}. If you weren't expecting this invitation, you can safely ignore this email.`,
+          companyId,
+        });
 
         await emailService.sendEmailWithAttachment({
           to: email,

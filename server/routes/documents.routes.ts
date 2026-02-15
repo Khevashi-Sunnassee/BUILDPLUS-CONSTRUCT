@@ -1070,6 +1070,7 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
       body: message.replace(/\n/g, "<br>"),
       attachmentSummary,
       footerNote: "Please download the attached documents. If you have any questions, reply directly to this email.",
+      companyId,
     });
 
     let finalAttachments = attachments;
@@ -1531,16 +1532,14 @@ router.post("/api/document-bundles/:bundleId/notify-updates", requireAuth, async
       `<li><strong>${d.documentTitle}</strong>${d.documentNumber ? ` (${d.documentNumber})` : ""}${d.oldVersion && d.newVersion ? ` — updated from v${d.oldVersion} to v${d.newVersion}` : ""}</li>`
     ).join("");
 
-    const htmlBody = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #1a56db;">Document Bundle Update Notice</h2>
-      <p>Dear ${data.recipientName || "Recipient"},</p>
-      <p>Please be advised that the following documents in bundle <strong>${bundle.bundleName}</strong> have been updated:</p>
+    const htmlBody = await buildBrandedEmail({
+      title: `Document Bundle Update Notice`,
+      recipientName: data.recipientName || "Recipient",
+      body: `<p>Please be advised that the following documents in bundle <strong>${bundle.bundleName}</strong> have been updated:</p>
       <ul>${docListHtml}</ul>
-      <p>Please ensure you are referencing the latest versions of these documents.</p>
-      <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999;">
-        <p>This is an automated notification from BuildPlus AI. Please do not reply directly to this email.</p>
-      </div>
-    </div>`;
+      <p>Please ensure you are referencing the latest versions of these documents.</p>`,
+      companyId,
+    });
 
     const result = await emailService.sendEmailWithAttachment({
       to: data.recipientEmail,

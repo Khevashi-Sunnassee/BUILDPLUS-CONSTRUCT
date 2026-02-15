@@ -3,6 +3,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { users, broadcastMessages, broadcastDeliveries, customers, suppliers, employees } from "@shared/schema";
 import { twilioService } from "./twilio.service";
 import { emailService } from "./email.service";
+import { buildBrandedEmail } from "../lib/email-template";
 import logger from "../lib/logger";
 
 interface Recipient {
@@ -76,10 +77,16 @@ class BroadcastService {
             } else if (!recipient.email) {
               result = { success: false, error: "No email address for recipient" };
             } else {
+              const emailHtml = await buildBrandedEmail({
+                title: message.subject || "Broadcast Message",
+                recipientName: recipient.name || undefined,
+                body: message.message,
+                companyId: message.companyId,
+              });
               result = await emailService.sendEmail(
                 recipient.email,
                 message.subject || "Broadcast Message",
-                message.message
+                emailHtml
               );
             }
             break;
@@ -314,10 +321,16 @@ class BroadcastService {
         } else if (!currentEmail) {
           result = { success: false, error: "No email address for recipient" };
         } else {
+          const resendEmailHtml = await buildBrandedEmail({
+            title: message.subject || "Broadcast Message",
+            recipientName: currentName || undefined,
+            body: message.message,
+            companyId: message.companyId,
+          });
           result = await emailService.sendEmail(
             currentEmail,
             message.subject || "Broadcast Message",
-            message.message
+            resendEmailHtml
           );
         }
         break;

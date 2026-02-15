@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database, RefreshCw, CheckCircle, FileText, Plus, Pencil, Users } from "lucide-react";
+import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database, RefreshCw, CheckCircle, FileText, Plus, Pencil, Users, Mail } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,6 +87,10 @@ export default function AdminSettingsPage() {
   const [deptActive, setDeptActive] = useState(true);
   const [showDeleteDeptDialog, setShowDeleteDeptDialog] = useState(false);
   const [deletingDept, setDeletingDept] = useState<Department | null>(null);
+
+  const [emailTemplatePreviewHtml, setEmailTemplatePreviewHtml] = useState<string | null>(null);
+  const [showEditTemplateDialog, setShowEditTemplateDialog] = useState(false);
+  const [editTemplateValue, setEditTemplateValue] = useState("");
 
   const deletionCategories = useMemo(() => [
     { key: "activity_templates", label: "Activity Templates", description: "Workflow activity templates and subtasks" },
@@ -465,6 +469,51 @@ export default function AdminSettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to delete data", variant: "destructive" });
+    },
+  });
+
+  const { data: emailTemplateData, isLoading: emailTemplateLoading } = useQuery<{ emailTemplateHtml: string | null; defaultTemplate: string }>({
+    queryKey: ["/api/settings/email-template"],
+  });
+
+  const emailTemplatePreviewMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/settings/email-template/preview");
+      return response.json();
+    },
+    onSuccess: (data: { html: string }) => {
+      setEmailTemplatePreviewHtml(data.html);
+    },
+    onError: () => {
+      toast({ title: "Failed to generate preview", variant: "destructive" });
+    },
+  });
+
+  const saveEmailTemplateMutation = useMutation({
+    mutationFn: async (emailTemplateHtml: string | null) => {
+      return apiRequest("PUT", "/api/settings/email-template", { emailTemplateHtml });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/email-template"] });
+      setShowEditTemplateDialog(false);
+      toast({ title: "Email template saved successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save email template", variant: "destructive" });
+    },
+  });
+
+  const resetEmailTemplateMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("PUT", "/api/settings/email-template", { emailTemplateHtml: null });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/email-template"] });
+      setEmailTemplatePreviewHtml(null);
+      toast({ title: "Email template reset to default" });
+    },
+    onError: () => {
+      toast({ title: "Failed to reset email template", variant: "destructive" });
     },
   });
 
@@ -1594,6 +1643,123 @@ export default function AdminSettingsPage() {
           </div>
         </form>
       </Form>
+
+      {/* Email Notification Template Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Email Notification Template
+          </CardTitle>
+          <CardDescription>
+            Configure the email template used for all system notifications. Available placeholders: {"{{TITLE}}"}, {"{{SUBTITLE}}"}, {"{{LOGO}}"}, {"{{GREETING}}"}, {"{{BODY}}"}, {"{{ATTACHMENT_SUMMARY}}"}, {"{{COMPANY_NAME}}"}, {"{{FOOTER_NOTE}}"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {emailTemplateLoading ? (
+            <Skeleton className="h-20 w-full" />
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => emailTemplatePreviewMutation.mutate()}
+                  disabled={emailTemplatePreviewMutation.isPending}
+                  data-testid="button-preview-email-template"
+                >
+                  {emailTemplatePreviewMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileText className="h-4 w-4 mr-2" />
+                  )}
+                  Preview
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditTemplateValue(emailTemplateData?.emailTemplateHtml || emailTemplateData?.defaultTemplate || "");
+                    setShowEditTemplateDialog(true);
+                  }}
+                  data-testid="button-edit-email-template"
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit Template
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => resetEmailTemplateMutation.mutate()}
+                  disabled={resetEmailTemplateMutation.isPending}
+                  data-testid="button-reset-email-template"
+                >
+                  {resetEmailTemplateMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
+                  Reset to Default
+                </Button>
+              </div>
+
+              {emailTemplateData?.emailTemplateHtml && (
+                <Badge variant="secondary" data-testid="badge-custom-template">Custom template active</Badge>
+              )}
+
+              {emailTemplatePreviewHtml && (
+                <div className="space-y-2">
+                  <Label>Preview</Label>
+                  <iframe
+                    srcDoc={emailTemplatePreviewHtml}
+                    className="w-full border rounded-md"
+                    style={{ height: "500px" }}
+                    title="Email Template Preview"
+                    data-testid="iframe-email-template-preview"
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={showEditTemplateDialog} onOpenChange={setShowEditTemplateDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Edit Email Template</DialogTitle>
+            <DialogDescription>
+              Edit the raw HTML for the email notification template. Use the available placeholders to insert dynamic content.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 min-h-0">
+            <Textarea
+              value={editTemplateValue}
+              onChange={(e) => setEditTemplateValue(e.target.value)}
+              className="font-mono text-sm min-h-[400px]"
+              data-testid="textarea-email-template"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditTemplateDialog(false)}
+              data-testid="button-cancel-email-template"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => saveEmailTemplateMutation.mutate(editTemplateValue)}
+              disabled={saveEmailTemplateMutation.isPending}
+              data-testid="button-save-email-template"
+            >
+              {saveEmailTemplateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Data Management Section */}
       <Card className="border-destructive/50">

@@ -3,6 +3,7 @@ import { z } from "zod";
 import sanitizeHtml from "sanitize-html";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import { getDefaultTemplate, clearBrandingCache } from "../lib/email-template";
 
 const router = Router();
 
@@ -176,6 +177,57 @@ router.put("/api/settings/po-terms", requireRole("ADMIN"), async (req, res) => {
     res.json({ success: true, poTermsHtml: settings.poTermsHtml });
   } catch (error: unknown) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Failed to save PO terms" });
+  }
+});
+
+router.get("/api/settings/email-template", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId as string;
+    const settings = await storage.getGlobalSettings(companyId);
+    res.json({
+      emailTemplateHtml: (settings as any)?.emailTemplateHtml || null,
+      defaultTemplate: getDefaultTemplate(),
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to load email template" });
+  }
+});
+
+router.put("/api/settings/email-template", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId as string;
+    const schema = z.object({
+      emailTemplateHtml: z.string().nullable(),
+    });
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { emailTemplateHtml } = result.data;
+    const settings = await storage.updateGlobalSettings({ emailTemplateHtml }, companyId);
+    clearBrandingCache(companyId);
+    res.json({ success: true, emailTemplateHtml: (settings as any).emailTemplateHtml });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to save email template" });
+  }
+});
+
+router.post("/api/settings/email-template/preview", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const { buildBrandedEmail } = await import("../lib/email-template");
+    const companyId = req.companyId as string;
+    const preview = await buildBrandedEmail({
+      title: "Sample Notification Title",
+      subtitle: "Subtitle Example",
+      recipientName: "John Smith",
+      body: `<p>This is a preview of how your email notifications will look. All system notifications will use this consistent template format.</p>
+      <p>The template includes your company branding, a greeting, and a standard footer disclaimer.</p>`,
+      footerNote: "This is a sample footer note.",
+      companyId,
+    });
+    res.json({ html: preview });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate preview" });
   }
 });
 

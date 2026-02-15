@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import { emailService } from "../services/email.service";
+import { buildBrandedEmail } from "../lib/email-template";
 import { logPanelChange, advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../services/panel-audit.service";
 import { PANEL_LIFECYCLE_STATUS, insertTrailerTypeSchema, insertZoneSchema, insertLoadListSchema, insertDeliveryRecordSchema } from "@shared/schema";
 import type { JobPhase } from "@shared/job-phases";
@@ -354,10 +355,17 @@ router.post("/api/test-gmail", requireAuth, async (req, res) => {
   try {
     const { to } = req.body;
     if (!to) return res.status(400).json({ error: "Recipient email required" });
+    const companyId = req.session?.companyId || req.companyId;
+    const htmlBody = await buildBrandedEmail({
+      title: "Test Email",
+      body: `<p>This is a test email sent from the BuildPlus Ai system.</p>
+      <p><strong>Sent at:</strong> ${new Date().toLocaleString("en-AU", { timeZone: "Australia/Brisbane" })}</p>`,
+      companyId,
+    });
     const result = await emailService.sendEmail(
       to,
-      "Test Email from BuildPlus Ai System (via Gmail)",
-      `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;"><h2 style="color: #1a56db;">BuildPlus Ai Management System</h2><p>This is a test email sent via <strong>Gmail</strong> from the BuildPlus Ai system.</p><p><strong>Sent at:</strong> ${new Date().toLocaleString("en-AU", { timeZone: "Australia/Brisbane" })}</p><p style="color: #666; font-size: 12px; margin-top: 20px;">This is an automated test message.</p></div>`
+      "Test Email from BuildPlus Ai System",
+      htmlBody
     );
     res.json(result);
   } catch (error: unknown) {
