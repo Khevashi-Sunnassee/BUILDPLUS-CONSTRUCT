@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -239,7 +239,7 @@ export default function DraftingProgramPage() {
     return "";
   };
 
-  const filteredPrograms = programs.filter(entry => {
+  const filteredPrograms = useMemo(() => programs.filter(entry => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -248,7 +248,7 @@ export default function DraftingProgramPage() {
       entry.job.name?.toLowerCase().includes(query) ||
       entry.level?.toLowerCase().includes(query)
     );
-  });
+  }), [programs, searchQuery]);
 
   const toggleGroup = (groupKey: string) => {
     setExpandedGroups(prev => {
@@ -262,7 +262,7 @@ export default function DraftingProgramPage() {
     });
   };
 
-  const groupedPrograms = (() => {
+  const groupedPrograms = useMemo(() => {
     if (groupBy === "none") return null;
     
     const groups: Record<string, { label: string; entries: DraftingProgramWithDetails[] }> = {};
@@ -300,7 +300,7 @@ export default function DraftingProgramPage() {
     }
     
     return groups;
-  })();
+  }, [groupBy, filteredPrograms, weekStartDay]);
 
   useEffect(() => {
     if (groupedPrograms) {
@@ -308,11 +308,11 @@ export default function DraftingProgramPage() {
     }
   }, [groupBy, filteredPrograms.length]);
 
-  const uniqueAssignees = Array.from(new Map(
+  const uniqueAssignees = useMemo(() => Array.from(new Map(
     programs
       .filter(p => p.assignedTo)
       .map(p => [p.assignedToId, p.assignedTo] as const)
-  ).values());
+  ).values()), [programs]);
 
   return (
     <div className="space-y-6" role="main" aria-label="Drafting Program">

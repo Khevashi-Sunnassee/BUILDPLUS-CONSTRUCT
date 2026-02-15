@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -388,7 +388,7 @@ export default function AdminCostCodesPage() {
     }
   }
 
-  const filteredCodes = (costCodesWithChildren || []).filter((cc) => {
+  const filteredCodes = useMemo(() => (costCodesWithChildren || []).filter((cc) => {
     if (!searchTerm.trim()) return true;
     const s = searchTerm.toLowerCase();
     const parentMatch = cc.code.toLowerCase().includes(s) || cc.name.toLowerCase().includes(s);
@@ -396,16 +396,16 @@ export default function AdminCostCodesPage() {
       (child) => child.code.toLowerCase().includes(s) || child.name.toLowerCase().includes(s)
     );
     return parentMatch || childMatch;
-  });
+  }), [costCodesWithChildren, searchTerm]);
 
-  const activeCostCodes = (costCodesFlat || []).filter((cc) => cc.isActive);
+  const activeCostCodes = useMemo(() => (costCodesFlat || []).filter((cc) => cc.isActive), [costCodesFlat]);
 
-  const defaultCostCodeIds = new Set((defaultsData || []).map((d: any) => d.costCodeId));
+  const defaultCostCodeIds = useMemo(() => new Set((defaultsData || []).map((d: any) => d.costCodeId)), [defaultsData]);
   const effectiveSelection = selectedCostCodeIds.size > 0 ? selectedCostCodeIds : defaultCostCodeIds;
   const hasChanges = selectedJobTypeId && selectedCostCodeIds.size > 0;
 
   const totalParents = costCodesWithChildren?.length || 0;
-  const totalChildren = costCodesWithChildren?.reduce((sum, cc) => sum + cc.children.length, 0) || 0;
+  const totalChildren = useMemo(() => costCodesWithChildren?.reduce((sum, cc) => sum + cc.children.length, 0) || 0, [costCodesWithChildren]);
 
   return (
     <div className="p-4 space-y-4 max-w-6xl mx-auto" role="main" aria-label="Cost Codes Management" data-testid="admin-cost-codes-page">

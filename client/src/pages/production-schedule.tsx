@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PRODUCTION_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
@@ -174,7 +174,7 @@ export default function ProductionSchedulePage() {
     });
   };
 
-  const filteredPanels = readyPanels.filter(panel => {
+  const filteredPanels = useMemo(() => readyPanels.filter(panel => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -183,9 +183,9 @@ export default function ProductionSchedulePage() {
       panel.jobName?.toLowerCase().includes(query) ||
       panel.level?.toLowerCase().includes(query)
     );
-  });
+  }), [readyPanels, searchQuery]);
 
-  const groupedPanels = (() => {
+  const groupedPanels = useMemo(() => {
     if (groupBy === "none") return null;
     
     const groups: Record<string, { label: string; entries: ReadyPanel[] }> = {};
@@ -221,7 +221,7 @@ export default function ProductionSchedulePage() {
     }
     
     return groups;
-  })();
+  }, [groupBy, filteredPanels]);
 
   useEffect(() => {
     if (groupedPanels) {

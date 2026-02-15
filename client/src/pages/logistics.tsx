@@ -625,9 +625,9 @@ export default function LogisticsPage() {
 
   const watchedJobId = loadListForm.watch("jobId");
 
-  const filteredPanels = approvedPanels?.filter(p => 
+  const filteredPanels = useMemo(() => approvedPanels?.filter(p => 
     !watchedJobId || watchedJobId === "" || p.jobId === watchedJobId
-  ) || [];
+  ) || [], [approvedPanels, watchedJobId]);
 
   const exportToPDF = async () => {
     if (!reportRef.current) return;
@@ -756,14 +756,14 @@ export default function LogisticsPage() {
     );
   }
 
-  const filteredLoadLists = loadLists?.filter(ll => {
+  const filteredLoadLists = useMemo(() => loadLists?.filter(ll => {
     if (factoryFilter !== "all" && ll.factory !== factoryFilter) {
       return false;
     }
     return true;
-  }) || [];
-  const pendingLoadLists = filteredLoadLists.filter(ll => ll.status === "PENDING");
-  const completedLoadLists = filteredLoadLists.filter(ll => ll.status === "COMPLETE");
+  }) || [], [loadLists, factoryFilter]);
+  const pendingLoadLists = useMemo(() => filteredLoadLists.filter(ll => ll.status === "PENDING"), [filteredLoadLists]);
+  const completedLoadLists = useMemo(() => filteredLoadLists.filter(ll => ll.status === "COMPLETE"), [filteredLoadLists]);
 
   return (
     <div className="space-y-6" role="main" aria-label="Logistics">

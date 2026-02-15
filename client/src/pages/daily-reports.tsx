@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -285,12 +285,10 @@ export default function DailyReportsPage() {
     },
   });
 
-  const filteredLogs = logs?.filter((log) => {
-    // Filter by factory
+  const filteredLogs = useMemo(() => logs?.filter((log) => {
     if (factoryFilter !== "all" && log.factory !== factoryFilter) {
       return false;
     }
-    // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -300,7 +298,7 @@ export default function DailyReportsPage() {
       );
     }
     return true;
-  });
+  }), [logs, factoryFilter, searchQuery]);
 
   const formatMinutes = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -333,7 +331,7 @@ export default function DailyReportsPage() {
     });
   };
 
-  const groupedLogs = (() => {
+  const groupedLogs = useMemo(() => {
     if (groupBy === "none" || !filteredLogs) return null;
     
     const groups: Record<string, { label: string; logs: DailyLogSummary[] }> = {};
@@ -357,7 +355,7 @@ export default function DailyReportsPage() {
     }
     
     return groups;
-  })();
+  }, [groupBy, filteredLogs]);
 
   // Expand all groups by default when grouping changes
   useEffect(() => {
