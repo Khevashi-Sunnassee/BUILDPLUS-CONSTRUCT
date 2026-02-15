@@ -1957,10 +1957,11 @@ IMPORTANT SEARCH RADIUS RULES (Australian construction industry standards):
 - For large projects (high-rise, precast, long duration), trades will travel 60-90km or even temporarily relocate.
 - Prioritise suppliers closest to the job site first, then expand outward within the ${searchRadiusKm}km radius.
 
-Find 8-12 real Australian suppliers/subcontractors that would be relevant for these trade categories within ${searchRadiusKm}km of ${location}. For each supplier, provide realistic business details.
+Find as many real Australian suppliers/subcontractors as possible for these trade categories within ${searchRadiusKm}km of ${location}. For each supplier, provide realistic business details.
+Aim for 3-5 suppliers PER trade category, for a total of ${Math.min(Math.max(costCodeEntries.length * 4, 15), 50)} suppliers overall. More results are better - the user wants comprehensive coverage.
 
 CRITICAL: Each supplier MUST be assigned to exactly one of these trade categories: ${tradeCategoryList}
-You MUST provide at least 1-2 suppliers per trade category. The "tradeCategory" field MUST exactly match one of the values listed above.
+You MUST provide at least 3 suppliers per trade category where possible. The "tradeCategory" field MUST exactly match one of the values listed above.
 
 IMPORTANT: Return ONLY a valid JSON array. No markdown, no explanation. Each object must have these exact fields:
 [
@@ -1976,7 +1977,7 @@ IMPORTANT: Return ONLY a valid JSON array. No markdown, no explanation. Each obj
   }
 ]
 
-Return between 8 and 12 suppliers. Make sure they are realistic for the ${location} area (within ${searchRadiusKm}km) and relevant to the trade categories: ${costCodeNames}. Group and sort results by trade category, then by proximity (closest first) within each category.`;
+Return as many suppliers as you can find (aim for ${Math.min(Math.max(costCodeEntries.length * 4, 15), 50)} total, with 3-5 per trade category). Make sure they are realistic for the ${location} area (within ${searchRadiusKm}km) and relevant to the trade categories: ${costCodeNames}. Group and sort results by trade category, then by proximity (closest first) within each category.`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -1985,7 +1986,7 @@ Return between 8 and 12 suppliers. Make sure they are realistic for the ${locati
         { role: "user", content: prompt },
       ],
       temperature: 0.7,
-      max_tokens: 3000,
+      max_tokens: 8000,
     });
 
     const responseText = completion.choices[0]?.message?.content?.trim() || "[]";
