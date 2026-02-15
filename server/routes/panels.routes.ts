@@ -168,10 +168,11 @@ router.get("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res: 
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     
     const page = parseInt(req.query.page as string) || 1;
-    const pageSize = parseInt(req.query.pageSize as string) || 50;
+    const pageSize = parseInt(req.query.limit as string) || parseInt(req.query.pageSize as string) || 50;
     const jobId = req.query.jobId as string | undefined;
     const search = req.query.search as string | undefined;
     const status = req.query.status as string | undefined;
+    const factoryId = req.query.factoryId as string | undefined;
     
     const panels = await storage.getAllPanelRegisterItems(req.companyId);
     
@@ -187,7 +188,10 @@ router.get("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res: 
       );
     }
     if (status && status !== 'all') {
-      filtered = filtered.filter(p => p.approvedForProduction === (status === 'approved'));
+      filtered = filtered.filter(p => p.status === status);
+    }
+    if (factoryId) {
+      filtered = filtered.filter(p => p.job?.factoryId === factoryId || !p.job?.factoryId);
     }
     
     const start = (page - 1) * pageSize;
@@ -197,7 +201,7 @@ router.get("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res: 
       panels: paginated,
       total: filtered.length,
       page,
-      pageSize,
+      limit: pageSize,
       totalPages: Math.ceil(filtered.length / pageSize)
     });
   } catch (error: unknown) {

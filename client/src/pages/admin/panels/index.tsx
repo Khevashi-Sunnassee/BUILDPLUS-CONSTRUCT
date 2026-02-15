@@ -300,7 +300,7 @@ export default function AdminPanelsPage() {
     if (panel.consolidatedIntoPanelId) return false;
     if (filterJobId && panel.jobId !== filterJobId) return false;
     if (jobFilter !== "all" && panel.jobId !== jobFilter) return false;
-    if (factoryFilter !== "all" && panel.job.factoryId !== factoryFilter) return false;
+    if (factoryFilter !== "all" && panel.job?.factoryId && panel.job.factoryId !== factoryFilter) return false;
     if (statusFilter !== "all" && panel.status !== statusFilter) return false;
     if (panelTypeFilter !== "all" && panel.panelType !== panelTypeFilter) return false;
     if (levelFilter !== "all" && panel.level !== levelFilter) return false;
@@ -1834,7 +1834,7 @@ export default function AdminPanelsPage() {
           {viewMode === "list" && (
             <div className="flex items-center justify-between mt-4 px-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalPanels)} of {totalPanels} panels</span>
+                <span>Showing {filteredPanels && filteredPanels.length > 0 ? `${((currentPage - 1) * pageSize) + 1}-${Math.min(currentPage * pageSize, filteredPanels.length)}` : "0"} of {filteredPanels?.length || 0} panels{filteredPanels && panels && filteredPanels.length < panels.length ? ` (${panels.length} total)` : ""}</span>
                 <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(parseInt(v)); setCurrentPage(1); }}>
                   <SelectTrigger className="w-[80px] h-8" data-testid="select-page-size">
                     <SelectValue />
