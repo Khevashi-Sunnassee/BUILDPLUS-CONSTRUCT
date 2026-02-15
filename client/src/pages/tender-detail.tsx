@@ -73,7 +73,8 @@ interface FoundSupplier {
   specialty: string;
   location: string;
   estimatedDistanceKm?: number;
-  selected?: boolean;
+  tradeCategory?: string;
+  costCodeId?: string;
 }
 
 interface SubmissionWithDetails {
@@ -505,7 +506,7 @@ export default function TenderDetailPage() {
       const res = await apiRequest("POST", `/api/tenders/${tenderId}/find-suppliers`, { costCodeIds, searchRadiusKm });
       return res.json();
     },
-    onSuccess: (data: { suppliers: FoundSupplier[]; context: { costCodes: string; location: string; projectType: string; searchRadiusKm?: number; projectScale?: string; projectValue?: string } }) => {
+    onSuccess: (data: { suppliers: FoundSupplier[]; costCodeMapping?: Array<{ id: string; label: string }>; context: { costCodes: string; location: string; projectType: string; searchRadiusKm?: number; projectScale?: string; projectValue?: string } }) => {
       setFoundSuppliers(data.suppliers);
       setSelectedFoundSuppliers(new Set(data.suppliers.map((_, i) => i)));
       setSearchContext(data.context);
@@ -1371,61 +1372,85 @@ export default function TenderDetailPage() {
                   <p>No suppliers found. Try different trade categories.</p>
                 </div>
               ) : (
-                <div className="max-h-80 overflow-y-auto space-y-2">
-                  {foundSuppliers.map((supplier, index) => (
-                    <div
-                      key={index}
-                      className={`border rounded-md p-3 cursor-pointer transition-colors ${
-                        selectedFoundSuppliers.has(index) ? "border-primary bg-primary/5" : "hover-elevate"
-                      }`}
-                      onClick={() => toggleFoundSupplier(index)}
-                      data-testid={`card-found-supplier-${index}`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <Checkbox
-                          checked={selectedFoundSuppliers.has(index)}
-                          onCheckedChange={() => toggleFoundSupplier(index)}
-                          className="mt-0.5"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium" data-testid={`text-found-name-${index}`}>{supplier.companyName}</span>
-                            {supplier.location && (
-                              <Badge variant="outline" className="text-xs">
-                                <MapPin className="h-3 w-3 mr-0.5" />
-                                {supplier.location}
-                              </Badge>
-                            )}
-                            {supplier.estimatedDistanceKm != null && (
-                              <Badge variant="secondary" className="text-xs">
-                                ~{supplier.estimatedDistanceKm}km
-                              </Badge>
-                            )}
-                          </div>
-                          {supplier.specialty && (
-                            <p className="text-sm text-muted-foreground mt-0.5">{supplier.specialty}</p>
-                          )}
-                          <div className="flex items-center gap-4 mt-1 flex-wrap">
-                            {supplier.contactName && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Users className="h-3 w-3" /> {supplier.contactName}
-                              </span>
-                            )}
-                            {supplier.email && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Mail className="h-3 w-3" /> {supplier.email}
-                              </span>
-                            )}
-                            {supplier.phone && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Phone className="h-3 w-3" /> {supplier.phone}
-                              </span>
-                            )}
-                          </div>
+                <div className="max-h-96 overflow-y-auto space-y-4">
+                  {(() => {
+                    const grouped = new Map<string, { suppliers: FoundSupplier[]; indices: number[] }>();
+                    foundSuppliers.forEach((supplier, index) => {
+                      const category = supplier.tradeCategory || "Uncategorised";
+                      const existing = grouped.get(category) || { suppliers: [], indices: [] };
+                      existing.suppliers.push(supplier);
+                      existing.indices.push(index);
+                      grouped.set(category, existing);
+                    });
+                    return Array.from(grouped.entries()).map(([category, { suppliers: groupedSuppliers, indices }]) => (
+                      <div key={category} className="space-y-2">
+                        <div className="flex items-center gap-2 sticky top-0 bg-background z-10 py-1">
+                          <Layers className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium text-sm">{category}</span>
+                          <Badge variant="secondary" className="text-xs">{groupedSuppliers.length}</Badge>
+                        </div>
+                        <div className="space-y-2 pl-1">
+                          {groupedSuppliers.map((supplier, groupIdx) => {
+                            const globalIndex = indices[groupIdx];
+                            return (
+                              <div
+                                key={globalIndex}
+                                className={`border rounded-md p-3 cursor-pointer transition-colors ${
+                                  selectedFoundSuppliers.has(globalIndex) ? "border-primary bg-primary/5" : "hover-elevate"
+                                }`}
+                                onClick={() => toggleFoundSupplier(globalIndex)}
+                                data-testid={`card-found-supplier-${globalIndex}`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <Checkbox
+                                    checked={selectedFoundSuppliers.has(globalIndex)}
+                                    onCheckedChange={() => toggleFoundSupplier(globalIndex)}
+                                    className="mt-0.5"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-medium" data-testid={`text-found-name-${globalIndex}`}>{supplier.companyName}</span>
+                                      {supplier.location && (
+                                        <Badge variant="outline" className="text-xs">
+                                          <MapPin className="h-3 w-3 mr-0.5" />
+                                          {supplier.location}
+                                        </Badge>
+                                      )}
+                                      {supplier.estimatedDistanceKm != null && (
+                                        <Badge variant="secondary" className="text-xs">
+                                          ~{supplier.estimatedDistanceKm}km
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {supplier.specialty && (
+                                      <p className="text-sm text-muted-foreground mt-0.5">{supplier.specialty}</p>
+                                    )}
+                                    <div className="flex items-center gap-4 mt-1 flex-wrap">
+                                      {supplier.contactName && (
+                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                          <Users className="h-3 w-3" /> {supplier.contactName}
+                                        </span>
+                                      )}
+                                      {supplier.email && (
+                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                          <Mail className="h-3 w-3" /> {supplier.email}
+                                        </span>
+                                      )}
+                                      {supplier.phone && (
+                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                          <Phone className="h-3 w-3" /> {supplier.phone}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
               )}
 

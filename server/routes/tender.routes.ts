@@ -1802,7 +1802,14 @@ router.post("/api/tenders/:id/find-suppliers", requireAuth, requirePermission("t
       .from(costCodes)
       .where(and(inArray(costCodes.id, data.costCodeIds), eq(costCodes.companyId, companyId)));
 
-    const costCodeNames = selectedCodes.map(c => `${c.code} - ${c.name}`).join(", ");
+    const costCodeEntries = selectedCodes.map(c => ({ id: c.id, code: c.code, name: c.name, label: `${c.code} - ${c.name}` }));
+    const costCodeNames = costCodeEntries.map(c => c.label).join(", ");
+    const costCodeLookup = new Map(costCodeEntries.map(c => [c.label.toLowerCase(), c.id]));
+    costCodeEntries.forEach(c => {
+      costCodeLookup.set(c.name.toLowerCase(), c.id);
+      costCodeLookup.set(c.code.toLowerCase(), c.id);
+    });
+
     const location = [job?.address, job?.city, job?.state].filter(Boolean).join(", ") || "Australia";
     const projectValue = job?.estimatedValue ? `$${parseFloat(job.estimatedValue).toLocaleString()}` : "Not specified";
     const estimatedValueNum = job?.estimatedValue ? parseFloat(job.estimatedValue) : 0;
@@ -1810,6 +1817,8 @@ router.post("/api/tenders/:id/find-suppliers", requireAuth, requirePermission("t
     const calculated = calculateSearchRadius(jobTypeName, estimatedValueNum);
     const searchRadiusKm = data.searchRadiusKm || calculated.searchRadiusKm;
     const projectScale = calculated.projectScale;
+
+    const tradeCategoryList = costCodeEntries.map(c => `"${c.label}"`).join(", ");
 
     const openai = new OpenAI();
 
@@ -1834,6 +1843,9 @@ IMPORTANT SEARCH RADIUS RULES (Australian construction industry standards):
 
 Find 8-12 real Australian suppliers/subcontractors that would be relevant for these trade categories within ${searchRadiusKm}km of ${location}. For each supplier, provide realistic business details.
 
+CRITICAL: Each supplier MUST be assigned to exactly one of these trade categories: ${tradeCategoryList}
+You MUST provide at least 1-2 suppliers per trade category. The "tradeCategory" field MUST exactly match one of the values listed above.
+
 IMPORTANT: Return ONLY a valid JSON array. No markdown, no explanation. Each object must have these exact fields:
 [
   {
@@ -1843,11 +1855,12 @@ IMPORTANT: Return ONLY a valid JSON array. No markdown, no explanation. Each obj
     "phone": "string - Australian phone number",
     "specialty": "string - brief description of their specialty/trade",
     "location": "string - city/suburb and state",
-    "estimatedDistanceKm": "number - estimated distance in km from job site"
+    "estimatedDistanceKm": "number - estimated distance in km from job site",
+    "tradeCategory": "string - MUST be exactly one of: ${tradeCategoryList}"
   }
 ]
 
-Return between 8 and 12 suppliers. Make sure they are realistic for the ${location} area (within ${searchRadiusKm}km) and relevant to the trade categories: ${costCodeNames}. Sort results by proximity (closest first).`;
+Return between 8 and 12 suppliers. Make sure they are realistic for the ${location} area (within ${searchRadiusKm}km) and relevant to the trade categories: ${costCodeNames}. Group and sort results by trade category, then by proximity (closest first) within each category.`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -1869,6 +1882,8 @@ Return between 8 and 12 suppliers. Make sure they are realistic for the ${locati
       specialty: string;
       location: string;
       estimatedDistanceKm?: number;
+      tradeCategory?: string;
+      costCodeId?: string;
     }> = [];
 
     try {
@@ -1880,8 +1895,33 @@ Return between 8 and 12 suppliers. Make sure they are realistic for the ${locati
       foundSuppliers = [];
     }
 
+    for (const supplier of foundSuppliers) {
+      if (supplier.tradeCategory) {
+        const tcLower = supplier.tradeCategory.toLowerCase().trim();
+        let matchedId = costCodeLookup.get(tcLower);
+        if (!matchedId) {
+          for (const [key, id] of costCodeLookup.entries()) {
+            if (tcLower.includes(key) || key.includes(tcLower)) {
+              matchedId = id;
+              break;
+            }
+          }
+        }
+        if (matchedId) {
+          supplier.costCodeId = matchedId;
+          const matchedEntry = costCodeEntries.find(c => c.id === matchedId);
+          if (matchedEntry) supplier.tradeCategory = matchedEntry.label;
+        }
+      }
+      if (!supplier.costCodeId && costCodeEntries.length === 1) {
+        supplier.costCodeId = costCodeEntries[0].id;
+        supplier.tradeCategory = costCodeEntries[0].label;
+      }
+    }
+
     res.json({
       suppliers: foundSuppliers,
+      costCodeMapping: costCodeEntries.map(c => ({ id: c.id, label: c.label })),
       context: {
         costCodes: costCodeNames,
         location,
@@ -1919,6 +1959,8 @@ router.post("/api/tenders/:id/add-found-suppliers", requireAuth, requirePermissi
       specialty: z.string().optional().default(""),
       location: z.string().optional().default(""),
       costCodeId: z.string().nullable().optional(),
+      tradeCategory: z.string().optional(),
+      estimatedDistanceKm: z.coerce.number().optional(),
     });
 
     const schema = z.object({
