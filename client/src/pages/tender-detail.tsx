@@ -419,11 +419,14 @@ export default function TenderDetailPage() {
   const [scopeSearch, setScopeSearch] = useState("");
 
   const [findSuppliersOpen, setFindSuppliersOpen] = useState(false);
-  const [findSuppliersStep, setFindSuppliersStep] = useState<"select-codes" | "searching" | "results">("select-codes");
+  const [findSuppliersStep, setFindSuppliersStep] = useState<"select-codes" | "confirm-radius" | "searching" | "results">("select-codes");
   const [selectedCostCodeIds, setSelectedCostCodeIds] = useState<string[]>([]);
   const [foundSuppliers, setFoundSuppliers] = useState<FoundSupplier[]>([]);
   const [selectedFoundSuppliers, setSelectedFoundSuppliers] = useState<Set<number>>(new Set());
   const [searchContext, setSearchContext] = useState<{ costCodes: string; location: string; projectType: string; searchRadiusKm?: number; projectScale?: string; projectValue?: string } | null>(null);
+  const [userSearchRadius, setUserSearchRadius] = useState<number>(40);
+  const [radiusInfo, setRadiusInfo] = useState<{ searchRadiusKm: number; projectScale: string; location: string; projectType: string; projectValue: string } | null>(null);
+  const [loadingRadius, setLoadingRadius] = useState(false);
 
   const { data: tender, isLoading, error } = useQuery<TenderDetail>({
     queryKey: ["/api/tenders", tenderId],
@@ -498,8 +501,8 @@ export default function TenderDetailPage() {
   });
 
   const findSuppliersMutation = useMutation({
-    mutationFn: async (costCodeIds: string[]) => {
-      const res = await apiRequest("POST", `/api/tenders/${tenderId}/find-suppliers`, { costCodeIds });
+    mutationFn: async ({ costCodeIds, searchRadiusKm }: { costCodeIds: string[]; searchRadiusKm: number }) => {
+      const res = await apiRequest("POST", `/api/tenders/${tenderId}/find-suppliers`, { costCodeIds, searchRadiusKm });
       return res.json();
     },
     onSuccess: (data: { suppliers: FoundSupplier[]; context: { costCodes: string; location: string; projectType: string; searchRadiusKm?: number; projectScale?: string; projectValue?: string } }) => {
@@ -510,7 +513,7 @@ export default function TenderDetailPage() {
     },
     onError: (error: Error) => {
       toast({ title: "Search failed", description: error.message, variant: "destructive" });
-      setFindSuppliersStep("select-codes");
+      setFindSuppliersStep("confirm-radius");
     },
   });
 
@@ -543,6 +546,8 @@ export default function TenderDetailPage() {
     setFoundSuppliers([]);
     setSelectedFoundSuppliers(new Set());
     setSearchContext(null);
+    setRadiusInfo(null);
+    setUserSearchRadius(40);
   }
 
   function closeFindSuppliersDialog() {
@@ -552,15 +557,32 @@ export default function TenderDetailPage() {
     setFoundSuppliers([]);
     setSelectedFoundSuppliers(new Set());
     setSearchContext(null);
+    setRadiusInfo(null);
+    setUserSearchRadius(40);
   }
 
-  function handleFindSuppliers() {
+  async function handleProceedToRadius() {
     if (selectedCostCodeIds.length === 0) {
       toast({ title: "Please select at least one trade category", variant: "destructive" });
       return;
     }
+    setLoadingRadius(true);
+    try {
+      const res = await apiRequest("GET", `/api/tenders/${tenderId}/search-radius`);
+      const info = await res.json();
+      setRadiusInfo(info);
+      setUserSearchRadius(info.searchRadiusKm);
+      setFindSuppliersStep("confirm-radius");
+    } catch {
+      toast({ title: "Failed to calculate search area", variant: "destructive" });
+    } finally {
+      setLoadingRadius(false);
+    }
+  }
+
+  function handleFindSuppliers() {
     setFindSuppliersStep("searching");
-    findSuppliersMutation.mutate(selectedCostCodeIds);
+    findSuppliersMutation.mutate({ costCodeIds: selectedCostCodeIds, searchRadiusKm: userSearchRadius });
   }
 
   function handleAddSelectedSuppliers() {
@@ -1166,11 +1188,13 @@ export default function TenderDetailPage() {
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
               {findSuppliersStep === "select-codes" && "Find Suppliers"}
+              {findSuppliersStep === "confirm-radius" && "Set Search Area"}
               {findSuppliersStep === "searching" && "Searching for Suppliers..."}
               {findSuppliersStep === "results" && "AI-Found Suppliers"}
             </DialogTitle>
             <DialogDescription>
               {findSuppliersStep === "select-codes" && "Select trade categories to search for relevant suppliers in your project area."}
+              {findSuppliersStep === "confirm-radius" && "Review the recommended search radius based on your project, then adjust if needed."}
               {findSuppliersStep === "searching" && "AI is searching for suppliers matching your trade categories and project location."}
               {findSuppliersStep === "results" && (
                 <>Found {foundSuppliers.length} suppliers. Select which ones to add to this tender.</>
@@ -1205,12 +1229,92 @@ export default function TenderDetailPage() {
               <DialogFooter>
                 <Button variant="outline" onClick={closeFindSuppliersDialog} data-testid="button-cancel-find-suppliers">Cancel</Button>
                 <Button
-                  onClick={handleFindSuppliers}
-                  disabled={selectedCostCodeIds.length === 0}
-                  data-testid="button-search-suppliers"
+                  onClick={handleProceedToRadius}
+                  disabled={selectedCostCodeIds.length === 0 || loadingRadius}
+                  data-testid="button-next-radius"
                 >
+                  {loadingRadius ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
+                  Next: Set Search Area
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {findSuppliersStep === "confirm-radius" && radiusInfo && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-md p-3 text-sm space-y-1">
+                <div><span className="font-medium">Project Type:</span> {radiusInfo.projectType}</div>
+                <div><span className="font-medium">Location:</span> {radiusInfo.location}</div>
+                <div><span className="font-medium">Estimated Value:</span> {radiusInfo.projectValue}</div>
+                <div><span className="font-medium">Classification:</span> {radiusInfo.projectScale}</div>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Search Radius (km)</Label>
+                <p className="text-sm text-muted-foreground">
+                  We recommend <span className="font-medium">{radiusInfo.searchRadiusKm}km</span> based on your project type and value. Adjust if needed.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setUserSearchRadius(prev => Math.max(5, prev - 5))}
+                    disabled={userSearchRadius <= 5}
+                    data-testid="button-radius-decrease"
+                  >
+                    <span className="text-lg font-bold">-</span>
+                  </Button>
+                  <Input
+                    type="number"
+                    min={5}
+                    max={500}
+                    value={userSearchRadius}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val >= 5 && val <= 500) setUserSearchRadius(val);
+                    }}
+                    className="w-24 text-center text-lg font-medium"
+                    data-testid="input-search-radius"
+                  />
+                  <span className="text-sm text-muted-foreground">km</span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setUserSearchRadius(prev => Math.min(500, prev + 5))}
+                    disabled={userSearchRadius >= 500}
+                    data-testid="button-radius-increase"
+                  >
+                    <span className="text-lg font-bold">+</span>
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[10, 25, 50, 75, 100, 150, 200].map((r) => (
+                    <Button
+                      key={r}
+                      variant={userSearchRadius === r ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setUserSearchRadius(r)}
+                      data-testid={`button-radius-preset-${r}`}
+                    >
+                      {r}km
+                    </Button>
+                  ))}
+                </div>
+                {userSearchRadius !== radiusInfo.searchRadiusKm && (
+                  <p className="text-xs text-muted-foreground">
+                    Changed from recommended {radiusInfo.searchRadiusKm}km to {userSearchRadius}km
+                  </p>
+                )}
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setFindSuppliersStep("select-codes")} data-testid="button-back-to-codes-from-radius">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+                <Button onClick={handleFindSuppliers} data-testid="button-search-suppliers">
                   <Search className="h-4 w-4 mr-2" />
-                  Search Suppliers
+                  Search within {userSearchRadius}km
                 </Button>
               </DialogFooter>
             </div>
@@ -1326,7 +1430,7 @@ export default function TenderDetailPage() {
               )}
 
               <DialogFooter className="flex items-center justify-between gap-2">
-                <Button variant="outline" onClick={() => setFindSuppliersStep("select-codes")} data-testid="button-back-to-codes">
+                <Button variant="outline" onClick={() => setFindSuppliersStep("confirm-radius")} data-testid="button-back-to-codes">
                   <ArrowLeft className="h-4 w-4 mr-1" />
                   Back
                 </Button>

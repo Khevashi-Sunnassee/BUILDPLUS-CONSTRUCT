@@ -1653,6 +1653,103 @@ router.post("/api/tenders/:id/duplicate-package", requireAuth, requirePermission
   }
 });
 
+function calculateSearchRadius(jobTypeName: string, estimatedValue: number): { searchRadiusKm: number; projectScale: string } {
+  const jobTypeNameLower = jobTypeName.toLowerCase();
+  let searchRadiusKm = 40;
+  let projectScale = "Medium";
+
+  const isSmallResidential = jobTypeNameLower.includes("residential") ||
+    jobTypeNameLower.includes("house") ||
+    jobTypeNameLower.includes("renovation") ||
+    jobTypeNameLower.includes("extension") ||
+    jobTypeNameLower.includes("duplex");
+
+  const isLargeProject = jobTypeNameLower.includes("high-rise") ||
+    jobTypeNameLower.includes("highrise") ||
+    jobTypeNameLower.includes("high rise") ||
+    jobTypeNameLower.includes("precast") ||
+    jobTypeNameLower.includes("infrastructure") ||
+    jobTypeNameLower.includes("civil") ||
+    jobTypeNameLower.includes("industrial") ||
+    jobTypeNameLower.includes("hospital") ||
+    jobTypeNameLower.includes("government");
+
+  if (isSmallResidential || estimatedValue < 200000) {
+    searchRadiusKm = 25;
+    projectScale = "Small Residential (1-5 days typical)";
+  } else if (isLargeProject || estimatedValue > 2000000) {
+    searchRadiusKm = 80;
+    projectScale = "Large / Long Duration";
+  } else {
+    searchRadiusKm = 45;
+    projectScale = "Medium Commercial / Multi-Week";
+  }
+
+  if (estimatedValue > 5000000) {
+    searchRadiusKm = 100;
+    projectScale = "Major Project (state-wide search)";
+  }
+
+  return { searchRadiusKm, projectScale };
+}
+
+router.get("/api/tenders/:id/search-radius", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const tenderId = req.params.id;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, tenderId))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    const [tender] = await db
+      .select({ id: tenders.id, jobId: tenders.jobId })
+      .from(tenders)
+      .where(and(eq(tenders.id, tenderId), eq(tenders.companyId, companyId)));
+
+    if (!tender) {
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
+    }
+
+    const [job] = await db
+      .select({
+        id: jobs.id, name: jobs.name, address: jobs.address,
+        city: jobs.city, state: jobs.state, estimatedValue: jobs.estimatedValue,
+        jobTypeId: jobs.jobTypeId,
+      })
+      .from(jobs)
+      .where(and(eq(jobs.id, tender.jobId), eq(jobs.companyId, companyId)));
+
+    if (!job) {
+      return res.status(404).json({ message: "Job not found for this tender", code: "NOT_FOUND" });
+    }
+
+    let jobTypeName = "Construction";
+    if (job.jobTypeId) {
+      const [jt] = await db.select({ name: jobTypes.name }).from(jobTypes).where(eq(jobTypes.id, job.jobTypeId));
+      if (jt) jobTypeName = jt.name;
+    }
+
+    const estimatedValueNum = job.estimatedValue ? parseFloat(job.estimatedValue) : 0;
+    const location = [job.address, job.city, job.state].filter(Boolean).join(", ") || "Australia";
+    const projectValue = job.estimatedValue ? `$${parseFloat(job.estimatedValue).toLocaleString()}` : "Not specified";
+
+    const { searchRadiusKm, projectScale } = calculateSearchRadius(jobTypeName, estimatedValueNum);
+
+    res.json({
+      searchRadiusKm,
+      projectScale,
+      location,
+      projectType: jobTypeName,
+      projectValue,
+    });
+  } catch (error: unknown) {
+    logger.error("Error calculating search radius:", error);
+    res.status(500).json({ message: "Failed to calculate search radius", code: "INTERNAL_ERROR" });
+  }
+});
+
 router.post("/api/tenders/:id/find-suppliers", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
@@ -1665,6 +1762,7 @@ router.post("/api/tenders/:id/find-suppliers", requireAuth, requirePermission("t
 
     const schema = z.object({
       costCodeIds: z.array(z.string()).min(1, "At least one cost code is required"),
+      searchRadiusKm: z.number().min(5).max(500).optional(),
     });
     const data = schema.parse(req.body);
 
@@ -1709,41 +1807,9 @@ router.post("/api/tenders/:id/find-suppliers", requireAuth, requirePermission("t
     const projectValue = job?.estimatedValue ? `$${parseFloat(job.estimatedValue).toLocaleString()}` : "Not specified";
     const estimatedValueNum = job?.estimatedValue ? parseFloat(job.estimatedValue) : 0;
 
-    const jobTypeNameLower = jobTypeName.toLowerCase();
-    let searchRadiusKm = 40;
-    let projectScale = "Medium";
-
-    const isSmallResidential = jobTypeNameLower.includes("residential") ||
-      jobTypeNameLower.includes("house") ||
-      jobTypeNameLower.includes("renovation") ||
-      jobTypeNameLower.includes("extension") ||
-      jobTypeNameLower.includes("duplex");
-
-    const isLargeProject = jobTypeNameLower.includes("high-rise") ||
-      jobTypeNameLower.includes("highrise") ||
-      jobTypeNameLower.includes("high rise") ||
-      jobTypeNameLower.includes("precast") ||
-      jobTypeNameLower.includes("infrastructure") ||
-      jobTypeNameLower.includes("civil") ||
-      jobTypeNameLower.includes("industrial") ||
-      jobTypeNameLower.includes("hospital") ||
-      jobTypeNameLower.includes("government");
-
-    if (isSmallResidential || estimatedValueNum < 200000) {
-      searchRadiusKm = 25;
-      projectScale = "Small Residential (1-5 days typical)";
-    } else if (isLargeProject || estimatedValueNum > 2000000) {
-      searchRadiusKm = 80;
-      projectScale = "Large / Long Duration";
-    } else {
-      searchRadiusKm = 45;
-      projectScale = "Medium Commercial / Multi-Week";
-    }
-
-    if (estimatedValueNum > 5000000) {
-      searchRadiusKm = 100;
-      projectScale = "Major Project (state-wide search)";
-    }
+    const calculated = calculateSearchRadius(jobTypeName, estimatedValueNum);
+    const searchRadiusKm = data.searchRadiusKm || calculated.searchRadiusKm;
+    const projectScale = calculated.projectScale;
 
     const openai = new OpenAI();
 
