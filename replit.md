@@ -139,6 +139,13 @@ Standard handler pattern, no TODOs/FIXMEs, consistent naming, logger usage (647)
 
 ## Recent Changes
 
+### 2026-02-15 (Session 2)
+- Fixed critical companyId injection vulnerability in document creation endpoints (categories, disciplines, types, type statuses) - now override companyId from req.companyId instead of accepting from request body.
+- Dropped 4 global unique constraints (factories_code_unique, work_types_code_unique, zones_code_unique, panel_types_code_unique) that prevented multiple companies from using the same codes. Per-company composite unique indexes (e.g., factories_code_company_idx) already existed in the Drizzle schema.
+- Extended settings validation schema to support productionWorkDays, draftingWorkDays, cfmeuCalendar, includePOTerms fields.
+- Created comprehensive company isolation test script (scripts/company-isolation-test.cjs) with 174 passing tests validating multi-tenant data separation across all modules.
+- Verified complete isolation: settings, departments, factories, work types, zones, customers, jobs, employees, cost codes, documents, assets, chat, tasks, broadcasts, and all other company-owned data.
+
 ### 2026-02-15 (Session 1)
 - Implemented multi-company visibility and switching:
   * `/me` endpoint now returns `companyName` and `activeCompanyId` based on session's current companyId (supports admin company switching).
