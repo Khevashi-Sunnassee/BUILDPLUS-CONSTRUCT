@@ -3,7 +3,7 @@ import { storage, db } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { 
   insertWorkTypeSchema, insertDeviceSchema,
-  jobs, productionSlots, panelRegister, draftingProgram, dailyLogs, logRows, productionEntries, 
+  users, jobs, productionSlots, panelRegister, draftingProgram, dailyLogs, logRows, productionEntries, 
   weeklyWageReports, weeklyJobReports, weeklyJobReportSchedules,
   loadLists, loadListPanels, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments, 
   suppliers, items, itemCategories,
@@ -166,22 +166,22 @@ router.get("/api/admin/data-deletion/counts", requireRole("ADMIN"), async (req, 
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const counts: Record<string, number> = {};
     
-    const [panelCount] = await db.select({ count: sql<number>`count(*)` }).from(panelRegister).where(eq(panelRegister.companyId, companyId));
+    const [panelCount] = await db.select({ count: sql<number>`count(*)` }).from(panelRegister).innerJoin(jobs, eq(panelRegister.jobId, jobs.id)).where(eq(jobs.companyId, companyId));
     counts.panels = Number(panelCount.count);
     
-    const [slotCount] = await db.select({ count: sql<number>`count(*)` }).from(productionSlots).where(eq(productionSlots.companyId, companyId));
+    const [slotCount] = await db.select({ count: sql<number>`count(*)` }).from(productionSlots).innerJoin(jobs, eq(productionSlots.jobId, jobs.id)).where(eq(jobs.companyId, companyId));
     counts.production_slots = Number(slotCount.count);
     
-    const [draftingCount] = await db.select({ count: sql<number>`count(*)` }).from(draftingProgram).where(eq(draftingProgram.companyId, companyId));
+    const [draftingCount] = await db.select({ count: sql<number>`count(*)` }).from(draftingProgram).innerJoin(jobs, eq(draftingProgram.jobId, jobs.id)).where(eq(jobs.companyId, companyId));
     counts.drafting_program = Number(draftingCount.count);
     
-    const [logCount] = await db.select({ count: sql<number>`count(*)` }).from(dailyLogs).where(eq(dailyLogs.companyId, companyId));
+    const [logCount] = await db.select({ count: sql<number>`count(*)` }).from(dailyLogs).innerJoin(users, eq(dailyLogs.userId, users.id)).where(eq(users.companyId, companyId));
     counts.daily_logs = Number(logCount.count);
     
     const [poCount] = await db.select({ count: sql<number>`count(*)` }).from(purchaseOrders).where(eq(purchaseOrders.companyId, companyId));
     counts.purchase_orders = Number(poCount.count);
     
-    const [loadListCount] = await db.select({ count: sql<number>`count(*)` }).from(loadLists).where(eq(loadLists.companyId, companyId));
+    const [loadListCount] = await db.select({ count: sql<number>`count(*)` }).from(loadLists).innerJoin(jobs, eq(loadLists.jobId, jobs.id)).where(eq(jobs.companyId, companyId));
     counts.logistics = Number(loadListCount.count);
     
     const [wageCount] = await db.select({ count: sql<number>`count(*)` }).from(weeklyWageReports).where(eq(weeklyWageReports.companyId, companyId));
@@ -190,7 +190,7 @@ router.get("/api/admin/data-deletion/counts", requireRole("ADMIN"), async (req, 
     const [chatCount] = await db.select({ count: sql<number>`count(*)` }).from(conversations).where(eq(conversations.companyId, companyId));
     counts.chats = Number(chatCount.count);
     
-    const [taskCount] = await db.select({ count: sql<number>`count(*)` }).from(tasks).where(eq(tasks.companyId, companyId));
+    const [taskCount] = await db.select({ count: sql<number>`count(*)` }).from(tasks).innerJoin(taskGroups, eq(tasks.groupId, taskGroups.id)).where(eq(taskGroups.companyId, companyId));
     counts.tasks = Number(taskCount.count);
     
     const [supplierCount] = await db.select({ count: sql<number>`count(*)` }).from(suppliers).where(eq(suppliers.companyId, companyId));
@@ -264,25 +264,25 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     
     if (selected.has("jobs")) {
       if (!selected.has("panels")) {
-        const [panelWithJob] = await db.select({ count: sql<number>`count(*)` }).from(panelRegister).where(eq(panelRegister.companyId, cid));
+        const [panelWithJob] = await db.select({ count: sql<number>`count(*)` }).from(panelRegister).innerJoin(jobs, eq(panelRegister.jobId, jobs.id)).where(eq(jobs.companyId, cid));
         if (Number(panelWithJob.count) > 0) {
           errors.push("Cannot delete Jobs while Panels exist. Select Panels for deletion first.");
         }
       }
       if (!selected.has("production_slots")) {
-        const [slotWithJob] = await db.select({ count: sql<number>`count(*)` }).from(productionSlots).where(eq(productionSlots.companyId, cid));
+        const [slotWithJob] = await db.select({ count: sql<number>`count(*)` }).from(productionSlots).innerJoin(jobs, eq(productionSlots.jobId, jobs.id)).where(eq(jobs.companyId, cid));
         if (Number(slotWithJob.count) > 0) {
           errors.push("Cannot delete Jobs while Production Slots exist. Select Production Slots for deletion first.");
         }
       }
       if (!selected.has("drafting_program")) {
-        const [draftingWithJob] = await db.select({ count: sql<number>`count(*)` }).from(draftingProgram).where(eq(draftingProgram.companyId, cid));
+        const [draftingWithJob] = await db.select({ count: sql<number>`count(*)` }).from(draftingProgram).innerJoin(jobs, eq(draftingProgram.jobId, jobs.id)).where(eq(jobs.companyId, cid));
         if (Number(draftingWithJob.count) > 0) {
           errors.push("Cannot delete Jobs while Drafting Program entries exist. Select Drafting Program for deletion first.");
         }
       }
       if (!selected.has("logistics")) {
-        const [loadListWithJob] = await db.select({ count: sql<number>`count(*)` }).from(loadLists).where(eq(loadLists.companyId, cid));
+        const [loadListWithJob] = await db.select({ count: sql<number>`count(*)` }).from(loadLists).innerJoin(jobs, eq(loadLists.jobId, jobs.id)).where(eq(jobs.companyId, cid));
         if (Number(loadListWithJob.count) > 0) {
           errors.push("Cannot delete Jobs while Load Lists exist. Select Logistics for deletion first.");
         }
@@ -303,7 +303,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     
     if (selected.has("panels")) {
       if (!selected.has("drafting_program")) {
-        const [draftingWithPanel] = await db.select({ count: sql<number>`count(*)` }).from(draftingProgram).where(eq(draftingProgram.companyId, cid));
+        const [draftingWithPanel] = await db.select({ count: sql<number>`count(*)` }).from(draftingProgram).innerJoin(jobs, eq(draftingProgram.jobId, jobs.id)).where(eq(jobs.companyId, cid));
         if (Number(draftingWithPanel.count) > 0) {
           errors.push("Cannot delete Panels while Drafting Program entries exist. Select Drafting Program for deletion first.");
         }
@@ -323,7 +323,8 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     if (selected.has("production_slots") && !selected.has("drafting_program")) {
       const [draftingWithSlot] = await db.select({ count: sql<number>`count(*)` })
         .from(draftingProgram)
-        .where(and(eq(draftingProgram.companyId, cid), isNotNull(draftingProgram.productionSlotId)));
+        .innerJoin(jobs, eq(draftingProgram.jobId, jobs.id))
+        .where(and(eq(jobs.companyId, cid), isNotNull(draftingProgram.productionSlotId)));
       if (Number(draftingWithSlot.count) > 0) {
         warnings.push("Production slot references in Drafting Program will be cleared.");
       }
