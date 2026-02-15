@@ -106,6 +106,19 @@ function ScopeStatusBadge({ status }: { status: string }) {
   }
 }
 
+function getStatusSelectColor(status: string): string {
+  switch (status) {
+    case "INCLUDED":
+      return "border-green-600 text-green-500 [&>svg]:text-green-500";
+    case "EXCLUDED":
+      return "border-red-600 text-red-500 [&>svg]:text-red-500";
+    case "NA":
+      return "border-orange-500 text-orange-400 [&>svg]:text-orange-400";
+    default:
+      return "";
+  }
+}
+
 function ItemStatusBadge({ status }: { status: string }) {
   switch (status) {
     case "INCLUDED":
@@ -113,7 +126,7 @@ function ItemStatusBadge({ status }: { status: string }) {
     case "EXCLUDED":
       return <Badge variant="destructive" data-testid={`badge-item-${status}`}>Excluded</Badge>;
     case "NA":
-      return <Badge variant="secondary" data-testid={`badge-item-${status}`}>N/A</Badge>;
+      return <Badge variant="secondary" className="bg-orange-500/10 text-orange-400 border-orange-500/20" data-testid={`badge-item-${status}`}>N/A</Badge>;
     default:
       return <Badge variant="secondary">{status}</Badge>;
   }
@@ -1218,15 +1231,15 @@ export default function ScopeOfWorksPage() {
                                       }
                                     >
                                       <SelectTrigger
-                                        className="w-[110px]"
+                                        className={`w-[110px] ${getStatusSelectColor(item.status)}`}
                                         data-testid={`select-item-status-${item.id}`}
                                       >
                                         <SelectValue />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="INCLUDED">Included</SelectItem>
-                                        <SelectItem value="EXCLUDED">Excluded</SelectItem>
-                                        <SelectItem value="NA">N/A</SelectItem>
+                                        <SelectItem value="INCLUDED" className="text-green-500">Included</SelectItem>
+                                        <SelectItem value="EXCLUDED" className="text-red-500">Excluded</SelectItem>
+                                        <SelectItem value="NA" className="text-orange-400">N/A</SelectItem>
                                       </SelectContent>
                                     </Select>
                                   </TableCell>
@@ -1297,13 +1310,13 @@ export default function ScopeOfWorksPage() {
             <div className="space-y-2">
               <Label htmlFor="item-status">Status</Label>
               <Select value={itemStatus} onValueChange={(val) => setItemStatus(val as ItemStatus)}>
-                <SelectTrigger data-testid="select-item-status">
+                <SelectTrigger className={getStatusSelectColor(itemStatus)} data-testid="select-item-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="INCLUDED">Included</SelectItem>
-                  <SelectItem value="EXCLUDED">Excluded</SelectItem>
-                  <SelectItem value="NA">N/A</SelectItem>
+                  <SelectItem value="INCLUDED" className="text-green-500">Included</SelectItem>
+                  <SelectItem value="EXCLUDED" className="text-red-500">Excluded</SelectItem>
+                  <SelectItem value="NA" className="text-orange-400">N/A</SelectItem>
                 </SelectContent>
               </Select>
             </div>
