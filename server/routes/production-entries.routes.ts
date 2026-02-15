@@ -9,6 +9,8 @@ import { z } from "zod";
 
 const createProductionEntrySchema = z.object({
   panelId: z.string().optional(),
+  jobId: z.string(),
+  productionDate: z.string(),
   loadWidth: z.string().optional(),
   loadHeight: z.string().optional(),
   panelThickness: z.string().optional(),
@@ -81,6 +83,12 @@ router.post("/api/production-entries", requireAuth, requirePermission("productio
       if (panel.documentStatus !== "APPROVED") {
         return res.status(400).json({ error: "Panel document status must be 'Approved for Production'. Current status: " + (panel.documentStatus || "DRAFT") + ". Please update the document status in the Drafting Register first." });
       }
+
+      if (panel.lifecycleStatus < PANEL_LIFECYCLE_STATUS.PRODUCTION_APPROVED) {
+        return res.status(400).json({ error: "Panel must be approved for production (lifecycle status PRODUCTION_APPROVED or higher) before a production entry can be created." });
+      }
+
+      const existingEntry = await storage.getProductionEntryByPanelId(panelId);
       
       const panelUpdates: Record<string, unknown> = {};
       if (loadWidth !== undefined) panelUpdates.loadWidth = loadWidth;
@@ -92,11 +100,19 @@ router.post("/api/production-entries", requireAuth, requirePermission("productio
       if (Object.keys(panelUpdates).length > 0) {
         await storage.updatePanelRegisterItem(panelId, panelUpdates);
       }
+
+      if (existingEntry) {
+        const updateData: Record<string, unknown> = { ...entryFields };
+        const updated = await storage.updateProductionEntry(existingEntry.id, updateData);
+        return res.json(updated);
+      } else {
+        return res.status(400).json({ error: "Panel must be scheduled for production before a production entry can be created. Use the Production Schedule to add panels first." });
+      }
     }
     
     const entryData = {
       ...entryFields,
-      panelId,
+      panelId: (entryFields as Record<string, unknown>).panelId as string || "",
       userId: req.session.userId!,
     };
     const entry = await storage.createProductionEntry(entryData);

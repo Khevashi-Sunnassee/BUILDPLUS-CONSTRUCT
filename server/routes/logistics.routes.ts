@@ -130,6 +130,18 @@ router.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW
       }
     }
 
+    if (panelIds && panelIds.length > 0) {
+      for (const pId of panelIds) {
+        const panelCheck = await storage.getPanelById(pId);
+        if (!panelCheck) {
+          return res.status(404).json({ error: `Panel ${pId} not found` });
+        }
+        if (panelCheck.lifecycleStatus < PANEL_LIFECYCLE_STATUS.PRODUCED) {
+          return res.status(400).json({ error: `Panel ${panelCheck.panelMark} must be produced before it can be added to a load list.` });
+        }
+      }
+    }
+
     const loadList = await storage.createLoadList({
       ...data,
       loadNumber,
@@ -151,7 +163,7 @@ router.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW
 router.put("/api/load-lists/:id", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
   const companyId = req.session.companyId;
   const existing = await storage.getLoadList(req.params.id as string);
-  if (!existing || (existing as Record<string, unknown>).companyId !== companyId) {
+  if (!existing || (existing as unknown as Record<string, unknown>).companyId !== companyId) {
     return res.status(404).json({ error: "Load list not found" });
   }
   const parsed = insertLoadListSchema.partial().safeParse(req.body);
@@ -165,7 +177,7 @@ router.put("/api/load-lists/:id", requireAuth, requirePermission("logistics", "V
 router.delete("/api/load-lists/:id", requireRole("ADMIN", "MANAGER"), requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
   const companyId = req.session.companyId;
   const existing = await storage.getLoadList(req.params.id as string);
-  if (!existing || (existing as Record<string, unknown>).companyId !== companyId) {
+  if (!existing || (existing as unknown as Record<string, unknown>).companyId !== companyId) {
     return res.status(404).json({ error: "Load list not found" });
   }
   await storage.deleteLoadList(req.params.id as string);
@@ -180,8 +192,15 @@ router.post("/api/load-lists/:id/panels", requireAuth, requirePermission("logist
     if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
   }
   const { panelId, sequence } = req.body;
+  const panelRecord = await storage.getPanelById(panelId);
+  if (!panelRecord) {
+    return res.status(404).json({ error: "Panel not found" });
+  }
+  if (panelRecord.lifecycleStatus < PANEL_LIFECYCLE_STATUS.PRODUCED) {
+    return res.status(400).json({ error: "Panel must be produced before it can be added to a load list. Current lifecycle status does not meet the minimum requirement." });
+  }
   const panel = await storage.addPanelToLoadList(req.params.id as string, panelId, sequence);
-  advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.ON_LOAD_LIST, "Added to load list", req.session.userId, { loadListId: req.params.id });
+  await advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.ON_LOAD_LIST, "Added to load list", req.session.userId, { loadListId: req.params.id });
   res.json(panel);
 });
 
@@ -253,7 +272,7 @@ router.put("/api/delivery-records/:id", requireAuth, async (req, res) => {
   }
   const loadList = await storage.getLoadList(record.loadListId);
   const companyId = req.session.companyId;
-  if (!loadList || (loadList as Record<string, unknown>).companyId !== companyId) {
+  if (!loadList || (loadList as unknown as Record<string, unknown>).companyId !== companyId) {
     return res.status(404).json({ error: "Delivery record not found" });
   }
   const parsed = insertDeliveryRecordSchema.partial().safeParse(req.body);
