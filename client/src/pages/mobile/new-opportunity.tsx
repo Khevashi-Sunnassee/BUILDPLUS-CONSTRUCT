@@ -5,6 +5,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PROCUREMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { useToast } from "@/hooks/use-toast";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import { SuburbLookup } from "@/components/suburb-lookup";
 import {
   ArrowLeft,
   MapPin,
@@ -286,14 +287,15 @@ export default function MobileNewOpportunity() {
                 data-testid="input-address"
               />
             </FormField>
-            <FormField label="City" required error={errors.city}>
-              <input
-                type="text"
-                className={inputClass}
-                placeholder="City location"
+            <FormField label="City / Suburb" required error={errors.city}>
+              <SuburbLookup
                 value={form.city}
-                onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                aria-required="true"
+                onChange={(val) => setForm((f) => ({ ...f, city: val }))}
+                onSelect={(result) => {
+                  setForm((f) => ({ ...f, city: result.suburb, state: result.state }));
+                }}
+                placeholder="Start typing suburb..."
+                className={inputClass}
                 data-testid="input-city"
               />
             </FormField>

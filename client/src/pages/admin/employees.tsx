@@ -47,6 +47,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { SuburbLookup } from "@/components/suburb-lookup";
 import {
   Select,
   SelectContent,
@@ -672,7 +673,17 @@ export default function AdminEmployeesPage() {
                     <FormItem>
                       <FormLabel>Suburb</FormLabel>
                       <FormControl>
-                        <Input placeholder="Suburb" {...field} data-testid="input-employee-suburb" />
+                        <SuburbLookup
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          onSelect={(result) => {
+                            field.onChange(result.suburb);
+                            form.setValue("state", result.state);
+                            form.setValue("postcode", result.postcode);
+                          }}
+                          placeholder="Start typing suburb..."
+                          data-testid="input-employee-suburb"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

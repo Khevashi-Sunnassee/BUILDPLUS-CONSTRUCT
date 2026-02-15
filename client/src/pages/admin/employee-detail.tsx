@@ -50,6 +50,7 @@ import { Input } from "@/components/ui/input";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { SuburbLookup } from "@/components/suburb-lookup";
 import {
   Select,
   SelectContent,
@@ -1291,7 +1292,19 @@ export default function EmployeeDetailPage() {
                 <FormField control={editForm.control} name="suburb" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Suburb</FormLabel>
-                    <FormControl><Input {...field} data-testid="input-edit-suburb" /></FormControl>
+                    <FormControl>
+                      <SuburbLookup
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        onSelect={(result) => {
+                          field.onChange(result.suburb);
+                          editForm.setValue("state", result.state);
+                          editForm.setValue("postcode", result.postcode);
+                        }}
+                        placeholder="Start typing suburb..."
+                        data-testid="input-edit-suburb"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

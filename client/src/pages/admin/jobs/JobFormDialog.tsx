@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { SuburbLookup } from "@/components/suburb-lookup";
 import {
   Form,
   FormControl,
@@ -355,9 +356,18 @@ export function JobFormDialog({
                     name="city"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>City</FormLabel>
+                        <FormLabel>City / Suburb</FormLabel>
                         <FormControl>
-                          <Input placeholder="City" {...field} data-testid="input-job-city" />
+                          <SuburbLookup
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            onSelect={(result) => {
+                              field.onChange(result.suburb);
+                              jobForm.setValue("state", result.state);
+                            }}
+                            placeholder="Start typing suburb..."
+                            data-testid="input-job-city"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

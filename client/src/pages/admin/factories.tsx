@@ -68,6 +68,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Factory as FactoryType, ProductionBed } from "@shared/schema";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { SuburbLookup } from "@/components/suburb-lookup";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -677,11 +678,16 @@ export default function AdminFactoriesPage() {
                     <FormItem>
                       <FormLabel>City / Suburb</FormLabel>
                       <FormControl>
-                        <Input
-                          {...field}
+                        <SuburbLookup
                           value={field.value || ""}
-                          onChange={e => { field.onChange(e.target.value); debouncedGeocode(); }}
-                          placeholder="Melbourne"
+                          onChange={(val) => { field.onChange(val); debouncedGeocode(); }}
+                          onSelect={(result) => {
+                            field.onChange(result.suburb);
+                            form.setValue("state", result.state);
+                            form.setValue("postcode", result.postcode);
+                            debouncedGeocode();
+                          }}
+                          placeholder="Start typing suburb..."
                           data-testid="input-factory-city"
                         />
                       </FormControl>

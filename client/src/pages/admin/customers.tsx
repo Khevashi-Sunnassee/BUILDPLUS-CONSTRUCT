@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { SuburbLookup } from "@/components/suburb-lookup";
 import {
   Users,
   Plus,
@@ -636,9 +637,19 @@ export default function AdminCustomersPage() {
                   name="city"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>City</FormLabel>
+                      <FormLabel>City / Suburb</FormLabel>
                       <FormControl>
-                        <Input placeholder="City" {...field} data-testid="input-customer-city" />
+                        <SuburbLookup
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          onSelect={(result) => {
+                            field.onChange(result.suburb);
+                            form.setValue("state", result.state);
+                            form.setValue("postcode", result.postcode);
+                          }}
+                          placeholder="Start typing suburb..."
+                          data-testid="input-customer-city"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
