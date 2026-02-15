@@ -82,6 +82,15 @@ const uploadLimiter = rateLimit({
   message: { error: "Too many upload requests, please try again later" },
 });
 
+app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  next();
+});
+app.set('etag', false);
+
 app.use(compression({
   threshold: 1024,
   level: 6,
