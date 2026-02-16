@@ -126,6 +126,38 @@ router.post("/api/webhooks/resend-inbound", async (req: Request, res: Response) 
       return res.status(401).json({ error: "Webhook timestamp expired" });
     }
 
+    const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
+    if (webhookSecret) {
+      const secretBytes = Buffer.from(webhookSecret.replace(/^whsec_/, ""), "base64");
+      const rawBody = (req as any).rawBody ? (req as any).rawBody.toString("utf8") : JSON.stringify(req.body);
+      const signedContent = `${svixId}.${svixTimestamp}.${rawBody}`;
+      const expectedSignature = crypto
+        .createHmac("sha256", secretBytes)
+        .update(signedContent)
+        .digest("base64");
+
+      const signatures = svixSignature.split(" ");
+      const verified = signatures.some(sig => {
+        const sigValue = sig.replace(/^v1,/, "");
+        try {
+          const expectedBuf = Buffer.from(expectedSignature);
+          const actualBuf = Buffer.from(sigValue);
+          if (expectedBuf.length !== actualBuf.length) return false;
+          return crypto.timingSafeEqual(expectedBuf, actualBuf);
+        } catch {
+          return false;
+        }
+      });
+
+      if (!verified) {
+        logger.warn("[AP Inbox] Webhook signature verification failed");
+        return res.status(401).json({ error: "Invalid webhook signature" });
+      }
+      logger.info("[AP Inbox] Webhook signature verified successfully");
+    } else {
+      logger.warn("[AP Inbox] No RESEND_WEBHOOK_SECRET configured - skipping signature verification");
+    }
+
     const event = req.body;
 
     if (!event || event.type !== "email.received") {
