@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AP_INVOICE_ROUTES } from "@shared/api-routes";
 import { useRoute, useLocation } from "wouter";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,10 +87,22 @@ interface CommentItem {
 
 interface ApprovalPathStep {
   id: string;
-  userName: string;
-  role: string;
+  approverUserId: string;
+  approverName: string | null;
+  approverEmail: string | null;
+  stepIndex: number;
   status: string;
-  timestamp?: string;
+  decisionAt: string | null;
+  note: string | null;
+  ruleName: string | null;
+  isCurrent: boolean;
+}
+
+interface ApprovalPathResponse {
+  steps: ApprovalPathStep[];
+  totalSteps: number;
+  completedSteps: number;
+  currentStepIndex: number | null;
 }
 
 function formatDate(date: string | null | undefined): string {
@@ -745,10 +758,15 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
 }
 
 function ApprovalPathSheet({ invoiceId, open, onOpenChange }: { invoiceId: string; open: boolean; onOpenChange: (v: boolean) => void }) {
-  const { data: approvalPath } = useQuery<ApprovalPathStep[]>({
+  const { data: approvalData } = useQuery<ApprovalPathResponse>({
     queryKey: [AP_INVOICE_ROUTES.APPROVAL_PATH(invoiceId)],
     enabled: open,
   });
+
+  const steps = approvalData?.steps || [];
+  const totalSteps = approvalData?.totalSteps || 0;
+  const completedSteps = approvalData?.completedSteps || 0;
+  const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -757,28 +775,90 @@ function ApprovalPathSheet({ invoiceId, open, onOpenChange }: { invoiceId: strin
           <SheetTitle>Approval Path</SheetTitle>
         </SheetHeader>
         <div className="mt-4 space-y-4">
-          {!approvalPath || approvalPath.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No approval path configured</p>
+          {steps.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8" data-testid="text-no-approval-path">No approval path configured</p>
           ) : (
-            approvalPath.map((step, i) => (
-              <div key={step.id} className="flex items-start gap-3" data-testid={`approval-step-${i}`}>
-                <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                  step.status === "approved" ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" :
-                  step.status === "rejected" ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" :
-                  "bg-muted text-muted-foreground"
-                }`}>
-                  {i + 1}
+            <>
+              <div className="space-y-2" data-testid="approval-progress">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Progress</span>
+                  <span className="font-medium" data-testid="text-approval-progress">{completedSteps} of {totalSteps} approved</span>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{step.userName}</p>
-                  <p className="text-xs text-muted-foreground">{step.role}</p>
-                  {step.timestamp && <p className="text-xs text-muted-foreground mt-1">{formatDate(step.timestamp)}</p>}
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-green-600 transition-all duration-300"
+                    style={{ width: `${progressPercent}%` }}
+                    data-testid="bar-approval-progress"
+                  />
                 </div>
-                <Badge variant={step.status === "approved" ? "default" : step.status === "rejected" ? "destructive" : "secondary"} className={step.status === "approved" ? "bg-green-600 text-white" : ""}>
-                  {step.status}
-                </Badge>
               </div>
-            ))
+
+              <Separator />
+
+              <div className="space-y-1">
+                {steps.map((step, i) => {
+                  const isApproved = step.status === "APPROVED";
+                  const isRejected = step.status === "REJECTED";
+                  const isPending = step.status === "PENDING";
+
+                  return (
+                    <div key={step.id} data-testid={`approval-step-${i}`}>
+                      <div className="flex items-start gap-3 py-2">
+                        <div className="flex flex-col items-center">
+                          <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                            isApproved ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" :
+                            isRejected ? "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" :
+                            step.isCurrent ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 ring-2 ring-blue-400" :
+                            "bg-muted text-muted-foreground"
+                          }`}>
+                            {isApproved ? <Check className="h-4 w-4" /> :
+                             isRejected ? <X className="h-4 w-4" /> :
+                             step.stepIndex + 1}
+                          </div>
+                          {i < steps.length - 1 && (
+                            <div className={`w-0.5 h-6 mt-1 ${isApproved ? "bg-green-400" : "bg-muted"}`} />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium" data-testid={`text-approver-name-${i}`}>
+                              {step.approverName || step.approverEmail || "Unknown"}
+                            </p>
+                            {step.isCurrent && (
+                              <Badge variant="outline" className="text-xs border-blue-400 text-blue-600 dark:text-blue-400" data-testid={`badge-current-step-${i}`}>
+                                Current
+                              </Badge>
+                            )}
+                          </div>
+                          {step.ruleName && (
+                            <p className="text-xs text-muted-foreground" data-testid={`text-rule-name-${i}`}>
+                              Rule: {step.ruleName}
+                            </p>
+                          )}
+                          {step.decisionAt && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {isApproved ? "Approved" : "Rejected"} {formatDate(step.decisionAt)}
+                            </p>
+                          )}
+                          {step.note && (
+                            <p className="text-xs text-muted-foreground mt-0.5 italic">
+                              "{step.note}"
+                            </p>
+                          )}
+                        </div>
+                        <Badge
+                          variant={isApproved ? "default" : isRejected ? "destructive" : "secondary"}
+                          className={isApproved ? "bg-green-600 text-white" : ""}
+                          data-testid={`badge-step-status-${i}`}
+                        >
+                          {step.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </SheetContent>
@@ -794,6 +874,7 @@ export default function ApInvoiceDetailPage() {
 
   useDocumentTitle("Invoice Detail");
 
+  const { user } = useAuth();
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [approvalSheetOpen, setApprovalSheetOpen] = useState(false);
   const [goToNext, setGoToNext] = useState(false);
@@ -809,6 +890,22 @@ export default function ApInvoiceDetailPage() {
     queryKey: [AP_INVOICE_ROUTES.SPLITS(invoiceId || "")],
     enabled: !!invoiceId,
   });
+
+  const { data: approvalData } = useQuery<ApprovalPathResponse>({
+    queryKey: [AP_INVOICE_ROUTES.APPROVAL_PATH(invoiceId || "")],
+    enabled: !!invoiceId && invoice?.status === "PENDING_REVIEW",
+  });
+
+  const isCurrentApprover = useMemo(() => {
+    if (!approvalData?.steps || !user?.id) return false;
+    return approvalData.steps.some(s => s.isCurrent && s.approverUserId === user.id);
+  }, [approvalData, user?.id]);
+
+  const currentApproverName = useMemo(() => {
+    if (!approvalData?.steps) return null;
+    const current = approvalData.steps.find(s => s.isCurrent);
+    return current ? (current.approverName || current.approverEmail || "Unknown") : null;
+  }, [approvalData]);
 
   if (splitsData && !splitsInitialized) {
     setSplits(splitsData);
@@ -834,6 +931,7 @@ export default function ApInvoiceDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId!)] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.APPROVAL_PATH(invoiceId!)] });
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
       toast({ title: "Invoice approved" });
@@ -850,6 +948,7 @@ export default function ApInvoiceDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId!)] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.APPROVAL_PATH(invoiceId!)] });
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
       toast({ title: "Invoice rejected" });
@@ -1039,14 +1138,19 @@ export default function ApInvoiceDetailPage() {
           )}
           {invoice.status === "PENDING_REVIEW" && (
             <>
-              <Button size="sm" onClick={() => { setGoToNext(false); approveMutation.mutate(); }} disabled={approveMutation.isPending} data-testid="button-approve-invoice">
+              <Button size="sm" onClick={() => { setGoToNext(false); approveMutation.mutate(); }} disabled={approveMutation.isPending || (approvalData && !isCurrentApprover)} data-testid="button-approve-invoice">
                 <Check className="h-3 w-3 mr-1" />
                 Approve
               </Button>
-              <Button variant="destructive" size="sm" onClick={() => { setGoToNext(false); handleReject(); }} disabled={rejectMutation.isPending} data-testid="button-reject-invoice">
+              <Button variant="destructive" size="sm" onClick={() => { setGoToNext(false); handleReject(); }} disabled={rejectMutation.isPending || (approvalData && !isCurrentApprover)} data-testid="button-reject-invoice">
                 <X className="h-3 w-3 mr-1" />
                 Reject
               </Button>
+              {approvalData && !isCurrentApprover && currentApproverName && (
+                <span className="text-xs text-muted-foreground" data-testid="text-waiting-approver">
+                  Waiting for {currentApproverName}
+                </span>
+              )}
             </>
           )}
           <Button variant="outline" size="sm" onClick={() => onHoldMutation.mutate()} disabled={onHoldMutation.isPending} data-testid="button-toggle-hold">
@@ -1136,7 +1240,7 @@ export default function ApInvoiceDetailPage() {
                 size="sm"
                 className="text-destructive border-destructive/50"
                 onClick={handleReject}
-                disabled={rejectMutation.isPending}
+                disabled={rejectMutation.isPending || (approvalData && !isCurrentApprover)}
                 data-testid="button-reject"
               >
                 {rejectMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <X className="h-3 w-3 mr-1" />}
@@ -1146,7 +1250,7 @@ export default function ApInvoiceDetailPage() {
                 size="sm"
                 className="bg-green-600 text-white"
                 onClick={() => approveMutation.mutate()}
-                disabled={approveMutation.isPending}
+                disabled={approveMutation.isPending || (approvalData && !isCurrentApprover)}
                 data-testid="button-approve"
               >
                 {approveMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}

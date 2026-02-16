@@ -12,8 +12,9 @@ import {
   apInvoices, apInvoiceDocuments, apInvoiceExtractedFields,
   apInvoiceSplits, apInvoiceActivity, apInvoiceComments,
   apInvoiceApprovals, apApprovalRules, users, suppliers,
-  costCodes, jobs
+  costCodes, jobs, companies
 } from "@shared/schema";
+import type { ApApprovalCondition } from "@shared/schema";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -489,31 +490,106 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
       .orderBy(asc(apApprovalRules.priority));
 
     const invoiceTotal = parseFloat(existing.totalInc || "0");
-    const matchedRules = rules.filter((rule) => {
-      const conditions = rule.conditions as any;
-      if (!conditions) return true;
-      if (conditions.minAmount && invoiceTotal < parseFloat(conditions.minAmount)) return false;
-      if (conditions.maxAmount && invoiceTotal > parseFloat(conditions.maxAmount)) return false;
-      if (conditions.supplierId && conditions.supplierId !== existing.supplierId) return false;
+
+    const splits = await db
+      .select()
+      .from(apInvoiceSplits)
+      .where(eq(apInvoiceSplits.invoiceId, id));
+
+    const splitJobIds = splits.map(s => s.jobId).filter(Boolean) as string[];
+    const splitCostCodeIds = splits.map(s => s.costCodeId).filter(Boolean) as string[];
+
+    function evaluateCondition(cond: ApApprovalCondition): boolean {
+      const { field, operator, values } = cond;
+      if (!values || values.length === 0) return true;
+
+      if (field === "COMPANY") {
+        const invoiceVal = existing.companyId;
+        if (operator === "EQUALS") return values.some(v => v === invoiceVal);
+        if (operator === "NOT_EQUALS") return values.every(v => v !== invoiceVal);
+        return false;
+      }
+
+      if (field === "AMOUNT") {
+        const condVal = parseFloat(values[0]);
+        if (isNaN(condVal)) return false;
+        switch (operator) {
+          case "EQUALS": return invoiceTotal === condVal;
+          case "NOT_EQUALS": return invoiceTotal !== condVal;
+          case "GREATER_THAN": return invoiceTotal > condVal;
+          case "LESS_THAN": return invoiceTotal < condVal;
+          case "GREATER_THAN_OR_EQUALS": return invoiceTotal >= condVal;
+          case "LESS_THAN_OR_EQUALS": return invoiceTotal <= condVal;
+          default: return false;
+        }
+      }
+
+      if (field === "JOB") {
+        if (operator === "EQUALS") return splitJobIds.some(jId => values.includes(jId));
+        return false;
+      }
+
+      if (field === "SUPPLIER") {
+        const invoiceVal = existing.supplierId || "";
+        if (operator === "EQUALS") return values.some(v => v === invoiceVal);
+        if (operator === "NOT_EQUALS") return values.every(v => v !== invoiceVal);
+        return false;
+      }
+
+      if (field === "GL_CODE") {
+        if (operator === "EQUALS") return splitCostCodeIds.some(ccId => values.includes(ccId));
+        return false;
+      }
+
+      return false;
+    }
+
+    function ruleMatchesInvoice(rule: typeof rules[number]): boolean {
+      const ruleType = (rule as any).ruleType || "USER";
+      if (ruleType === "USER_CATCH_ALL") return true;
+
+      const conditionsData = rule.conditions as any;
+      if (!conditionsData) return true;
+
+      if (Array.isArray(conditionsData)) {
+        if (conditionsData.length === 0) return true;
+        return conditionsData.every((cond: ApApprovalCondition) => evaluateCondition(cond));
+      }
+
+      if (typeof conditionsData === "object" && conditionsData !== null) {
+        if (conditionsData.minAmount && invoiceTotal < parseFloat(conditionsData.minAmount)) return false;
+        if (conditionsData.maxAmount && invoiceTotal > parseFloat(conditionsData.maxAmount)) return false;
+        if (conditionsData.supplierId && conditionsData.supplierId !== existing.supplierId) return false;
+        return true;
+      }
+
       return true;
-    });
+    }
+
+    let matchedRule: typeof rules[number] | null = null;
+    for (const rule of rules) {
+      if (ruleMatchesInvoice(rule)) {
+        matchedRule = rule;
+        break;
+      }
+    }
 
     let approvalStepIndex = 0;
     let autoApproved = false;
 
-    if (matchedRules.length > 0) {
-      for (const rule of matchedRules) {
-        if (rule.autoApprove) {
-          autoApproved = true;
-          continue;
-        }
-        for (const approverUserId of rule.approverUserIds) {
+    if (matchedRule) {
+      const ruleType = (matchedRule as any).ruleType || "USER";
+      if (ruleType === "AUTO_APPROVE" || matchedRule.autoApprove) {
+        autoApproved = true;
+      } else {
+        for (let i = 0; i < matchedRule.approverUserIds.length; i++) {
+          const approverUserId = matchedRule.approverUserIds[i];
           await db.insert(apInvoiceApprovals).values({
             invoiceId: id,
-            stepIndex: approvalStepIndex,
+            stepIndex: i,
             approverUserId,
             status: "PENDING",
-            ruleId: rule.id,
+            ruleId: matchedRule.id,
           });
           approvalStepIndex++;
         }
@@ -592,23 +668,26 @@ router.post("/api/ap-invoices/:id/approve", requireAuth, async (req: Request, re
 
     if (!existing) return res.status(404).json({ error: "Invoice not found" });
 
-    const myPending = await db
+    const allSteps = await db
       .select()
       .from(apInvoiceApprovals)
-      .where(
-        and(
-          eq(apInvoiceApprovals.invoiceId, id),
-          eq(apInvoiceApprovals.approverUserId, userId),
-          eq(apInvoiceApprovals.status, "PENDING"),
-        )
-      );
+      .where(eq(apInvoiceApprovals.invoiceId, id))
+      .orderBy(asc(apInvoiceApprovals.stepIndex));
 
-    for (const approval of myPending) {
-      await db
-        .update(apInvoiceApprovals)
-        .set({ status: "APPROVED", decisionAt: new Date(), note: body.note || null })
-        .where(eq(apInvoiceApprovals.id, approval.id));
+    const currentStep = allSteps.find(s => s.status === "PENDING");
+
+    if (!currentStep) {
+      return res.status(400).json({ error: "No pending approval steps for this invoice" });
     }
+
+    if (currentStep.approverUserId !== userId) {
+      return res.status(403).json({ error: `It's not your turn to approve. Waiting on step ${currentStep.stepIndex} approver.` });
+    }
+
+    await db
+      .update(apInvoiceApprovals)
+      .set({ status: "APPROVED", decisionAt: new Date(), note: body.note || null })
+      .where(eq(apInvoiceApprovals.id, currentStep.id));
 
     const remainingPending = await db
       .select({ cnt: count() })
@@ -621,7 +700,7 @@ router.post("/api/ap-invoices/:id/approve", requireAuth, async (req: Request, re
       );
 
     const allApproved = (remainingPending[0]?.cnt || 0) === 0;
-    const newStatus = allApproved ? "APPROVED" : existing.status;
+    const newStatus = allApproved ? "APPROVED" : "PENDING_REVIEW";
 
     const [updated] = await db
       .update(apInvoices)
@@ -629,7 +708,13 @@ router.post("/api/ap-invoices/:id/approve", requireAuth, async (req: Request, re
       .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
       .returning();
 
-    await logActivity(id, "approved", allApproved ? "Invoice fully approved" : "Approval step completed", userId, { note: body.note });
+    const totalSteps = allSteps.length;
+    const completedSteps = allSteps.filter(s => s.status === "APPROVED").length + 1;
+    const stepMessage = allApproved
+      ? `Invoice fully approved (all ${totalSteps} steps completed)`
+      : `Approval step ${completedSteps} of ${totalSteps} completed by approver`;
+
+    await logActivity(id, "approved", stepMessage, userId, { note: body.note, stepIndex: currentStep.stepIndex, totalSteps, completedSteps });
 
     res.json(updated);
   } catch (error: unknown) {
@@ -1083,7 +1168,17 @@ router.get("/api/ap-invoices/:id/approval-path", requireAuth, async (req: Reques
       .where(eq(apInvoiceApprovals.invoiceId, id))
       .orderBy(asc(apInvoiceApprovals.stepIndex));
 
-    res.json(approvals);
+    const totalSteps = approvals.length;
+    const completedSteps = approvals.filter(a => a.status === "APPROVED").length;
+    const lowestPending = approvals.find(a => a.status === "PENDING");
+    const currentStepIndex = lowestPending ? lowestPending.stepIndex : null;
+
+    const steps = approvals.map(a => ({
+      ...a,
+      isCurrent: a.status === "PENDING" && a.stepIndex === currentStepIndex,
+    }));
+
+    res.json({ steps, totalSteps, completedSteps, currentStepIndex });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching AP invoice approval path");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch approval path" });
@@ -1113,12 +1208,49 @@ router.post("/api/ap-invoices/bulk-approve", requireAuth, async (req: Request, r
 
     for (const invoice of invoices) {
       try {
-        await db
-          .update(apInvoices)
-          .set({ status: "APPROVED", updatedAt: new Date() })
-          .where(eq(apInvoices.id, invoice.id));
+        const allSteps = await db
+          .select()
+          .from(apInvoiceApprovals)
+          .where(eq(apInvoiceApprovals.invoiceId, invoice.id))
+          .orderBy(asc(apInvoiceApprovals.stepIndex));
 
-        await logActivity(invoice.id, "approved", "Invoice bulk approved", userId);
+        const currentStep = allSteps.find(s => s.status === "PENDING");
+
+        if (!currentStep) {
+          errors.push({ id: invoice.id, error: "No pending approval steps" });
+          continue;
+        }
+
+        if (currentStep.approverUserId !== userId) {
+          errors.push({ id: invoice.id, error: "Not your turn to approve this invoice" });
+          continue;
+        }
+
+        await db
+          .update(apInvoiceApprovals)
+          .set({ status: "APPROVED", decisionAt: new Date() })
+          .where(eq(apInvoiceApprovals.id, currentStep.id));
+
+        const remainingPending = allSteps.filter(s => s.status === "PENDING" && s.id !== currentStep.id);
+        const allDone = remainingPending.length === 0;
+
+        if (allDone) {
+          await db
+            .update(apInvoices)
+            .set({ status: "APPROVED", updatedAt: new Date() })
+            .where(eq(apInvoices.id, invoice.id));
+        }
+
+        const totalSteps = allSteps.length;
+        const completedNow = allSteps.filter(s => s.status === "APPROVED").length + 1;
+        await logActivity(
+          invoice.id,
+          "approved",
+          allDone
+            ? `Invoice bulk approved (all ${totalSteps} steps completed)`
+            : `Bulk approval step ${completedNow} of ${totalSteps} completed`,
+          userId
+        );
         approved.push(invoice.id);
       } catch (err) {
         errors.push({ id: invoice.id, error: "Failed to approve" });
@@ -1176,6 +1308,7 @@ router.get("/api/ap-approval-rules", requireAuth, async (req: Request, res: Resp
 const approvalRuleSchema = z.object({
   name: z.string().min(1),
   description: z.string().nullable().optional(),
+  ruleType: z.enum(["USER_CATCH_ALL", "USER", "AUTO_APPROVE"]).optional(),
   isActive: z.boolean().optional(),
   priority: z.number().optional(),
   conditions: z.any(),
@@ -1199,6 +1332,7 @@ router.post("/api/ap-approval-rules", requireAuth, async (req: Request, res: Res
         companyId,
         name: parsed.data.name,
         description: parsed.data.description || null,
+        ruleType: parsed.data.ruleType ?? "USER",
         isActive: parsed.data.isActive ?? true,
         priority: parsed.data.priority ?? 0,
         conditions: parsed.data.conditions,
@@ -1236,6 +1370,7 @@ router.patch("/api/ap-approval-rules/:id", requireAuth, async (req: Request, res
     const updates: any = { updatedAt: new Date() };
     if (parsed.data.name !== undefined) updates.name = parsed.data.name;
     if (parsed.data.description !== undefined) updates.description = parsed.data.description;
+    if (parsed.data.ruleType !== undefined) updates.ruleType = parsed.data.ruleType;
     if (parsed.data.isActive !== undefined) updates.isActive = parsed.data.isActive;
     if (parsed.data.priority !== undefined) updates.priority = parsed.data.priority;
     if (parsed.data.conditions !== undefined) updates.conditions = parsed.data.conditions;
