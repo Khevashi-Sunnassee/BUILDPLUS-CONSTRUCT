@@ -521,6 +521,19 @@ async function extractInvoiceDataFromBuffer(
       .limit(1);
     if (matchingSuppliers.length > 0) {
       updateData.supplierId = matchingSuppliers[0].id;
+    } else {
+      try {
+        const [newSupplier] = await db.insert(suppliers).values({
+          companyId,
+          name: data.supplier_name,
+          abn: data.supplier_abn || null,
+          isActive: true,
+        }).returning();
+        updateData.supplierId = newSupplier.id;
+        logger.info({ invoiceId, supplierName: data.supplier_name }, "[AP Extract] Created new supplier from extraction");
+      } catch (supplierErr: any) {
+        logger.warn({ err: supplierErr, supplierName: data.supplier_name }, "[AP Extract] Failed to create supplier, storing name only");
+      }
     }
   }
 
