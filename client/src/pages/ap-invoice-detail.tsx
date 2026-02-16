@@ -21,7 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Download, FileText, Plus, Send, Shield, ShieldAlert, ShieldCheck,
-  Clock, Pause, AlertTriangle, X, Pencil, Check, ChevronLeft, ChevronRight,
+  Clock, Pause, AlertTriangle, X, Pencil, Check, CheckCircle2, ChevronLeft, ChevronRight,
   ZoomIn, ZoomOut, FolderOpen, Loader2, BarChart3, Filter
 } from "lucide-react";
 
@@ -1220,6 +1220,21 @@ export default function ApInvoiceDetailPage() {
     },
   });
 
+  const confirmMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", AP_INVOICE_ROUTES.CONFIRM(invoiceId!));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId!)] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
+      toast({ title: "Invoice confirmed" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Confirm failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const submitMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", AP_INVOICE_ROUTES.SUBMIT(invoiceId!));
@@ -1256,7 +1271,7 @@ export default function ApInvoiceDetailPage() {
     if (autoExtractTriggered.current) return;
     const hasDoc = invoice.documents && invoice.documents.length > 0;
     const hasFields = invoice.extractedFields && invoice.extractedFields.length > 0;
-    if (hasDoc && !hasFields && invoice.status === "DRAFT" && !extractMutation.isPending) {
+    if (hasDoc && !hasFields && ["DRAFT", "IMPORTED"].includes(invoice.status) && !extractMutation.isPending) {
       autoExtractTriggered.current = true;
       extractMutation.mutate();
     }
@@ -1328,7 +1343,19 @@ export default function ApInvoiceDetailPage() {
         <h1 className="text-sm font-semibold" data-testid="text-invoice-number">
           Invoice {invoice.invoiceNumber || invoice.id}
         </h1>
-        <Badge variant="secondary" data-testid="badge-status">
+        <Badge
+          variant={
+            invoice.status === "APPROVED" ? "default" :
+            invoice.status === "REJECTED" || invoice.status === "FAILED_EXPORT" ? "destructive" :
+            invoice.status === "IMPORTED" ? "outline" : "secondary"
+          }
+          className={
+            invoice.status === "APPROVED" ? "bg-green-600 text-white" :
+            invoice.status === "CONFIRMED" ? "bg-teal-600 text-white" :
+            invoice.status === "EXPORTED" ? "bg-blue-600 text-white" : undefined
+          }
+          data-testid="badge-status"
+        >
           {(invoice.status || "draft").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
         </Badge>
         {invoice.isOnHold && <Badge variant="outline" className="text-amber-600 border-amber-300">On Hold</Badge>}
@@ -1350,10 +1377,16 @@ export default function ApInvoiceDetailPage() {
               {extractMutation.isPending ? "Extracting..." : "Extract with AI"}
             </Button>
           )}
-          {invoice.status === "DRAFT" && (
+          {(invoice.status === "DRAFT" || invoice.status === "IMPORTED") && (
+            <Button size="sm" onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending} data-testid="button-confirm-invoice">
+              {confirmMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+              Confirm
+            </Button>
+          )}
+          {invoice.status === "CONFIRMED" && (
             <Button size="sm" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending} data-testid="button-submit-invoice">
               {submitMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Send className="h-3 w-3 mr-1" />}
-              Submit
+              Submit for Approval
             </Button>
           )}
           {invoice.status === "PENDING_REVIEW" && (

@@ -170,7 +170,7 @@ router.get("/api/ap-invoices/counts", requireAuth, async (req: Request, res: Res
           and(
             eq(apInvoices.companyId, companyId),
             eq(apInvoices.assigneeUserId, userId),
-            inArray(apInvoices.status, ["DRAFT", "PENDING_REVIEW"] as any),
+            inArray(apInvoices.status, ["DRAFT", "IMPORTED", "CONFIRMED", "PENDING_REVIEW"] as any),
           )
         ),
       db
@@ -530,6 +530,43 @@ router.patch("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Resp
   }
 });
 
+router.post("/api/ap-invoices/:id/confirm", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select()
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+    if (!["DRAFT", "IMPORTED"].includes(existing.status)) {
+      return res.status(400).json({ error: "Only draft or imported invoices can be confirmed" });
+    }
+
+    if (!existing.invoiceNumber) {
+      return res.status(400).json({ error: "Invoice number is required before confirming" });
+    }
+
+    const [updated] = await db
+      .update(apInvoices)
+      .set({ status: "CONFIRMED", updatedAt: new Date() })
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .returning();
+
+    await logActivity(id, "confirmed", "Invoice confirmed by data entry clerk", userId);
+
+    res.json(updated);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error confirming AP invoice");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to confirm invoice" });
+  }
+});
+
 router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
@@ -544,7 +581,9 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
       .limit(1);
 
     if (!existing) return res.status(404).json({ error: "Invoice not found" });
-    if (existing.status !== "DRAFT") return res.status(400).json({ error: "Only draft invoices can be submitted" });
+    if (existing.status !== "CONFIRMED") {
+      return res.status(400).json({ error: "Only confirmed invoices can be submitted for approval" });
+    }
 
     if (!existing.invoiceNumber) {
       return res.status(400).json({ error: "Invoice number is required before submitting" });
@@ -679,7 +718,7 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
       .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
       .returning();
 
-    await logActivity(id, "submitted", `Invoice submitted for review (${approvalStepIndex} approver(s) assigned)`, userId);
+    await logActivity(id, "submitted", `Invoice submitted for approval (${approvalStepIndex} approver(s) assigned)`, userId);
 
     res.json(updated);
   } catch (error: unknown) {

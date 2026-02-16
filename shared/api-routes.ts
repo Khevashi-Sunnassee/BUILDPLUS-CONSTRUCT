@@ -961,6 +961,7 @@ export const AP_INVOICE_ROUTES = {
   COUNTS: '/api/ap-invoices/counts',
   BY_ID: (id: string | number) => `/api/ap-invoices/${id}`,
   UPLOAD: '/api/ap-invoices/upload',
+  CONFIRM: (id: string | number) => `/api/ap-invoices/${id}/confirm`,
   SUBMIT: (id: string | number) => `/api/ap-invoices/${id}/submit`,
   ASSIGN: (id: string | number) => `/api/ap-invoices/${id}/assign`,
   APPROVE: (id: string | number) => `/api/ap-invoices/${id}/approve`,

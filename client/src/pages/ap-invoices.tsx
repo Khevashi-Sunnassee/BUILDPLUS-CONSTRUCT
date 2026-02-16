@@ -55,7 +55,9 @@ interface InvoiceListResponse {
 
 interface StatusCounts {
   waiting_on_me: number;
+  imported: number;
   draft: number;
+  confirmed: number;
   pending_review: number;
   approved: number;
   exported: number;
@@ -66,7 +68,9 @@ interface StatusCounts {
 
 const STATUS_TABS = [
   { key: "waiting_on_me", label: "Waiting On Me", showCount: true },
+  { key: "imported", label: "Imported", showCount: false },
   { key: "draft", label: "Drafts", showCount: false },
+  { key: "confirmed", label: "Confirmed", showCount: false },
   { key: "pending_review", label: "Pending Review", showCount: false },
   { key: "approved", label: "Approved", showCount: false },
   { key: "exported", label: "Exported", showCount: false },
@@ -77,6 +81,8 @@ const STATUS_TABS = [
 
 const STATUS_BADGE_CONFIG: Record<string, { variant: "secondary" | "default" | "destructive" | "outline"; className?: string }> = {
   draft: { variant: "secondary" },
+  imported: { variant: "outline" },
+  confirmed: { variant: "default", className: "bg-teal-600 text-white" },
   pending_review: { variant: "default" },
   waiting_on_me: { variant: "default", className: "bg-amber-500 text-white" },
   approved: { variant: "default", className: "bg-green-600 text-white" },
@@ -407,7 +413,7 @@ export default function ApInvoicesPage() {
 
   const queryParams = useMemo(() => {
     const params: Record<string, string> = { page: String(page), limit: "50" };
-    if (activeTab !== "all") params.status = activeTab;
+    if (activeTab !== "all" && activeTab !== "waiting_on_me") params.status = activeTab.toUpperCase();
     if (search.trim()) params.q = search.trim();
     if (flagFilter !== "all") params.flagged = flagFilter;
     if (uploadedByFilter !== "all") params.uploadedBy = uploadedByFilter;
@@ -497,7 +503,9 @@ export default function ApInvoicesPage() {
 
   const getCount = (key: string): number => {
     if (!statusCounts) return 0;
-    return (statusCounts as any)[key] || 0;
+    const counts = statusCounts as any;
+    if (key === "waiting_on_me") return counts.waitingOnMe || counts.waiting_on_me || 0;
+    return counts[key.toUpperCase()] || counts[key] || 0;
   };
 
   if (isLoading) return <LoadingSkeleton />;
