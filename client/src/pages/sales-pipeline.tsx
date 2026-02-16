@@ -38,7 +38,10 @@ import {
   History,
   Loader2,
   Plus,
+  MessageSquare,
+  Paperclip,
 } from "lucide-react";
+import { OpportunitySidebar } from "./OpportunitySidebar";
 import {
   SALES_STAGES,
   STAGE_STATUSES,
@@ -154,6 +157,7 @@ export default function SalesPipelinePage() {
   const [statusNote, setStatusNote] = useState("");
   const [detailTab, setDetailTab] = useState<"details" | "history">("details");
   const [showNewOpp, setShowNewOpp] = useState(false);
+  const [sidebarOpp, setSidebarOpp] = useState<{ id: string; name: string; tab: "updates" | "files" | "activity" } | null>(null);
   const [newOpp, setNewOpp] = useState({
     name: "",
     customerId: "",
@@ -424,6 +428,12 @@ export default function SalesPipelinePage() {
                   <th className="text-right p-3 text-sm font-medium text-muted-foreground">Est. Value</th>
                   <th className="text-center p-3 text-sm font-medium text-muted-foreground">Prob.</th>
                   <th className="text-left p-3 text-sm font-medium text-muted-foreground">Created</th>
+                  <th className="text-center p-3 text-sm font-medium text-muted-foreground">
+                    <MessageSquare className="h-4 w-4 mx-auto" />
+                  </th>
+                  <th className="text-center p-3 text-sm font-medium text-muted-foreground">
+                    <Paperclip className="h-4 w-4 mx-auto" />
+                  </th>
                   <th className="p-3"></th>
                 </tr>
               </thead>
@@ -498,6 +508,34 @@ export default function SalesPipelinePage() {
                         )}
                       </td>
                       <td className="p-3 text-sm text-muted-foreground">{formatDate(opp.createdAt)}</td>
+                      <td className="p-3 text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSidebarOpp({ id: opp.id, name: opp.name, tab: "updates" });
+                          }}
+                          data-testid={`btn-opp-updates-${opp.id}`}
+                          aria-label="View updates"
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      </td>
+                      <td className="p-3 text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSidebarOpp({ id: opp.id, name: opp.name, tab: "files" });
+                          }}
+                          data-testid={`btn-opp-files-${opp.id}`}
+                          aria-label="View files"
+                        >
+                          <Paperclip className="h-4 w-4" />
+                        </Button>
+                      </td>
                       <td className="p-3">
                         <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       </td>
@@ -517,6 +555,34 @@ export default function SalesPipelinePage() {
             <DialogTitle className="flex items-center gap-2 flex-wrap">
               {selectedOpp?.name}
               <span className="text-xs text-muted-foreground font-normal">{selectedOpp?.jobNumber}</span>
+              <div className="ml-auto flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (selectedOpp) {
+                      setSidebarOpp({ id: selectedOpp.id, name: selectedOpp.name, tab: "updates" });
+                    }
+                  }}
+                  data-testid="btn-detail-updates"
+                >
+                  <MessageSquare className="h-4 w-4 mr-1" />
+                  Updates
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (selectedOpp) {
+                      setSidebarOpp({ id: selectedOpp.id, name: selectedOpp.name, tab: "files" });
+                    }
+                  }}
+                  data-testid="btn-detail-files"
+                >
+                  <Paperclip className="h-4 w-4 mr-1" />
+                  Files
+                </Button>
+              </div>
             </DialogTitle>
           </DialogHeader>
           {selectedOpp && (
@@ -903,6 +969,13 @@ export default function SalesPipelinePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <OpportunitySidebar
+        opportunityId={sidebarOpp?.id || null}
+        opportunityName={sidebarOpp?.name || ""}
+        onClose={() => setSidebarOpp(null)}
+        initialTab={sidebarOpp?.tab}
+      />
     </div>
   );
 }
