@@ -333,6 +333,22 @@ const ENTITY_TABS: EntityTabConfig[] = [
     ],
     getRowName: (r: any) => r.name || `BOQ Group ${r.id}`,
   },
+  {
+    key: "ap-invoices",
+    label: "AP Invoices",
+    entityType: "ap-invoices",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_AP_INVOICES,
+    columns: [
+      { key: "invoiceNumber", label: "Invoice #", render: (r: any) => r.invoiceNumber || "-" },
+      { key: "supplierName", label: "Supplier", render: (r: any) => r.supplierName || "-" },
+      { key: "description", label: "Description", render: (r: any) => r.description || "-" },
+      { key: "totalInc", label: "Total Inc", render: (r: any) => r.totalInc ? `$${Number(r.totalInc).toFixed(2)}` : "-" },
+      { key: "status", label: "Status", render: (r: any) => <Badge variant="secondary">{r.status || "Unknown"}</Badge> },
+      { key: "sourceEmail", label: "Source", render: (r: any) => r.sourceEmail ? "Email" : "Upload" },
+      { key: "createdAt", label: "Created", render: (r: any) => r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "-" },
+    ],
+    getRowName: (r: any) => r.invoiceNumber || r.description || `AP Invoice ${r.id?.slice(0, 8)}`,
+  },
 ];
 
 function EntityTable({

@@ -53,6 +53,8 @@ import {
   budgetLineFiles,
   boqGroups,
   boqItems,
+  apInvoices,
+  apInvoiceDocuments,
 } from "@shared/schema";
 import { inArray, notInArray } from "drizzle-orm";
 
@@ -1265,6 +1267,14 @@ dataManagementRouter.delete("/api/admin/data-management/:entityType/bulk-delete"
         deletedCount = safeIds.length;
         break;
       }
+      case "ap-invoices": {
+        const [total] = await db.select({ count: count() }).from(apInvoices).where(eq(apInvoices.companyId, companyId));
+        totalCount = total.count;
+        protectedCount = 0;
+        await db.delete(apInvoices).where(eq(apInvoices.companyId, companyId));
+        deletedCount = totalCount;
+        break;
+      }
       default:
         return res.status(400).json({ error: `Unknown entity type: ${entityType}` });
     }
@@ -1517,5 +1527,44 @@ dataManagementRouter.delete("/api/admin/data-management/boq-groups/:id", require
     res.json({ success: true });
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete BOQ group" });
+  }
+});
+
+dataManagementRouter.get("/api/admin/data-management/ap-invoices", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db
+      .select({
+        id: apInvoices.id,
+        invoiceNumber: apInvoices.invoiceNumber,
+        description: apInvoices.description,
+        supplierName: suppliers.name,
+        totalInc: apInvoices.totalInc,
+        status: apInvoices.status,
+        sourceEmail: apInvoices.sourceEmail,
+        createdAt: apInvoices.createdAt,
+      })
+      .from(apInvoices)
+      .leftJoin(suppliers, eq(apInvoices.supplierId, suppliers.id))
+      .where(eq(apInvoices.companyId, companyId))
+      .orderBy(desc(apInvoices.createdAt));
+    res.json(result);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch AP invoices" });
+  }
+});
+
+dataManagementRouter.delete("/api/admin/data-management/ap-invoices/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const { id } = req.params;
+    const [existing] = await db.select({ id: apInvoices.id }).from(apInvoices).where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)));
+    if (!existing) return res.status(404).json({ error: "AP invoice not found" });
+    await db.delete(apInvoices).where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)));
+    res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete AP invoice" });
   }
 });
