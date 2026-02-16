@@ -423,6 +423,7 @@ const updateInvoiceSchema = z.object({
   dueDate: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
   supplierId: z.string().nullable().optional(),
+  supplierName: z.string().nullable().optional(),
   totalEx: z.string().nullable().optional(),
   totalTax: z.string().nullable().optional(),
   totalInc: z.string().nullable().optional(),
@@ -471,6 +472,29 @@ router.patch("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Resp
     if (parsed.data.supplierId !== undefined) {
       updates.supplierId = parsed.data.supplierId;
       changedFields.push("supplierId");
+    }
+    if (parsed.data.supplierName !== undefined && parsed.data.supplierId === undefined) {
+      const name = parsed.data.supplierName?.trim();
+      if (name) {
+        const [existingSupplier] = await db.select({ id: suppliers.id })
+          .from(suppliers)
+          .where(and(eq(suppliers.companyId, companyId), ilike(suppliers.name, name)))
+          .limit(1);
+        if (existingSupplier) {
+          updates.supplierId = existingSupplier.id;
+        } else {
+          const [newSupplier] = await db.insert(suppliers).values({
+            companyId,
+            name,
+            isActive: true,
+          }).returning();
+          updates.supplierId = newSupplier.id;
+        }
+        changedFields.push("supplier");
+      } else {
+        updates.supplierId = null;
+        changedFields.push("supplier");
+      }
     }
     if (parsed.data.totalEx !== undefined) {
       updates.totalEx = parsed.data.totalEx;

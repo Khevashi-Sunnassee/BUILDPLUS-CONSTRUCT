@@ -223,6 +223,118 @@ function EditableField({ label, value, fieldKey, onSave, onFocus, type = "text" 
   );
 }
 
+function SupplierSearchField({ invoice, onSupplierSelect, onFocus }: {
+  invoice: InvoiceDetail;
+  onSupplierSelect: (supplierId: string | null, supplierName: string) => void;
+  onFocus: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [search, setSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const { data: allSuppliers } = useQuery<Array<{ id: string; name: string }>>({
+    queryKey: ["/api/procurement/suppliers/active"],
+  });
+
+  const filtered = useMemo(() => {
+    if (!allSuppliers) return [];
+    if (!search.trim()) return allSuppliers.slice(0, 20);
+    const q = search.toLowerCase();
+    return allSuppliers.filter(s => s.name.toLowerCase().includes(q)).slice(0, 20);
+  }, [allSuppliers, search]);
+
+  const exactMatch = useMemo(() => {
+    if (!search.trim() || !allSuppliers) return false;
+    return allSuppliers.some(s => s.name.toLowerCase() === search.toLowerCase());
+  }, [allSuppliers, search]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setEditing(false);
+        setShowDropdown(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelect = (supplier: { id: string; name: string }) => {
+    onSupplierSelect(supplier.id, supplier.name);
+    setEditing(false);
+    setShowDropdown(false);
+    setSearch("");
+  };
+
+  const handleCreateNew = () => {
+    const name = search.trim();
+    if (!name) return;
+    onSupplierSelect(null, name);
+    setEditing(false);
+    setShowDropdown(false);
+    setSearch("");
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="flex items-start gap-2 py-1.5 px-2 rounded-md hover-elevate cursor-pointer group relative"
+      onClick={() => { onFocus(); if (!editing) { setEditing(true); setSearch(invoice.supplier?.name || ""); setShowDropdown(true); setTimeout(() => inputRef.current?.focus(), 0); } }}
+      data-testid="field-supplierName"
+    >
+      <span className="text-sm text-muted-foreground whitespace-nowrap min-w-[100px] pt-0.5">Supplier</span>
+      {editing ? (
+        <div className="flex-1 relative">
+          <Input
+            ref={inputRef}
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setShowDropdown(true); }}
+            onFocus={() => setShowDropdown(true)}
+            placeholder="Search suppliers..."
+            className="h-7 text-sm"
+            autoFocus
+            data-testid="input-supplierName"
+          />
+          {showDropdown && (
+            <div className="absolute z-50 top-8 left-0 right-0 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto" data-testid="dropdown-supplier-results">
+              {filtered.map((s) => (
+                <div
+                  key={s.id}
+                  className="px-3 py-1.5 text-sm cursor-pointer hover-elevate"
+                  onClick={(e) => { e.stopPropagation(); handleSelect(s); }}
+                  data-testid={`option-supplier-${s.id}`}
+                >
+                  {s.name}
+                </div>
+              ))}
+              {search.trim() && !exactMatch && (
+                <div
+                  className="px-3 py-1.5 text-sm cursor-pointer hover-elevate border-t flex items-center gap-1.5 text-primary"
+                  onClick={(e) => { e.stopPropagation(); handleCreateNew(); }}
+                  data-testid="button-create-supplier"
+                >
+                  <Plus className="h-3 w-3" />
+                  Add "{search.trim()}" as new supplier
+                </div>
+              )}
+              {filtered.length === 0 && !search.trim() && (
+                <div className="px-3 py-2 text-sm text-muted-foreground">No suppliers found</div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <span className="text-sm font-medium text-left break-words min-w-0" data-testid="value-supplierName">
+          {invoice.supplier?.name || "—"}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function InvoiceSummaryCard({ invoice, onFieldSave, onFieldFocus }: {
   invoice: InvoiceDetail;
   onFieldSave: (key: string, val: string) => void;
@@ -230,12 +342,19 @@ function InvoiceSummaryCard({ invoice, onFieldSave, onFieldFocus }: {
 }) {
   const fields = [
     { label: "Invoice Number", key: "invoiceNumber", value: invoice.invoiceNumber || "" },
-    { label: "Supplier", key: "supplierName", value: invoice.supplier?.name || "" },
     { label: "Invoice Date", key: "invoiceDate", value: invoice.invoiceDate ? invoice.invoiceDate.split("T")[0] : "", type: "date" as const },
     { label: "Due Date", key: "dueDate", value: invoice.dueDate ? invoice.dueDate.split("T")[0] : "", type: "date" as const },
     { label: "Post Period", key: "postPeriod", value: invoice.postPeriod || "" },
     { label: "Description", key: "description", value: invoice.description || "" },
   ];
+
+  const handleSupplierSelect = (supplierId: string | null, supplierName: string) => {
+    if (supplierId) {
+      onFieldSave("supplierId", supplierId);
+    } else {
+      onFieldSave("supplierName", supplierName);
+    }
+  };
 
   return (
     <Card data-testid="card-invoice-summary">
@@ -243,7 +362,19 @@ function InvoiceSummaryCard({ invoice, onFieldSave, onFieldFocus }: {
         <CardTitle className="text-sm font-semibold">General Information</CardTitle>
       </CardHeader>
       <CardContent className="p-4 pt-0 space-y-0.5">
-        {fields.map((f) => (
+        <EditableField
+          label="Invoice Number"
+          value={invoice.invoiceNumber || ""}
+          fieldKey="invoiceNumber"
+          onSave={onFieldSave}
+          onFocus={onFieldFocus}
+        />
+        <SupplierSearchField
+          invoice={invoice}
+          onSupplierSelect={handleSupplierSelect}
+          onFocus={() => onFieldFocus("supplierName")}
+        />
+        {fields.filter(f => f.key !== "invoiceNumber").map((f) => (
           <EditableField
             key={f.key}
             label={f.label}
