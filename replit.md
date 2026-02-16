@@ -46,6 +46,24 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Accessibility:** All interactive elements and pages adhere to accessibility standards (`aria-label`, `aria-required`, `role="alert"`).
 - **Testing:** Frontend tested with React Testing Library + Vitest (135 files, 562+ tests); backend tested with 43+ API integration tests covering company isolation, data integrity, pagination, rate limiting, and input sanitization.
 
+## Sidebar Pattern (EntitySidebar)
+
+When building sidebar components with Updates/Files/Activity tabs, **always** use the shared `EntitySidebar` component (`client/src/components/EntitySidebar.tsx`) instead of duplicating sidebar logic. Shared utilities live in `client/src/lib/sidebar-utils.tsx`.
+
+**How to add a new sidebar:**
+1. Define route constants in `shared/api-routes.ts` (UPDATES, UPDATE_BY_ID, FILES, FILE_BY_ID, EMAIL_DROP)
+2. Create a thin wrapper component that passes entity-specific props to `EntitySidebar`
+3. Use `testIdPrefix` for consistent data-testid naming (e.g., `"task"`, `"opp"`, `"budget"`, `"invitation"`)
+4. Use `extraTabs` + `renderExtraTab` for entity-specific tabs (e.g., BudgetLineSidebar's "items" tab)
+5. Use `hideActivityTab` if the entity doesn't need an activity log
+6. Use `invalidationKeys` to specify parent query keys to invalidate on mutations
+
+**Existing sidebars using this pattern:**
+- `TaskSidebar` → `client/src/pages/tasks/TaskSidebar.tsx` (uses TASKS_ROUTES)
+- `OpportunitySidebar` → `client/src/pages/OpportunitySidebar.tsx` (uses OPPORTUNITY_ROUTES)
+- `BudgetLineSidebar` → `client/src/components/budget/BudgetLineSidebar.tsx` (uses BUDGET_LINE_ROUTES, has extra "items" tab)
+- `InvitationSidebar` → inline in `client/src/pages/tender-detail.tsx` (uses TENDER_MEMBER_ROUTES)
+
 ## Lifecycle Testing
 
 The lifecycle testing skill (`.agents/skills/lifecycle-testing/SKILL.md`) documents the complete 15-stage panel lifecycle test workflow. Key points:

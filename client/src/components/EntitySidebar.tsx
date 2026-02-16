@@ -47,6 +47,7 @@ interface EntitySidebarProps {
   sheetWidth?: string;
   extraTabs?: ExtraTab[];
   renderExtraTab?: (tabId: string) => ReactNode;
+  hideActivityTab?: boolean;
   emptyUpdatesMessage?: string;
   emptyFilesMessage?: string;
 }
@@ -62,6 +63,7 @@ export function EntitySidebar({
   sheetWidth = "w-[400px] sm:w-[500px]",
   extraTabs = [],
   renderExtraTab,
+  hideActivityTab = false,
   emptyUpdatesMessage = "Write a note, drop an email, or share files to get things moving",
   emptyFilesMessage = "Upload files or paste screenshots to attach them",
 }: EntitySidebarProps) {
@@ -324,14 +326,16 @@ export function EntitySidebar({
               <Paperclip className="h-4 w-4 mr-1" />
               Files
             </Button>
-            <Button
-              variant={activeTab === "activity" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setActiveTab("activity")}
-              data-testid={`${testIdPrefix}-tab-activity`}
-            >
-              Activity Log
-            </Button>
+            {!hideActivityTab && (
+              <Button
+                variant={activeTab === "activity" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTab("activity")}
+                data-testid={`${testIdPrefix}-tab-activity`}
+              >
+                Activity Log
+              </Button>
+            )}
             {extraTabs.map((tab) => (
               <Button
                 key={tab.id}
@@ -609,7 +613,7 @@ export function EntitySidebar({
             </div>
           )}
 
-          {activeTab === "activity" && (
+          {activeTab === "activity" && !hideActivityTab && (
             <div className="text-center py-8 text-muted-foreground">
               <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
               <p>Activity log</p>
