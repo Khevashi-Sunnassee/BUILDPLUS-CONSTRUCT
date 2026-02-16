@@ -131,7 +131,7 @@ router.post("/api/ap-inbox/check-emails", requireAuth, async (req: Request, res:
     const maxPages = 10;
 
     while (hasMore && pageCount < maxPages) {
-      const url = new URL("https://api.resend.com/emails/receiving/list");
+      const url = new URL("https://api.resend.com/emails/receiving");
       if (cursor) url.searchParams.set("after", cursor);
 
       const listRes = await fetch(url.toString(), {
@@ -381,7 +381,7 @@ async function processInboundEmail(
 
     const apiKey = await getResendApiKey();
 
-    const emailDetailRes = await fetch(`https://api.resend.com/emails/${resendEmailId}/receiving`, {
+    const emailDetailRes = await fetch(`https://api.resend.com/emails/receiving/${resendEmailId}`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
 
@@ -394,7 +394,7 @@ async function processInboundEmail(
     let attachments: any[] = [];
     if (Array.isArray(emailDetail.attachments) && emailDetail.attachments.length > 0) {
       for (const att of emailDetail.attachments) {
-        const attDetailRes = await fetch(`https://api.resend.com/emails/${resendEmailId}/receiving/attachments/${att.id}`, {
+        const attDetailRes = await fetch(`https://api.resend.com/emails/receiving/${resendEmailId}/attachments/${att.id}`, {
           headers: { Authorization: `Bearer ${apiKey}` },
         });
         if (attDetailRes.ok) {
