@@ -711,17 +711,9 @@ async function handleTenderInboundEmail(
     metaJson: { subject, from: fromAddress },
   });
 
-  if (has_attachments) {
-    processTenderInboundEmail(inboundRecord.id, email_id, settings).catch(err => {
-      logger.error({ err, inboundId: inboundRecord.id }, "[Tender Inbox] Background processing failed");
-    });
-  } else {
-    await db.update(tenderInboundEmails)
-      .set({ status: "NO_ATTACHMENTS", processedAt: new Date() })
-      .where(eq(tenderInboundEmails.id, inboundRecord.id));
-
-    logger.info({ emailId: email_id }, "[Tender Inbox] Email has no attachments, skipping");
-  }
+  processTenderInboundEmail(inboundRecord.id, email_id, settings).catch(err => {
+    logger.error({ err, inboundId: inboundRecord.id }, "[Tender Inbox] Background processing failed");
+  });
 
   return res.status(200).json({ status: "accepted", inbox: "tender", inboundId: inboundRecord.id });
 }
@@ -784,10 +776,39 @@ async function processTenderInboundEmail(
       .where(eq(tenderInboundEmails.id, inboundId));
 
     if (relevantAttachments.length === 0) {
-      await db.update(tenderInboundEmails)
-        .set({ status: "NO_PDF_ATTACHMENTS", processedAt: new Date() })
-        .where(eq(tenderInboundEmails.id, inboundId));
-      logger.info({ inboundId, totalAttachments: attachments.length }, "[Tender Inbox] No PDF/image attachments found");
+      const emailBodyText = emailDetail.text || emailDetail.html || "";
+      if (emailBodyText && settings.autoExtract) {
+        try {
+          const { extractTenderEmailFromText } = await import("../lib/tender-inbox-jobs");
+          await extractTenderEmailFromText(inboundId, settings.companyId, emailBodyText);
+          await db.update(tenderInboundEmails)
+            .set({ status: "PROCESSED", processedAt: new Date() })
+            .where(eq(tenderInboundEmails.id, inboundId));
+          await db.insert(tenderEmailActivity).values({
+            inboundEmailId: inboundId,
+            activityType: "processed",
+            message: "Email processed from body text (no attachments)",
+            metaJson: { source: "email_body", totalAttachments: attachments.length },
+          });
+          logger.info({ inboundId }, "[Tender Inbox] Processed email from body text (no attachments)");
+        } catch (extractErr: any) {
+          logger.warn({ err: extractErr, inboundId }, "[Tender Inbox] Body text extraction failed");
+          await db.update(tenderInboundEmails)
+            .set({ status: "PROCESSED", processedAt: new Date() })
+            .where(eq(tenderInboundEmails.id, inboundId));
+        }
+      } else {
+        await db.update(tenderInboundEmails)
+          .set({ status: "PROCESSED", processedAt: new Date() })
+          .where(eq(tenderInboundEmails.id, inboundId));
+      }
+      await db.insert(tenderEmailActivity).values({
+        inboundEmailId: inboundId,
+        activityType: "processed",
+        message: `Email received with ${attachments.length} attachment(s), no PDF/images found`,
+        metaJson: { totalAttachments: attachments.length },
+      });
+      logger.info({ inboundId, totalAttachments: attachments.length }, "[Tender Inbox] No PDF/image attachments found, email still recorded");
       return;
     }
 
