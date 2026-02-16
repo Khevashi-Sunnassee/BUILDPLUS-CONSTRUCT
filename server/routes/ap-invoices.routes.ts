@@ -570,8 +570,29 @@ router.post("/api/ap-invoices/:id/confirm", requireAuth, async (req: Request, re
       return res.status(400).json({ error: "Only imported or processed invoices can be confirmed" });
     }
 
-    if (!existing.invoiceNumber) {
-      return res.status(400).json({ error: "Invoice number is required before confirming" });
+    const missingFields: string[] = [];
+    if (!existing.invoiceNumber) missingFields.push("Invoice Number");
+    if (!existing.supplierId) missingFields.push("Supplier");
+    const totalAmount = parseFloat(existing.totalInc || existing.totalEx || "0");
+    if (!totalAmount || totalAmount <= 0) missingFields.push("Amount");
+
+    const invoiceSplits = await db
+      .select()
+      .from(apInvoiceSplits)
+      .where(eq(apInvoiceSplits.invoiceId, id));
+
+    if (invoiceSplits.length === 0) {
+      missingFields.push("At least one coding split");
+    } else {
+      const hasJob = invoiceSplits.some(s => s.jobId);
+      if (!hasJob) missingFields.push("Job on at least one coding split");
+    }
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        error: `Cannot confirm: missing required fields - ${missingFields.join(", ")}`,
+        missingFields,
+      });
     }
 
     const [updated] = await db
@@ -603,12 +624,8 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
       .limit(1);
 
     if (!existing) return res.status(404).json({ error: "Invoice not found" });
-    if (!["IMPORTED", "PROCESSED", "CONFIRMED"].includes(existing.status)) {
-      return res.status(400).json({ error: "Only imported, processed, or confirmed invoices can be submitted for approval" });
-    }
-
-    if (!existing.invoiceNumber) {
-      return res.status(400).json({ error: "Invoice number is required before submitting" });
+    if (existing.status !== "CONFIRMED") {
+      return res.status(400).json({ error: "Invoice must be confirmed before submitting for approval" });
     }
 
     await db.delete(apInvoiceApprovals).where(eq(apInvoiceApprovals.invoiceId, id));

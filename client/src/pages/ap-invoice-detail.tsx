@@ -1281,6 +1281,29 @@ export default function ApInvoiceDetailPage() {
     }
   }, [invoice]);
 
+  const handleConfirm = useCallback(() => {
+    if (!invoice) return;
+    const missing: string[] = [];
+    if (!invoice.invoiceNumber) missing.push("Invoice Number");
+    if (!invoice.supplierId) missing.push("Supplier");
+    const totalAmount = parseFloat(invoice.totalInc || invoice.totalEx || "0");
+    if (!totalAmount || totalAmount <= 0) missing.push("Amount");
+    if (!splits || splits.length === 0) {
+      missing.push("At least one coding split");
+    } else if (!splits.some(s => s.jobId)) {
+      missing.push("Job on at least one coding split");
+    }
+    if (missing.length > 0) {
+      toast({
+        title: "Cannot confirm invoice",
+        description: `Please fill in: ${missing.join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    confirmMutation.mutate();
+  }, [invoice, splits, confirmMutation, toast]);
+
   const handleReject = useCallback(() => {
     const note = window.prompt("Please provide a reason for rejection:");
     if (!note || note.trim().length === 0) {
@@ -1385,12 +1408,12 @@ export default function ApInvoiceDetailPage() {
             </Button>
           )}
           {(invoice.status === "IMPORTED" || invoice.status === "PROCESSED") && (
-            <Button size="sm" onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending} data-testid="button-confirm-invoice">
+            <Button size="sm" onClick={handleConfirm} disabled={confirmMutation.isPending} data-testid="button-confirm-invoice">
               {confirmMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
               Confirm
             </Button>
           )}
-          {(invoice.status === "IMPORTED" || invoice.status === "PROCESSED" || invoice.status === "CONFIRMED") && (
+          {invoice.status === "CONFIRMED" && (
             <Button size="sm" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending} data-testid="button-submit-invoice">
               {submitMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Send className="h-3 w-3 mr-1" />}
               Submit for Approval
