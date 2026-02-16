@@ -469,140 +469,76 @@ async function extractInvoiceData(
   const { default: OpenAI } = await import("openai");
   const openai = new OpenAI();
 
-  const extractionPrompt = `You are an expert invoice data extraction system. Analyze this invoice image/document and extract the following fields.
-For each field, return an object with:
-- key: the field name (use snake_case)
-- value: the extracted value
-- confidence: a number from 0 to 1 indicating extraction confidence
-- bbox: approximate bounding box as {x1, y1, x2, y2} in normalized coordinates (0-1 range relative to page dimensions), or null if you cannot determine the location
-
-Extract these fields:
-1. "invoice_number" - The invoice number/reference
-2. "supplier_name" - The supplier/vendor company name
-3. "supplier_abn" - The supplier ABN (Australian Business Number) if present
-4. "invoice_date" - The invoice date (return in YYYY-MM-DD format)
-5. "due_date" - The due/payment date if present (YYYY-MM-DD format)
-6. "subtotal" - The subtotal/amount before tax
-7. "gst" - The GST/tax amount
-8. "total" - The total amount including tax
-9. "po_number" - Purchase order number if present
-10. "description" - Brief description of goods/services
-
-Also extract line items if visible as an array called "line_items" where each item has:
-- description, quantity, unit_price, amount
-
-Return your response as valid JSON with this exact structure:
-{
-  "fields": [
-    {"key": "invoice_number", "value": "...", "confidence": 0.95, "bbox": {"x1": 0.5, "y1": 0.1, "x2": 0.8, "y2": 0.15}},
-    ...
-  ],
-  "line_items": [
-    {"description": "...", "quantity": "...", "unit_price": "...", "amount": "..."},
-    ...
-  ]
-}`;
-
-  const messages: any[] = [{
-    role: "user",
-    content: [
-      { type: "text", text: extractionPrompt },
-      ...imageBuffers.map(img => ({
-        type: "image_url",
-        image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: "high" },
-      })),
-    ],
-  }];
+  const { AP_EXTRACTION_SYSTEM_PROMPT, AP_EXTRACTION_USER_PROMPT, parseExtractedData, buildExtractedFieldRecords, buildInvoiceUpdateFromExtraction, sanitizeNumericValue } = await import("./ap-extraction-prompt");
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
-    messages,
-    max_tokens: 4096,
+    messages: [
+      { role: "system", content: AP_EXTRACTION_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: AP_EXTRACTION_USER_PROMPT },
+          ...imageBuffers.map(img => ({
+            type: "image_url" as const,
+            image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: "high" as const },
+          })),
+        ],
+      },
+    ],
+    max_tokens: 2048,
     temperature: 0,
     response_format: { type: "json_object" },
   });
 
   const responseText = completion.choices[0]?.message?.content || "{}";
-  let extractedData: any;
+  let rawData: any;
   try {
-    extractedData = JSON.parse(responseText);
+    rawData = JSON.parse(responseText);
   } catch {
     logger.error({ invoiceId }, "[AP Background] Failed to parse extraction response");
     return;
   }
 
-  const fields = extractedData.fields || [];
+  const data = parseExtractedData(rawData);
+  const fieldRecords = buildExtractedFieldRecords(invoiceId, data);
 
-  for (const field of fields) {
+  for (const field of fieldRecords) {
     await db.insert(apInvoiceExtractedFields).values({
       invoiceId,
-      fieldKey: field.key,
-      fieldValue: field.value || null,
-      confidence: field.confidence != null ? Number(field.confidence) : null,
-      bboxJson: field.bbox || null,
+      fieldKey: field.fieldKey,
+      fieldValue: field.fieldValue,
+      confidence: field.confidence,
+      bboxJson: null,
       source: "extraction",
     });
   }
 
-  const fieldMap: Record<string, string> = {};
-  for (const f of fields) {
-    if (f.value) fieldMap[f.key] = f.value;
-  }
+  const updateData = buildInvoiceUpdateFromExtraction(data);
 
-  const updateData: any = {};
-  if (fieldMap.invoice_number) updateData.invoiceNumber = fieldMap.invoice_number;
-  if (fieldMap.invoice_date) {
-    try { updateData.invoiceDate = new Date(fieldMap.invoice_date); } catch {}
-  }
-  if (fieldMap.due_date) {
-    try { updateData.dueDate = new Date(fieldMap.due_date); } catch {}
-  }
-  if (fieldMap.total) updateData.totalInc = fieldMap.total.replace(/[^0-9.-]/g, "");
-  if (fieldMap.gst) updateData.totalTax = fieldMap.gst.replace(/[^0-9.-]/g, "");
-  if (fieldMap.subtotal) updateData.totalEx = fieldMap.subtotal.replace(/[^0-9.-]/g, "");
-  if (fieldMap.description) updateData.description = fieldMap.description;
-
-  if (fieldMap.supplier_name) {
+  if (data.supplier_name) {
     const matchingSuppliers = await db.select().from(suppliers)
-      .where(and(eq(suppliers.companyId, companyId), ilike(suppliers.name, `%${fieldMap.supplier_name}%`)))
+      .where(and(eq(suppliers.companyId, companyId), ilike(suppliers.name, `%${data.supplier_name}%`)))
       .limit(1);
     if (matchingSuppliers.length > 0) {
       updateData.supplierId = matchingSuppliers[0].id;
     }
   }
 
-  let riskScore = 0;
-  const riskReasons: string[] = [];
-  for (const field of fields) {
-    if (field.confidence !== null && field.confidence < 0.7) {
-      riskScore += 15;
-      riskReasons.push(`Low confidence on ${field.key}: ${(field.confidence * 100).toFixed(0)}%`);
-    }
-  }
-  if (!fieldMap.invoice_number) {
-    riskScore += 20;
-    riskReasons.push("Missing invoice number");
-  }
-  if (!fieldMap.total) {
-    riskScore += 20;
-    riskReasons.push("Missing total amount");
-  }
-  updateData.riskScore = Math.min(riskScore, 100);
-  updateData.riskReasons = riskReasons;
   updateData.status = "PROCESSED";
   updateData.updatedAt = new Date();
 
   await db.update(apInvoices).set(updateData).where(eq(apInvoices.id, invoiceId));
 
-  const totalInc = parseFloat(updateData.totalInc || "0");
+  const totalInc = parseFloat(sanitizeNumericValue(data.total_amount_inc_gst) || "0");
   if (totalInc > 0) {
-    const gstAmount = parseFloat(updateData.totalTax || "0");
-    const subtotal = parseFloat(updateData.totalEx || String(totalInc));
+    const gstAmount = parseFloat(sanitizeNumericValue(data.total_gst) || "0");
+    const subtotal = parseFloat(sanitizeNumericValue(data.subtotal_ex_gst) || String(totalInc));
     const taxCodeLabel = gstAmount > 0 ? "GST" : "FRE";
 
     await db.insert(apInvoiceSplits).values({
       invoiceId,
-      description: fieldMap.description || "Invoice total",
+      description: data.description || "Invoice total",
       percentage: "100",
       amount: subtotal > 0 ? subtotal.toFixed(2) : totalInc.toFixed(2),
       taxCodeId: taxCodeLabel,
@@ -611,9 +547,8 @@ Return your response as valid JSON with this exact structure:
   }
 
   await logActivity(invoiceId, "auto_extraction_completed", "AI extraction completed automatically in background", undefined, {
-    fieldsExtracted: fields.length,
-    lineItemsFound: (extractedData.line_items || []).length,
+    fieldsExtracted: fieldRecords.length,
   });
 
-  logger.info({ invoiceId, fieldsExtracted: fields.length }, "[AP Background] Extraction complete");
+  logger.info({ invoiceId, fieldsExtracted: fieldRecords.length }, "[AP Background] Extraction complete");
 }

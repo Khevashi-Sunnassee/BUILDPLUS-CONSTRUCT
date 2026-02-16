@@ -1260,7 +1260,7 @@ export default function ApInvoiceDetailPage() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId!)] });
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
-      toast({ title: "Extraction complete", description: `${data.fields?.length || 0} fields extracted` });
+      toast({ title: "Extraction complete", description: `${data.fieldsStored || data.fields?.length || 0} fields extracted` });
     },
     onError: (err: Error) => {
       toast({ title: "Extraction failed", description: err.message, variant: "destructive" });

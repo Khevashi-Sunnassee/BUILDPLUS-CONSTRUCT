@@ -1919,134 +1919,64 @@ router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, re
 
     const OpenAI = (await import("openai")).default;
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-    const extractionPrompt = `You are an expert invoice data extraction system. Analyze this invoice image/document and extract the following fields.
-
-For each field, provide:
-- key: the field identifier
-- value: the extracted value
-- confidence: your confidence level from 0.0 to 1.0
-- bbox: approximate bounding box as {x1, y1, x2, y2} in normalized coordinates (0-1 range relative to page dimensions), or null if you cannot determine the location
-
-Extract these fields:
-1. "invoice_number" - The invoice number/reference
-2. "supplier_name" - The supplier/vendor company name
-3. "supplier_abn" - The supplier ABN (Australian Business Number) if present
-4. "invoice_date" - The invoice date (return in YYYY-MM-DD format)
-5. "due_date" - The due/payment date if present (YYYY-MM-DD format)
-6. "subtotal" - The subtotal/amount before tax
-7. "gst" - The GST/tax amount
-8. "total" - The total amount including tax
-9. "po_number" - Purchase order number if present
-10. "description" - Brief description of goods/services
-
-Also extract line items if visible as an array called "line_items" where each item has:
-- description, quantity, unit_price, amount
-
-Return your response as valid JSON with this exact structure:
-{
-  "fields": [
-    {"key": "invoice_number", "value": "...", "confidence": 0.95, "bbox": {"x1": 0.5, "y1": 0.1, "x2": 0.8, "y2": 0.15}},
-    ...
-  ],
-  "line_items": [
-    {"description": "...", "quantity": "...", "unit_price": "...", "amount": "..."},
-    ...
-  ]
-}`;
-
-    const imageContent = imageBuffers.map(img => ({
-      type: "image_url" as const,
-      image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: "high" as const },
-    }));
+    const { AP_EXTRACTION_SYSTEM_PROMPT, AP_EXTRACTION_USER_PROMPT, parseExtractedData, buildExtractedFieldRecords, buildInvoiceUpdateFromExtraction, sanitizeNumericValue } = await import("../lib/ap-extraction-prompt");
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
+        { role: "system", content: AP_EXTRACTION_SYSTEM_PROMPT },
         {
           role: "user",
           content: [
-            { type: "text", text: extractionPrompt },
-            ...imageContent,
+            { type: "text", text: AP_EXTRACTION_USER_PROMPT },
+            ...imageBuffers.map(img => ({
+              type: "image_url" as const,
+              image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: "high" as const },
+            })),
           ],
         },
       ],
-      max_tokens: 4096,
+      max_tokens: 2048,
       temperature: 0,
       response_format: { type: "json_object" },
     });
 
     const responseText = response.choices[0]?.message?.content || "{}";
-    let extractedData: any;
+    let rawData: any;
     try {
-      extractedData = JSON.parse(responseText);
+      rawData = JSON.parse(responseText);
     } catch {
       logger.error("Failed to parse extraction response as JSON");
       return res.status(500).json({ error: "Extraction produced invalid response" });
     }
 
+    const data = parseExtractedData(rawData);
+    const fieldRecords = buildExtractedFieldRecords(id, data);
+
     await db.delete(apInvoiceExtractedFields).where(eq(apInvoiceExtractedFields.invoiceId, id));
 
-    const fields = extractedData.fields || [];
-    for (const field of fields) {
+    for (const field of fieldRecords) {
       await db.insert(apInvoiceExtractedFields).values({
         invoiceId: id,
-        fieldKey: field.key,
-        fieldValue: field.value || null,
-        confidence: field.confidence || null,
+        fieldKey: field.fieldKey,
+        fieldValue: field.fieldValue,
+        confidence: field.confidence,
         page: 1,
-        bboxJson: field.bbox || null,
+        bboxJson: null,
         source: "extraction",
       });
     }
 
-    const updateData: any = {};
-    for (const field of fields) {
-      if (field.value) {
-        switch (field.key) {
-          case "invoice_number": updateData.invoiceNumber = field.value; break;
-          case "invoice_date":
-            try { updateData.invoiceDate = new Date(field.value); } catch {}
-            break;
-          case "due_date":
-            try { updateData.dueDate = new Date(field.value); } catch {}
-            break;
-          case "total": updateData.totalInc = field.value.replace(/[^0-9.-]/g, ""); break;
-          case "subtotal": updateData.totalEx = field.value.replace(/[^0-9.-]/g, ""); break;
-          case "gst": updateData.totalTax = field.value.replace(/[^0-9.-]/g, ""); break;
-          case "description": updateData.description = field.value; break;
-        }
-      }
-    }
+    const updateData = buildInvoiceUpdateFromExtraction(data);
 
-    const supplierNameField = fields.find((f: any) => f.key === "supplier_name");
-    if (supplierNameField?.value) {
+    if (data.supplier_name) {
       const matchingSuppliers = await db.select().from(suppliers)
-        .where(and(eq(suppliers.companyId, companyId), ilike(suppliers.name, `%${supplierNameField.value}%`)))
+        .where(and(eq(suppliers.companyId, companyId), ilike(suppliers.name, `%${data.supplier_name}%`)))
         .limit(1);
       if (matchingSuppliers.length > 0) {
         updateData.supplierId = matchingSuppliers[0].id;
       }
     }
-
-    let riskScore = 0;
-    const riskReasons: string[] = [];
-    for (const field of fields) {
-      if (field.confidence !== null && field.confidence < 0.7) {
-        riskScore += 15;
-        riskReasons.push(`Low confidence on ${field.key}: ${(field.confidence * 100).toFixed(0)}%`);
-      }
-    }
-    if (!fields.find((f: any) => f.key === "invoice_number")?.value) {
-      riskScore += 20;
-      riskReasons.push("Missing invoice number");
-    }
-    if (!fields.find((f: any) => f.key === "total")?.value) {
-      riskScore += 20;
-      riskReasons.push("Missing total amount");
-    }
-    updateData.riskScore = Math.min(riskScore, 100);
-    updateData.riskReasons = riskReasons;
 
     if (invoice.status === "IMPORTED") {
       updateData.status = "PROCESSED";
@@ -2058,16 +1988,15 @@ Return your response as valid JSON with this exact structure:
     }
 
     await logActivity(id, "extraction_completed", "AI extraction completed", userId, {
-      fieldsExtracted: fields.length,
-      lineItemsFound: (extractedData.line_items || []).length,
+      fieldsExtracted: fieldRecords.length,
     });
 
     res.json({
       success: true,
-      fields,
-      lineItems: extractedData.line_items || [],
+      extractedData: data,
+      fieldsStored: fieldRecords.length,
       riskScore: updateData.riskScore,
-      riskReasons,
+      riskReasons: updateData.riskReasons,
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error extracting AP invoice fields");
