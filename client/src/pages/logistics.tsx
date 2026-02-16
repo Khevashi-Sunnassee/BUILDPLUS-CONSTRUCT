@@ -320,11 +320,13 @@ export default function LogisticsPage() {
         notes: `Auto-created from ${panels.length} ready panel${panels.length !== 1 ? "s" : ""}`,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, panelIds) => {
       queryClient.invalidateQueries({ queryKey: [LOGISTICS_ROUTES.LOAD_LISTS] });
       queryClient.invalidateQueries({ queryKey: [PANELS_ROUTES.READY_FOR_LOADING] });
-      toast({ title: "Load list created successfully" });
+      toast({ title: `Load list created with ${panelIds.length} panel${panelIds.length !== 1 ? "s" : ""}` });
       setSelectedReadyPanels(new Set());
+      setPendingJobFilter("all");
+      setActiveTab("pending");
     },
     onError: (error: any) => {
       toast({ title: "Failed to create load list", description: error.message, variant: "destructive" });
@@ -411,12 +413,16 @@ export default function LogisticsPage() {
     mutationFn: async (data: LoadListFormData) => {
       return apiRequest("POST", LOGISTICS_ROUTES.LOAD_LISTS, data);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: [LOGISTICS_ROUTES.LOAD_LISTS] });
-      toast({ title: "Load list created successfully" });
+      queryClient.invalidateQueries({ queryKey: [PANELS_ROUTES.READY_FOR_LOADING] });
+      const panelCount = variables.panelIds?.length || 0;
+      toast({ title: panelCount > 0 ? `Load list created with ${panelCount} panel${panelCount !== 1 ? "s" : ""}` : "Load list created successfully" });
       setCreateDialogOpen(false);
       loadListForm.reset();
       setSelectedJobId("");
+      setPendingJobFilter("all");
+      setActiveTab("pending");
     },
     onError: (error: any) => {
       toast({ title: "Failed to create load list", description: error.message, variant: "destructive" });
