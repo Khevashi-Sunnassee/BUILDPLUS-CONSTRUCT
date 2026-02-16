@@ -299,26 +299,28 @@ function SupplierSearchField({ invoice, onSupplierSelect, onFocus }: {
             data-testid="input-supplierName"
           />
           {showDropdown && (
-            <div className="absolute z-50 top-8 left-0 right-0 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto" data-testid="dropdown-supplier-results">
+            <div className="absolute top-8 left-0 right-0 border rounded-md shadow-lg max-h-48 overflow-y-auto bg-card text-card-foreground" style={{ zIndex: 9999 }} data-testid="dropdown-supplier-results">
               {filtered.map((s) => (
-                <div
+                <button
+                  type="button"
                   key={s.id}
-                  className="px-3 py-1.5 text-sm cursor-pointer hover-elevate"
-                  onClick={(e) => { e.stopPropagation(); handleSelect(s); }}
+                  className="w-full text-left px-3 py-1.5 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleSelect(s); }}
                   data-testid={`option-supplier-${s.id}`}
                 >
                   {s.name}
-                </div>
+                </button>
               ))}
               {search.trim() && !exactMatch && (
-                <div
-                  className="px-3 py-1.5 text-sm cursor-pointer hover-elevate border-t flex items-center gap-1.5 text-primary"
-                  onClick={(e) => { e.stopPropagation(); handleCreateNew(); }}
+                <button
+                  type="button"
+                  className="w-full text-left px-3 py-1.5 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground border-t flex items-center gap-1.5 text-primary"
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleCreateNew(); }}
                   data-testid="button-create-supplier"
                 >
                   <Plus className="h-3 w-3" />
                   Add "{search.trim()}" as new supplier
-                </div>
+                </button>
               )}
               {filtered.length === 0 && !search.trim() && (
                 <div className="px-3 py-2 text-sm text-muted-foreground">No suppliers found</div>
