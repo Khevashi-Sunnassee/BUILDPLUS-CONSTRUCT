@@ -480,17 +480,15 @@ export default function ApInvoicesPage() {
       return res.json();
     },
     onSuccess: (data: { triggered: boolean; message: string }) => {
-      toast({ title: data.message });
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
-        queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
-        queryClient.invalidateQueries({ queryKey: [AP_INBOX_ROUTES.BACKGROUND_STATUS] });
-      }, 3000);
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
-        queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
-        queryClient.invalidateQueries({ queryKey: [AP_INBOX_ROUTES.BACKGROUND_STATUS] });
-      }, 10000);
+      toast({ title: "Checking emails and extracting invoice data...", description: "Invoices will appear with supplier and amount data as they are processed." });
+      const refreshIntervals = [3000, 8000, 15000, 25000, 40000, 60000, 90000, 120000];
+      for (const delay of refreshIntervals) {
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
+          queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
+          queryClient.invalidateQueries({ queryKey: [AP_INBOX_ROUTES.BACKGROUND_STATUS] });
+        }, delay);
+      }
     },
     onError: (err: Error) => {
       toast({ title: "Failed to check emails", description: err.message, variant: "destructive" });
