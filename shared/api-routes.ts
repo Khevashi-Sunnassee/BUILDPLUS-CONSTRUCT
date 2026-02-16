@@ -975,6 +975,7 @@ export const AP_INVOICE_ROUTES = {
   APPROVAL_PATH: (id: string | number) => `/api/ap-invoices/${id}/approval-path`,
   BULK_APPROVE: '/api/ap-invoices/bulk-approve',
   BULK_DELETE: '/api/ap-invoices/bulk-delete',
+  PAGE_THUMBNAILS: (id: string | number) => `/api/ap-invoices/${id}/page-thumbnails`,
 } as const;
 export type ApInvoiceRoutes = typeof AP_INVOICE_ROUTES;
 

@@ -1406,6 +1406,114 @@ router.get("/api/ap-invoices/:id/document-view", requireAuth, async (req: Reques
 });
 
 // ============================================================================
+// PAGE THUMBNAILS - Server-side PDF to image rendering (like Drawing Package)
+// ============================================================================
+router.get("/api/ap-invoices/:id/page-thumbnails", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [invoice] = await db.select().from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId))).limit(1);
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+
+    const docs = await db.select().from(apInvoiceDocuments)
+      .where(eq(apInvoiceDocuments.invoiceId, id)).limit(1);
+    if (!docs.length) return res.status(404).json({ error: "No document found" });
+
+    const doc = docs[0];
+
+    const file = await objectStorageService.getObjectEntityFile(doc.storageKey);
+    const chunks: Buffer[] = [];
+    const stream = file.createReadStream();
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    const buffer = Buffer.concat(chunks);
+
+    if (doc.mimeType?.includes("pdf")) {
+      const { spawn } = await import("child_process");
+      const fs = await import("fs");
+      const os = await import("os");
+      const path = await import("path");
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ap-thumbs-"));
+      const pdfPath = path.join(tmpDir, "invoice.pdf");
+      fs.writeFileSync(pdfPath, buffer);
+
+      try {
+        const pythonScript = `
+import fitz
+import json
+import sys
+import base64
+
+pdf_path = sys.argv[1]
+doc = fitz.open(pdf_path)
+pages = []
+
+for i in range(len(doc)):
+    page = doc[i]
+    rect = page.rect
+    w, h = rect.width, rect.height
+    scale = min(1600 / max(w, h), 2.5)
+    scale = max(scale, 1.0)
+    mat = fitz.Matrix(scale, scale)
+    pix = page.get_pixmap(matrix=mat)
+    thumbnail = base64.b64encode(pix.tobytes("png")).decode("ascii")
+    pages.append({
+        "pageNumber": i + 1,
+        "thumbnail": thumbnail,
+        "width": pix.width,
+        "height": pix.height,
+    })
+
+doc.close()
+print(json.dumps({"totalPages": len(pages), "pages": pages}))
+`;
+
+        const result: string = await new Promise((resolve, reject) => {
+          let output = "";
+          let errorOutput = "";
+          const proc = spawn("python3", ["-c", pythonScript, pdfPath], { timeout: 60000 });
+          proc.stdout.on("data", (data: Buffer) => { output += data.toString(); });
+          proc.stderr.on("data", (data: Buffer) => { errorOutput += data.toString(); });
+          proc.on("close", (code: number | null) => {
+            if (code === 0) resolve(output);
+            else reject(new Error(`Python process exited with code ${code}: ${errorOutput}`));
+          });
+          proc.on("error", (err: Error) => reject(err));
+        });
+
+        const parsed = JSON.parse(result);
+        res.json(parsed);
+      } finally {
+        try {
+          const fs2 = await import("fs");
+          fs2.rmSync(tmpDir, { recursive: true, force: true });
+        } catch {}
+      }
+    } else if (doc.mimeType?.startsWith("image/")) {
+      const thumbnail = buffer.toString("base64");
+      res.json({
+        totalPages: 1,
+        pages: [{
+          pageNumber: 1,
+          thumbnail,
+          width: 0,
+          height: 0,
+        }],
+      });
+    } else {
+      res.status(400).json({ error: "Unsupported document type" });
+    }
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error generating page thumbnails");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate thumbnails" });
+  }
+});
+
+// ============================================================================
 // OPENAI VISION EXTRACTION - Extract fields from invoice PDF/image
 // ============================================================================
 router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, res: Response) => {
