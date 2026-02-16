@@ -81,7 +81,8 @@ chatRouter.get("/conversations", requireAuth, requireChatPermission, async (req,
         lastReadAt: conversationMembers.lastReadAt,
       })
       .from(conversationMembers)
-      .where(eq(conversationMembers.userId, userId));
+      .where(eq(conversationMembers.userId, userId))
+      .limit(1000);
 
     const convIds = memberships.map((m) => m.conversationId);
     if (!convIds.length) return res.json([]);
@@ -90,7 +91,8 @@ chatRouter.get("/conversations", requireAuth, requireChatPermission, async (req,
     const convRows = await db
       .select()
       .from(conversations)
-      .where(inArray(conversations.id, convIds));
+      .where(inArray(conversations.id, convIds))
+      .limit(1000);
 
     // Batch fetch all members for all conversations
     const allMembers = await db
@@ -102,13 +104,14 @@ chatRouter.get("/conversations", requireAuth, requireChatPermission, async (req,
         joinedAt: conversationMembers.joinedAt,
       })
       .from(conversationMembers)
-      .where(inArray(conversationMembers.conversationId, convIds));
+      .where(inArray(conversationMembers.conversationId, convIds))
+      .limit(1000);
 
     // Batch fetch all unique users
     const memberUserIds = Array.from(new Set(allMembers.map(m => m.userId)));
     const allUsers = memberUserIds.length > 0 
       ? await db.select({ id: users.id, name: users.name, email: users.email })
-          .from(users).where(inArray(users.id, memberUserIds))
+          .from(users).where(inArray(users.id, memberUserIds)).limit(1000)
       : [];
     const userMap = new Map(allUsers.map(u => [u.id, u]));
 
@@ -169,14 +172,14 @@ chatRouter.get("/conversations", requireAuth, requireChatPermission, async (req,
     // Batch fetch jobs
     const jobIds = convRows.filter(c => c.jobId).map(c => c.jobId!);
     const allJobs = jobIds.length > 0 
-      ? await db.select().from(jobs).where(inArray(jobs.id, jobIds))
+      ? await db.select().from(jobs).where(inArray(jobs.id, jobIds)).limit(1000)
       : [];
     const jobMap = new Map(allJobs.map(j => [j.id, j]));
 
     // Batch fetch panels
     const panelIds = convRows.filter(c => c.panelId).map(c => c.panelId!);
     const allPanels = panelIds.length > 0 
-      ? await db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds))
+      ? await db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds)).limit(1000)
       : [];
     const panelMap = new Map(allPanels.map(p => [p.id, p]));
 
@@ -426,8 +429,8 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
     const msgRows = await db.select().from(chatMessages).where(eq(chatMessages.id, messageId)).limit(1);
     const senderRows = await db.select({ id: users.id, name: users.name, email: users.email })
       .from(users).where(eq(users.id, userId)).limit(1);
-    const attachments = await db.select().from(chatMessageAttachments).where(eq(chatMessageAttachments.messageId, messageId));
-    const mentions = await db.select().from(chatMessageMentions).where(eq(chatMessageMentions.messageId, messageId));
+    const attachments = await db.select().from(chatMessageAttachments).where(eq(chatMessageAttachments.messageId, messageId)).limit(200);
+    const mentions = await db.select().from(chatMessageMentions).where(eq(chatMessageMentions.messageId, messageId)).limit(200);
     let mentionsWithUsers: Record<string, unknown>[] = [];
     if (mentions.length > 0) {
       const mentionUserIds = [...new Set(mentions.map(m => m.mentionedUserId))];
@@ -505,7 +508,8 @@ chatRouter.get("/mentions", requireAuth, requireChatPermission, async (req, res)
       })
       .from(conversationMembers)
       .innerJoin(users, eq(users.id, conversationMembers.userId))
-      .where(eq(conversationMembers.conversationId, conversationId));
+      .where(eq(conversationMembers.conversationId, conversationId))
+      .limit(1000);
 
     const filtered = rows
       .filter((u) => (u.name || "").toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
@@ -639,12 +643,13 @@ chatRouter.get("/panels/:panelId/conversation", requireAuth, requireChatPermissi
           joinedAt: conversationMembers.joinedAt,
         })
         .from(conversationMembers)
-        .where(eq(conversationMembers.conversationId, conv.id));
+        .where(eq(conversationMembers.conversationId, conv.id))
+        .limit(1000);
       
       const memberUserIds = [...new Set(members.map(m => m.userId))];
       const memberUsers = memberUserIds.length > 0
         ? await db.select({ id: users.id, name: users.name, email: users.email })
-            .from(users).where(inArray(users.id, memberUserIds))
+            .from(users).where(inArray(users.id, memberUserIds)).limit(1000)
         : [];
       const memberUserMap = new Map(memberUsers.map(u => [u.id, u]));
       const membersWithUsers = members.map(m => ({ ...m, user: memberUserMap.get(m.userId) || null }));
@@ -685,12 +690,13 @@ chatRouter.get("/panels/:panelId/conversation", requireAuth, requireChatPermissi
         joinedAt: conversationMembers.joinedAt,
       })
       .from(conversationMembers)
-      .where(eq(conversationMembers.conversationId, convId));
+      .where(eq(conversationMembers.conversationId, convId))
+      .limit(1000);
     
     const memberUserIds2 = [...new Set(members.map(m => m.userId))];
     const memberUsers2 = memberUserIds2.length > 0
       ? await db.select({ id: users.id, name: users.name, email: users.email })
-          .from(users).where(inArray(users.id, memberUserIds2))
+          .from(users).where(inArray(users.id, memberUserIds2)).limit(1000)
       : [];
     const memberUserMap2 = new Map(memberUsers2.map(u => [u.id, u]));
     const membersWithUsers = members.map(m => ({ ...m, user: memberUserMap2.get(m.userId) || null }));
@@ -866,7 +872,8 @@ chatRouter.patch("/conversations/:conversationId/messages/:messageId", requireAu
     const attachments = await db
       .select()
       .from(chatMessageAttachments)
-      .where(eq(chatMessageAttachments.messageId, messageId));
+      .where(eq(chatMessageAttachments.messageId, messageId))
+      .limit(200);
 
     res.json({ 
       ...updatedMessage, 
@@ -943,7 +950,8 @@ chatRouter.post("/messages", requireAuth, requireChatPermission, async (req, res
     const members = await db
       .select({ memberId: conversationMembers.userId })
       .from(conversationMembers)
-      .where(eq(conversationMembers.conversationId, conversationId));
+      .where(eq(conversationMembers.conversationId, conversationId))
+      .limit(1000);
 
     for (const m of members) {
       if (m.memberId === userId) continue;
@@ -976,7 +984,7 @@ chatRouter.get("/users", requireAuth, requireChatPermission, async (_req, res) =
       id: users.id,
       name: users.name,
       email: users.email,
-    }).from(users).where(eq(users.isActive, true));
+    }).from(users).where(eq(users.isActive, true)).limit(1000);
     res.json(allUsers);
   } catch (e: unknown) {
     res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
@@ -989,7 +997,7 @@ chatRouter.get("/jobs", requireAuth, requireChatPermission, async (_req, res) =>
       id: jobs.id,
       jobNumber: jobs.jobNumber,
       name: jobs.name,
-    }).from(jobs).where(eq(jobs.status, "ACTIVE"));
+    }).from(jobs).where(eq(jobs.status, "ACTIVE")).limit(1000);
     res.json(allJobs);
   } catch (e: unknown) {
     res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
@@ -1052,7 +1060,8 @@ chatRouter.get("/unread-counts", requireAuth, requireChatPermission, async (req,
     const unreadNotifs = await db
       .select({ id: chatNotifications.id, type: chatNotifications.type })
       .from(chatNotifications)
-      .where(and(eq(chatNotifications.userId, userId), isNull(chatNotifications.readAt)));
+      .where(and(eq(chatNotifications.userId, userId), isNull(chatNotifications.readAt)))
+      .limit(1000);
 
     const unread = unreadNotifs.filter(n => n.type === "MESSAGE").length;
     const mentions = unreadNotifs.filter(n => n.type === "MENTION").length;
@@ -1073,7 +1082,8 @@ chatRouter.get("/total-unread", requireAuth, requireChatPermission, async (req, 
         lastReadAt: conversationMembers.lastReadAt,
       })
       .from(conversationMembers)
-      .where(eq(conversationMembers.userId, userId));
+      .where(eq(conversationMembers.userId, userId))
+      .limit(1000);
 
     if (!memberships.length) return res.json({ totalUnread: 0 });
 
@@ -1139,7 +1149,8 @@ chatRouter.get("/topics", requireAuth, requireChatPermission, async (req, res) =
     const companyId = req.session.companyId!;
     const topics = await db.select().from(chatTopics)
       .where(eq(chatTopics.companyId, companyId))
-      .orderBy(asc(chatTopics.sortOrder), asc(chatTopics.createdAt));
+      .orderBy(asc(chatTopics.sortOrder), asc(chatTopics.createdAt))
+      .limit(1000);
     res.json(topics);
   } catch (e: unknown) {
     res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
@@ -1161,7 +1172,7 @@ chatRouter.post("/topics", requireAuth, requireChatPermission, async (req, res) 
     const { name } = schema.parse(req.body);
 
     const existingTopics = await db.select({ color: chatTopics.color })
-      .from(chatTopics).where(eq(chatTopics.companyId, companyId));
+      .from(chatTopics).where(eq(chatTopics.companyId, companyId)).limit(1000);
     const usedColors = new Set(existingTopics.map(t => t.color?.toLowerCase()));
     const nextColor = TOPIC_DEFAULT_COLORS.find(c => !usedColors.has(c.toLowerCase())) || TOPIC_DEFAULT_COLORS[existingTopics.length % TOPIC_DEFAULT_COLORS.length];
 

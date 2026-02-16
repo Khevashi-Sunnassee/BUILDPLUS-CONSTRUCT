@@ -301,7 +301,7 @@ process.on("uncaughtException", (err) => {
 
 let isShuttingDown = false;
 
-function gracefulShutdown(signal: string) {
+async function gracefulShutdown(signal: string) {
   if (isShuttingDown) return;
   isShuttingDown = true;
   
@@ -312,6 +312,24 @@ function gracefulShutdown(signal: string) {
     process.exit(1);
   }, 15000);
   forceExitTimer.unref();
+
+  try {
+    const { scheduler } = await import("./lib/background-scheduler");
+    scheduler.stop();
+    logger.info("Background scheduler stopped");
+  } catch (err) {
+    logger.error({ err }, "Error stopping background scheduler");
+  }
+
+  try {
+    const { emailQueue, aiQueue, pdfQueue } = await import("./lib/job-queue");
+    emailQueue.drain();
+    aiQueue.drain();
+    pdfQueue.drain();
+    logger.info("Job queues drained");
+  } catch (err) {
+    logger.error({ err }, "Error draining job queues");
+  }
   
   httpServer.close(async () => {
     logger.info("HTTP server closed");

@@ -112,11 +112,13 @@ async function findAffectedOpenTenders(documentId: string, companyId: string) {
         eq(tenderPackages.documentId, documentId),
         eq(tenderPackages.companyId, companyId),
         inArray(tenders.status, ["DRAFT", "OPEN", "UNDER_REVIEW"]),
-      )),
+      ))
+      .limit(1000),
     db.select({ bundleId: documentBundleItems.bundleId })
       .from(documentBundleItems)
       .innerJoin(documentBundles, eq(documentBundleItems.bundleId, documentBundles.id))
-      .where(and(eq(documentBundleItems.documentId, documentId), eq(documentBundles.companyId, companyId))),
+      .where(and(eq(documentBundleItems.documentId, documentId), eq(documentBundles.companyId, companyId)))
+      .limit(1000),
   ]);
 
   const bundleIds = bundleItems.map(b => b.bundleId);
@@ -136,7 +138,8 @@ async function findAffectedOpenTenders(documentId: string, companyId: string) {
         inArray(tenderPackages.bundleId, bundleIds),
         eq(tenderPackages.companyId, companyId),
         inArray(tenders.status, ["DRAFT", "OPEN", "UNDER_REVIEW"]),
-      ));
+      ))
+      .limit(1000);
   }
 
   const allHits = [...directPackages, ...bundlePackages];
@@ -523,7 +526,8 @@ router.get("/api/documents", requireAuth, async (req, res) => {
     if (user && user.role !== "ADMIN" && user.role !== "MANAGER") {
       const memberships = await db.select({ jobId: jobMembers.jobId })
         .from(jobMembers)
-        .where(eq(jobMembers.userId, req.session.userId!));
+        .where(eq(jobMembers.userId, req.session.userId!))
+        .limit(1000);
       allowedJobIds = memberships.map(m => m.jobId);
     }
 
@@ -624,7 +628,8 @@ router.post("/api/documents/check-duplicates", requireAuth, async (req: Request,
             eq(documents.documentNumber, trimmed),
             eq(documents.isLatestVersion, true),
           )
-        );
+        )
+        .limit(1000);
 
       if (result.length > 0) {
         duplicates[trimmed] = result.map(r => ({
@@ -1430,7 +1435,8 @@ router.get("/api/document-bundles", requireAuth, async (req, res) => {
           or(eq(documentBundles.jobId, jobId), isNull(documentBundles.jobId)),
           eq(documentBundles.companyId, companyId),
         ))
-        .orderBy(desc(documentBundles.createdAt));
+        .orderBy(desc(documentBundles.createdAt))
+        .limit(1000);
       return res.json(bundles);
     }
     const bundles = await storage.getAllDocumentBundles(req.companyId);
@@ -2275,7 +2281,8 @@ router.post("/api/documents/bulk-upload", requireAuth, bulkUpload.array("files",
       if (user && user.role !== "ADMIN" && user.role !== "MANAGER") {
         const memberships = await db.select({ jobId: jobMembers.jobId })
           .from(jobMembers)
-          .where(eq(jobMembers.userId, req.session.userId!));
+          .where(eq(jobMembers.userId, req.session.userId!))
+          .limit(1000);
         const allowedJobIds = memberships.map(m => m.jobId);
         if (!allowedJobIds.includes(jobId)) {
           return res.status(403).json({ error: "You do not have access to the selected job" });

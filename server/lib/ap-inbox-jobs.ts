@@ -31,7 +31,8 @@ export function getLastExtractResult() { return lastExtractResult; }
 
 export async function pollEmailsJob(): Promise<void> {
   const allSettings = await db.select().from(apInboxSettings)
-    .where(eq(apInboxSettings.isEnabled, true));
+    .where(eq(apInboxSettings.isEnabled, true))
+    .limit(100);
 
   if (allSettings.length === 0) {
     logger.debug("[AP Background] No enabled inbox settings found, skipping poll");
@@ -341,6 +342,16 @@ const MAX_EXTRACT_BATCH = 3;
 const MAX_EXTRACT_RETRIES = 3;
 
 const extractionRetryCount: Map<string, number> = new Map();
+const MAX_RETRY_MAP_SIZE = 500;
+
+function pruneRetryMap() {
+  if (extractionRetryCount.size > MAX_RETRY_MAP_SIZE) {
+    const keysToDelete = Array.from(extractionRetryCount.keys()).slice(0, extractionRetryCount.size - MAX_RETRY_MAP_SIZE);
+    for (const key of keysToDelete) {
+      extractionRetryCount.delete(key);
+    }
+  }
+}
 
 export async function processImportedInvoicesJob(): Promise<void> {
   const importedInvoices = await db
@@ -418,6 +429,8 @@ export async function processImportedInvoicesJob(): Promise<void> {
       }
     }
   }
+
+  pruneRetryMap();
 
   lastExtractResult = {
     timestamp: new Date(),

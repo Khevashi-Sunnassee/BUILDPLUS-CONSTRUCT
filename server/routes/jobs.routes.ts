@@ -82,14 +82,16 @@ router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Res
     })
     .from(jobs)
     .where(sql`(${inArray(jobs.jobPhase, [...OPPORTUNITY_PHASES])} OR ${eq(jobs.salesStage, 'AWARDED')}) AND ${eq(jobs.companyId, req.companyId)}`)
-    .orderBy(desc(jobs.createdAt));
+    .orderBy(desc(jobs.createdAt))
+    .limit(1000);
 
     const customerIds = [...new Set(result.filter(j => j.customerId).map(j => j.customerId!))];
     let customerMap = new Map<string, { id: string; name: string }>();
     if (customerIds.length > 0) {
       const custRows = await db.select({ id: customers.id, name: customers.name })
         .from(customers)
-        .where(inArray(customers.id, customerIds));
+        .where(inArray(customers.id, customerIds))
+        .limit(1000);
       for (const c of custRows) {
         customerMap.set(c.id, c);
       }
@@ -319,7 +321,8 @@ router.get("/api/jobs/opportunities/:id/history", requireAuth, async (req: Reque
     const history = await db.select()
       .from(salesStatusHistory)
       .where(eq(salesStatusHistory.jobId, String(req.params.id)))
-      .orderBy(desc(salesStatusHistory.createdAt));
+      .orderBy(desc(salesStatusHistory.createdAt))
+      .limit(1000);
 
     res.json(history);
   } catch (error: unknown) {
@@ -373,7 +376,8 @@ router.get("/api/jobs/my-memberships", requireAuth, async (req: Request, res: Re
   try {
     const memberships = await db.select({ jobId: jobMembers.jobId })
       .from(jobMembers)
-      .where(eq(jobMembers.userId, req.session.userId!));
+      .where(eq(jobMembers.userId, req.session.userId!))
+      .limit(1000);
     res.json(memberships.map(m => m.jobId));
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching user job memberships");
@@ -537,7 +541,8 @@ router.get("/api/admin/jobs", requireAuth, async (req: Request, res: Response) =
     
     const memberships = await db.select({ jobId: jobMembers.jobId })
       .from(jobMembers)
-      .where(eq(jobMembers.userId, user.id));
+      .where(eq(jobMembers.userId, user.id))
+      .limit(1000);
     const allowedJobIds = new Set(memberships.map(m => m.jobId));
     
     res.json(serialized.filter((job) => allowedJobIds.has(job.id)));
@@ -560,7 +565,8 @@ router.get("/api/admin/jobs/:id", requireAuth, async (req: Request, res: Respons
     if (user.role !== "ADMIN" && user.role !== "MANAGER") {
       const membership = await db.select({ jobId: jobMembers.jobId })
         .from(jobMembers)
-        .where(and(eq(jobMembers.userId, user.id), eq(jobMembers.jobId, job.id)));
+        .where(and(eq(jobMembers.userId, user.id), eq(jobMembers.jobId, job.id)))
+        .limit(1000);
       if (membership.length === 0) {
         return res.status(403).json({ error: "Not a member of this job" });
       }
@@ -1535,7 +1541,8 @@ router.get("/api/admin/jobs/:id/members", requireRole("ADMIN", "MANAGER"), async
     })
       .from(jobMembers)
       .innerJoin(users, eq(jobMembers.userId, users.id))
-      .where(eq(jobMembers.jobId, jobId));
+      .where(eq(jobMembers.jobId, jobId))
+      .limit(1000);
 
     res.json(members);
   } catch (error: unknown) {
@@ -1567,7 +1574,8 @@ router.post("/api/admin/jobs/:id/members", requireRole("ADMIN", "MANAGER"), asyn
 
     const existing = await db.select()
       .from(jobMembers)
-      .where(and(eq(jobMembers.jobId, jobId), eq(jobMembers.userId, userId)));
+      .where(and(eq(jobMembers.jobId, jobId), eq(jobMembers.userId, userId)))
+      .limit(1000);
     if (existing.length > 0) {
       return res.status(409).json({ error: "User is already a member of this job" });
     }

@@ -221,7 +221,8 @@ router.get("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW")
       })
       .from(tenderMembers)
       .leftJoin(suppliers, eq(tenderMembers.supplierId, suppliers.id))
-      .where(and(eq(tenderMembers.tenderId, req.params.id), eq(tenderMembers.companyId, companyId)));
+      .where(and(eq(tenderMembers.tenderId, req.params.id), eq(tenderMembers.companyId, companyId)))
+      .limit(1000);
 
     const row = result[0];
     res.json({
@@ -436,7 +437,8 @@ router.patch("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW
             eq(tenderPackages.companyId, companyId),
             isNotNull(tenderPackages.bundleId),
             isNull(tenderPackages.documentId),
-          ));
+          ))
+          .limit(1000);
 
         if (existingBundlePkgs.length > 0) {
           const oldBundleLinkedToTenderField = existingBundlePkgs.find(p => p.bundleId === currentTender.bundleId);
@@ -932,7 +934,8 @@ router.get("/api/jobs/:jobId/tenders", requireAuth, requirePermission("tenders",
           inArray(tenderSubmissions.tenderId, tenderIds),
           eq(tenderSubmissions.companyId, companyId),
         ))
-        .orderBy(desc(tenderSubmissions.createdAt));
+        .orderBy(desc(tenderSubmissions.createdAt))
+        .limit(1000);
 
       for (const row of allSubmissions) {
         const tid = row.submission.tenderId;
@@ -1013,7 +1016,8 @@ router.get("/api/jobs/:jobId/tenders/:tenderId/sheet", requireAuth, requirePermi
       .innerJoin(costCodes, eq(budgetLines.costCodeId, costCodes.id))
       .leftJoin(childCostCodes, eq(budgetLines.childCostCodeId, childCostCodes.id))
       .where(and(eq(budgetLines.budgetId, budget.id), eq(budgetLines.companyId, companyId)))
-      .orderBy(asc(budgetLines.sortOrder));
+      .orderBy(asc(budgetLines.sortOrder))
+      .limit(5000);
 
     const submissions = await db
       .select({
@@ -1026,7 +1030,8 @@ router.get("/api/jobs/:jobId/tenders/:tenderId/sheet", requireAuth, requirePermi
       .from(tenderSubmissions)
       .leftJoin(suppliers, eq(tenderSubmissions.supplierId, suppliers.id))
       .where(and(eq(tenderSubmissions.tenderId, tenderId), eq(tenderSubmissions.companyId, companyId)))
-      .orderBy(desc(tenderSubmissions.createdAt));
+      .orderBy(desc(tenderSubmissions.createdAt))
+      .limit(1000);
 
     const submissionIds = submissions.map(s => s.submission.id);
     let lineItemsBySubmission: Record<string, any[]> = {};
@@ -1049,7 +1054,8 @@ router.get("/api/jobs/:jobId/tenders/:tenderId/sheet", requireAuth, requirePermi
           inArray(tenderLineItems.tenderSubmissionId, submissionIds),
           eq(tenderLineItems.companyId, companyId),
         ))
-        .orderBy(asc(tenderLineItems.sortOrder));
+        .orderBy(asc(tenderLineItems.sortOrder))
+        .limit(5000);
 
       for (const item of allLineItems) {
         if (!lineItemsBySubmission[item.tenderSubmissionId]) {
@@ -1090,7 +1096,8 @@ router.get("/api/jobs/:jobId/tenders/:tenderId/sheet", requireAuth, requirePermi
       .leftJoin(documents, eq(tenderPackages.documentId, documents.id))
       .leftJoin(documentBundles, eq(tenderPackages.bundleId, documentBundles.id))
       .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)))
-      .orderBy(asc(tenderPackages.sortOrder));
+      .orderBy(asc(tenderPackages.sortOrder))
+      .limit(1000);
 
     const mappedPackages = packages.map(p => ({
       ...p.pkg,
@@ -1156,7 +1163,8 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/submissions/:submissionId/upsert
         .where(and(
           eq(tenderLineItems.tenderSubmissionId, submissionId),
           eq(tenderLineItems.companyId, companyId),
-        ));
+        ))
+        .limit(5000);
 
       const existingMap = new Map<string, typeof existingItems[0]>();
       for (const item of existingItems) {
@@ -1270,7 +1278,8 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/documents", requireAuth, require
         eq(tenderPackages.tenderId, tenderId),
         eq(tenderPackages.bundleId, data.bundleId),
         eq(tenderPackages.companyId, companyId),
-      ));
+      ))
+      .limit(1);
 
     if (existing.length > 0) {
       return res.status(400).json({ message: "This bundle is already attached to this tender", code: "DUPLICATE" });
@@ -1357,7 +1366,8 @@ router.get("/api/tenders/:id/members", requireAuth, requirePermission("tenders",
       .from(tenderMembers)
       .leftJoin(suppliers, eq(tenderMembers.supplierId, suppliers.id))
       .leftJoin(costCodes, eq(suppliers.defaultCostCodeId, costCodes.id))
-      .where(and(eq(tenderMembers.tenderId, req.params.id), eq(tenderMembers.companyId, companyId)));
+      .where(and(eq(tenderMembers.tenderId, req.params.id), eq(tenderMembers.companyId, companyId)))
+      .limit(1000);
 
     const mapped = results.map((row) => ({
       ...row.member,
@@ -1405,7 +1415,8 @@ router.get("/api/tenders/:id/packages", requireAuth, requirePermission("tenders"
       .leftJoin(documentBundles, eq(tenderPackages.bundleId, documentBundles.id))
       .leftJoin(documents, eq(tenderPackages.documentId, documents.id))
       .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)))
-      .orderBy(asc(tenderPackages.sortOrder));
+      .orderBy(asc(tenderPackages.sortOrder))
+      .limit(1000);
 
     const mapped: any[] = [];
 
@@ -1434,7 +1445,8 @@ router.get("/api/tenders/:id/packages", requireAuth, requirePermission("tenders"
           .from(documentBundleItems)
           .innerJoin(documents, eq(documentBundleItems.documentId, documents.id))
           .where(eq(documentBundleItems.bundleId, r.bundle.id))
-          .orderBy(asc(documentBundleItems.sortOrder));
+          .orderBy(asc(documentBundleItems.sortOrder))
+          .limit(1000);
 
         if (bundleDocs.length > 0) {
           for (const bd of bundleDocs) {
@@ -1505,7 +1517,8 @@ router.post("/api/tenders/:id/send-invitations", requireAuth, requirePermission(
         inArray(tenderMembers.id, data.memberIds),
         eq(tenderMembers.tenderId, tenderId),
         eq(tenderMembers.companyId, companyId),
-      ));
+      ))
+      .limit(1000);
 
     const packages = await db
       .select({
@@ -1520,7 +1533,8 @@ router.post("/api/tenders/:id/send-invitations", requireAuth, requirePermission(
       .from(tenderPackages)
       .leftJoin(documentBundles, eq(tenderPackages.bundleId, documentBundles.id))
       .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)))
-      .orderBy(asc(tenderPackages.sortOrder));
+      .orderBy(asc(tenderPackages.sortOrder))
+      .limit(1000);
 
     const seenBundleIds = new Set<string>();
     const bundlesWithQr = packages
@@ -1663,7 +1677,8 @@ router.post("/api/tenders/:id/notify-doc-updates", requireAuth, requirePermissio
       .select({ member: tenderMembers, supplier: { id: suppliers.id, name: suppliers.name, email: suppliers.email } })
       .from(tenderMembers)
       .leftJoin(suppliers, eq(tenderMembers.supplierId, suppliers.id))
-      .where(and(eq(tenderMembers.tenderId, tenderId), eq(tenderMembers.companyId, companyId)));
+      .where(and(eq(tenderMembers.tenderId, tenderId), eq(tenderMembers.companyId, companyId)))
+      .limit(1000);
 
     let sent = 0;
     let failed = 0;
@@ -1727,7 +1742,8 @@ router.post("/api/tenders/:id/duplicate-package", requireAuth, requirePermission
       .select({ pkg: tenderPackages, bundle: { id: documentBundles.id, bundleName: documentBundles.bundleName } })
       .from(tenderPackages)
       .leftJoin(documentBundles, eq(tenderPackages.bundleId, documentBundles.id))
-      .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)));
+      .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)))
+      .limit(1000);
 
     let updatedDirectCount = 0;
     let updatedBundleCount = 0;
@@ -1744,7 +1760,8 @@ router.post("/api/tenders/:id/duplicate-package", requireAuth, requirePermission
         const bundleItems = await db
           .select()
           .from(documentBundleItems)
-          .where(and(eq(documentBundleItems.bundleId, pkg.pkg.bundleId), eq(documentBundleItems.documentId, data.supersededDocumentId)));
+          .where(and(eq(documentBundleItems.bundleId, pkg.pkg.bundleId), eq(documentBundleItems.documentId, data.supersededDocumentId)))
+          .limit(1000);
 
         for (const item of bundleItems) {
           await db.update(documentBundleItems)
@@ -1761,7 +1778,8 @@ router.post("/api/tenders/:id/duplicate-package", requireAuth, requirePermission
       .leftJoin(documents, eq(tenderPackages.documentId, documents.id))
       .leftJoin(documentBundles, eq(tenderPackages.bundleId, documentBundles.id))
       .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)))
-      .orderBy(asc(tenderPackages.sortOrder));
+      .orderBy(asc(tenderPackages.sortOrder))
+      .limit(1000);
 
     const mapped = updatedPackages.map(p => ({
       ...p.pkg,
@@ -1926,7 +1944,8 @@ router.post("/api/tenders/:id/find-suppliers", requireAuth, requirePermission("t
     const selectedCodes = await db
       .select({ id: costCodes.id, code: costCodes.code, name: costCodes.name })
       .from(costCodes)
-      .where(and(inArray(costCodes.id, data.costCodeIds), eq(costCodes.companyId, companyId)));
+      .where(and(inArray(costCodes.id, data.costCodeIds), eq(costCodes.companyId, companyId)))
+      .limit(1000);
 
     const costCodeEntries = selectedCodes.map(c => ({ id: c.id, code: c.code, name: c.name, label: `${c.code} - ${c.name}` }));
     const costCodeNames = costCodeEntries.map(c => c.label).join(", ");
@@ -2206,7 +2225,8 @@ router.get("/api/tenders/:id/notes", requireAuth, requirePermission("tenders", "
       .from(tenderNotes)
       .leftJoin(users, eq(tenderNotes.createdById, users.id))
       .where(and(eq(tenderNotes.tenderId, tenderId), eq(tenderNotes.companyId, companyId)))
-      .orderBy(desc(tenderNotes.createdAt));
+      .orderBy(desc(tenderNotes.createdAt))
+      .limit(1000);
 
     res.json(notes);
   } catch (error: unknown) {
@@ -2322,7 +2342,8 @@ router.get("/api/tenders/:id/files", requireAuth, requirePermission("tenders", "
       .from(tenderFiles)
       .leftJoin(users, eq(tenderFiles.uploadedById, users.id))
       .where(and(eq(tenderFiles.tenderId, tenderId), eq(tenderFiles.companyId, companyId)))
-      .orderBy(desc(tenderFiles.createdAt));
+      .orderBy(desc(tenderFiles.createdAt))
+      .limit(1000);
 
     res.json(files);
   } catch (error: unknown) {
@@ -2460,7 +2481,8 @@ router.post("/api/tenders/:id/files/send-email", requireAuth, requirePermission(
         eq(tenderFiles.tenderId, tenderId),
         eq(tenderFiles.companyId, companyId),
         inArray(tenderFiles.id, data.fileIds)
-      ));
+      ))
+      .limit(1000);
 
     if (files.length === 0) {
       return res.status(404).json({ error: "No matching files found" });
@@ -2612,7 +2634,8 @@ router.post("/api/tenders/:id/members/:memberId/send-invite", requireAuth, requi
       })
       .from(tenderPackages)
       .leftJoin(documentBundles, eq(tenderPackages.bundleId, documentBundles.id))
-      .where(and(eq(tenderPackages.tenderId, tenderId), isNotNull(tenderPackages.bundleId)));
+      .where(and(eq(tenderPackages.tenderId, tenderId), isNotNull(tenderPackages.bundleId)))
+      .limit(1000);
 
     let bundleSection = "";
     const bundlesWithQr = packages.filter(p => p.bundle?.qrCodeId);
@@ -2663,7 +2686,8 @@ router.post("/api/tenders/:id/members/:memberId/send-invite", requireAuth, requi
             eq(tenderScopes.tenderId, tenderId),
             eq(tenderScopes.companyId, companyId),
             sql`(${scopeTrades.costCodeId} = ${supplierCostCode.id} OR (${scopeTrades.costCodeId} IS NULL AND LOWER(${scopeTrades.name}) = LOWER(${supplierCostCode.name})))`
-          ));
+          ))
+          .limit(1000);
 
         if (linkedScopeRows.length > 0) {
           const scopeIds = linkedScopeRows.map(s => s.scopeId);
@@ -2680,7 +2704,8 @@ router.post("/api/tenders/:id/members/:memberId/send-invite", requireAuth, requi
               inArray(scopeItems.scopeId, scopeIds),
               eq(scopeItems.status, "INCLUDED")
             ))
-            .orderBy(asc(scopeItems.sortOrder));
+            .orderBy(asc(scopeItems.sortOrder))
+            .limit(5000);
 
           const scopeBlocks = linkedScopeRows.map(scope => {
             const items = allItems.filter(i => i.scopeId === scope.scopeId);
@@ -2912,7 +2937,8 @@ router.get("/api/tender-members/:id/files", requireAuth, requirePermission("tend
 
     const files = await db.select().from(tenderMemberFiles)
       .where(eq(tenderMemberFiles.tenderMemberId, memberId))
-      .orderBy(desc(tenderMemberFiles.createdAt));
+      .orderBy(desc(tenderMemberFiles.createdAt))
+      .limit(1000);
 
     res.json(files);
   } catch (error: unknown) {

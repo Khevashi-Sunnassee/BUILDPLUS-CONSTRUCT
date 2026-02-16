@@ -88,7 +88,8 @@ router.get("/api/scope-trades/cost-codes", requireAuth, requirePermission("scope
       .select({ id: costCodes.id, code: costCodes.code, name: costCodes.name })
       .from(costCodes)
       .where(and(eq(costCodes.companyId, companyId), eq(costCodes.isActive, true)))
-      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code));
+      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code))
+      .limit(1000);
     res.json(results);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching cost codes for scope trades");
@@ -103,7 +104,8 @@ router.get("/api/scope-trades", requireAuth, requirePermission("scopes", "VIEW")
       .select()
       .from(scopeTrades)
       .where(eq(scopeTrades.companyId, companyId))
-      .orderBy(asc(scopeTrades.sortOrder), asc(scopeTrades.name));
+      .orderBy(asc(scopeTrades.sortOrder), asc(scopeTrades.name))
+      .limit(1000);
     res.json(results);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching scope trades");
@@ -120,7 +122,8 @@ router.post("/api/scope-trades/seed", requireAuth, requirePermission("scopes", "
     const existingTrades = await db
       .select({ name: scopeTrades.name })
       .from(scopeTrades)
-      .where(eq(scopeTrades.companyId, companyId));
+      .where(eq(scopeTrades.companyId, companyId))
+      .limit(1000);
     const existingNames = new Set(existingTrades.map(t => t.name));
 
     const toInsert: { companyId: string; name: string; isActive: boolean; sortOrder: number }[] = [];
@@ -290,7 +293,8 @@ router.get("/api/scopes", requireAuth, requirePermission("scopes", "VIEW"), asyn
       .leftJoin(users, eq(scopes.createdById, users.id))
       .leftJoin(itemCountSubquery, eq(scopes.id, itemCountSubquery.scopeId))
       .where(and(...conditions))
-      .orderBy(desc(scopes.updatedAt));
+      .orderBy(desc(scopes.updatedAt))
+      .limit(1000);
 
     if (search && typeof search === "string" && search.trim()) {
       const s = search.trim().toLowerCase();
@@ -405,7 +409,8 @@ router.get("/api/scopes/:id", requireAuth, requirePermission("scopes", "VIEW"), 
       .select()
       .from(scopeItems)
       .where(and(eq(scopeItems.scopeId, id), eq(scopeItems.companyId, companyId)))
-      .orderBy(asc(scopeItems.sortOrder), asc(scopeItems.createdAt));
+      .orderBy(asc(scopeItems.sortOrder), asc(scopeItems.createdAt))
+      .limit(1000);
 
     res.json({
       ...result.scope,
@@ -527,7 +532,8 @@ router.post("/api/scopes/:id/duplicate", requireAuth, requirePermission("scopes"
       .select()
       .from(scopeItems)
       .where(and(eq(scopeItems.scopeId, id), eq(scopeItems.companyId, companyId)))
-      .orderBy(asc(scopeItems.sortOrder));
+      .orderBy(asc(scopeItems.sortOrder))
+      .limit(1000);
 
     const newName = req.body.name || `${original.name} (Copy)`;
 
@@ -1275,7 +1281,8 @@ router.get("/api/scopes/:id/export", requireAuth, requirePermission("scopes", "V
       .select()
       .from(scopeItems)
       .where(and(eq(scopeItems.scopeId, id), eq(scopeItems.companyId, companyId)))
-      .orderBy(asc(scopeItems.sortOrder));
+      .orderBy(asc(scopeItems.sortOrder))
+      .limit(1000);
 
     res.json({
       name: scope.scope.name,
@@ -1321,7 +1328,8 @@ router.get("/api/tenders/:tenderId/scopes", requireAuth, requirePermission("tend
       .innerJoin(scopes, eq(tenderScopes.scopeId, scopes.id))
       .leftJoin(scopeTrades, eq(scopes.tradeId, scopeTrades.id))
       .where(and(eq(tenderScopes.tenderId, tenderId), eq(tenderScopes.companyId, companyId)))
-      .orderBy(asc(tenderScopes.sortOrder));
+      .orderBy(asc(tenderScopes.sortOrder))
+      .limit(1000);
 
     const mapped = results.map((row) => ({
       ...row.tenderScope,
@@ -1428,7 +1436,8 @@ router.post("/api/scopes/email", requireAuth, requirePermission("scopes", "VIEW"
       .where(and(
         inArray(scopes.id, scopeIds),
         eq(scopes.companyId, companyId)
-      ));
+      ))
+      .limit(1000);
 
     if (scopeResults.length === 0) {
       return res.status(404).json({ message: "No scopes found" });
@@ -1441,7 +1450,8 @@ router.post("/api/scopes/email", requireAuth, requirePermission("scopes", "VIEW"
         .select()
         .from(scopeItems)
         .where(and(eq(scopeItems.scopeId, row.scope.id), eq(scopeItems.companyId, companyId)))
-        .orderBy(asc(scopeItems.sortOrder));
+        .orderBy(asc(scopeItems.sortOrder))
+        .limit(1000);
 
       scopeBodyHtml += `
         <h3>${row.scope.name} - ${row.tradeName || "Unknown Trade"}</h3>
@@ -1517,7 +1527,8 @@ router.get("/api/scopes/:id/print", requireAuth, requirePermission("scopes", "VI
       .select()
       .from(scopeItems)
       .where(and(eq(scopeItems.scopeId, id), eq(scopeItems.companyId, companyId)))
-      .orderBy(asc(scopeItems.sortOrder));
+      .orderBy(asc(scopeItems.sortOrder))
+      .limit(1000);
 
     const categories = new Map<string, typeof items>();
     for (const item of items) {
