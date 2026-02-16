@@ -334,6 +334,17 @@ export const TASKS_ROUTES = {
 } as const;
 
 // ============================================================================
+// OPPORTUNITY UPDATES & FILES
+// ============================================================================
+export const OPPORTUNITY_ROUTES = {
+  UPDATES: (id: string | number) => `/api/opportunities/${id}/updates`,
+  UPDATE_BY_ID: (id: string | number) => `/api/opportunity-updates/${id}`,
+  FILES: (id: string | number) => `/api/opportunities/${id}/files`,
+  FILE_BY_ID: (id: string | number) => `/api/opportunity-files/${id}`,
+  EMAIL_DROP: (id: string | number) => `/api/opportunities/${id}/email-drop`,
+} as const;
+
+// ============================================================================
 // CHAT
 // ============================================================================
 export const CHAT_ROUTES = {

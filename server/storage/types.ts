@@ -30,6 +30,8 @@ import type {
   TaskGroupMember,
   TaskUpdate, InsertTaskUpdate,
   TaskFile, InsertTaskFile,
+  OpportunityUpdate, InsertOpportunityUpdate,
+  OpportunityFile, InsertOpportunityFile,
   Company, InsertCompany,
   DocumentTypeConfig, InsertDocumentType,
   DocumentTypeStatus, InsertDocumentTypeStatus,
@@ -447,6 +449,16 @@ export interface IStorage {
   getTaskFile(id: string): Promise<TaskFile | undefined>;
   createTaskFile(data: InsertTaskFile): Promise<TaskFile>;
   deleteTaskFile(id: string): Promise<void>;
+
+  getOpportunityUpdates(jobId: string): Promise<(OpportunityUpdate & { user: User; files?: OpportunityFile[] })[]>;
+  getOpportunityUpdate(id: string): Promise<OpportunityUpdate | undefined>;
+  createOpportunityUpdate(data: InsertOpportunityUpdate): Promise<OpportunityUpdate>;
+  deleteOpportunityUpdate(id: string): Promise<void>;
+
+  getOpportunityFiles(jobId: string): Promise<(OpportunityFile & { uploadedBy?: User | null })[]>;
+  getOpportunityFile(id: string): Promise<OpportunityFile | undefined>;
+  createOpportunityFile(data: InsertOpportunityFile): Promise<OpportunityFile>;
+  deleteOpportunityFile(id: string): Promise<void>;
 
   getTaskNotifications(userId: string): Promise<any[]>;
   getUnreadTaskNotificationCount(userId: string): Promise<number>;

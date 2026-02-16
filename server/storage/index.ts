@@ -17,6 +17,7 @@ import { broadcastMethods } from "./broadcast";
 import { employeeMethods } from "./employees";
 import { invitationMethods } from "./invitations";
 import { capexMethods } from "./capex";
+import { opportunityMethods } from "./opportunities";
 
 export type { IStorage } from "./types";
 export type {
@@ -459,6 +460,15 @@ export class DatabaseStorage implements IStorage {
   createCapexAuditEvent = capexMethods.createCapexAuditEvent;
   getCapexAuditHistory = capexMethods.getCapexAuditHistory;
   getCapexApprovers = capexMethods.getCapexApprovers;
+
+  getOpportunityUpdates = opportunityMethods.getOpportunityUpdates;
+  getOpportunityUpdate = opportunityMethods.getOpportunityUpdate;
+  createOpportunityUpdate = opportunityMethods.createOpportunityUpdate;
+  deleteOpportunityUpdate = opportunityMethods.deleteOpportunityUpdate;
+  getOpportunityFiles = opportunityMethods.getOpportunityFiles;
+  getOpportunityFile = opportunityMethods.getOpportunityFile;
+  createOpportunityFile = opportunityMethods.createOpportunityFile;
+  deleteOpportunityFile = opportunityMethods.deleteOpportunityFile;
 }
 
 export const storage = new DatabaseStorage();
