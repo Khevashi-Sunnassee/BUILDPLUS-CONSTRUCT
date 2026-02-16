@@ -171,8 +171,18 @@ Central hub for managing all construction jobs and projects. Track every job fro
 - **Details** - Basic job information (name, number, client, address)
 - **Production** - Manufacturing settings (cycle times, levels, production windows)
 - **Scheduling** - Timeline and delivery scheduling settings
-- **Audit** - View history of all changes made to this job`,
-    keywords: ["jobs", "projects", "contracts", "phases", "status"],
+- **Audit** - View history of all changes made to this job
+
+### Related Pages
+
+From a job, you can navigate to:
+- **Job Budget** - Manage estimated costs, tender amounts, and forecasts
+- **Bill of Quantities (BOQ)** - Detailed quantity and pricing breakdowns
+- **Job Tender Sheets** - View tender amounts vs budget by cost code
+- **Project Activities** - Workflow-based activity tracking with dependencies
+- **Job Programme** - Production scheduling with pour labels and sequence ordering
+- **Progress Claims** - Submit and track payment claims`,
+    keywords: ["jobs", "projects", "contracts", "phases", "status", "budget", "tender"],
     category: "Jobs",
     pageRoute: "/admin/jobs",
   },
@@ -250,22 +260,24 @@ View all information about a single panel including its specifications, producti
   {
     key: "page.documents",
     scope: "PAGE",
-    title: "Document Register",
-    shortText: "Manage project documents with version control and bundles.",
+    title: "Document Management",
+    shortText: "Upload, organise, and manage project documents with version control, bundles, bulk upload, and AI metadata extraction.",
     bodyMd: `## Document Register
 
-Centralised document management system with version tracking, bundles, and full search capability.
+Centralised document management system with version tracking, bundles, drag-and-drop upload, bulk operations, and AI-powered metadata extraction.
 
 ### Buttons & Actions
 
 - **Upload Document** - Opens a dialog to upload a new document. Select the file, assign it to a job, and set its category, discipline, and status
-- **Create Bundle** - Group related documents together into a bundle for easy sharing
+- **Bulk Upload** - Upload multiple files at once with drag-and-drop support
+- **Create Bundle** - Group related documents together into a bundle for easy sharing via QR codes
 - **Toggle Filters** - Show or hide the filter panel for advanced searching
 - **Search** - Find documents by title, number, or description
 - **Clear Filters** - Remove all active filters
 - **View Bundles** - Switch to the document bundles view
 - **Visual Overlay** - Open the visual comparison tool to overlay two document versions
-- **Email Documents** - Select multiple documents and send them via email
+- **Email Documents** - Select multiple documents and send them via email with drag-and-drop attachment
+- **AI Metadata Extraction** - Automatically extract document metadata from uploaded files using AI
 - **Previous/Next Page** - Navigate between pages of results when you have many documents
 
 ### Filter Options
@@ -285,11 +297,15 @@ Centralised document management system with version tracking, bundles, and full 
 | **Approved** | Formally approved and finalised |
 
 ### Features
-- **Version Control** - Track document revisions automatically
+- **Version Control** - Track document revisions automatically with full revision history
 - **Document Bundles** - Group related documents for sharing via QR codes
-- **Entity Linking** - Link documents to specific jobs, panels, or other records
-- **Preview** - Click any document to view or download it`,
-    keywords: ["documents", "files", "version control", "bundles", "upload"],
+- **Entity Linking** - Link documents to specific jobs, panels, tenders, or other records
+- **Drag-and-Drop** - Drag files directly into the upload area or email composer
+- **Bulk Upload** - Upload multiple files simultaneously with progress tracking
+- **AI Metadata** - AI automatically extracts title, description, and category from uploaded documents
+- **Preview** - Click any document to view or download it
+- **Email Integration** - Send documents directly via email with drag-and-drop attachment support`,
+    keywords: ["documents", "files", "version control", "bundles", "upload", "AI", "metadata", "drag and drop", "bulk"],
     category: "Documents",
     pageRoute: "/documents",
   },
@@ -744,8 +760,10 @@ Full purchase order management with line items, approval workflows, and PDF gene
 - Customisable terms and conditions with rich text editing
 - Track PO status through the approval workflow
 - Receive goods against POs
-- Print or download POs as PDFs`,
-    keywords: ["purchase orders", "PO", "procurement", "buying"],
+- Print or download POs as PDFs
+- **CAPEX Integration** - Approved CAPEX requests can automatically generate purchase orders
+- **Budget Integration** - POs can be linked to job budget lines and cost codes for financial tracking`,
+    keywords: ["purchase orders", "PO", "procurement", "buying", "CAPEX"],
     category: "Finance",
     pageRoute: "/purchase-orders",
   },
@@ -799,10 +817,10 @@ The detailed form for creating or editing a purchase order. Add line items, set 
     key: "page.sales-pipeline",
     scope: "PAGE",
     title: "Sales Pipeline",
-    shortText: "Track sales opportunities from lead to won or lost.",
+    shortText: "Track sales opportunities from lead to won or lost, with mobile support.",
     bodyMd: `## Sales Pipeline
 
-Visual pipeline for managing pre-sales opportunities. Track leads from initial contact through to won or lost.
+Visual pipeline for managing pre-sales opportunities. Track leads from initial contact through to won or lost. Fully accessible on desktop and mobile.
 
 ### Buttons & Actions
 
@@ -812,6 +830,7 @@ Visual pipeline for managing pre-sales opportunities. Track leads from initial c
 - **Filter by Date Range** - Show opportunities within a time period
 - **Click Opportunity Card** - Open the full details to edit or update the opportunity
 - **Convert to Job** - When an opportunity is won, convert it directly into a job record
+- **Email Integration** - Drag and drop emails onto opportunities to log communication
 
 ### Pipeline Stages
 
@@ -829,8 +848,10 @@ Visual pipeline for managing pre-sales opportunities. Track leads from initial c
 - Track opportunity value and probability
 - Log sales activities and follow-up dates
 - View pipeline value totals by stage
-- Convert won opportunities to jobs automatically`,
-    keywords: ["sales", "pipeline", "opportunities", "leads", "CRM"],
+- Convert won opportunities to jobs automatically
+- **Mobile Support** - Create and manage opportunities from the mobile app
+- **Address Autocomplete** - Australian suburb/postcode/state lookup when entering addresses`,
+    keywords: ["sales", "pipeline", "opportunities", "leads", "CRM", "mobile"],
     category: "Sales",
     pageRoute: "/sales-pipeline",
   },
@@ -838,10 +859,10 @@ Visual pipeline for managing pre-sales opportunities. Track leads from initial c
     key: "page.contracts",
     scope: "PAGE",
     title: "Contract Hub",
-    shortText: "Manage job contracts, retention tracking, and contract details.",
+    shortText: "Manage job contracts, retention tracking, budget links, and contract details.",
     bodyMd: `## Contract Hub
 
-Centralised contract management for all jobs. View contract values, retention amounts, and access detailed contract information.
+Centralised contract management for all jobs. View contract values, retention amounts, budget summaries, and access detailed contract information.
 
 ### Buttons & Actions
 
@@ -853,13 +874,17 @@ Centralised contract management for all jobs. View contract values, retention am
 - List of all jobs with contract information
 - Contract value and retention summary for each job
 - Quick access to detailed contract editing
+- Budget and tender cost summaries per contract
 
 ### Features
 - View and edit contract details for each job
 - Track contract retention amounts and release schedules
 - Monitor contract milestones and progress
-- Link to progress claims for each contract`,
-    keywords: ["contracts", "retention", "agreement", "terms"],
+- Link to progress claims for each contract
+- **Budget Integration** - View budget totals, tender costs, and forecast alongside contract values
+- **AI Contract Analysis** - Upload contract PDFs for automatic extraction of key terms, values, and conditions
+- **Document Management** - Attach and manage contract documents with version control`,
+    keywords: ["contracts", "retention", "agreement", "terms", "budget", "AI"],
     category: "Finance",
     pageRoute: "/contracts",
   },
@@ -2354,6 +2379,23 @@ Click the tasks icon on any activity to expand an inline task panel where you ca
 - Add comments and files to individual tasks
 - Drag and drop to reorder tasks
 
+### Dependencies (MS Project-style)
+
+Activities support predecessor and successor dependencies:
+- **Finish-to-Start (FS)** - Successor cannot start until predecessor finishes
+- **Start-to-Start (SS)** - Successor cannot start until predecessor starts
+- **Finish-to-Finish (FF)** - Successor cannot finish until predecessor finishes
+- **Start-to-Finish (SF)** - Successor cannot finish until predecessor starts
+- **Lag Days** - Add a delay between linked activities
+
+Dependencies are shown as connecting lines in the Gantt Chart view.
+
+### Email Integration
+
+- Drag and drop emails from your inbox directly onto activities
+- AI summarisation automatically generates a comment from the email content
+- Attached files are linked to the activity
+
 ### Progress Tracking
 
 - Progress bar shows percentage of completed activities
@@ -2361,11 +2403,12 @@ Click the tasks icon on any activity to expand an inline task panel where you ca
 - Progress is calculated from all activities regardless of the current filter
 
 ### Tips
-- Use the Gantt Chart view for a visual timeline of all activities
+- Use the Gantt Chart view for a visual timeline of all activities and their dependencies
 - Activities are grouped by stage for easy navigation
 - Overdue activities are highlighted in red
-- The Show Done toggle helps keep your view focused on active work`,
-    keywords: ["activities", "workflow", "project", "stages", "status", "tasks"],
+- The Show Done toggle helps keep your view focused on active work
+- Set dependencies to automatically schedule activities based on their predecessors`,
+    keywords: ["activities", "workflow", "project", "stages", "status", "tasks", "dependencies", "gantt"],
     category: "Tasks",
     pageRoute: "/jobs/:jobId/activities",
   },
@@ -2569,6 +2612,516 @@ Split a level into multiple pours when production needs to be staged:
     keywords: ["programme", "schedule", "levels", "pours", "cycle times", "production"],
     category: "Production",
     pageRoute: "/admin/jobs/:id/programme",
+  },
+  {
+    key: "page.scope-of-works",
+    scope: "PAGE",
+    title: "Scope of Works",
+    shortText: "Build and manage trade-based scopes of work for tender and contract documentation.",
+    bodyMd: `## Scope of Works
+
+The Scope of Works page lets you define detailed scopes for each trade on a project. Scopes list what is included, excluded, or not applicable for a given trade and can be linked to tenders and emailed to subcontractors.
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Create Scope** | Start a new scope by selecting a trade, job type, and providing a name and description |
+| **AI-Powered Generation** | Use AI to automatically generate scope items for a trade based on industry standards |
+| **Manual Item Entry** | Add individual scope items with a description, category, details, and status (Included / Excluded / N/A) |
+| **Import Scope** | Upload a text or CSV file to bulk-import scope items, with optional AI formatting |
+| **Duplicate Scope** | Copy an existing scope as a starting point for a new one |
+| **Email Scope** | Send one or more scopes directly to a recipient via email |
+| **Print / Export** | Generate a print-friendly view of any scope |
+| **Status Management** | Mark scopes as Draft, Active, or Archived |
+
+### Scope Items
+
+Each scope contains line items that describe specific work elements:
+
+| Field | Description |
+|-------|-------------|
+| **Description** | What the work item covers |
+| **Category** | Grouping label for organising items (e.g. "Structural", "Finishing") |
+| **Details** | Additional notes or specifications |
+| **Status** | Whether the item is Included, Excluded, or Not Applicable |
+
+### AI Generation
+
+When creating or editing a scope, click the AI Generate button to have the system suggest scope items based on the selected trade. You can review, edit, and accept or reject each suggestion before adding them.
+
+### Bulk Actions
+
+- Select multiple scope items to change their status in bulk
+- Reorder items using the sort controls
+- Delete multiple items at once
+
+### Tips
+- Link your scopes to tenders so subcontractors know exactly what is expected
+- Use AI generation as a starting point and customise items for your specific project
+- The Print view creates a professional document suitable for distribution
+- Archive old scopes to keep your list clean while preserving history`,
+    keywords: ["scope", "works", "trade", "tender", "inclusions", "exclusions", "AI", "generate"],
+    category: "Tendering",
+    pageRoute: "/scopes",
+  },
+  {
+    key: "page.tender-center",
+    scope: "PAGE",
+    title: "Tender Center",
+    shortText: "Central hub for managing all tenders across jobs, tracking status, and creating new tenders.",
+    bodyMd: `## Tender Center
+
+The Tender Center provides a centralised view of all tenders across your jobs. From here you can create new tenders, track their progress, and navigate to detailed tender management.
+
+### What You Will See
+
+| Column | Description |
+|--------|-------------|
+| **Tender #** | Unique identifier for each tender |
+| **Title** | Descriptive name for the tender |
+| **Job** | The job this tender belongs to |
+| **Status** | Current stage: Draft, Open, Under Review, Approved, Closed, or Cancelled |
+| **Due Date** | Closing date for tender submissions |
+| **Submissions** | Number of supplier submissions received |
+
+### Buttons & Actions
+
+- **New Tender** - Create a new tender, selecting a job and providing details
+- **Search** - Filter tenders by title or number
+- **Job Filter** - Show tenders for a specific job only
+- **Status Filter** - Show tenders in a specific stage
+- **Click a Row** - Opens the full Tender Detail page for that tender
+
+### Tender Statuses
+
+| Status | Meaning |
+|--------|---------|
+| **Draft** | Tender is being prepared, not yet sent to suppliers |
+| **Open** | Tender is active and accepting submissions |
+| **Under Review** | Submissions are being evaluated |
+| **Approved** | A submission has been accepted |
+| **Closed** | Tender process is complete |
+| **Cancelled** | Tender was cancelled before completion |
+
+### Tips
+- Use the job filter to focus on tenders for a specific project
+- Monitor the submission count to see which tenders are getting responses
+- Tenders link to the budget system so costs flow through automatically`,
+    keywords: ["tender", "center", "hub", "procurement", "suppliers", "submissions"],
+    category: "Tendering",
+    pageRoute: "/tenders",
+  },
+  {
+    key: "page.tender-detail",
+    scope: "PAGE",
+    title: "Tender Detail",
+    shortText: "Manage a specific tender including invitations, submissions, documents, scopes, and notes.",
+    bodyMd: `## Tender Detail
+
+The Tender Detail page is the complete management view for a single tender. It has five tabs covering every aspect of the tendering process.
+
+### Tabs
+
+| Tab | Purpose |
+|-----|---------|
+| **Invitations** | Manage which suppliers are invited to tender |
+| **Submissions** | Record and compare supplier submissions with pricing |
+| **Documents** | Attach tender documents, drawings, and specifications |
+| **Scopes** | Link Scope of Works documents to the tender |
+| **Notes** | Add internal notes and commentary |
+
+### Invitations Tab
+
+- **Find Suppliers** - Search for suppliers by cost code and location radius
+- **Invite Supplier** - Add a supplier to the tender panel
+- **Send Invitation** - Email the tender invitation with optional documents attached
+- **Track Status** - See which suppliers have been invited, sent, accepted, or declined
+
+### Submissions Tab
+
+- **Add Submission** - Record a supplier's pricing submission
+- **Line Items** - Enter pricing against each budget line / cost code
+- **Compare** - View submissions side by side to evaluate pricing
+- **Accept Submission** - Mark the winning submission which flows through to the budget
+
+### Documents Tab
+
+- Upload and manage tender-related documents
+- Drag and drop files to attach them
+- Link existing documents from the document management system
+
+### Scopes Tab
+
+- Link existing Scope of Works entries to the tender
+- Suppliers can see exactly what is included and excluded
+
+### Tips
+- Send invitations with all relevant documents attached so suppliers have everything they need
+- Use the submissions comparison to identify the best value
+- Link scopes early so suppliers understand the full extent of work
+- Notes are internal only and not shared with suppliers`,
+    keywords: ["tender", "detail", "invitations", "submissions", "documents", "scopes", "suppliers"],
+    category: "Tendering",
+    pageRoute: "/tenders/:id",
+  },
+  {
+    key: "page.job-tenders",
+    scope: "PAGE",
+    title: "Job Tender Sheets",
+    shortText: "View and manage tender amounts against budget lines for a specific job.",
+    bodyMd: `## Job Tender Sheets
+
+The Job Tender Sheets page shows how tender submissions map to your job's budget. It provides a side-by-side view of estimated budget amounts versus actual tender prices for each cost code.
+
+### Summary Cards
+
+| Card | Description |
+|------|-------------|
+| **Est. Budget Total** | The total estimated budget across all cost codes |
+| **Tender Total** | The total from accepted tender submissions |
+| **Difference to Budget** | How tender costs compare to the budget (green = under budget, red = over) |
+
+### Tender Amounts Table
+
+The table groups budget lines by parent cost code and shows:
+
+| Column | Description |
+|--------|-------------|
+| **Code** | The cost code identifier |
+| **Description** | What the cost code covers |
+| **Est. Budget** | The budgeted amount for this item |
+| **Tender Amount** | The actual tender price (editable) |
+| **Diff to Budget** | Variance between budget and tender |
+
+### How Tender Amounts Work
+
+1. Create tenders in the Tender Center and receive submissions
+2. When a submission is accepted, its line items populate the tender amounts
+3. You can also manually enter tender amounts directly in this table
+4. Changes save automatically and flow through to the Job Budget page
+
+### Tips
+- Green values mean you are under budget; red values mean over budget
+- The percentage difference helps quickly identify cost code areas that need attention
+- Use this view alongside the Job Budget page for complete financial oversight`,
+    keywords: ["tender", "sheets", "budget", "cost codes", "amounts", "comparison"],
+    category: "Budget",
+    pageRoute: "/jobs/:id/tenders",
+  },
+  {
+    key: "page.job-budget",
+    scope: "PAGE",
+    title: "Job Budget",
+    shortText: "Manage the complete budget for a job including estimates, tenders, variations, and forecasts.",
+    bodyMd: `## Job Budget
+
+The Job Budget page is the central financial management tool for each job. It tracks estimated costs, tender amounts, variations, and forecast totals across all cost codes.
+
+### Summary Cards
+
+| Card | Description |
+|------|-------------|
+| **Total Estimated Budget** | Sum of all budget line estimates |
+| **Total Tender Cost** | Sum of accepted tender amounts |
+| **Total Variations** | Sum of approved variation amounts |
+| **Total Forecast** | Calculated forecast combining tenders and variations |
+| **Profit Margin** | Percentage difference between budget and forecast |
+
+### Budget Lines
+
+Each budget line represents a cost item and includes:
+
+| Field | Description |
+|-------|-------------|
+| **Cost Code** | Parent cost code category |
+| **Child Code** | Specific cost code within the category |
+| **Description** | What this budget item covers |
+| **Estimated Amount** | The budgeted estimate |
+| **Tender Amount** | Amount from accepted tender submissions |
+| **Variation Amount** | Approved changes to the original scope |
+| **Forecast** | Projected final cost |
+
+### Buttons & Actions
+
+- **Add Line** - Create a new budget line with a cost code and estimated amount
+- **Create from Cost Codes** - Auto-generate budget lines from your cost code structure
+- **Edit Budget** - Modify budget-level details like name and notes
+- **Tender Sheets** - Navigate to the tender amounts view for this job
+- **Detail Sidebar** - Click a budget line to see updates, files, and detailed items
+
+### Budget Line Detail Items
+
+Each budget line can have detailed breakdown items (sub-items) for granular cost tracking, including quantity, unit price, and calculated totals.
+
+### Tips
+- Use "Create from Cost Codes" to quickly set up a budget structure matching your cost code hierarchy
+- Budget lines link directly to the tender system - accepted submissions automatically populate tender amounts
+- Monitor the profit margin card to track overall job profitability
+- The detail sidebar lets you attach files and record updates against specific budget lines`,
+    keywords: ["budget", "estimates", "tender", "variations", "forecast", "profit", "cost codes"],
+    category: "Budget",
+    pageRoute: "/jobs/:id/budget",
+  },
+  {
+    key: "page.job-boq",
+    scope: "PAGE",
+    title: "Bill of Quantities",
+    shortText: "Manage detailed quantities, unit rates, and cost breakdowns for a job.",
+    bodyMd: `## Bill of Quantities (BOQ)
+
+The Bill of Quantities page provides granular quantity and pricing management for job items, organised by cost code groups.
+
+### Summary Cards
+
+| Card | Description |
+|------|-------------|
+| **Total Items** | Number of BOQ items across all groups |
+| **Total Value** | Combined value of all quantity items |
+
+### BOQ Groups
+
+Items are organised into groups based on cost codes:
+
+| Field | Description |
+|-------|-------------|
+| **Group Name** | Descriptive name for the group |
+| **Cost Code** | Parent cost code this group relates to |
+| **Child Code** | Specific child cost code (optional) |
+
+### BOQ Items
+
+Each item within a group tracks:
+
+| Field | Description |
+|-------|-------------|
+| **Description** | What this item covers |
+| **Quantity** | Number of units |
+| **Unit** | Unit of measurement (e.g. m2, each, LM) |
+| **Rate** | Price per unit |
+| **Total** | Calculated total (quantity x rate) |
+| **Notes** | Additional details |
+
+### Buttons & Actions
+
+- **Add Group** - Create a new group linked to a cost code
+- **Add Item** - Add a new quantity item (optionally within a group)
+- **Edit / Delete** - Modify or remove groups and items
+- **Cost Code Filter** - Filter items by a specific cost code
+- **Expand / Collapse** - Show or hide items within groups
+
+### Tips
+- Use groups to organise items by trade or work package
+- The BOQ links to the budget system through shared cost codes
+- Filter by cost code to focus on a specific trade's quantities
+- Totals update automatically as you add or edit items`,
+    keywords: ["boq", "bill of quantities", "quantities", "rates", "pricing", "items", "groups"],
+    category: "Budget",
+    pageRoute: "/jobs/:id/boq",
+  },
+  {
+    key: "page.capex-requests",
+    scope: "PAGE",
+    title: "CAPEX Requests",
+    shortText: "Submit, review, and approve capital expenditure requests for equipment and assets.",
+    bodyMd: `## CAPEX Requests
+
+The CAPEX (Capital Expenditure) Requests page manages the process of requesting, reviewing, and approving purchases of significant equipment or assets.
+
+### What You Will See
+
+A list of all CAPEX requests with their current status, requested amount, equipment title, and the person who submitted them.
+
+### Request Statuses
+
+| Status | Meaning |
+|--------|---------|
+| **Draft** | Request is being prepared, not yet submitted |
+| **Submitted** | Sent for review by management |
+| **Approved** | Request has been approved for purchase |
+| **Rejected** | Request was declined |
+| **Withdrawn** | Requester cancelled the request |
+
+### Creating a CAPEX Request
+
+Fill in the request form with:
+
+| Field | Description |
+|-------|-------------|
+| **Equipment Title** | Name of the equipment or asset being requested |
+| **Description** | Detailed justification for the purchase |
+| **Estimated Cost** | Expected purchase price |
+| **Department** | Which department needs this equipment |
+| **Job** | (Optional) Which job this relates to |
+| **Preferred Supplier** | Suggested vendor |
+| **Category** | Type of expenditure (New Purchase, Replacement, Upgrade) |
+| **Priority** | How urgent the request is |
+| **Proposed Asset Manager** | Who will be responsible for the asset |
+
+### Request Detail View
+
+Click any request to open the detail view with three tabs:
+
+| Tab | Purpose |
+|-----|---------|
+| **CAPEX Form** | The full request form with all details |
+| **Documents** | Supporting documents, quotes, and attachments |
+| **History** | Audit trail showing all status changes and actions |
+
+### Approval Workflow
+
+1. **Create** a request as a Draft
+2. **Submit** when ready for review
+3. Manager reviews and either **Approves** or **Rejects**
+4. Approved requests can generate a Purchase Order automatically
+
+### PO Integration
+
+Approved CAPEX requests can be linked to Purchase Orders for procurement tracking. If a PO exists, it appears on the request with its status and total.
+
+### Tips
+- Attach supporting quotes and documents before submitting
+- The history tab provides a complete audit trail of who did what and when
+- Withdrawn requests can be resubmitted after modification
+- Approved CAPEX requests flow into the asset register when the equipment is received`,
+    keywords: ["capex", "capital expenditure", "equipment", "purchase", "approval", "assets"],
+    category: "Finance",
+    pageRoute: "/capex-requests",
+  },
+  {
+    key: "page.pm-call-logs",
+    scope: "PAGE",
+    title: "PM Call Logs",
+    shortText: "Record and track project manager site visit call logs with production and drafting updates.",
+    bodyMd: `## PM Call Logs
+
+PM Call Logs let project managers record structured notes from site visits and phone calls. Each log captures production updates, drafting changes, and any issues raised.
+
+### What You Will See
+
+A list of call logs sorted by date, showing the job name, date, and key badges indicating whether issues, production updates, or drafting updates were recorded.
+
+### Creating a Call Log
+
+Click **New Call Log** to create a new entry:
+
+| Field | Description |
+|-------|-------------|
+| **Job** | Select which job this call relates to |
+| **Date** | When the call or visit took place |
+| **Production Update** | Notes on production progress |
+| **Drafting Update** | Notes on drafting status and changes |
+| **Issues** | Any problems, delays, or concerns raised |
+| **General Notes** | Other relevant information |
+
+### Buttons & Actions
+
+- **New Call Log** - Create a new call log entry
+- **Job Filter** - Filter logs by a specific job
+- **Click a Log** - Opens the detail view to read or edit the full log
+- **Delete** - Remove a call log (with confirmation)
+
+### Tips
+- Use call logs to maintain a written record of all project communications
+- The badges on each card let you quickly see which logs have issues flagged
+- Filter by job to review the communication history for a specific project
+- Call logs are also available on the mobile app for on-site recording`,
+    keywords: ["pm", "call logs", "project manager", "site visits", "production", "drafting", "issues"],
+    category: "Project Management",
+    pageRoute: "/pm-call-logs",
+  },
+  {
+    key: "page.admin.cost-codes",
+    scope: "PAGE",
+    title: "Cost Codes",
+    shortText: "Manage the two-tier cost code structure used across budgets, tenders, and BOQ.",
+    bodyMd: `## Cost Codes
+
+The Cost Codes page lets administrators set up and manage the hierarchical cost code structure used throughout the budget and tender systems.
+
+### Two-Tier Structure
+
+Cost codes use a parent-child hierarchy:
+
+| Level | Example | Description |
+|-------|---------|-------------|
+| **Parent Code** | 100 - Structural | Top-level trade or category |
+| **Child Code** | 100.01 - Concrete Supply | Specific cost item within the parent |
+
+### Tabs
+
+| Tab | Purpose |
+|-----|---------|
+| **Codes** | Manage the full parent and child cost code tree |
+| **Defaults** | Configure default cost codes and system-wide settings |
+
+### Buttons & Actions
+
+- **Add Cost Code** - Create a new parent or child cost code
+- **Expand All / Collapse All** - Show or hide child codes under parents
+- **Search** - Find codes by name or number
+- **Edit** - Modify an existing code's name, number, or description
+- **Delete** - Remove a code (only if not in use by budget lines or tenders)
+- **Download Template** - Get a CSV template for bulk import
+- **Import Cost Codes** - Upload a CSV file to bulk-create codes
+
+### Cost Code Fields
+
+| Field | Description |
+|-------|-------------|
+| **Code** | Unique identifier (e.g. 100, 100.01) |
+| **Name** | Descriptive name for the cost code |
+| **Description** | Additional details about what this code covers |
+| **Parent** | For child codes, which parent code it belongs to |
+
+### Tips
+- Set up your cost code structure before creating budgets - it forms the backbone of all financial tracking
+- Use the import feature to quickly set up codes from a spreadsheet
+- Child codes inherit from their parent but can have their own specific descriptions
+- Cost codes are shared across all jobs in your company
+- Deleting a parent code will also affect its child codes`,
+    keywords: ["cost codes", "budget codes", "trade codes", "hierarchy", "parent", "child"],
+    category: "Administration",
+    pageRoute: "/admin/cost-codes",
+  },
+  {
+    key: "page.document-register",
+    scope: "PAGE",
+    title: "Document Register",
+    shortText: "Centralised register of all project documents with filtering, search, and status tracking.",
+    bodyMd: `## Document Register
+
+The Document Register provides a filterable, searchable list of all documents across your projects. It serves as a central index for finding and tracking documents.
+
+### What You Will See
+
+A table listing all documents with key details:
+
+| Column | Description |
+|--------|-------------|
+| **Document #** | Unique document reference number |
+| **Title** | Document name |
+| **Type** | Category of document (Drawing, Specification, Report, etc.) |
+| **Status** | Current status (Draft, For Review, Approved, Superseded) |
+| **Job** | Which job the document belongs to |
+| **Revision** | Current revision number |
+| **Date** | When the document was last updated |
+
+### Buttons & Actions
+
+- **Search** - Find documents by title, number, or description
+- **Filter by Job** - Show documents for a specific job
+- **Filter by Type** - Show only a specific document type
+- **Filter by Status** - Show documents in a particular status
+- **Click a Row** - Opens the document detail view
+
+### Tips
+- Use the register to find documents quickly across all projects
+- Combine filters to narrow down results (e.g. all Approved Drawings for a specific job)
+- The register automatically updates as documents are added or revised through the Documents page`,
+    keywords: ["document", "register", "index", "search", "filter", "drawings", "specifications"],
+    category: "Documents",
+    pageRoute: "/document-register",
   },
 ];
 
