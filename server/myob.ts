@@ -163,6 +163,10 @@ export function createMyobClient(companyId: string) {
     getAccounts: (query?: string) => myobFetch(companyId, `GeneralLedger/Account/${query ? `?${query}` : ""}`),
     getInvoices: (query?: string) => myobFetch(companyId, `Sale/Invoice/${query ? `?${query}` : ""}`),
     getItems: (query?: string) => myobFetch(companyId, `Inventory/Item/${query ? `?${query}` : ""}`),
+    createPurchaseBill: (bill: any) => myobFetch(companyId, "Purchase/Bill/Service", {
+      method: "POST",
+      body: JSON.stringify(bill),
+    }),
   };
 }
 

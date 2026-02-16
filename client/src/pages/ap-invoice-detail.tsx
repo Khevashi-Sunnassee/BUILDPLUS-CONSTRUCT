@@ -58,13 +58,13 @@ interface InvoiceDetail {
 
 interface InvoiceSplit {
   id?: string;
-  itemId: number;
-  description: string;
-  splitPercent: number;
-  extendedCost: number;
-  total: number;
-  glCode: string;
-  jobId: string;
+  description: string | null;
+  percentage: string | null;
+  amount: string;
+  costCodeId: string | null;
+  jobId: string | null;
+  taxCodeId: string | null;
+  sortOrder: number;
 }
 
 interface ActivityItem {
@@ -239,16 +239,34 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
 }) {
   const { toast } = useToast();
 
-  const totalSplitPercent = useMemo(() => splits.reduce((sum, s) => sum + (s.splitPercent || 0), 0), [splits]);
-  const totalAmount = useMemo(() => splits.reduce((sum, s) => sum + (s.total || 0), 0), [splits]);
+  const { data: jobs } = useQuery<Array<{ id: string; name: string; jobNumber: string }>>({
+    queryKey: ["/api/jobs"],
+  });
+
+  const { data: costCodes } = useQuery<Array<{ id: string; code: string; name: string }>>({
+    queryKey: ["/api/cost-codes-with-children"],
+  });
+
+  const totalAmount = useMemo(() => splits.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0), [splits]);
   const variance = invoiceTotal - totalAmount;
+  const allocatedPercent = invoiceTotal > 0 ? (totalAmount / invoiceTotal) * 100 : 0;
 
   const saveMutation = useMutation({
     mutationFn: async (updatedSplits: InvoiceSplit[]) => {
-      await apiRequest("PUT", AP_INVOICE_ROUTES.SPLITS(invoiceId), { splits: updatedSplits });
+      const payload = updatedSplits.map((s, idx) => ({
+        description: s.description || null,
+        percentage: s.percentage || null,
+        amount: s.amount,
+        costCodeId: s.costCodeId || null,
+        jobId: s.jobId || null,
+        taxCodeId: s.taxCodeId || null,
+        sortOrder: idx,
+      }));
+      await apiRequest("PUT", AP_INVOICE_ROUTES.SPLITS(invoiceId), payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId)] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.SPLITS(invoiceId)] });
       toast({ title: "Splits saved" });
     },
     onError: (err: Error) => {
@@ -256,21 +274,29 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
     },
   });
 
-  const updateSplit = (index: number, field: keyof InvoiceSplit, value: string | number) => {
+  const updateSplit = (index: number, field: keyof InvoiceSplit, value: string | null) => {
     const updated = [...splits];
     (updated[index] as any)[field] = value;
-    if (field === "splitPercent") {
-      updated[index].total = invoiceTotal * (Number(value) / 100);
-      updated[index].extendedCost = updated[index].total;
+    if (field === "percentage" && value) {
+      const pct = parseFloat(value) || 0;
+      updated[index].amount = (invoiceTotal * pct / 100).toFixed(2);
+    }
+    if (field === "amount" && value && invoiceTotal > 0) {
+      updated[index].percentage = ((parseFloat(value) / invoiceTotal) * 100).toFixed(2);
     }
     onSplitsChange(updated);
   };
 
   const addSplit = () => {
+    const remaining = invoiceTotal - totalAmount;
     onSplitsChange([
       ...splits,
-      { itemId: splits.length + 1, description: "", splitPercent: 0, extendedCost: 0, total: 0, glCode: "", jobId: "" },
+      { description: null, percentage: invoiceTotal > 0 ? ((remaining / invoiceTotal) * 100).toFixed(2) : "0", amount: remaining > 0 ? remaining.toFixed(2) : "0.00", costCodeId: null, jobId: null, taxCodeId: null, sortOrder: splits.length },
     ]);
+  };
+
+  const removeSplit = (index: number) => {
+    onSplitsChange(splits.filter((_, i) => i !== index));
   };
 
   return (
@@ -280,7 +306,7 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
           <CardTitle className="text-sm font-semibold">Cost Splits</CardTitle>
           <Button size="sm" variant="outline" onClick={addSplit} data-testid="button-add-split">
             <Plus className="h-3 w-3 mr-1" />
-            Add Row
+            Add Line
           </Button>
         </div>
       </CardHeader>
@@ -289,12 +315,12 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
           <div className="flex-1 min-w-[120px]">
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full transition-all ${totalSplitPercent >= 100 ? "bg-green-500" : "bg-amber-500"}`}
-                style={{ width: `${Math.min(100, totalSplitPercent)}%` }}
+                className={`h-full rounded-full transition-all ${allocatedPercent >= 99.9 ? "bg-green-500" : "bg-amber-500"}`}
+                style={{ width: `${Math.min(100, allocatedPercent)}%` }}
               />
             </div>
           </div>
-          <span className="text-xs font-medium" data-testid="text-split-percent">{totalSplitPercent.toFixed(1)}%</span>
+          <span className="text-xs font-medium" data-testid="text-split-percent">{allocatedPercent.toFixed(1)}%</span>
           <span className={`text-xs font-medium ${Math.abs(variance) < 0.01 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-variance">
             Variance: {formatCurrency(variance)}
           </span>
@@ -303,13 +329,13 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-12">#</TableHead>
+                <TableHead className="w-10">#</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead className="w-20">% Split</TableHead>
-                <TableHead className="w-28 text-right">Ext. Cost</TableHead>
-                <TableHead className="w-28 text-right">Total</TableHead>
-                <TableHead className="w-28">GL Code</TableHead>
-                <TableHead className="w-28">Job</TableHead>
+                <TableHead className="w-20">%</TableHead>
+                <TableHead className="w-28 text-right">Amount</TableHead>
+                <TableHead className="w-36">Cost Code</TableHead>
+                <TableHead className="w-36">Job</TableHead>
+                <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -322,10 +348,10 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
               ) : (
                 splits.map((split, i) => (
                   <TableRow key={i} data-testid={`row-split-${i}`}>
-                    <TableCell className="text-xs text-muted-foreground">{split.itemId}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
                     <TableCell>
                       <Input
-                        value={split.description}
+                        value={split.description || ""}
                         onChange={(e) => updateSplit(i, "description", e.target.value)}
                         className="h-7 text-sm border-0 bg-transparent p-0 focus-visible:ring-1"
                         placeholder="Description"
@@ -335,31 +361,51 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
                     <TableCell>
                       <Input
                         type="number"
-                        value={split.splitPercent}
-                        onChange={(e) => updateSplit(i, "splitPercent", parseFloat(e.target.value) || 0)}
+                        value={split.percentage || ""}
+                        onChange={(e) => updateSplit(i, "percentage", e.target.value)}
                         className="h-7 text-sm border-0 bg-transparent p-0 w-16 focus-visible:ring-1"
                         data-testid={`input-split-percent-${i}`}
                       />
                     </TableCell>
-                    <TableCell className="text-right text-sm">{formatCurrency(split.extendedCost)}</TableCell>
-                    <TableCell className="text-right text-sm font-medium">{formatCurrency(split.total)}</TableCell>
                     <TableCell>
                       <Input
-                        value={split.glCode}
-                        onChange={(e) => updateSplit(i, "glCode", e.target.value)}
-                        className="h-7 text-sm border-0 bg-transparent p-0 w-24 focus-visible:ring-1"
-                        placeholder="GL Code"
-                        data-testid={`input-split-gl-${i}`}
+                        type="number"
+                        value={split.amount}
+                        onChange={(e) => updateSplit(i, "amount", e.target.value)}
+                        className="h-7 text-sm border-0 bg-transparent p-0 w-24 text-right focus-visible:ring-1"
+                        data-testid={`input-split-amount-${i}`}
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        value={split.jobId}
-                        onChange={(e) => updateSplit(i, "jobId", e.target.value)}
-                        className="h-7 text-sm border-0 bg-transparent p-0 w-24 focus-visible:ring-1"
-                        placeholder="Job"
-                        data-testid={`input-split-job-${i}`}
-                      />
+                      <Select value={split.costCodeId || "none"} onValueChange={(v) => updateSplit(i, "costCodeId", v === "none" ? null : v)}>
+                        <SelectTrigger className="h-7 text-sm border-0 bg-transparent p-0" data-testid={`select-split-costcode-${i}`}>
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {(costCodes || []).map(cc => (
+                            <SelectItem key={cc.id} value={cc.id}>{cc.code} - {cc.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Select value={split.jobId || "none"} onValueChange={(v) => updateSplit(i, "jobId", v === "none" ? null : v)}>
+                        <SelectTrigger className="h-7 text-sm border-0 bg-transparent p-0" data-testid={`select-split-job-${i}`}>
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {(jobs || []).map(j => (
+                            <SelectItem key={j.id} value={j.id}>{j.jobNumber} - {j.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Button size="icon" variant="ghost" onClick={() => removeSplit(i)} data-testid={`button-remove-split-${i}`}>
+                        <X className="h-3 w-3" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -368,10 +414,24 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
           </Table>
         </div>
         {splits.length > 0 && (
-          <div className="flex justify-end">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <span className="text-xs text-muted-foreground">
+              Total: {formatCurrency(totalAmount)} of {formatCurrency(invoiceTotal)}
+            </span>
+            {Math.abs(variance) > 0.02 && invoiceTotal > 0 && (
+              <span className="text-xs text-amber-600 dark:text-amber-400" data-testid="text-variance-warning">
+                Split total must match invoice total
+              </span>
+            )}
             <Button
               size="sm"
-              onClick={() => saveMutation.mutate(splits)}
+              onClick={() => {
+                if (Math.abs(variance) > 0.02 && invoiceTotal > 0) {
+                  toast({ title: "Variance too high", description: `Split total ($${totalAmount.toFixed(2)}) does not match invoice total ($${invoiceTotal.toFixed(2)})`, variant: "destructive" });
+                  return;
+                }
+                saveMutation.mutate(splits);
+              }}
               disabled={saveMutation.isPending}
               data-testid="button-save-splits"
             >
@@ -502,8 +562,8 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
   const [zoom, setZoom] = useState(100);
 
   const doc = invoice.documents?.[0];
-  const focusedFieldData = focusedField && invoice.extractedFields?.find(f => f.fieldKey === focusedField);
-  const bbox = focusedFieldData?.bboxJson;
+  const focusedFieldData = focusedField ? invoice.extractedFields?.find(f => f.fieldKey === focusedField) : null;
+  const bbox = focusedFieldData ? focusedFieldData.bboxJson : null;
 
   return (
     <div className="flex flex-col h-full bg-muted/30" data-testid="panel-pdf-viewer">
@@ -681,8 +741,8 @@ export default function ApInvoiceDetailPage() {
   });
 
   const rejectMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", AP_INVOICE_ROUTES.REJECT(invoiceId!));
+    mutationFn: async (note: string) => {
+      await apiRequest("POST", AP_INVOICE_ROUTES.REJECT(invoiceId!), { note });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId!)] });
@@ -722,6 +782,21 @@ export default function ApInvoiceDetailPage() {
     },
   });
 
+  const exportMyobMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", AP_INVOICE_ROUTES.EXPORT_MYOB(invoiceId!));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId!)] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
+      toast({ title: "Invoice exported to MYOB" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "MYOB export failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const submitMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", AP_INVOICE_ROUTES.SUBMIT(invoiceId!));
@@ -751,6 +826,15 @@ export default function ApInvoiceDetailPage() {
       toast({ title: "Extraction failed", description: err.message, variant: "destructive" });
     },
   });
+
+  const handleReject = useCallback(() => {
+    const note = window.prompt("Please provide a reason for rejection:");
+    if (!note || note.trim().length === 0) {
+      toast({ title: "Rejection cancelled", description: "A reason is required to reject an invoice", variant: "destructive" });
+      return;
+    }
+    rejectMutation.mutate(note.trim());
+  }, [rejectMutation, toast]);
 
   const handleFieldSave = useCallback((key: string, value: string) => {
     updateFieldMutation.mutate({ key, value });
@@ -843,7 +927,7 @@ export default function ApInvoiceDetailPage() {
                 <Check className="h-3 w-3 mr-1" />
                 Approve
               </Button>
-              <Button variant="destructive" size="sm" onClick={() => { setGoToNext(false); rejectMutation.mutate(); }} disabled={rejectMutation.isPending} data-testid="button-reject-invoice">
+              <Button variant="destructive" size="sm" onClick={() => { setGoToNext(false); handleReject(); }} disabled={rejectMutation.isPending} data-testid="button-reject-invoice">
                 <X className="h-3 w-3 mr-1" />
                 Reject
               </Button>
@@ -935,7 +1019,7 @@ export default function ApInvoiceDetailPage() {
                 variant="outline"
                 size="sm"
                 className="text-destructive border-destructive/50"
-                onClick={() => rejectMutation.mutate()}
+                onClick={handleReject}
                 disabled={rejectMutation.isPending}
                 data-testid="button-reject"
               >
@@ -952,6 +1036,17 @@ export default function ApInvoiceDetailPage() {
                 {approveMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}
                 Approve
               </Button>
+              {invoice.status === "APPROVED" && (
+                <Button
+                  size="sm"
+                  onClick={() => exportMyobMutation.mutate()}
+                  disabled={exportMyobMutation.isPending}
+                  data-testid="button-export-myob"
+                >
+                  {exportMyobMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Download className="h-3 w-3 mr-1" />}
+                  Export to MYOB
+                </Button>
+              )}
             </div>
           </div>
         </div>

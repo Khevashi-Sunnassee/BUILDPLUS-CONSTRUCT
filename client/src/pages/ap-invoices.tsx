@@ -23,21 +23,23 @@ interface ApInvoice {
   supplierId: string | null;
   companyName: string | null;
   companyId: string | null;
-  uploadDate: string | null;
+  uploadedAt: string | null;
   invoiceDate: string | null;
   dueDate: string | null;
-  invoiceTotal: string | number | null;
-  assigneeId: string | null;
+  totalInc: string | number | null;
+  totalEx: string | number | null;
+  totalTax: string | number | null;
+  assigneeUserId: string | null;
   assigneeName: string | null;
   riskScore: number | null;
   status: string;
   description: string | null;
-  uploadedById: string | null;
-  uploadedByName: string | null;
-  flagged: boolean | null;
-  urgent: boolean | null;
-  onHold: boolean | null;
+  createdByUserId: string | null;
+  createdByName: string | null;
+  isUrgent: boolean | null;
+  isOnHold: boolean | null;
   currency: string | null;
+  postPeriod: string | null;
 }
 
 interface InvoiceListResponse {
@@ -264,7 +266,7 @@ export default function ApInvoicesPage() {
   const uploaders = useMemo(() => {
     const map = new Map<string, string>();
     invoices.forEach((inv) => {
-      if (inv.uploadedById && inv.uploadedByName) map.set(inv.uploadedById, inv.uploadedByName);
+      if (inv.createdByUserId && inv.createdByName) map.set(inv.createdByUserId, inv.createdByName);
     });
     return Array.from(map.entries());
   }, [invoices]);
