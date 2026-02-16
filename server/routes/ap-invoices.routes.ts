@@ -1424,8 +1424,7 @@ router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, re
     if (!docs.length) return res.status(400).json({ error: "No document to extract from" });
 
     const doc = docs[0];
-    let imageBase64: string;
-    let mimeType = doc.mimeType;
+    let imageBuffers: { base64: string; mimeType: string }[] = [];
 
     try {
       const file = await objectStorageService.getObjectEntityFile(doc.storageKey);
@@ -1435,7 +1434,33 @@ router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, re
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
       }
       const buffer = Buffer.concat(chunks);
-      imageBase64 = buffer.toString("base64");
+
+      if (doc.mimeType?.includes("pdf")) {
+        const { execSync } = await import("child_process");
+        const fs = await import("fs");
+        const os = await import("os");
+        const path = await import("path");
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ap-extract-"));
+        const pdfPath = path.join(tmpDir, "invoice.pdf");
+        fs.writeFileSync(pdfPath, buffer);
+        try {
+          execSync(`pdftoppm -png -r 300 -l 3 "${pdfPath}" "${path.join(tmpDir, 'page')}"`, { timeout: 30000 });
+          const pageFiles = fs.readdirSync(tmpDir)
+            .filter((f: string) => f.startsWith("page") && f.endsWith(".png"))
+            .sort();
+          for (const pageFile of pageFiles) {
+            const pageBuffer = fs.readFileSync(path.join(tmpDir, pageFile));
+            imageBuffers.push({ base64: pageBuffer.toString("base64"), mimeType: "image/png" });
+          }
+        } finally {
+          try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+        }
+        if (imageBuffers.length === 0) {
+          return res.status(500).json({ error: "Failed to convert PDF to images for extraction" });
+        }
+      } else {
+        imageBuffers.push({ base64: buffer.toString("base64"), mimeType: doc.mimeType || "image/png" });
+      }
     } catch (err: any) {
       logger.error({ err }, "Error reading document for extraction");
       return res.status(500).json({ error: "Cannot read document file" });
@@ -1479,6 +1504,11 @@ Return your response as valid JSON with this exact structure:
   ]
 }`;
 
+    const imageContent = imageBuffers.map(img => ({
+      type: "image_url" as const,
+      image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: "high" as const },
+    }));
+
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
@@ -1486,13 +1516,7 @@ Return your response as valid JSON with this exact structure:
           role: "user",
           content: [
             { type: "text", text: extractionPrompt },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${mimeType};base64,${imageBase64}`,
-                detail: "high",
-              },
-            },
+            ...imageContent,
           ],
         },
       ],

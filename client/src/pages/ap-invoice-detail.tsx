@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -560,50 +560,100 @@ function CommentsSection({ invoiceId }: { invoiceId: string }) {
 
 function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedField: string | null }) {
   const [zoom, setZoom] = useState(100);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const doc = invoice.documents?.[0];
   const focusedFieldData = focusedField ? invoice.extractedFields?.find(f => f.fieldKey === focusedField) : null;
   const bbox = focusedFieldData ? focusedFieldData.bboxJson : null;
 
+  useEffect(() => {
+    if (!doc) return;
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    fetch(AP_INVOICE_ROUTES.DOCUMENT(invoice.id), { credentials: "include" })
+      .then(res => {
+        if (!res.ok) throw new Error(`Failed to load document: ${res.status}`);
+        return res.blob();
+      })
+      .then(blob => {
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        setBlobUrl(url);
+        setLoading(false);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setLoadError(err.message);
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      setBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+    };
+  }, [doc?.id, invoice.id]);
+
+  const handleDownload = useCallback(() => {
+    if (!blobUrl || !doc) return;
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = doc.fileName || "invoice";
+    a.click();
+  }, [blobUrl, doc]);
+
   return (
     <div className="flex flex-col h-full bg-muted/30" data-testid="panel-pdf-viewer">
       <div className="flex-1 relative overflow-auto p-4">
         {doc ? (
-          <div className="relative w-full h-full" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top left" }}>
-            {doc.mimeType?.includes("pdf") ? (
-              <iframe
-                src={AP_INVOICE_ROUTES.DOCUMENT(invoice.id)}
-                className="w-full h-full min-h-[600px] border-0"
-                title="Invoice PDF"
-                data-testid="iframe-pdf-viewer"
-              />
-            ) : doc.mimeType?.startsWith("image/") ? (
-              <img
-                src={AP_INVOICE_ROUTES.DOCUMENT(invoice.id)}
-                alt="Invoice document"
-                className="max-w-full"
-                data-testid="img-document"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
-                <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-                <p className="text-sm font-medium mb-1">{doc.fileName}</p>
-                <Badge variant="outline">Unsupported format</Badge>
-              </div>
-            )}
-            {bbox && (
-              <div
-                className="absolute border-2 border-red-500 bg-red-500/10 pointer-events-none z-10"
-                style={{
-                  left: `${(bbox.x1 || 0) * 100}%`,
-                  top: `${(bbox.y1 || 0) * 100}%`,
-                  width: `${((bbox.x2 || 0) - (bbox.x1 || 0)) * 100}%`,
-                  height: `${((bbox.y2 || 0) - (bbox.y1 || 0)) * 100}%`,
-                }}
-                data-testid="bbox-highlight"
-              />
-            )}
-          </div>
+          loading ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">Loading document...</p>
+            </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
+              <AlertTriangle className="h-8 w-8 text-destructive mb-2" />
+              <p className="text-sm text-destructive">{loadError}</p>
+            </div>
+          ) : blobUrl ? (
+            <div className="relative w-full h-full" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top left" }}>
+              {doc.mimeType?.includes("pdf") ? (
+                <iframe
+                  src={blobUrl}
+                  className="w-full h-full min-h-[600px] border-0"
+                  title="Invoice PDF"
+                  data-testid="iframe-pdf-viewer"
+                />
+              ) : doc.mimeType?.startsWith("image/") ? (
+                <img
+                  src={blobUrl}
+                  alt="Invoice document"
+                  className="max-w-full"
+                  data-testid="img-document"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
+                  <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+                  <p className="text-sm font-medium mb-1">{doc.fileName}</p>
+                  <Badge variant="outline">Unsupported format</Badge>
+                </div>
+              )}
+              {bbox && (
+                <div
+                  className="absolute border-2 border-red-500 bg-red-500/10 pointer-events-none z-10"
+                  style={{
+                    left: `${(bbox.x1 || 0) * 100}%`,
+                    top: `${(bbox.y1 || 0) * 100}%`,
+                    width: `${((bbox.x2 || 0) - (bbox.x1 || 0)) * 100}%`,
+                    height: `${((bbox.y2 || 0) - (bbox.y1 || 0)) * 100}%`,
+                  }}
+                  data-testid="bbox-highlight"
+                />
+              )}
+            </div>
+          ) : null
         ) : (
           <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
             <FileText className="h-16 w-16 text-muted-foreground mb-4" />
@@ -614,7 +664,7 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
       </div>
       <div className="flex items-center justify-between gap-2 px-4 py-2 border-t bg-background flex-wrap">
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="sm" disabled={!doc} data-testid="button-download-invoice">
+          <Button variant="outline" size="sm" disabled={!blobUrl} onClick={handleDownload} data-testid="button-download-invoice">
             <Download className="h-3 w-3 mr-1" />
             Download
           </Button>
@@ -826,6 +876,18 @@ export default function ApInvoiceDetailPage() {
       toast({ title: "Extraction failed", description: err.message, variant: "destructive" });
     },
   });
+
+  const autoExtractTriggered = useRef(false);
+  useEffect(() => {
+    if (!invoice) return;
+    if (autoExtractTriggered.current) return;
+    const hasDoc = invoice.documents && invoice.documents.length > 0;
+    const hasFields = invoice.extractedFields && invoice.extractedFields.length > 0;
+    if (hasDoc && !hasFields && invoice.status === "DRAFT" && !extractMutation.isPending) {
+      autoExtractTriggered.current = true;
+      extractMutation.mutate();
+    }
+  }, [invoice]);
 
   const handleReject = useCallback(() => {
     const note = window.prompt("Please provide a reason for rejection:");
