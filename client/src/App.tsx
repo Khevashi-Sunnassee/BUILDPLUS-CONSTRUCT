@@ -134,6 +134,7 @@ const MobileRecordDeliveryPage = lazyWithRetry(() => import("@/pages/mobile/reco
 const MobileReturnLoadPage = lazyWithRetry(() => import("@/pages/mobile/return-load"));
 const MobilePurchaseOrdersPage = lazyWithRetry(() => import("@/pages/mobile/purchase-orders"));
 const MobileCapexRequestsPage = lazyWithRetry(() => import("@/pages/mobile/capex-requests"));
+const MobileApApprovalsPage = lazyWithRetry(() => import("@/pages/mobile/ap-approvals"));
 const MobileMore = lazyWithRetry(() => import("@/pages/mobile/more"));
 const MobileProfilePage = lazyWithRetry(() => import("@/pages/mobile/profile"));
 const MobileWeeklyJobReportPage = lazyWithRetry(() => import("@/pages/mobile/weekly-job-report"));
@@ -198,6 +199,7 @@ function getMobileEquivalentRoute(desktopPath: string): string {
     '/hire-bookings': '/mobile/hire-bookings',
     '/pm-call-logs': '/mobile/pm-call-logs',
     '/capex-requests': '/mobile/capex-requests',
+    '/ap-invoices': '/mobile/ap-approvals',
     '/jobs': '/mobile/jobs',
     '/sales-pipeline': '/mobile/more',
     '/profile': '/mobile/profile',
@@ -1046,6 +1048,11 @@ function Router() {
       <Route path="/mobile/capex-requests">
         <ProtectedRoute>
           <MobileCapexRequestsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/ap-approvals">
+        <ProtectedRoute>
+          <MobileApApprovalsPage />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/more">

@@ -16,6 +16,7 @@ import {
   Camera,
   Phone,
   DollarSign,
+  CheckSquare,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -167,6 +168,12 @@ export default function MobileMore() {
             href="/mobile/capex-requests"
           />
         )}
+        <MenuItem
+          icon={<CheckSquare className="h-5 w-5 text-sky-400" />}
+          iconBg="bg-sky-500/20"
+          label="AP Approvals"
+          href="/mobile/ap-approvals"
+        />
         {showWeeklyReport && (
           <MenuItem
             icon={<FileText className="h-5 w-5 text-indigo-400" />}
