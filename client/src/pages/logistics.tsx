@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { LOGISTICS_ROUTES, ADMIN_ROUTES, PANELS_ROUTES, PANEL_TYPES_ROUTES, SETTINGS_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import {
   Truck,
@@ -1019,12 +1019,19 @@ export default function LogisticsPage() {
                                 Docket: {loadList.docketNumber}
                               </span>
                             )}
-                            {loadList.scheduledDate && (
-                              <span className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {new Date(loadList.scheduledDate).toLocaleDateString()}
-                              </span>
-                            )}
+                            {loadList.scheduledDate && (() => {
+                              const daysUntil = differenceInDays(new Date(loadList.scheduledDate), new Date());
+                              const isUrgent = daysUntil >= 0 && daysUntil <= 5;
+                              const isOverdue = daysUntil < 0;
+                              return (
+                                <span className={`flex items-center gap-1 ${isOverdue ? "text-destructive font-semibold" : isUrgent ? "text-destructive font-medium" : ""}`}>
+                                  <Calendar className={`h-3 w-3 ${isOverdue || isUrgent ? "text-destructive" : ""}`} />
+                                  {new Date(loadList.scheduledDate).toLocaleDateString()}
+                                  {isOverdue && <span className="text-xs">(overdue)</span>}
+                                  {isUrgent && !isOverdue && <span className="text-xs">({daysUntil === 0 ? "today" : `${daysUntil}d`})</span>}
+                                </span>
+                              );
+                            })()}
                             <span className="flex items-center gap-1">
                               <Package className="h-3 w-3" />
                               Mass: {calculateTotalMass(loadList.panels).toLocaleString()} kg
