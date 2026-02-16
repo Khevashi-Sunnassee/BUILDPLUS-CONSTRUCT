@@ -237,7 +237,8 @@ router.post("/api/webhooks/resend-inbound", async (req: Request, res: Response) 
     })
       .from(apInboxSettings)
       .leftJoin(companies, eq(apInboxSettings.companyId, companies.id))
-      .where(eq(apInboxSettings.isEnabled, true));
+      .where(eq(apInboxSettings.isEnabled, true))
+      .limit(1000);
 
     let matchedSettings = null;
     for (const { settings } of allSettings) {

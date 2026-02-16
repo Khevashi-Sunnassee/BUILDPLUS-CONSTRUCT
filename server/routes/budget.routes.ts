@@ -78,7 +78,8 @@ router.get("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets", 
       .leftJoin(tenderSubmissions, eq(budgetLines.selectedTenderSubmissionId, tenderSubmissions.id))
       .leftJoin(suppliers, eq(budgetLines.selectedContractorId, suppliers.id))
       .where(and(eq(budgetLines.budgetId, budget.id), eq(budgetLines.companyId, companyId)))
-      .orderBy(asc(budgetLines.sortOrder));
+      .orderBy(asc(budgetLines.sortOrder))
+      .limit(1000);
 
     const lineIds = lines.map(l => l.line.id);
 
@@ -277,7 +278,8 @@ router.get("/api/jobs/:jobId/budget/lines", requireAuth, requirePermission("budg
       .leftJoin(tenderSubmissions, eq(budgetLines.selectedTenderSubmissionId, tenderSubmissions.id))
       .leftJoin(suppliers, eq(budgetLines.selectedContractorId, suppliers.id))
       .where(and(eq(budgetLines.budgetId, budget.id), eq(budgetLines.companyId, companyId)))
-      .orderBy(asc(budgetLines.sortOrder));
+      .orderBy(asc(budgetLines.sortOrder))
+      .limit(1000);
 
     const lineIds = results.map(r => r.line.id);
     let updatesCounts: Record<string, number> = {};
@@ -540,7 +542,8 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
       .from(jobCostCodes)
       .innerJoin(costCodes, eq(jobCostCodes.costCodeId, costCodes.id))
       .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.companyId, companyId)))
-      .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code));
+      .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code))
+      .limit(1000);
 
     let inherited = 0;
     if (jobCostCodeRows.length === 0) {
@@ -559,7 +562,8 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
       const defaults = await db
         .select({ costCodeId: costCodeDefaults.costCodeId })
         .from(costCodeDefaults)
-        .where(and(eq(costCodeDefaults.jobTypeId, job.jobTypeId), eq(costCodeDefaults.companyId, companyId)));
+        .where(and(eq(costCodeDefaults.jobTypeId, job.jobTypeId), eq(costCodeDefaults.companyId, companyId)))
+        .limit(1000);
 
       if (defaults.length === 0) {
         return res.status(400).json({ message: "No default cost codes are configured for this job type. Go to Admin > Cost Codes to set up defaults for this job type." });
@@ -588,7 +592,8 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
           .from(jobCostCodes)
           .innerJoin(costCodes, eq(jobCostCodes.costCodeId, costCodes.id))
           .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.companyId, companyId)))
-          .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code));
+          .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code))
+          .limit(1000);
       });
     }
 
@@ -614,12 +619,14 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
         inArray(childCostCodes.parentCostCodeId, parentIds),
         eq(childCostCodes.isActive, true)
       ))
-      .orderBy(asc(childCostCodes.sortOrder), asc(childCostCodes.code));
+      .orderBy(asc(childCostCodes.sortOrder), asc(childCostCodes.code))
+      .limit(1000);
 
     const existingLines = await db
       .select({ costCodeId: budgetLines.costCodeId, childCostCodeId: budgetLines.childCostCodeId })
       .from(budgetLines)
-      .where(and(eq(budgetLines.budgetId, budget.id), eq(budgetLines.companyId, companyId)));
+      .where(and(eq(budgetLines.budgetId, budget.id), eq(budgetLines.companyId, companyId)))
+      .limit(1000);
 
     const existingKey = new Set(existingLines.map(l => `${l.costCodeId}|${l.childCostCodeId || ""}`));
 
@@ -711,7 +718,8 @@ router.get("/api/budget-lines/:lineId/updates", requireAuth, requirePermission("
       .from(budgetLineUpdates)
       .innerJoin(users, eq(budgetLineUpdates.userId, users.id))
       .where(eq(budgetLineUpdates.budgetLineId, lineId))
-      .orderBy(desc(budgetLineUpdates.createdAt));
+      .orderBy(desc(budgetLineUpdates.createdAt))
+      .limit(1000);
 
     const filesForUpdates = await db
       .select()
@@ -719,7 +727,8 @@ router.get("/api/budget-lines/:lineId/updates", requireAuth, requirePermission("
       .where(and(
         eq(budgetLineFiles.budgetLineId, lineId),
         sql`${budgetLineFiles.updateId} IS NOT NULL`
-      ));
+      ))
+      .limit(1000);
 
     const updatesWithFiles = updates.map(u => ({
       ...u,
@@ -826,7 +835,8 @@ router.get("/api/budget-lines/:lineId/files", requireAuth, requirePermission("bu
       .from(budgetLineFiles)
       .leftJoin(users, eq(budgetLineFiles.uploadedById, users.id))
       .where(eq(budgetLineFiles.budgetLineId, lineId))
-      .orderBy(desc(budgetLineFiles.createdAt));
+      .orderBy(desc(budgetLineFiles.createdAt))
+      .limit(1000);
 
     res.json(files);
   } catch (error: unknown) {
@@ -905,7 +915,8 @@ router.get("/api/budget-lines/:budgetLineId/detail-items", requireAuth, requireP
         eq(budgetLineDetailItems.budgetLineId, budgetLineId),
         eq(budgetLineDetailItems.companyId, companyId),
       ))
-      .orderBy(asc(budgetLineDetailItems.sortOrder), asc(budgetLineDetailItems.createdAt));
+      .orderBy(asc(budgetLineDetailItems.sortOrder), asc(budgetLineDetailItems.createdAt))
+      .limit(1000);
 
     res.json(items);
   } catch (error: unknown) {

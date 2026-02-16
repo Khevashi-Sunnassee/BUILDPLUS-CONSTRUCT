@@ -108,7 +108,8 @@ async function getPreviouslyClaimedPercents(
     })
     .from(progressClaimItems)
     .innerJoin(progressClaims, eq(progressClaimItems.progressClaimId, progressClaims.id))
-    .where(and(...conditions));
+    .where(and(...conditions))
+    .limit(5000);
 
   const map = new Map<string, number>();
   for (const item of items) {
@@ -206,7 +207,7 @@ router.get("/api/progress-claims", requireAuth, async (req: Request, res: Respon
             inArray(progressClaims.jobId, uniqueJobIds),
           ))
           .groupBy(progressClaims.jobId),
-        db.select().from(panelTypes).where(eq(panelTypes.companyId, companyId)),
+        db.select().from(panelTypes).where(eq(panelTypes.companyId, companyId)).limit(1000),
       ]);
 
       for (const row of approvedClaimTotals) {
@@ -224,8 +225,9 @@ router.get("/api/progress-claims", requireAuth, async (req: Request, res: Respon
               panelVolume: panelRegister.panelVolume,
             })
             .from(panelRegister)
-            .where(eq(panelRegister.jobId, jId)),
-          db.select().from(jobPanelRates).where(eq(jobPanelRates.jobId, jId)),
+            .where(eq(panelRegister.jobId, jId))
+            .limit(5000),
+          db.select().from(jobPanelRates).where(eq(jobPanelRates.jobId, jId)).limit(1000),
         ]);
 
         const jrMap = new Map(allJR.map(jr => [jr.panelTypeId, jr]));
@@ -318,7 +320,8 @@ router.get("/api/progress-claims/retention-report", requireAuth, async (req: Req
           revisedContractValue: contracts.revisedContractValue,
         })
         .from(contracts)
-        .where(and(eq(contracts.companyId, companyId), inArray(contracts.jobId, jobIds)));
+        .where(and(eq(contracts.companyId, companyId), inArray(contracts.jobId, jobIds)))
+        .limit(1000);
 
       for (const c of allContracts) {
         const rate = safeParseFinancial(c.retentionPercentage, 10);
@@ -477,17 +480,20 @@ router.get("/api/progress-claims/job/:jobId/claimable-panels", requireAuth, asyn
         description: panelRegister.description,
       })
       .from(panelRegister)
-      .where(eq(panelRegister.jobId, jobId));
+      .where(eq(panelRegister.jobId, jobId))
+      .limit(5000);
 
     const allPanelTypes = await db
       .select()
       .from(panelTypes)
-      .where(eq(panelTypes.companyId, companyId));
+      .where(eq(panelTypes.companyId, companyId))
+      .limit(1000);
 
     const allJobRates = await db
       .select()
       .from(jobPanelRates)
-      .where(eq(jobPanelRates.jobId, jobId));
+      .where(eq(jobPanelRates.jobId, jobId))
+      .limit(1000);
 
     const panelTypeMap = new Map(allPanelTypes.map(pt => [pt.code, pt]));
     const jobRateMap = new Map(allJobRates.map(jr => [jr.panelTypeId, jr]));
@@ -511,7 +517,8 @@ router.get("/api/progress-claims/job/:jobId/claimable-panels", requireAuth, asyn
       })
       .from(progressClaimItems)
       .innerJoin(progressClaims, eq(progressClaimItems.progressClaimId, progressClaims.id))
-      .where(and(...claimConditions));
+      .where(and(...claimConditions))
+      .limit(5000);
 
     const claimedPercentByPanel = new Map<string, number>();
     const claimedAmountByPanel = new Map<string, number>();
@@ -591,10 +598,11 @@ router.get("/api/progress-claims/job/:jobId/summary", requireAuth, async (req: R
         panelVolume: panelRegister.panelVolume,
       })
       .from(panelRegister)
-      .where(eq(panelRegister.jobId, jobId));
+      .where(eq(panelRegister.jobId, jobId))
+      .limit(5000);
 
-    const allPT = await db.select().from(panelTypes).where(eq(panelTypes.companyId, companyId));
-    const allJR = await db.select().from(jobPanelRates).where(eq(jobPanelRates.jobId, jobId));
+    const allPT = await db.select().from(panelTypes).where(eq(panelTypes.companyId, companyId)).limit(1000);
+    const allJR = await db.select().from(jobPanelRates).where(eq(jobPanelRates.jobId, jobId)).limit(1000);
     const ptMap = new Map(allPT.map(pt => [pt.code, pt]));
     const jrMap = new Map(allJR.map(jr => [jr.panelTypeId, jr]));
 
@@ -874,7 +882,8 @@ router.post("/api/progress-claims/:id/approve", requireAuth, async (req: Request
         .returning();
 
       const items = await tx.select().from(progressClaimItems)
-        .where(eq(progressClaimItems.progressClaimId, claim.id));
+        .where(eq(progressClaimItems.progressClaimId, claim.id))
+        .limit(5000);
 
       const fullClaimPanelIds = items
         .filter(item => {
@@ -967,7 +976,8 @@ router.get("/api/progress-claims/job/:jobId/retention-summary", requireAuth, asy
         eq(progressClaims.companyId, companyId),
         eq(progressClaims.jobId, jobId),
       ))
-      .orderBy(progressClaims.claimDate);
+      .orderBy(progressClaims.claimDate)
+      .limit(1000);
 
     const totalRetentionHeld = claims.reduce(
       (sum, c) => sum + safeParseFinancial(c.retentionAmount, 0), 0

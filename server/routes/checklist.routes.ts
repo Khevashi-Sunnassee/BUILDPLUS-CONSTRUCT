@@ -35,7 +35,8 @@ router.get("/api/checklist/entity-types", requireAuth, async (req: Request, res:
         eq(entityTypes.companyId, companyId),
         eq(entityTypes.isActive, true)
       ))
-      .orderBy(entityTypes.sortOrder);
+      .orderBy(entityTypes.sortOrder)
+      .limit(1000);
 
     res.json(types);
   } catch (error: unknown) {
@@ -143,7 +144,8 @@ router.get("/api/checklist/entity-subtypes", requireAuth, async (req: Request, r
         eq(entitySubtypes.companyId, companyId),
         eq(entitySubtypes.isActive, true)
       ))
-      .orderBy(entitySubtypes.sortOrder);
+      .orderBy(entitySubtypes.sortOrder)
+      .limit(1000);
 
     res.json(subtypes);
   } catch (error: unknown) {
@@ -168,7 +170,8 @@ router.get("/api/checklist/entity-types/:entityTypeId/subtypes", requireAuth, as
         eq(entitySubtypes.entityTypeId, entityTypeId),
         eq(entitySubtypes.isActive, true)
       ))
-      .orderBy(entitySubtypes.sortOrder);
+      .orderBy(entitySubtypes.sortOrder)
+      .limit(1000);
 
     res.json(subtypes);
   } catch (error: unknown) {
@@ -269,7 +272,8 @@ router.get("/api/checklist/templates", requireAuth, async (req: Request, res: Re
         eq(checklistTemplates.companyId, companyId),
         eq(checklistTemplates.isActive, true)
       ))
-      .orderBy(desc(checklistTemplates.createdAt));
+      .orderBy(desc(checklistTemplates.createdAt))
+      .limit(1000);
 
     res.json(templates);
   } catch (error: unknown) {
@@ -296,7 +300,8 @@ router.get("/api/checklist/templates/by-type/:entityTypeId/:entitySubtypeId", re
         eq(checklistTemplates.entitySubtypeId, entitySubtypeId),
         eq(checklistTemplates.isActive, true)
       ))
-      .orderBy(checklistTemplates.name);
+      .orderBy(checklistTemplates.name)
+      .limit(1000);
 
     res.json(templates);
   } catch (error: unknown) {
@@ -321,7 +326,8 @@ router.get("/api/checklist/templates/by-type/:entityTypeId", requireAuth, async 
         eq(checklistTemplates.entityTypeId, entityTypeId),
         eq(checklistTemplates.isActive, true)
       ))
-      .orderBy(checklistTemplates.name);
+      .orderBy(checklistTemplates.name)
+      .limit(1000);
 
     res.json(templates);
   } catch (error: unknown) {
@@ -859,7 +865,8 @@ router.get("/api/checklist/reports/summary", requireAuth, async (req: Request, r
 
     const instances = await db.select()
       .from(checklistInstances)
-      .where(eq(checklistInstances.companyId, companyId));
+      .where(eq(checklistInstances.companyId, companyId))
+      .limit(5000);
 
     const summary = {
       total: instances.length,

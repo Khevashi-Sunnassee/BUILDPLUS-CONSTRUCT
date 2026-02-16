@@ -152,6 +152,13 @@ export const mailgunBreaker = new CircuitBreaker({
   halfOpenMaxAttempts: 3,
 });
 
+export const resendBreaker = new CircuitBreaker({
+  name: "resend",
+  failureThreshold: 4,
+  resetTimeoutMs: 45000,
+  halfOpenMaxAttempts: 2,
+});
+
 export function getAllCircuitStats() {
-  return [openAIBreaker, twilioBreaker, mailgunBreaker].map(b => b.getStats());
+  return [openAIBreaker, twilioBreaker, mailgunBreaker, resendBreaker].map(b => b.getStats());
 }

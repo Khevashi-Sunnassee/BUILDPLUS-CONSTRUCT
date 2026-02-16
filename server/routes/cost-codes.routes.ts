@@ -88,7 +88,8 @@ router.get("/api/cost-codes", requireAuth, requirePermission("admin_cost_codes",
       .select()
       .from(costCodes)
       .where(and(...conditions))
-      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code));
+      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code))
+      .limit(1000);
 
     if (search && typeof search === "string" && search.trim()) {
       const s = search.trim().toLowerCase();
@@ -142,7 +143,8 @@ router.get("/api/child-cost-codes", requireAuth, requirePermission("admin_cost_c
       .from(childCostCodes)
       .innerJoin(costCodes, eq(childCostCodes.parentCostCodeId, costCodes.id))
       .where(and(...conditions))
-      .orderBy(asc(childCostCodes.sortOrder), asc(childCostCodes.code));
+      .orderBy(asc(childCostCodes.sortOrder), asc(childCostCodes.code))
+      .limit(1000);
 
     if (search && typeof search === "string" && search.trim()) {
       const s = search.trim().toLowerCase();
@@ -170,13 +172,15 @@ router.get("/api/cost-codes-with-children", requireAuth, async (req: Request, re
       .select()
       .from(costCodes)
       .where(and(eq(costCodes.companyId, companyId), eq(costCodes.isActive, true)))
-      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code));
+      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code))
+      .limit(1000);
 
     const children = await db
       .select()
       .from(childCostCodes)
       .where(and(eq(childCostCodes.companyId, companyId), eq(childCostCodes.isActive, true)))
-      .orderBy(asc(childCostCodes.sortOrder), asc(childCostCodes.code));
+      .orderBy(asc(childCostCodes.sortOrder), asc(childCostCodes.code))
+      .limit(1000);
 
     const childMap = new Map<string, typeof children>();
     for (const child of children) {
@@ -327,7 +331,8 @@ router.post("/api/cost-codes/import", requireAuth, requirePermission("admin_cost
     const existingParents = await db
       .select({ id: costCodes.id, code: costCodes.code, name: costCodes.name })
       .from(costCodes)
-      .where(eq(costCodes.companyId, companyId));
+      .where(eq(costCodes.companyId, companyId))
+      .limit(5000);
 
     const existingParentCodeMap = new Map(existingParents.map((c) => [c.code.toLowerCase(), c.id]));
     const parentNameToIdMap = new Map(existingParents.map((c) => [c.name.toLowerCase(), c.id]));
@@ -432,7 +437,8 @@ router.post("/api/cost-codes/import", requireAuth, requirePermission("admin_cost
         const existingChildren = await db
           .select({ id: childCostCodes.id, code: childCostCodes.code })
           .from(childCostCodes)
-          .where(eq(childCostCodes.companyId, companyId));
+          .where(eq(childCostCodes.companyId, companyId))
+          .limit(5000);
         const existingChildCodeMap = new Map(existingChildren.map((c) => [c.code.toLowerCase(), c.id]));
 
         interface ChildRow {
@@ -544,7 +550,8 @@ router.post("/api/cost-codes", requireAuth, requirePermission("admin_cost_codes"
     const existing = await db
       .select()
       .from(costCodes)
-      .where(and(eq(costCodes.code, data.code), eq(costCodes.companyId, companyId)));
+      .where(and(eq(costCodes.code, data.code), eq(costCodes.companyId, companyId)))
+      .limit(1);
 
     if (existing.length > 0) {
       return res.status(409).json({ message: `Cost code "${data.code}" already exists` });
@@ -582,7 +589,8 @@ router.patch("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_c
       const existing = await db
         .select()
         .from(costCodes)
-        .where(and(eq(costCodes.code, data.code), eq(costCodes.companyId, companyId)));
+        .where(and(eq(costCodes.code, data.code), eq(costCodes.companyId, companyId)))
+        .limit(1);
 
       if (existing.length > 0 && existing[0].id !== req.params.id) {
         return res.status(409).json({ message: `Cost code "${data.code}" already exists` });
@@ -692,7 +700,8 @@ router.post("/api/child-cost-codes", requireAuth, requirePermission("admin_cost_
     const existing = await db
       .select()
       .from(childCostCodes)
-      .where(and(eq(childCostCodes.code, data.code), eq(childCostCodes.companyId, companyId)));
+      .where(and(eq(childCostCodes.code, data.code), eq(childCostCodes.companyId, companyId)))
+      .limit(1);
 
     if (existing.length > 0) {
       return res.status(409).json({ message: `Child cost code "${data.code}" already exists` });
@@ -730,7 +739,8 @@ router.patch("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_
       const existing = await db
         .select()
         .from(childCostCodes)
-        .where(and(eq(childCostCodes.code, data.code), eq(childCostCodes.companyId, companyId)));
+        .where(and(eq(childCostCodes.code, data.code), eq(childCostCodes.companyId, companyId)))
+        .limit(1);
 
       if (existing.length > 0 && existing[0].id !== req.params.id) {
         return res.status(409).json({ message: `Child cost code "${data.code}" already exists` });
@@ -794,7 +804,8 @@ router.get("/api/cost-code-defaults/:jobTypeId", requireAuth, requirePermission(
       .from(costCodeDefaults)
       .innerJoin(costCodes, eq(costCodeDefaults.costCodeId, costCodes.id))
       .where(and(eq(costCodeDefaults.jobTypeId, req.params.jobTypeId), eq(costCodeDefaults.companyId, companyId)))
-      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code));
+      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code))
+      .limit(1000);
 
     res.json(results);
   } catch (error: unknown) {
@@ -836,7 +847,8 @@ router.post("/api/cost-code-defaults", requireAuth, requirePermission("admin_cos
       .from(costCodeDefaults)
       .innerJoin(costCodes, eq(costCodeDefaults.costCodeId, costCodes.id))
       .where(and(eq(costCodeDefaults.jobTypeId, jobTypeId), eq(costCodeDefaults.companyId, companyId)))
-      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code));
+      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code))
+      .limit(1000);
 
     res.json(results);
   } catch (error: unknown) {
@@ -868,7 +880,8 @@ router.get("/api/jobs/:jobId/cost-codes", requireAuth, async (req: Request, res:
       .from(jobCostCodes)
       .innerJoin(costCodes, eq(jobCostCodes.costCodeId, costCodes.id))
       .where(and(eq(jobCostCodes.jobId, req.params.jobId), eq(jobCostCodes.companyId, companyId)))
-      .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code));
+      .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code))
+      .limit(1000);
 
     res.json(results);
   } catch (error: unknown) {
@@ -898,7 +911,8 @@ router.post("/api/jobs/:jobId/cost-codes/inherit", requireAuth, async (req: Requ
     const defaults = await db
       .select({ costCodeId: costCodeDefaults.costCodeId })
       .from(costCodeDefaults)
-      .where(and(eq(costCodeDefaults.jobTypeId, job.jobTypeId), eq(costCodeDefaults.companyId, companyId)));
+      .where(and(eq(costCodeDefaults.jobTypeId, job.jobTypeId), eq(costCodeDefaults.companyId, companyId)))
+      .limit(1000);
 
     if (defaults.length === 0) {
       return res.status(400).json({ message: "No default cost codes defined for this job type" });
@@ -907,7 +921,8 @@ router.post("/api/jobs/:jobId/cost-codes/inherit", requireAuth, async (req: Requ
     const existing = await db
       .select({ costCodeId: jobCostCodes.costCodeId })
       .from(jobCostCodes)
-      .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.companyId, companyId)));
+      .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.companyId, companyId)))
+      .limit(1000);
 
     const existingSet = new Set(existing.map((e) => e.costCodeId));
     const newCodes = defaults.filter((d) => !existingSet.has(d.costCodeId));
@@ -939,7 +954,8 @@ router.post("/api/jobs/:jobId/cost-codes/inherit", requireAuth, async (req: Requ
       .from(jobCostCodes)
       .innerJoin(costCodes, eq(jobCostCodes.costCodeId, costCodes.id))
       .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.companyId, companyId)))
-      .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code));
+      .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code))
+      .limit(1000);
 
     res.json({ inherited: newCodes.length, total: results.length, costCodes: results });
   } catch (error: unknown) {
@@ -961,7 +977,8 @@ router.post("/api/jobs/:jobId/cost-codes", requireAuth, async (req: Request, res
     const existing = await db
       .select()
       .from(jobCostCodes)
-      .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.costCodeId, costCodeId)));
+      .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.costCodeId, costCodeId)))
+      .limit(1);
 
     if (existing.length > 0) {
       return res.status(409).json({ message: "Cost code already assigned to this job" });

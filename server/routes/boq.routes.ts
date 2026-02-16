@@ -63,7 +63,8 @@ router.get("/api/jobs/:jobId/boq/groups", requireAuth, requirePermission("budget
       .innerJoin(costCodes, eq(boqGroups.costCodeId, costCodes.id))
       .leftJoin(childCostCodes, eq(boqGroups.childCostCodeId, childCostCodes.id))
       .where(and(...conditions))
-      .orderBy(asc(boqGroups.sortOrder), asc(boqGroups.name));
+      .orderBy(asc(boqGroups.sortOrder), asc(boqGroups.name))
+      .limit(1000);
 
     const mapped = results.map((row) => ({
       ...row.group,
@@ -191,7 +192,8 @@ router.get("/api/jobs/:jobId/boq/items", requireAuth, requirePermission("budgets
       .innerJoin(costCodes, eq(boqItems.costCodeId, costCodes.id))
       .leftJoin(childCostCodes, eq(boqItems.childCostCodeId, childCostCodes.id))
       .where(and(...conditions))
-      .orderBy(asc(boqItems.sortOrder), asc(boqItems.description));
+      .orderBy(asc(boqItems.sortOrder), asc(boqItems.description))
+      .limit(1000);
 
     const mapped = results.map((row) => ({
       ...row.item,
@@ -328,7 +330,8 @@ router.get("/api/jobs/:jobId/boq/summary", requireAuth, requirePermission("budge
       .innerJoin(costCodes, eq(boqItems.costCodeId, costCodes.id))
       .where(and(eq(boqItems.jobId, jobId), eq(boqItems.companyId, companyId)))
       .groupBy(costCodes.id, costCodes.code, costCodes.name)
-      .orderBy(asc(costCodes.code));
+      .orderBy(asc(costCodes.code))
+      .limit(1000);
 
     res.json({
       totalItems: totals?.totalItems || 0,

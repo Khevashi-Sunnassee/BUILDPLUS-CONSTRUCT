@@ -293,7 +293,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
         }
       }
       if (!selected.has("daily_logs")) {
-        const companyJobIdsForLogs = (await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.companyId, cid))).map(r => r.id);
+        const companyJobIdsForLogs = (await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.companyId, cid)).limit(5000)).map(r => r.id);
         if (companyJobIdsForLogs.length > 0) {
           const [logsWithJob] = await db.select({ count: sql<number>`count(*)` })
             .from(logRows)
@@ -303,11 +303,11 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
           }
         }
       }
-      const companyJobIdsForReports = (await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.companyId, cid))).map(r => r.id);
+      const companyJobIdsForReports = (await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.companyId, cid)).limit(5000)).map(r => r.id);
       if (companyJobIdsForReports.length > 0) {
         const [weeklyScheduleCount] = await db.select({ count: sql<number>`count(*)` }).from(weeklyJobReportSchedules).where(inArray(weeklyJobReportSchedules.jobId, companyJobIdsForReports));
         if (Number(weeklyScheduleCount.count) > 0) {
-          const reportIds = (await db.selectDistinct({ reportId: weeklyJobReportSchedules.reportId }).from(weeklyJobReportSchedules).where(inArray(weeklyJobReportSchedules.jobId, companyJobIdsForReports))).map(r => r.reportId);
+          const reportIds = (await db.selectDistinct({ reportId: weeklyJobReportSchedules.reportId }).from(weeklyJobReportSchedules).where(inArray(weeklyJobReportSchedules.jobId, companyJobIdsForReports)).limit(5000)).map(r => r.reportId);
           warnings.push(`${reportIds.length} Weekly Job Reports (with ${weeklyScheduleCount.count} schedule entries) will also be deleted with Jobs.`);
         }
       }
@@ -321,9 +321,9 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
         }
       }
       if (!selected.has("logistics")) {
-        const companyJobIdsForPanels = (await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.companyId, cid))).map(r => r.id);
+        const companyJobIdsForPanels = (await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.companyId, cid)).limit(5000)).map(r => r.id);
         if (companyJobIdsForPanels.length > 0) {
-          const companyLLIds = (await db.select({ id: loadLists.id }).from(loadLists).where(inArray(loadLists.jobId, companyJobIdsForPanels))).map(r => r.id);
+          const companyLLIds = (await db.select({ id: loadLists.id }).from(loadLists).where(inArray(loadLists.jobId, companyJobIdsForPanels)).limit(5000)).map(r => r.id);
           if (companyLLIds.length > 0) {
             const [loadPanels] = await db.select({ count: sql<number>`count(*)` }).from(loadListPanels).where(inArray(loadListPanels.loadListId, companyLLIds));
             if (Number(loadPanels.count) > 0) {
@@ -332,9 +332,9 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
           }
         }
       }
-      const companyJobIdsForProd = (await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.companyId, cid))).map(r => r.id);
+      const companyJobIdsForProd = (await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.companyId, cid)).limit(5000)).map(r => r.id);
       if (companyJobIdsForProd.length > 0) {
-        const companyPanelIds = (await db.select({ id: panelRegister.id }).from(panelRegister).where(inArray(panelRegister.jobId, companyJobIdsForProd))).map(r => r.id);
+        const companyPanelIds = (await db.select({ id: panelRegister.id }).from(panelRegister).where(inArray(panelRegister.jobId, companyJobIdsForProd)).limit(5000)).map(r => r.id);
         if (companyPanelIds.length > 0) {
           const [prodEntries] = await db.select({ count: sql<number>`count(*)` }).from(productionEntries).where(inArray(productionEntries.panelId, companyPanelIds));
           if (Number(prodEntries.count) > 0) {
@@ -375,7 +375,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
       if (Number(contractDocRef.count) > 0 && !selected.has("contracts")) {
         errors.push("Cannot delete Documents while Contracts reference them. Select Contracts for deletion first, or unlink them.");
       }
-      const companyDocIds = (await db.select({ id: documents.id }).from(documents).where(eq(documents.companyId, cid))).map(r => r.id);
+      const companyDocIds = (await db.select({ id: documents.id }).from(documents).where(eq(documents.companyId, cid)).limit(5000)).map(r => r.id);
       if (companyDocIds.length > 0) {
         const [bundleItemCount] = await db.select({ count: sql<number>`count(*)` }).from(documentBundleItems).where(inArray(documentBundleItems.documentId, companyDocIds));
         if (Number(bundleItemCount.count) > 0) {
@@ -389,7 +389,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     }
     
     if (selected.has("progress_claims")) {
-      const companyClaimIds = (await db.select({ id: progressClaims.id }).from(progressClaims).where(eq(progressClaims.companyId, cid))).map(r => r.id);
+      const companyClaimIds = (await db.select({ id: progressClaims.id }).from(progressClaims).where(eq(progressClaims.companyId, cid)).limit(5000)).map(r => r.id);
       if (companyClaimIds.length > 0) {
         const [claimItemCount] = await db.select({ count: sql<number>`count(*)` }).from(progressClaimItems).where(inArray(progressClaimItems.progressClaimId, companyClaimIds));
         if (Number(claimItemCount.count) > 0) {
@@ -406,7 +406,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     }
     
     if (selected.has("activity_templates")) {
-      const companyTemplateIds = (await db.select({ id: activityTemplates.id }).from(activityTemplates).where(eq(activityTemplates.companyId, cid))).map(r => r.id);
+      const companyTemplateIds = (await db.select({ id: activityTemplates.id }).from(activityTemplates).where(eq(activityTemplates.companyId, cid)).limit(5000)).map(r => r.id);
       if (companyTemplateIds.length > 0) {
         const [subtaskCount] = await db.select({ count: sql<number>`count(*)` }).from(activityTemplateSubtasks).where(inArray(activityTemplateSubtasks.templateId, companyTemplateIds));
         if (Number(subtaskCount.count) > 0) {
@@ -416,7 +416,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     }
     
     if (selected.has("job_activities")) {
-      const companyActivityIds = (await db.select({ id: jobActivities.id }).from(jobActivities).where(eq(jobActivities.companyId, cid))).map(r => r.id);
+      const companyActivityIds = (await db.select({ id: jobActivities.id }).from(jobActivities).where(eq(jobActivities.companyId, cid)).limit(5000)).map(r => r.id);
       if (companyActivityIds.length > 0) {
         const [assigneeCount] = await db.select({ count: sql<number>`count(*)` }).from(jobActivityAssignees).where(inArray(jobActivityAssignees.activityId, companyActivityIds));
         const [updateCount] = await db.select({ count: sql<number>`count(*)` }).from(jobActivityUpdates).where(inArray(jobActivityUpdates.activityId, companyActivityIds));
@@ -447,7 +447,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
           warnings.push("Tender line items reference cost codes. Those references will be cleared.");
         }
       }
-      const companyCostCodeIds = (await db.select({ id: costCodes.id }).from(costCodes).where(eq(costCodes.companyId, cid))).map(r => r.id);
+      const companyCostCodeIds = (await db.select({ id: costCodes.id }).from(costCodes).where(eq(costCodes.companyId, cid)).limit(5000)).map(r => r.id);
       if (companyCostCodeIds.length > 0) {
         const [childCount] = await db.select({ count: sql<number>`count(*)` }).from(childCostCodes).where(inArray(childCostCodes.parentCostCodeId, companyCostCodeIds));
         const [defaultCount] = await db.select({ count: sql<number>`count(*)` }).from(costCodeDefaults).where(inArray(costCodeDefaults.costCodeId, companyCostCodeIds));
@@ -495,9 +495,9 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
         }
       }
       const [budgetLineCount] = await db.select({ count: sql<number>`count(*)` }).from(budgetLines).where(eq(budgetLines.companyId, cid));
-      const companyBudgetIdsForFiles = (await db.select({ id: jobBudgets.id }).from(jobBudgets).where(eq(jobBudgets.companyId, cid))).map(r => r.id);
+      const companyBudgetIdsForFiles = (await db.select({ id: jobBudgets.id }).from(jobBudgets).where(eq(jobBudgets.companyId, cid)).limit(5000)).map(r => r.id);
       const companyBudgetLineIdsForFiles = companyBudgetIdsForFiles.length > 0
-        ? (await db.select({ id: budgetLines.id }).from(budgetLines).where(inArray(budgetLines.budgetId, companyBudgetIdsForFiles))).map(r => r.id)
+        ? (await db.select({ id: budgetLines.id }).from(budgetLines).where(inArray(budgetLines.budgetId, companyBudgetIdsForFiles)).limit(5000)).map(r => r.id)
         : [];
       const [budgetFileCount] = companyBudgetLineIdsForFiles.length > 0
         ? await db.select({ count: sql<number>`count(*)` }).from(budgetLineFiles).where(inArray(budgetLineFiles.budgetLineId, companyBudgetLineIdsForFiles))
@@ -518,7 +518,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     }
     
     if (selected.has("ap_invoices")) {
-      const companyInvoiceIds = (await db.select({ id: apInvoices.id }).from(apInvoices).where(eq(apInvoices.companyId, cid))).map(r => r.id);
+      const companyInvoiceIds = (await db.select({ id: apInvoices.id }).from(apInvoices).where(eq(apInvoices.companyId, cid)).limit(5000)).map(r => r.id);
       if (companyInvoiceIds.length > 0) {
         const [docCount] = await db.select({ count: sql<number>`count(*)` }).from(apInvoiceDocuments).where(inArray(apInvoiceDocuments.invoiceId, companyInvoiceIds));
         const [splitCount] = await db.select({ count: sql<number>`count(*)` }).from(apInvoiceSplits).where(inArray(apInvoiceSplits.invoiceId, companyInvoiceIds));

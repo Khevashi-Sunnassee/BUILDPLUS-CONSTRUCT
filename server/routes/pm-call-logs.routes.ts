@@ -104,7 +104,8 @@ router.get(PM_CALL_LOGS_ROUTES.LIST, requireAuth, async (req: Request, res: Resp
       .leftJoin(jobs, eq(pmCallLogs.jobId, jobs.id))
       .leftJoin(users, eq(pmCallLogs.createdById, users.id))
       .where(and(...conditions))
-      .orderBy(desc(pmCallLogs.callDateTime));
+      .orderBy(desc(pmCallLogs.callDateTime))
+      .limit(1000);
 
     res.json(logs);
   } catch (error: unknown) {
@@ -158,7 +159,8 @@ router.get("/api/pm-call-logs/:id", requireAuth, async (req: Request, res: Respo
       .select()
       .from(pmCallLogLevels)
       .where(eq(pmCallLogLevels.callLogId, id))
-      .orderBy(asc(pmCallLogLevels.sequenceOrder));
+      .orderBy(asc(pmCallLogLevels.sequenceOrder))
+      .limit(1000);
 
     res.json({ ...log, levels });
   } catch (error: unknown) {
@@ -185,7 +187,8 @@ router.get("/api/pm-call-logs/job/:jobId/upcoming-levels", requireAuth, async (r
           ),
         )
       )
-      .orderBy(asc(jobLevelCycleTimes.sequenceOrder));
+      .orderBy(asc(jobLevelCycleTimes.sequenceOrder))
+      .limit(1000);
 
     const filtered = levels.filter((l) => {
       const startDate = l.manualStartDate || l.estimatedStartDate;
@@ -261,7 +264,8 @@ router.post(PM_CALL_LOGS_ROUTES.LIST, requireAuth, async (req: Request, res: Res
             .select()
             .from(productionSlots)
             .where(eq(productionSlots.jobId, logData.jobId))
-            .orderBy(asc(productionSlots.productionSlotDate));
+            .orderBy(asc(productionSlots.productionSlotDate))
+            .limit(1000);
 
           for (const lvl of lateLevels) {
             const matchingSlot = jobSlots.find(
@@ -290,7 +294,8 @@ router.post(PM_CALL_LOGS_ROUTES.LIST, requireAuth, async (req: Request, res: Res
                     eq(draftingProgram.jobId, logData.jobId),
                     eq(draftingProgram.level, lvl.level)
                   )
-                );
+                )
+                .limit(1000);
 
               for (const entry of draftingEntries) {
                 const newProdDate = new Date(lvl.adjustedStartDate);

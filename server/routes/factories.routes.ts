@@ -158,7 +158,7 @@ router.get("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const allFactories = await db.select().from(factories).where(eq(factories.companyId, companyId)).orderBy(factories.name);
+    const allFactories = await db.select().from(factories).where(eq(factories.companyId, companyId)).orderBy(factories.name).limit(1000);
     res.json(allFactories);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching factories");
@@ -170,7 +170,7 @@ router.get("/api/factories", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const activeFactories = await db.select().from(factories).where(and(eq(factories.companyId, companyId), eq(factories.isActive, true))).orderBy(factories.name);
+    const activeFactories = await db.select().from(factories).where(and(eq(factories.companyId, companyId), eq(factories.isActive, true))).orderBy(factories.name).limit(1000);
     res.json(activeFactories);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching factories");
@@ -186,7 +186,7 @@ router.get("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) =>
     if (factory.length === 0) {
       return res.status(404).json({ error: "Factory not found" });
     }
-    const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, factoryId)).orderBy(productionBeds.name);
+    const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, factoryId)).orderBy(productionBeds.name).limit(1000);
     res.json({ ...factory[0], beds });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching factory");
@@ -263,7 +263,7 @@ router.get("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (
     const companyId = req.companyId;
     const factory = await db.select().from(factories).where(and(eq(factories.id, String(req.params.factoryId)), eq(factories.companyId, companyId!))).limit(1);
     if (factory.length === 0) return res.status(404).json({ error: "Factory not found" });
-    const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, String(req.params.factoryId))).orderBy(productionBeds.name);
+    const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, String(req.params.factoryId))).orderBy(productionBeds.name).limit(1000);
     res.json(beds);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching production beds");

@@ -323,9 +323,10 @@ router.get("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Respon
         .leftJoin(costCodes, eq(apInvoiceSplits.costCodeId, costCodes.id))
         .leftJoin(jobs, eq(apInvoiceSplits.jobId, jobs.id))
         .where(eq(apInvoiceSplits.invoiceId, id))
-        .orderBy(asc(apInvoiceSplits.sortOrder)),
-      db.select().from(apInvoiceExtractedFields).where(eq(apInvoiceExtractedFields.invoiceId, id)),
-      db.select().from(apInvoiceDocuments).where(eq(apInvoiceDocuments.invoiceId, id)),
+        .orderBy(asc(apInvoiceSplits.sortOrder))
+        .limit(1000),
+      db.select().from(apInvoiceExtractedFields).where(eq(apInvoiceExtractedFields.invoiceId, id)).limit(1000),
+      db.select().from(apInvoiceDocuments).where(eq(apInvoiceDocuments.invoiceId, id)).limit(1000),
       db
         .select({
           id: apInvoiceApprovals.id,
@@ -343,7 +344,8 @@ router.get("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Respon
         .from(apInvoiceApprovals)
         .leftJoin(users, eq(apInvoiceApprovals.approverUserId, users.id))
         .where(eq(apInvoiceApprovals.invoiceId, id))
-        .orderBy(asc(apInvoiceApprovals.stepIndex)),
+        .orderBy(asc(apInvoiceApprovals.stepIndex))
+        .limit(1000),
       db
         .select({
           id: apInvoiceActivity.id,
@@ -374,7 +376,8 @@ router.get("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Respon
         .from(apInvoiceComments)
         .leftJoin(users, eq(apInvoiceComments.userId, users.id))
         .where(eq(apInvoiceComments.invoiceId, id))
-        .orderBy(asc(apInvoiceComments.createdAt)),
+        .orderBy(asc(apInvoiceComments.createdAt))
+        .limit(1000),
     ]);
 
     res.json({
@@ -590,7 +593,8 @@ router.post("/api/ap-invoices/:id/confirm", requireAuth, async (req: Request, re
     const invoiceSplits = await db
       .select()
       .from(apInvoiceSplits)
-      .where(eq(apInvoiceSplits.invoiceId, id));
+      .where(eq(apInvoiceSplits.invoiceId, id))
+      .limit(1000);
 
     if (invoiceSplits.length === 0) {
       missingFields.push("At least one coding split");
@@ -642,7 +646,8 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
     const approvalResult = await assignApprovalPathToInvoice(id, companyId, userId);
 
     const existingApprovals = await db.select().from(apInvoiceApprovals)
-      .where(eq(apInvoiceApprovals.invoiceId, id));
+      .where(eq(apInvoiceApprovals.invoiceId, id))
+      .limit(1000);
 
     let newStatus: string;
     if (approvalResult.matched && approvalResult.approverCount === 0) {
@@ -723,7 +728,8 @@ router.post("/api/ap-invoices/:id/approve", requireAuth, async (req: Request, re
       .select()
       .from(apInvoiceApprovals)
       .where(eq(apInvoiceApprovals.invoiceId, id))
-      .orderBy(asc(apInvoiceApprovals.stepIndex));
+      .orderBy(asc(apInvoiceApprovals.stepIndex))
+      .limit(1000);
 
     const currentStep = allSteps.find(s => s.status === "PENDING");
 
@@ -806,7 +812,8 @@ router.post("/api/ap-invoices/:id/reject", requireAuth, async (req: Request, res
           eq(apInvoiceApprovals.approverUserId, userId),
           eq(apInvoiceApprovals.status, "PENDING"),
         )
-      );
+      )
+      .limit(1000);
 
     for (const approval of pendingApprovals) {
       await db
@@ -938,7 +945,8 @@ router.get("/api/ap-invoices/:id/splits", requireAuth, async (req: Request, res:
         .where(and(
           eq(apInvoiceSplits.invoiceId, id),
           isNull(apInvoiceSplits.costCodeId)
-        ));
+        ))
+        .limit(1000);
 
       if (blanks.length > 0) {
         await db.update(apInvoiceSplits)
@@ -971,7 +979,8 @@ router.get("/api/ap-invoices/:id/splits", requireAuth, async (req: Request, res:
       .leftJoin(costCodes, eq(apInvoiceSplits.costCodeId, costCodes.id))
       .leftJoin(jobs, eq(apInvoiceSplits.jobId, jobs.id))
       .where(eq(apInvoiceSplits.invoiceId, id))
-      .orderBy(asc(apInvoiceSplits.sortOrder));
+      .orderBy(asc(apInvoiceSplits.sortOrder))
+      .limit(1000);
 
     res.json(splits);
   } catch (error: unknown) {
@@ -1046,7 +1055,8 @@ router.put("/api/ap-invoices/:id/splits", requireAuth, async (req: Request, res:
       .select()
       .from(apInvoiceSplits)
       .where(eq(apInvoiceSplits.invoiceId, id))
-      .orderBy(asc(apInvoiceSplits.sortOrder));
+      .orderBy(asc(apInvoiceSplits.sortOrder))
+      .limit(1000);
 
     res.json(splits);
   } catch (error: unknown) {
@@ -1072,7 +1082,8 @@ router.get("/api/ap-invoices/:id/extracted-fields", requireAuth, async (req: Req
     const fields = await db
       .select()
       .from(apInvoiceExtractedFields)
-      .where(eq(apInvoiceExtractedFields.invoiceId, id));
+      .where(eq(apInvoiceExtractedFields.invoiceId, id))
+      .limit(1000);
 
     res.json(fields);
   } catch (error: unknown) {
@@ -1201,7 +1212,8 @@ router.get("/api/ap-invoices/:id/comments", requireAuth, async (req: Request, re
       .from(apInvoiceComments)
       .leftJoin(users, eq(apInvoiceComments.userId, users.id))
       .where(eq(apInvoiceComments.invoiceId, id))
-      .orderBy(asc(apInvoiceComments.createdAt));
+      .orderBy(asc(apInvoiceComments.createdAt))
+      .limit(1000);
 
     res.json(comments);
   } catch (error: unknown) {
@@ -1274,7 +1286,8 @@ router.get("/api/ap-invoices/:id/activity", requireAuth, async (req: Request, re
       .from(apInvoiceActivity)
       .leftJoin(users, eq(apInvoiceActivity.actorUserId, users.id))
       .where(eq(apInvoiceActivity.invoiceId, id))
-      .orderBy(desc(apInvoiceActivity.createdAt));
+      .orderBy(desc(apInvoiceActivity.createdAt))
+      .limit(1000);
 
     res.json(activity);
   } catch (error: unknown) {
@@ -1318,7 +1331,8 @@ router.get("/api/ap-invoices/:id/approval-path", requireAuth, async (req: Reques
       .leftJoin(users, eq(apInvoiceApprovals.approverUserId, users.id))
       .leftJoin(apApprovalRules, eq(apInvoiceApprovals.ruleId, apApprovalRules.id))
       .where(eq(apInvoiceApprovals.invoiceId, id))
-      .orderBy(asc(apInvoiceApprovals.stepIndex));
+      .orderBy(asc(apInvoiceApprovals.stepIndex))
+      .limit(1000);
 
     const ruleIds = [...new Set(approvals.map(a => a.ruleId).filter(Boolean))] as string[];
     let resolvedConditionLabels: Record<string, any[]> = {};
@@ -1335,7 +1349,7 @@ router.get("/api/ap-invoices/:id/approval-path", requireAuth, async (req: Reques
               switch (cond.field) {
                 case "COMPANY": {
                   const companyRows = await db.select({ id: companies.id, name: companies.name }).from(companies)
-                    .where(inArray(companies.id, cond.values));
+                    .where(inArray(companies.id, cond.values)).limit(1000);
                   resolved.resolvedValues = cond.values.map((v: string) => {
                     const c = companyRows.find(r => r.id === v);
                     return c?.name || v;
@@ -1344,7 +1358,7 @@ router.get("/api/ap-invoices/:id/approval-path", requireAuth, async (req: Reques
                 }
                 case "SUPPLIER": {
                   const supplierRows = await db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers)
-                    .where(inArray(suppliers.id, cond.values));
+                    .where(inArray(suppliers.id, cond.values)).limit(1000);
                   resolved.resolvedValues = cond.values.map((v: string) => {
                     const s = supplierRows.find(r => r.id === v);
                     return s?.name || v;
@@ -1353,7 +1367,7 @@ router.get("/api/ap-invoices/:id/approval-path", requireAuth, async (req: Reques
                 }
                 case "JOB": {
                   const jobRows = await db.select({ id: jobs.id, name: jobs.name, jobNumber: jobs.jobNumber }).from(jobs)
-                    .where(inArray(jobs.id, cond.values));
+                    .where(inArray(jobs.id, cond.values)).limit(1000);
                   resolved.resolvedValues = cond.values.map((v: string) => {
                     const j = jobRows.find(r => r.id === v);
                     return j ? `${j.jobNumber} - ${j.name}` : v;
@@ -1407,7 +1421,8 @@ router.post("/api/ap-invoices/bulk-approve", requireAuth, async (req: Request, r
           eq(apInvoices.companyId, companyId),
           inArray(apInvoices.id, body.invoiceIds),
         )
-      );
+      )
+      .limit(1000);
 
     const approved: string[] = [];
     const errors: Array<{ id: string; error: string }> = [];
@@ -1418,7 +1433,8 @@ router.post("/api/ap-invoices/bulk-approve", requireAuth, async (req: Request, r
           .select()
           .from(apInvoiceApprovals)
           .where(eq(apInvoiceApprovals.invoiceId, invoice.id))
-          .orderBy(asc(apInvoiceApprovals.stepIndex));
+          .orderBy(asc(apInvoiceApprovals.stepIndex))
+          .limit(1000);
 
         const currentStep = allSteps.find(s => s.status === "PENDING");
 
@@ -1504,7 +1520,8 @@ router.get("/api/ap-approval-rules", requireAuth, async (req: Request, res: Resp
       .select()
       .from(apApprovalRules)
       .where(eq(apApprovalRules.companyId, companyId))
-      .orderBy(asc(apApprovalRules.priority));
+      .orderBy(asc(apApprovalRules.priority))
+      .limit(1000);
 
     res.json(rules);
   } catch (error: unknown) {
@@ -1651,7 +1668,8 @@ router.post("/api/ap-invoices/:id/export/myob", requireAuth, async (req: Request
 
     const splits = await db.select().from(apInvoiceSplits)
       .where(eq(apInvoiceSplits.invoiceId, id))
-      .orderBy(asc(apInvoiceSplits.sortOrder));
+      .orderBy(asc(apInvoiceSplits.sortOrder))
+      .limit(5000);
 
     let supplierInfo: any = null;
     if (invoice.supplierId) {

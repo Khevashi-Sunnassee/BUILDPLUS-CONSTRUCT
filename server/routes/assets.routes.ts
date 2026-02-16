@@ -725,7 +725,8 @@ router.get("/api/assets/simple", requireAuth, async (req: Request, res: Response
       registrationNumber: assets.registrationNumber,
     }).from(assets)
       .where(eq(assets.companyId, companyId))
-      .orderBy(assets.name);
+      .orderBy(assets.name)
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch simple assets list");

@@ -44,7 +44,7 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Robustness:** Extensive input validation using Zod, comprehensive error handling, and consistent API response structures.
 - **Security:** Role-Based Access Control (RBAC), authentication via `bcrypt` and `express-session`, and UUID validation.
 - **Data Integrity:** Enforced through 142 CHECK constraints, 61 unique constraints, and 390 foreign keys. Performance indexes on all user_id and created_at columns.
-- **Query Safety:** All list endpoints and multi-row queries have pagination limits to prevent unbounded result sets at scale.
+- **Query Safety:** All list endpoints and multi-row queries across 25+ route files have `.limit()` safeguards (1000 standard, 5000 for exports/reports) to prevent unbounded result sets at scale.
 - **Accessibility:** All interactive elements and pages adhere to accessibility standards (`aria-label`, `aria-required`, `role="alert"`).
 - **Testing:** Frontend tested with React Testing Library + Vitest (135 files, 562+ tests); backend tested with 43+ API integration tests covering company isolation, data integrity, pagination, rate limiting, and input sanitization.
 
@@ -82,30 +82,31 @@ Full-system audit covering all subsystems for enterprise readiness at 300+ simul
 
 ### Subsystems Audited
 1. **Database Layer** — Connection pooling (max 100), indexes, query safety, statement timeouts, transient retry logic
-2. **Background Job System** — BackgroundScheduler (setInterval-based), AP email poll (5min), AP invoice extraction (2min), overlap prevention, error tracking
-3. **Job Queue System** — In-memory priority queue with concurrency control (email: 2, AI: 1, PDF: 2), retry with backoff, queue size limits (10,000), auto-cleanup
-4. **Email System** — Resend integration via Replit connector, email sending with attachments, AP inbox polling for inbound invoices, attachment processing
-5. **Communication System** — Teams-style chat with conversations, DMs, groups, channels, @mentions, notifications, file attachments
-6. **Circuit Breakers** — OpenAI (threshold: 3, reset: 60s), Twilio (threshold: 5, reset: 30s), Mailgun (threshold: 5, reset: 30s)
-7. **Caching** — LRU cache with TTL (settings: 5min/100, users: 2min/500, jobs: 3min/200, queries: 30s/2000), auto-prune every 60s
+2. **Background Job System** — BackgroundScheduler (setInterval-based), AP email poll (5min), AP invoice extraction (2min), overlap prevention, error tracking, startup recovery check
+3. **Job Queue System** — In-memory priority queue with concurrency control (email: 2, AI: 1, PDF: 2), retry with backoff, queue size limits (10,000), auto-cleanup, graceful drain on shutdown
+4. **Email System** — Resend integration via Replit connector with circuit breaker protection, credential caching (5min TTL), email sending with attachments, AP inbox polling for inbound invoices
+5. **Communication System** — Teams-style chat with conversations, DMs, groups, channels, @mentions, notifications, file attachments, query limits on all fetches
+6. **Circuit Breakers** — OpenAI (threshold: 3, reset: 60s), Twilio (threshold: 5, reset: 30s), Mailgun (threshold: 5, reset: 30s), Resend (threshold: 4, reset: 45s)
+7. **Caching** — LRU cache with TTL (settings: 5min/100, users: 2min/500, jobs: 3min/200, queries: 30s/2000), auto-prune every 60s, credential caching for email service
 8. **Rate Limiting** — API (300/min per session), Auth (20/15min per IP), Uploads (30/min per IP)
 9. **Request Monitoring** — Metrics collection, event loop lag measurement, request timing, error monitoring
 10. **Security** — Helmet CSP, input sanitization, content type validation, request ID tracing, RBAC
-11. **Graceful Shutdown** — SIGTERM/SIGINT handlers, 15s force exit timeout, pool draining, HTTP server close
-12. **AP Invoice Processing** — Upload → OCR extraction (GPT-4o) → supplier matching → auto-split → approval path assignment → multi-step approval → MYOB export
+11. **Graceful Shutdown** — SIGTERM/SIGINT handlers, 15s force exit timeout, scheduler stop, job queue drain, pool draining, HTTP server close
+12. **AP Invoice Processing** — Upload → OCR extraction (GPT-4o) → supplier matching → auto-split → approval path assignment → multi-step approval → MYOB export, startup recovery for orphaned invoices
 13. **Broadcast System** — Template-based mass notifications via email/SMS/WhatsApp with delivery tracking
 14. **MYOB Integration** — OAuth 2.0 with auto-refresh, multi-tenant token isolation, data sync endpoints
+15. **Query Safety** — All list endpoints across 25+ route files have `.limit()` safeguards (1000 standard, 5000 for exports/reports) to prevent unbounded result sets
 
 ### Key Infrastructure Files
 - `server/db.ts` — PostgreSQL pool config (max: 100, min: 5, statement_timeout: 60s)
 - `server/lib/background-scheduler.ts` — Interval-based job scheduler with overlap prevention
 - `server/lib/job-queue.ts` — In-memory priority job queue (email, AI, PDF queues)
-- `server/lib/circuit-breaker.ts` — Circuit breakers for external services
+- `server/lib/circuit-breaker.ts` — Circuit breakers for OpenAI, Twilio, Mailgun, Resend
 - `server/lib/cache.ts` — LRU cache with TTL and pruning
 - `server/lib/metrics.ts` — Request metrics and event loop lag monitoring
-- `server/lib/ap-inbox-jobs.ts` — Email polling and invoice extraction background jobs
-- `server/services/email.service.ts` — Resend email integration
-- `server/chat/chat.routes.ts` — Chat system routes (1265 lines)
+- `server/lib/ap-inbox-jobs.ts` — Email polling and invoice extraction background jobs with memory leak prevention
+- `server/services/email.service.ts` — Resend email integration with circuit breaker and credential caching
+- `server/chat/chat.routes.ts` — Chat system routes (1265 lines) with query limits
 - `server/routes/broadcast.routes.ts` — Mass notification system
 
 ### Scalability Targets

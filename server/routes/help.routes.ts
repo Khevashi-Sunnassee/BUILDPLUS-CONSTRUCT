@@ -102,7 +102,8 @@ router.get("/api/help/categories", requireAuth, async (_req: Request, res: Respo
       .selectDistinct({ category: helpEntries.category })
       .from(helpEntries)
       .where(and(eq(helpEntries.status, "PUBLISHED"), sql`${helpEntries.category} IS NOT NULL`))
-      .orderBy(asc(helpEntries.category));
+      .orderBy(asc(helpEntries.category))
+      .limit(1000);
     res.json(cats.map((c) => c.category).filter(Boolean));
   } catch (error: unknown) {
     res.status(500).json({ error: "Failed to fetch categories" });
@@ -153,7 +154,8 @@ router.get("/api/help/admin/list", requireAuth, requireRole("ADMIN"), async (_re
     const all = await db
       .select()
       .from(helpEntries)
-      .orderBy(asc(helpEntries.category), asc(helpEntries.key));
+      .orderBy(asc(helpEntries.category), asc(helpEntries.key))
+      .limit(1000);
     res.json(all);
   } catch (error: unknown) {
     res.status(500).json({ error: "Failed to list help entries" });
@@ -271,7 +273,8 @@ router.get("/api/help/admin/:id/versions", requireAuth, requireRole("ADMIN"), as
       .select()
       .from(helpEntryVersions)
       .where(eq(helpEntryVersions.helpEntryId, id))
-      .orderBy(desc(helpEntryVersions.version));
+      .orderBy(desc(helpEntryVersions.version))
+      .limit(1000);
     res.json(versions);
   } catch (error: unknown) {
     res.status(500).json({ error: "Failed to fetch versions" });

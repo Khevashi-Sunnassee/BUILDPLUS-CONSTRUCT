@@ -13,7 +13,7 @@ import { seedHelpEntries } from "./seed-help";
 import { runMigrations } from "./migrate";
 import logger from "./lib/logger";
 import { errorMonitor } from "./lib/error-monitor";
-import { pool } from "./db";
+import { pool, db } from "./db";
 import { getAllCacheStats } from "./lib/cache";
 import { getAllCircuitStats } from "./lib/circuit-breaker";
 import { getAllQueueStats } from "./lib/job-queue";
@@ -432,4 +432,15 @@ async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean>
   scheduler.register("ap-invoice-extract", processImportedInvoicesJob, EXTRACT_INTERVAL);
   scheduler.start();
   logger.info("[Background] AP email poll (5min) and invoice extraction (2min) jobs started");
+
+  try {
+    const { eq, count } = await import("drizzle-orm");
+    const { apInvoices } = await import("@shared/schema");
+    const [result] = await db.select({ count: count() }).from(apInvoices).where(eq(apInvoices.status, "IMPORTED"));
+    if (result && result.count > 0) {
+      logger.info({ pendingInvoices: result.count }, "[Startup Recovery] Found IMPORTED invoices pending extraction — will be processed by background scheduler");
+    }
+  } catch (err) {
+    logger.debug("[Startup Recovery] Could not check for pending invoices");
+  }
 })();

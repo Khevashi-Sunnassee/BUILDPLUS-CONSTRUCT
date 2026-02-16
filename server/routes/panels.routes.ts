@@ -414,7 +414,8 @@ router.post("/api/panels/consolidation-check", requireAuth, requireRole("ADMIN",
     const panels = await db.select({ panel: panelRegister, job: jobs })
       .from(panelRegister)
       .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
-      .where(and(inArray(panelRegister.id, panelIds), eq(jobs.companyId, companyId)));
+      .where(and(inArray(panelRegister.id, panelIds), eq(jobs.companyId, companyId)))
+      .limit(1000);
 
     if (panels.length === 0) {
       return res.status(404).json({ error: "No authorized panels found" });
@@ -476,7 +477,7 @@ router.post("/api/panels/consolidate", requireAuth, requireRole("ADMIN", "MANAGE
       return res.status(400).json({ error: "Primary panel must be one of the selected panels" });
     }
 
-    const panels = await db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds));
+    const panels = await db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds)).limit(1000);
     if (panels.length !== panelIds.length) {
       return res.status(400).json({ error: "One or more panels not found" });
     }

@@ -28,7 +28,8 @@ router.get("/api/onboarding/instruments", requireAuth, async (req, res) => {
       .select()
       .from(industrialInstruments)
       .where(eq(industrialInstruments.companyId, companyId))
-      .orderBy(desc(industrialInstruments.createdAt));
+      .orderBy(desc(industrialInstruments.createdAt))
+      .limit(1000);
     res.json(results);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to fetch instruments";
@@ -111,14 +112,16 @@ router.get("/api/onboarding/templates", requireAuth, async (req, res) => {
       .select()
       .from(onboardingTemplates)
       .where(eq(onboardingTemplates.companyId, companyId))
-      .orderBy(desc(onboardingTemplates.createdAt));
+      .orderBy(desc(onboardingTemplates.createdAt))
+      .limit(1000);
 
     const templatesWithCounts = await Promise.all(
       templates.map(async (template) => {
         const tasks = await db
           .select()
           .from(onboardingTemplateTasks)
-          .where(eq(onboardingTemplateTasks.templateId, template.id));
+          .where(eq(onboardingTemplateTasks.templateId, template.id))
+          .limit(1000);
         return { ...template, taskCount: tasks.length };
       })
     );
@@ -175,7 +178,8 @@ router.get("/api/onboarding/templates/:id", requireAuth, async (req, res) => {
       .select()
       .from(onboardingTemplateTasks)
       .where(eq(onboardingTemplateTasks.templateId, id))
-      .orderBy(onboardingTemplateTasks.sortOrder);
+      .orderBy(onboardingTemplateTasks.sortOrder)
+      .limit(1000);
     res.json({ ...template, tasks });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to fetch template";
@@ -247,7 +251,8 @@ router.get("/api/onboarding/templates/:templateId/tasks", requireAuth, async (re
       .select()
       .from(onboardingTemplateTasks)
       .where(eq(onboardingTemplateTasks.templateId, templateId))
-      .orderBy(onboardingTemplateTasks.sortOrder);
+      .orderBy(onboardingTemplateTasks.sortOrder)
+      .limit(1000);
     res.json(tasks);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to fetch template tasks";
@@ -351,7 +356,8 @@ router.get("/api/employees/:employeeId/onboardings", requireAuth, async (req, re
       .select()
       .from(employeeOnboardings)
       .where(and(eq(employeeOnboardings.employeeId, employeeId), eq(employeeOnboardings.companyId, companyId)))
-      .orderBy(desc(employeeOnboardings.createdAt));
+      .orderBy(desc(employeeOnboardings.createdAt))
+      .limit(1000);
     res.json(results);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to fetch onboardings";
@@ -394,7 +400,8 @@ router.post("/api/employees/:employeeId/onboardings", requireAuth, requireRole("
         .select()
         .from(onboardingTemplateTasks)
         .where(eq(onboardingTemplateTasks.templateId, templateId))
-        .orderBy(onboardingTemplateTasks.sortOrder);
+        .orderBy(onboardingTemplateTasks.sortOrder)
+        .limit(1000);
 
       if (templateTasks.length > 0) {
         const startDate = new Date(employment.startDate);
@@ -456,7 +463,8 @@ router.get("/api/employees/:employeeId/onboardings/:id", requireAuth, async (req
       .select()
       .from(employeeOnboardingTasks)
       .where(eq(employeeOnboardingTasks.onboardingId, id))
-      .orderBy(employeeOnboardingTasks.sortOrder);
+      .orderBy(employeeOnboardingTasks.sortOrder)
+      .limit(1000);
     res.json({ ...onboarding, tasks });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to fetch onboarding";
@@ -557,7 +565,8 @@ router.patch("/api/employees/:employeeId/onboardings/:onboardingId/tasks/:taskId
     const allTasks = await db
       .select()
       .from(employeeOnboardingTasks)
-      .where(eq(employeeOnboardingTasks.onboardingId, onboardingId));
+      .where(eq(employeeOnboardingTasks.onboardingId, onboardingId))
+      .limit(1000);
 
     const allComplete = allTasks.every((t) => t.status === "complete");
     const anyBlocked = allTasks.some((t) => t.status === "blocked");

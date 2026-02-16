@@ -83,7 +83,8 @@ dataManagementRouter.get("/api/admin/data-management/items", requireRole("ADMIN"
       })
       .from(items)
       .where(eq(items.companyId, companyId))
-      .orderBy(asc(items.name));
+      .orderBy(asc(items.name))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch items" });
@@ -132,7 +133,8 @@ dataManagementRouter.get("/api/admin/data-management/item-categories", requireRo
       })
       .from(itemCategories)
       .where(eq(itemCategories.companyId, companyId))
-      .orderBy(asc(itemCategories.name));
+      .orderBy(asc(itemCategories.name))
+      .limit(1000);
 
     const catIds = cats.map(c => c.id);
     const countRows = catIds.length > 0
@@ -194,7 +196,8 @@ dataManagementRouter.get("/api/admin/data-management/assets", requireRole("ADMIN
       })
       .from(assets)
       .where(eq(assets.companyId, companyId))
-      .orderBy(asc(assets.name));
+      .orderBy(asc(assets.name))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch assets" });
@@ -245,7 +248,8 @@ dataManagementRouter.get("/api/admin/data-management/progress-claims", requireRo
       .from(progressClaims)
       .leftJoin(jobs, eq(progressClaims.jobId, jobs.id))
       .where(eq(progressClaims.companyId, companyId))
-      .orderBy(desc(progressClaims.createdAt));
+      .orderBy(desc(progressClaims.createdAt))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch progress claims" });
@@ -284,7 +288,8 @@ dataManagementRouter.get("/api/admin/data-management/broadcast-templates", requi
       })
       .from(broadcastTemplates)
       .where(eq(broadcastTemplates.companyId, companyId))
-      .orderBy(asc(broadcastTemplates.name));
+      .orderBy(asc(broadcastTemplates.name))
+      .limit(1000);
 
     const templateIds = result.map(t => t.id);
     const msgCountRows = templateIds.length > 0
@@ -349,7 +354,8 @@ dataManagementRouter.get("/api/admin/data-management/documents", requireRole("AD
       })
       .from(documents)
       .where(eq(documents.companyId, companyId))
-      .orderBy(desc(documents.createdAt));
+      .orderBy(desc(documents.createdAt))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch documents" });
@@ -414,7 +420,8 @@ dataManagementRouter.get("/api/admin/data-management/contracts", requireRole("AD
       .from(contracts)
       .leftJoin(jobs, eq(contracts.jobId, jobs.id))
       .where(eq(contracts.companyId, companyId))
-      .orderBy(desc(contracts.createdAt));
+      .orderBy(desc(contracts.createdAt))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch contracts" });
@@ -458,7 +465,8 @@ dataManagementRouter.get("/api/admin/data-management/deliveries", requireRole("A
       .innerJoin(loadLists, eq(deliveryRecords.loadListId, loadLists.id))
       .innerJoin(jobs, eq(loadLists.jobId, jobs.id))
       .where(eq(jobs.companyId, companyId))
-      .orderBy(desc(deliveryRecords.createdAt));
+      .orderBy(desc(deliveryRecords.createdAt))
+      .limit(1000);
 
     res.json(allDeliveries);
   } catch (error: unknown) {
@@ -517,7 +525,8 @@ dataManagementRouter.get("/api/admin/data-management/load-lists", requireRole("A
       .from(loadLists)
       .innerJoin(jobs, eq(loadLists.jobId, jobs.id))
       .where(eq(jobs.companyId, companyId))
-      .orderBy(desc(loadLists.createdAt));
+      .orderBy(desc(loadLists.createdAt))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch load lists" });
@@ -579,7 +588,8 @@ dataManagementRouter.get("/api/admin/data-management/suppliers", requireRole("AD
       })
       .from(suppliers)
       .where(eq(suppliers.companyId, companyId))
-      .orderBy(asc(suppliers.name));
+      .orderBy(asc(suppliers.name))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
@@ -657,7 +667,8 @@ dataManagementRouter.get("/api/admin/data-management/customers", requireRole("AD
       })
       .from(customers)
       .where(eq(customers.companyId, companyId))
-      .orderBy(asc(customers.name));
+      .orderBy(asc(customers.name))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch customers" });
@@ -707,7 +718,8 @@ dataManagementRouter.get("/api/admin/data-management/employees", requireRole("AD
       })
       .from(employees)
       .where(eq(employees.companyId, companyId))
-      .orderBy(asc(employees.lastName), asc(employees.firstName));
+      .orderBy(asc(employees.lastName), asc(employees.firstName))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch employees" });
@@ -766,7 +778,8 @@ dataManagementRouter.get("/api/admin/data-management/activity-templates", requir
       .leftJoin(jobTypes, eq(activityTemplates.jobTypeId, jobTypes.id))
       .leftJoin(activityStages, eq(activityTemplates.stageId, activityStages.id))
       .where(eq(activityTemplates.companyId, companyId))
-      .orderBy(asc(activityTemplates.sortOrder), asc(activityTemplates.name));
+      .orderBy(asc(activityTemplates.sortOrder), asc(activityTemplates.name))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity templates" });
@@ -814,7 +827,8 @@ dataManagementRouter.get("/api/admin/data-management/job-activities", requireRol
       .leftJoin(jobs, eq(jobActivities.jobId, jobs.id))
       .leftJoin(activityStages, eq(jobActivities.stageId, activityStages.id))
       .where(eq(jobActivities.companyId, companyId))
-      .orderBy(desc(jobActivities.createdAt));
+      .orderBy(desc(jobActivities.createdAt))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch job activities" });
@@ -855,7 +869,8 @@ dataManagementRouter.get("/api/admin/data-management/activity-stages", requireRo
       })
       .from(activityStages)
       .where(eq(activityStages.companyId, companyId))
-      .orderBy(asc(activityStages.stageNumber));
+      .orderBy(asc(activityStages.stageNumber))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity stages" });
@@ -901,7 +916,8 @@ dataManagementRouter.get("/api/admin/data-management/activity-consultants", requ
       })
       .from(activityConsultants)
       .where(eq(activityConsultants.companyId, companyId))
-      .orderBy(asc(activityConsultants.name));
+      .orderBy(asc(activityConsultants.name))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity consultants" });
@@ -1316,7 +1332,8 @@ dataManagementRouter.get("/api/admin/data-management/cost-codes", requireRole("A
       })
       .from(costCodes)
       .where(eq(costCodes.companyId, companyId))
-      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code));
+      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch cost codes" });
@@ -1358,7 +1375,8 @@ dataManagementRouter.get("/api/admin/data-management/child-cost-codes", requireR
       .from(childCostCodes)
       .leftJoin(costCodes, eq(childCostCodes.parentCostCodeId, costCodes.id))
       .where(eq(childCostCodes.companyId, companyId))
-      .orderBy(asc(costCodes.code), asc(childCostCodes.sortOrder), asc(childCostCodes.code));
+      .orderBy(asc(costCodes.code), asc(childCostCodes.sortOrder), asc(childCostCodes.code))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch child cost codes" });
@@ -1422,7 +1440,8 @@ dataManagementRouter.get("/api/admin/data-management/tenders", requireRole("ADMI
       .from(tenders)
       .leftJoin(jobs, eq(tenders.jobId, jobs.id))
       .where(eq(tenders.companyId, companyId))
-      .orderBy(desc(tenders.createdAt));
+      .orderBy(desc(tenders.createdAt))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch tenders" });
@@ -1473,7 +1492,8 @@ dataManagementRouter.get("/api/admin/data-management/budgets", requireRole("ADMI
       .from(jobBudgets)
       .leftJoin(jobs, eq(jobBudgets.jobId, jobs.id))
       .where(eq(jobBudgets.companyId, companyId))
-      .orderBy(desc(jobBudgets.createdAt));
+      .orderBy(desc(jobBudgets.createdAt))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch budgets" });
@@ -1518,7 +1538,8 @@ dataManagementRouter.get("/api/admin/data-management/boq-groups", requireRole("A
       .leftJoin(jobs, eq(boqGroups.jobId, jobs.id))
       .leftJoin(costCodes, eq(boqGroups.costCodeId, costCodes.id))
       .where(eq(boqGroups.companyId, companyId))
-      .orderBy(desc(boqGroups.createdAt));
+      .orderBy(desc(boqGroups.createdAt))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch BOQ groups" });
@@ -1558,7 +1579,8 @@ dataManagementRouter.get("/api/admin/data-management/ap-invoices", requireRole("
       .from(apInvoices)
       .leftJoin(suppliers, eq(apInvoices.supplierId, suppliers.id))
       .where(eq(apInvoices.companyId, companyId))
-      .orderBy(desc(apInvoices.createdAt));
+      .orderBy(desc(apInvoices.createdAt))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch AP invoices" });
