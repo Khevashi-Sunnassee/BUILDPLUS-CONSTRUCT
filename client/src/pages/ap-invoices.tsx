@@ -410,6 +410,7 @@ export default function ApInvoicesPage() {
   const [flagFilter, setFlagFilter] = useState("all");
   const [uploadedByFilter, setUploadedByFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
+  const [supplierFilter, setSupplierFilter] = useState<{ id: string; name: string } | null>(null);
 
   const queryParams = useMemo(() => {
     const params: Record<string, string> = { page: String(page), limit: "50" };
@@ -418,8 +419,9 @@ export default function ApInvoicesPage() {
     if (flagFilter !== "all") params.flagged = flagFilter;
     if (uploadedByFilter !== "all") params.uploadedBy = uploadedByFilter;
     if (companyFilter !== "all") params.companyId = companyFilter;
+    if (supplierFilter) params.supplierId = supplierFilter.id;
     return params;
-  }, [activeTab, search, page, flagFilter, uploadedByFilter, companyFilter]);
+  }, [activeTab, search, page, flagFilter, uploadedByFilter, companyFilter, supplierFilter]);
 
   const { data: invoiceData, isLoading } = useQuery<InvoiceListResponse>({
     queryKey: [AP_INVOICE_ROUTES.LIST, queryParams],
@@ -609,6 +611,21 @@ export default function ApInvoicesPage() {
               ))}
             </SelectContent>
           </Select>
+          {supplierFilter && (
+            <div className="flex items-center gap-1.5 rounded-md border px-2 py-1" data-testid="filter-supplier-active">
+              <span className="text-sm text-muted-foreground">Supplier:</span>
+              <span className="text-sm font-medium">{supplierFilter.name}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 ml-1"
+                onClick={() => { setSupplierFilter(null); setPage(1); }}
+                data-testid="button-clear-supplier-filter"
+              >
+                <XCircle className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-4 rounded-md border px-4 py-2">
@@ -694,7 +711,24 @@ export default function ApInvoicesPage() {
                           {inv.invoiceNumber || "—"}
                         </Link>
                       </TableCell>
-                      <TableCell data-testid={`text-supplier-${inv.id}`}>{inv.supplierName || "—"}</TableCell>
+                      <TableCell data-testid={`text-supplier-${inv.id}`}>
+                        {inv.supplierName && inv.supplierId ? (
+                          <button
+                            type="button"
+                            className="text-left text-primary font-medium hover:underline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSupplierFilter({ id: inv.supplierId!, name: inv.supplierName! });
+                              setPage(1);
+                            }}
+                            data-testid={`button-filter-supplier-${inv.id}`}
+                          >
+                            {inv.supplierName}
+                          </button>
+                        ) : (
+                          <span>{inv.supplierName || "—"}</span>
+                        )}
+                      </TableCell>
                       <TableCell>{formatDate(inv.uploadedAt)}</TableCell>
                       <TableCell>{formatDate(inv.invoiceDate)}</TableCell>
                       <TableCell>{formatDate(inv.dueDate)}</TableCell>
