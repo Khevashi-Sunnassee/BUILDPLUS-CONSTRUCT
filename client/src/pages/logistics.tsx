@@ -24,8 +24,11 @@ import {
   QrCode,
   Layers,
   RotateCcw,
+  Mail,
+  Printer,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -92,6 +95,7 @@ import { PageHelpButton } from "@/components/help/page-help-button";
 interface LoadListWithDetails {
   id: string;
   jobId: string;
+  loadNumber?: string | null;
   trailerTypeId?: string | null;
   docketNumber?: string | null;
   scheduledDate?: string | null;
@@ -189,6 +193,9 @@ export default function LogisticsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [selectedReadyPanels, setSelectedReadyPanels] = useState<Set<string>>(new Set());
   const [readyPanelJobFilter, setReadyPanelJobFilter] = useState("all");
+  const [pendingJobFilter, setPendingJobFilter] = useState("all");
+  const [completedJobFilter, setCompletedJobFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState("ready");
   const [readyPanelsExpanded, setReadyPanelsExpanded] = useState(true);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [returnLoadList, setReturnLoadList] = useState<LoadListWithDetails | null>(null);
@@ -200,7 +207,9 @@ export default function LogisticsPage() {
   const [unloadedAtFactoryTime, setUnloadedAtFactoryTime] = useState("");
   const [returnNotes, setReturnNotes] = useState("");
   const [returnPanelIds, setReturnPanelIds] = useState<Set<string>>(new Set());
-  const reportRef = useRef<HTMLDivElement>(null);
+  const readyTabRef = useRef<HTMLDivElement>(null);
+  const pendingTabRef = useRef<HTMLDivElement>(null);
+  const completedTabRef = useRef<HTMLDivElement>(null);
 
   const { data: userSettings } = useQuery<{ selectedFactoryIds: string[]; defaultFactoryId: string | null }>({
     queryKey: [USER_ROUTES.SETTINGS],
@@ -646,16 +655,15 @@ export default function LogisticsPage() {
     !watchedJobId || watchedJobId === "" || p.jobId === watchedJobId
   ) || [], [approvedPanels, watchedJobId]);
 
-  const exportToPDF = async () => {
-    if (!reportRef.current) return;
-    
+  const exportTabToPDF = async (ref: React.RefObject<HTMLDivElement | null>, filename: string) => {
+    if (!ref.current) return;
     setIsExporting(true);
     try {
       const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
         import("html2canvas"),
         import("jspdf"),
       ]);
-      const canvas = await html2canvas(reportRef.current, {
+      const canvas = await html2canvas(ref.current, {
         scale: 2,
         useCORS: true,
         logging: false,
@@ -664,17 +672,12 @@ export default function LogisticsPage() {
         onclone: (clonedDoc) => {
           clonedDoc.documentElement.classList.remove("dark");
           clonedDoc.documentElement.style.colorScheme = "light";
-          const clonedElement = clonedDoc.body.querySelector("[data-pdf-content]") || clonedDoc.body;
-          if (clonedElement instanceof HTMLElement) {
-            clonedElement.style.backgroundColor = "#ffffff";
-            clonedElement.style.color = "#000000";
-          }
           clonedDoc.querySelectorAll("*").forEach((el) => {
             if (el instanceof HTMLElement) {
               const computed = window.getComputedStyle(el);
-              if (computed.backgroundColor.includes("rgb(") && !computed.backgroundColor.includes("255, 255, 255")) {
+              if (computed.backgroundColor.includes("rgb(")) {
                 const bg = computed.backgroundColor;
-                if (bg.includes("rgb(0,") || bg.includes("rgb(10,") || bg.includes("rgb(20,") || bg.includes("rgb(30,") || bg.includes("hsl(")) {
+                if (bg.includes("rgb(0,") || bg.includes("rgb(10,") || bg.includes("rgb(20,") || bg.includes("rgb(30,")) {
                   el.style.backgroundColor = "#ffffff";
                 }
               }
@@ -682,81 +685,122 @@ export default function LogisticsPage() {
           });
         },
       });
-      
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-      
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const headerHeight = 35;
       const margin = 10;
-      const footerHeight = 12;
-      const usableHeight = pdfHeight - headerHeight - footerHeight - margin;
-      const usableWidth = pdfWidth - (margin * 2);
-      
-      // Clean header with logo - proper aspect ratio
-      const logoHeight = 12;
-      const logoWidth = 24; // 2:1 aspect ratio for typical logo
-      try {
-        if (reportLogo) pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
-      } catch (e) {}
-      
-      // Report title
-      pdf.setTextColor(0, 0, 0);
-      pdf.setFontSize(14);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Logistics Report", margin + logoWidth + 6, 12);
-      
-      // Subtitle info
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
-      pdf.text(`${pendingLoadLists.length} pending, ${completedLoadLists.length} completed`, margin + logoWidth + 6, 19);
-      
-      // Generated date on the right
-      pdf.setFontSize(8);
-      pdf.setTextColor(120, 120, 120);
-      pdf.text(`Generated: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, pdfWidth - margin, 19, { align: "right" });
-      
-      // Draw a simple line under header
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, 24, pdfWidth - margin, 24);
-      
-      pdf.setTextColor(0, 0, 0);
-      
+      const headerHeight = 25;
+      const usableWidth = pdfWidth - margin * 2;
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
-      const imgRatio = imgWidth / imgHeight;
-      let scaledWidth = usableWidth;
-      let scaledHeight = scaledWidth / imgRatio;
-      
-      if (scaledHeight > usableHeight) {
-        scaledHeight = usableHeight;
-        scaledWidth = scaledHeight * imgRatio;
+      const ratio = usableWidth / imgWidth;
+      const scaledHeight = imgHeight * ratio;
+      const usablePageHeight = pdfHeight - headerHeight - margin;
+      pdf.setFontSize(14);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(filename.replace(/-/g, " "), margin, 15);
+      pdf.setFontSize(9);
+      pdf.text(`Generated: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, pdfWidth - margin, 15, { align: "right" });
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, headerHeight - 3, pdfWidth - margin, headerHeight - 3);
+      if (scaledHeight <= usablePageHeight) {
+        pdf.addImage(imgData, "PNG", margin, headerHeight, usableWidth, scaledHeight);
+      } else {
+        let srcY = 0;
+        let page = 0;
+        while (srcY < imgHeight) {
+          if (page > 0) pdf.addPage();
+          const sliceHeight = Math.min(usablePageHeight / ratio, imgHeight - srcY);
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = imgWidth;
+          tempCanvas.height = sliceHeight;
+          const ctx = tempCanvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(canvas, 0, srcY, imgWidth, sliceHeight, 0, 0, imgWidth, sliceHeight);
+            pdf.addImage(tempCanvas.toDataURL("image/png"), "PNG", margin, page === 0 ? headerHeight : margin, usableWidth, sliceHeight * ratio);
+          }
+          srcY += sliceHeight;
+          page++;
+        }
       }
-      
-      const imgX = (pdfWidth - scaledWidth) / 2;
-      pdf.addImage(imgData, "PNG", imgX, headerHeight, scaledWidth, scaledHeight);
-      
-      pdf.setFillColor(248, 250, 252);
-      pdf.rect(0, pdfHeight - footerHeight, pdfWidth, footerHeight, "F");
-      pdf.setDrawColor(226, 232, 240);
-      pdf.line(0, pdfHeight - footerHeight, pdfWidth, pdfHeight - footerHeight);
-      
-      pdf.setFontSize(8);
-      pdf.setTextColor(100, 116, 139);
-      pdf.text(`${companyName} - Confidential`, margin, pdfHeight - 5);
-      pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
-      
-      pdf.save(`BuildPlus-Logistics-Report-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      pdf.save(`${filename}-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
+      toast({ title: "Failed to export PDF", variant: "destructive" });
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const handlePrintTab = (ref: React.RefObject<HTMLDivElement | null>) => {
+    if (!ref.current) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const content = ref.current.innerHTML;
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>BuildPlus - Logistics</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; color: #000; }
+            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+            th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; font-size: 12px; }
+            th { background: #f5f5f5; font-weight: 600; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            button, .hidden-print { display: none !important; }
+            @media print { body { margin: 0; padding: 10px; } }
+          </style>
+        </head>
+        <body>${content}</body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.onload = () => { printWindow.print(); printWindow.onafterprint = () => printWindow.close(); };
+  };
+
+  const handleEmailTab = (tabType: "ready" | "pending" | "completed") => {
+    let subject = "BuildPlus Logistics - ";
+    let body = "";
+    if (tabType === "ready") {
+      subject += `Panels Ready to Load (${filteredReadyPanels.length})`;
+      const grouped = new Map<string, typeof filteredReadyPanels>();
+      filteredReadyPanels.forEach(p => {
+        const key = p.job?.jobNumber || "Unknown";
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key)!.push(p);
+      });
+      body = `Panels Ready to Load - ${filteredReadyPanels.length} panels\n\n`;
+      grouped.forEach((panels, jobNumber) => {
+        body += `Job: ${jobNumber}\n`;
+        panels.forEach(p => {
+          body += `  - ${p.panelMark} | ${p.panelType || ""} | ${p.building || ""} ${p.level || ""} | ${p.panelMass ? parseFloat(p.panelMass).toLocaleString() + " kg" : ""}\n`;
+        });
+        body += "\n";
+      });
+    } else if (tabType === "pending") {
+      subject += `Pending Load Lists (${pendingLoadLists.length})`;
+      body = `Pending Load Lists - ${pendingLoadLists.length} lists\n\n`;
+      pendingLoadLists.forEach(ll => {
+        body += `${ll.loadNumber} - ${ll.job.jobNumber} ${ll.job.name}\n`;
+        body += `  Panels: ${ll.panels.length} | Mass: ${calculateTotalMass(ll.panels).toLocaleString()} kg\n`;
+        if (ll.scheduledDate) body += `  Scheduled: ${new Date(ll.scheduledDate).toLocaleDateString()}\n`;
+        if (ll.docketNumber) body += `  Docket: ${ll.docketNumber}\n`;
+        body += "\n";
+      });
+    } else {
+      subject += `Completed Deliveries (${completedLoadLists.length})`;
+      body = `Completed Deliveries - ${completedLoadLists.length} deliveries\n\n`;
+      completedLoadLists.forEach(ll => {
+        body += `${ll.loadNumber} - ${ll.job.jobNumber} ${ll.job.name}\n`;
+        body += `  Panels: ${ll.panels.length}\n`;
+        if (ll.deliveryRecord?.deliveryDate) body += `  Delivered: ${ll.deliveryRecord.deliveryDate}\n`;
+        if (ll.deliveryRecord?.truckRego) body += `  Truck: ${ll.deliveryRecord.truckRego}\n`;
+        body += "\n";
+      });
+    }
+    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
   };
 
   const filteredLoadLists = useMemo(() => loadLists?.filter(ll => {
@@ -765,8 +809,27 @@ export default function LogisticsPage() {
     }
     return true;
   }) || [], [loadLists, factoryFilter]);
-  const pendingLoadLists = useMemo(() => filteredLoadLists.filter(ll => ll.status === "PENDING"), [filteredLoadLists]);
-  const completedLoadLists = useMemo(() => filteredLoadLists.filter(ll => ll.status === "COMPLETE"), [filteredLoadLists]);
+  const pendingLoadListsAll = useMemo(() => filteredLoadLists.filter(ll => ll.status === "PENDING"), [filteredLoadLists]);
+  const completedLoadListsAll = useMemo(() => filteredLoadLists.filter(ll => ll.status === "COMPLETE"), [filteredLoadLists]);
+
+  const pendingLoadLists = useMemo(() => pendingJobFilter === "all" ? pendingLoadListsAll : pendingLoadListsAll.filter(ll => ll.job.id === pendingJobFilter), [pendingLoadListsAll, pendingJobFilter]);
+  const completedLoadLists = useMemo(() => completedJobFilter === "all" ? completedLoadListsAll : completedLoadListsAll.filter(ll => ll.job.id === completedJobFilter), [completedLoadListsAll, completedJobFilter]);
+
+  const pendingJobOptions = useMemo(() => {
+    const jobMap = new Map<string, { id: string; jobNumber: string; name: string }>();
+    for (const ll of pendingLoadListsAll) {
+      if (!jobMap.has(ll.job.id)) jobMap.set(ll.job.id, { id: ll.job.id, jobNumber: ll.job.jobNumber || "", name: ll.job.name });
+    }
+    return Array.from(jobMap.values()).sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
+  }, [pendingLoadListsAll]);
+
+  const completedJobOptions = useMemo(() => {
+    const jobMap = new Map<string, { id: string; jobNumber: string; name: string }>();
+    for (const ll of completedLoadListsAll) {
+      if (!jobMap.has(ll.job.id)) jobMap.set(ll.job.id, { id: ll.job.id, jobNumber: ll.job.jobNumber || "", name: ll.job.name });
+    }
+    return Array.from(jobMap.values()).sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
+  }, [completedLoadListsAll]);
 
   if (loadListsLoading) {
     return (
@@ -783,19 +846,17 @@ export default function LogisticsPage() {
   }
 
   return (
-    <div className="space-y-6" role="main" aria-label="Logistics">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4" role="main" aria-label="Logistics">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2" data-testid="text-page-title">
-            <Truck className="h-6 w-6" aria-hidden="true" />
-            Logistics
-          </h1>
+              <Truck className="h-6 w-6" aria-hidden="true" />
+              Logistics
+            </h1>
             <PageHelpButton pageHelpKey="page.logistics" />
           </div>
-          <p className="text-muted-foreground">
-            Manage load lists and track deliveries
-          </p>
+          <p className="text-muted-foreground">Manage load lists and track deliveries</p>
         </div>
         <div className="flex items-center gap-2">
           <Select value={factoryFilter} onValueChange={setFactoryFilter}>
@@ -808,19 +869,6 @@ export default function LogisticsPage() {
               <SelectItem value="VIC">Victoria</SelectItem>
             </SelectContent>
           </Select>
-          <Button 
-            variant="outline"
-            onClick={exportToPDF} 
-            disabled={isExporting || loadListsLoading}
-            data-testid="button-export-pdf"
-          >
-            {isExporting ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <FileDown className="h-4 w-4 mr-2" />
-            )}
-            Export PDF
-          </Button>
           <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-load-list">
             <Plus className="h-4 w-4 mr-2" />
             Create Load List
@@ -828,49 +876,78 @@ export default function LogisticsPage() {
         </div>
       </div>
 
-      <Card data-testid="card-ready-to-load">
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <CardTitle className="flex items-center gap-2 cursor-pointer" onClick={() => setReadyPanelsExpanded(!readyPanelsExpanded)}>
-              {readyPanelsExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-              <Layers className="h-5 w-5" />
-              Panels Ready to Load ({filteredReadyPanels.length})
-            </CardTitle>
-            {selectedReadyPanels.size > 0 && (
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" data-testid="badge-selected-count">{selectedReadyPanels.size} selected</Badge>
-                <Button
-                  onClick={handleCreateFromReady}
-                  disabled={createLoadListFromReady.isPending}
-                  data-testid="button-create-from-ready"
-                >
-                  {createLoadListFromReady.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4 mr-2" />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3" data-testid="tabs-logistics">
+          <TabsTrigger value="ready" data-testid="tab-ready">
+            <Layers className="h-4 w-4 mr-2" />
+            Ready to Load ({filteredReadyPanels.length})
+          </TabsTrigger>
+          <TabsTrigger value="pending" data-testid="tab-pending">
+            <Clock className="h-4 w-4 mr-2" />
+            Pending ({pendingLoadLists.length})
+          </TabsTrigger>
+          <TabsTrigger value="completed" data-testid="tab-completed">
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Delivered ({completedLoadLists.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="ready" className="mt-4">
+          <Card data-testid="card-ready-to-load">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="flex items-center gap-2">
+                  <Layers className="h-5 w-5" />
+                  Panels Ready to Load ({filteredReadyPanels.length})
+                </CardTitle>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {selectedReadyPanels.size > 0 && (
+                    <>
+                      <Badge variant="secondary" data-testid="badge-selected-count">{selectedReadyPanels.size} selected</Badge>
+                      <Button
+                        onClick={handleCreateFromReady}
+                        disabled={createLoadListFromReady.isPending}
+                        data-testid="button-create-from-ready"
+                      >
+                        {createLoadListFromReady.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Plus className="h-4 w-4 mr-2" />
+                        )}
+                        Create Loading List
+                      </Button>
+                    </>
                   )}
-                  Create Loading List
-                </Button>
+                  <Button variant="outline" size="sm" onClick={() => exportTabToPDF(readyTabRef, "Panels-Ready-To-Load")} disabled={isExporting} data-testid="button-export-ready-pdf">
+                    {isExporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileDown className="h-4 w-4 mr-1" />}
+                    Export PDF
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handlePrintTab(readyTabRef)} data-testid="button-print-ready">
+                    <Printer className="h-4 w-4 mr-1" />
+                    Print
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleEmailTab("ready")} data-testid="button-email-ready">
+                    <Mail className="h-4 w-4 mr-1" />
+                    Email
+                  </Button>
+                </div>
               </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <CardDescription className="flex-1">Produced panels not yet on a load list</CardDescription>
-            <Select value={readyPanelJobFilter} onValueChange={(v) => { setReadyPanelJobFilter(v); setSelectedReadyPanels(new Set()); }}>
-              <SelectTrigger className="w-[220px]" data-testid="select-ready-panel-job-filter">
-                <SelectValue placeholder="Filter by job" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Jobs</SelectItem>
-                {readyPanelJobs.map(j => (
-                  <SelectItem key={j.id} value={j.id}>{j.jobNumber} - {j.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-        {readyPanelsExpanded && (
-          <CardContent>
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardDescription className="flex-1">Produced panels not yet on a load list</CardDescription>
+                <Select value={readyPanelJobFilter} onValueChange={(v) => { setReadyPanelJobFilter(v); setSelectedReadyPanels(new Set()); }}>
+                  <SelectTrigger className="w-[220px]" data-testid="select-ready-panel-job-filter">
+                    <SelectValue placeholder="Filter by job" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Jobs</SelectItem>
+                    {readyPanelJobs.map(j => (
+                      <SelectItem key={j.id} value={j.id}>{j.jobNumber} - {j.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+          <CardContent ref={readyTabRef}>
             {readyPanelsError ? (
               <p className="text-destructive text-center py-8" data-testid="text-ready-panels-error">Failed to load panels. Please try refreshing the page.</p>
             ) : readyPanelsLoading ? (
@@ -970,19 +1047,48 @@ export default function LogisticsPage() {
               </div>
             )}
           </CardContent>
-        )}
-      </Card>
+          </Card>
+        </TabsContent>
 
-      <div ref={reportRef} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Pending Load Lists ({pendingLoadLists.length})
-            </CardTitle>
-            <CardDescription>Load lists awaiting delivery</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <TabsContent value="pending" className="mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Pending Load Lists ({pendingLoadLists.length})
+                </CardTitle>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={() => exportTabToPDF(pendingTabRef, "Pending-Load-Lists")} disabled={isExporting} data-testid="button-export-pending-pdf">
+                    {isExporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileDown className="h-4 w-4 mr-1" />}
+                    Export PDF
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handlePrintTab(pendingTabRef)} data-testid="button-print-pending">
+                    <Printer className="h-4 w-4 mr-1" />
+                    Print
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleEmailTab("pending")} data-testid="button-email-pending">
+                    <Mail className="h-4 w-4 mr-1" />
+                    Email
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardDescription className="flex-1">Load lists awaiting delivery</CardDescription>
+                <Select value={pendingJobFilter} onValueChange={setPendingJobFilter}>
+                  <SelectTrigger className="w-[220px]" data-testid="select-pending-job-filter">
+                    <SelectValue placeholder="Filter by job" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Jobs</SelectItem>
+                    {pendingJobOptions.map(j => (
+                      <SelectItem key={j.id} value={j.id}>{j.jobNumber} - {j.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent ref={pendingTabRef}>
             {pendingLoadLists.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No pending load lists</p>
             ) : (
@@ -1111,17 +1217,48 @@ export default function LogisticsPage() {
               </div>
             )}
           </CardContent>
-        </Card>
+          </Card>
+        </TabsContent>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              Completed Deliveries ({completedLoadLists.length})
-            </CardTitle>
-            <CardDescription>Load lists that have been delivered</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <TabsContent value="completed" className="mt-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  Completed Deliveries ({completedLoadLists.length})
+                </CardTitle>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={() => exportTabToPDF(completedTabRef, "Completed-Deliveries")} disabled={isExporting} data-testid="button-export-completed-pdf">
+                    {isExporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileDown className="h-4 w-4 mr-1" />}
+                    Export PDF
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handlePrintTab(completedTabRef)} data-testid="button-print-completed">
+                    <Printer className="h-4 w-4 mr-1" />
+                    Print
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleEmailTab("completed")} data-testid="button-email-completed">
+                    <Mail className="h-4 w-4 mr-1" />
+                    Email
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <CardDescription className="flex-1">Load lists that have been delivered</CardDescription>
+                <Select value={completedJobFilter} onValueChange={setCompletedJobFilter}>
+                  <SelectTrigger className="w-[220px]" data-testid="select-completed-job-filter">
+                    <SelectValue placeholder="Filter by job" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Jobs</SelectItem>
+                    {completedJobOptions.map(j => (
+                      <SelectItem key={j.id} value={j.id}>{j.jobNumber} - {j.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent ref={completedTabRef}>
             {completedLoadLists.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No completed deliveries</p>
             ) : (
@@ -1226,8 +1363,9 @@ export default function LogisticsPage() {
               </div>
             )}
           </CardContent>
-        </Card>
-      </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
         <DialogContent className="max-w-2xl">
