@@ -1462,7 +1462,7 @@ router.delete("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Res
 
     if (!existing) return res.status(404).json({ error: "Invoice not found" });
 
-    await db.update(apInboundEmails).set({ invoiceId: null }).where(eq(apInboundEmails.invoiceId, id));
+    await db.delete(apInboundEmails).where(eq(apInboundEmails.invoiceId, id));
     await db.delete(myobExportLogs).where(eq(myobExportLogs.invoiceId, id));
     await db.delete(apInvoices).where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)));
 

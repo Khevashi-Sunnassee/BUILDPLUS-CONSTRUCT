@@ -901,8 +901,8 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
       if (selected.has("ap_invoices")) {
         if (delCompanyId) {
           const companyInvoiceIds = (await tx.select({ id: apInvoices.id }).from(apInvoices).where(eq(apInvoices.companyId, delCompanyId))).map(r => r.id);
+          await tx.delete(apInboundEmails).where(eq(apInboundEmails.companyId, delCompanyId));
           if (companyInvoiceIds.length > 0) {
-            await tx.update(apInboundEmails).set({ invoiceId: null }).where(inArray(apInboundEmails.invoiceId, companyInvoiceIds));
             await tx.delete(myobExportLogs).where(inArray(myobExportLogs.invoiceId, companyInvoiceIds));
             await tx.delete(apInvoiceApprovals).where(inArray(apInvoiceApprovals.invoiceId, companyInvoiceIds));
             await tx.delete(apInvoiceComments).where(inArray(apInvoiceComments.invoiceId, companyInvoiceIds));

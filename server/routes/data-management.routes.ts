@@ -1276,9 +1276,9 @@ dataManagementRouter.delete("/api/admin/data-management/:entityType/bulk-delete"
         const [total] = await db.select({ count: count() }).from(apInvoices).where(eq(apInvoices.companyId, companyId));
         totalCount = total.count;
         protectedCount = 0;
+        await db.delete(apInboundEmails).where(eq(apInboundEmails.companyId, companyId));
         const invoiceIds = (await db.select({ id: apInvoices.id }).from(apInvoices).where(eq(apInvoices.companyId, companyId))).map(r => r.id);
         if (invoiceIds.length > 0) {
-          await db.update(apInboundEmails).set({ invoiceId: null }).where(inArray(apInboundEmails.invoiceId, invoiceIds));
           await db.delete(myobExportLogs).where(inArray(myobExportLogs.invoiceId, invoiceIds));
         }
         await db.delete(apInvoices).where(eq(apInvoices.companyId, companyId));
@@ -1572,7 +1572,7 @@ dataManagementRouter.delete("/api/admin/data-management/ap-invoices/:id", requir
     const { id } = req.params;
     const [existing] = await db.select({ id: apInvoices.id }).from(apInvoices).where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)));
     if (!existing) return res.status(404).json({ error: "AP invoice not found" });
-    await db.update(apInboundEmails).set({ invoiceId: null }).where(eq(apInboundEmails.invoiceId, id));
+    await db.delete(apInboundEmails).where(eq(apInboundEmails.invoiceId, id));
     await db.delete(myobExportLogs).where(eq(myobExportLogs.invoiceId, id));
     await db.delete(apInvoices).where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)));
     res.json({ success: true });
