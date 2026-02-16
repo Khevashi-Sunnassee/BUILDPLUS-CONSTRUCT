@@ -417,7 +417,7 @@ function InvitationSidebar({
   invitation: any | null;
   onClose: () => void;
   initialTab?: "updates" | "files" | "activity";
-) {
+}) {
   const supplierName = invitation?.supplier?.name || "Invitation";
 
   return (
