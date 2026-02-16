@@ -553,6 +553,14 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/procurement/reo-scheduling">
+        <ProtectedRoute requiredRole={["ADMIN", "MANAGER"]}>
+          <AuthenticatedLayout>
+            <ProcurementReoSchedulingPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/tasks">
         <ProtectedRoute>
           <AuthenticatedLayout>
