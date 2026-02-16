@@ -512,6 +512,8 @@ export const ADMIN_ROUTES = {
   DATA_MGMT_BUDGET_DELETE: (id: string) => `/api/admin/data-management/budgets/${id}`,
   DATA_MGMT_BOQ_GROUPS: '/api/admin/data-management/boq-groups',
   DATA_MGMT_BOQ_GROUP_DELETE: (id: string) => `/api/admin/data-management/boq-groups/${id}`,
+  DATA_MGMT_AP_INVOICES: '/api/admin/data-management/ap-invoices',
+  DATA_MGMT_AP_INVOICE_DELETE: (id: string) => `/api/admin/data-management/ap-invoices/${id}`,
   DATA_MGMT_BULK_DELETE: (entityType: string) => `/api/admin/data-management/${entityType}/bulk-delete`,
 } as const;
 
