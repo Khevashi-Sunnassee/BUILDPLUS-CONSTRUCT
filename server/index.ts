@@ -403,4 +403,15 @@ async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean>
 
   appReady = true;
   logger.info("Application fully initialized and ready");
+
+  const { scheduler } = await import("./lib/background-scheduler");
+  const { pollEmailsJob, processImportedInvoicesJob } = await import("./lib/ap-inbox-jobs");
+
+  const EMAIL_POLL_INTERVAL = 5 * 60 * 1000;
+  const EXTRACT_INTERVAL = 2 * 60 * 1000;
+
+  scheduler.register("ap-email-poll", pollEmailsJob, EMAIL_POLL_INTERVAL);
+  scheduler.register("ap-invoice-extract", processImportedInvoicesJob, EXTRACT_INTERVAL);
+  scheduler.start();
+  logger.info("[Background] AP email poll (5min) and invoice extraction (2min) jobs started");
 })();

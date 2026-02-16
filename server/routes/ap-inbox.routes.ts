@@ -122,140 +122,47 @@ router.post("/api/ap-inbox/check-emails", requireAuth, async (req: Request, res:
       return res.status(400).json({ error: "Email inbox not configured. Set up inbox settings first." });
     }
 
-    const apiKey = await getResendApiKey();
-
-    const allReceivedEmails: any[] = [];
-    let hasMore = true;
-    let cursor: string | null = null;
-    let pageCount = 0;
-    const maxPages = 10;
-
-    while (hasMore && pageCount < maxPages) {
-      const url = new URL("https://api.resend.com/emails/receiving");
-      if (cursor) url.searchParams.set("after", cursor);
-
-      const listRes = await fetch(url.toString(), {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-
-      if (!listRes.ok) {
-        const errText = await listRes.text();
-        logger.error({ status: listRes.status, body: errText }, "[AP Inbox] Failed to fetch received emails from Resend");
-        return res.status(502).json({ error: `Failed to fetch emails from Resend: ${listRes.status}` });
-      }
-
-      const listData = await listRes.json();
-      const pageEmails: any[] = Array.isArray(listData.data) ? listData.data : (Array.isArray(listData) ? listData : []);
-
-      if (pageEmails.length === 0) {
-        hasMore = false;
-      } else {
-        allReceivedEmails.push(...pageEmails);
-        cursor = pageEmails[pageEmails.length - 1]?.id || null;
-        hasMore = listData.has_more === true;
-      }
-      pageCount++;
+    const { scheduler } = await import("../lib/background-scheduler");
+    const isRunning = scheduler.isJobRunning("ap-email-poll");
+    if (isRunning) {
+      return res.json({ triggered: true, message: "Email check is already running in the background" });
     }
 
-    const inboundAddr = settings.inboundEmailAddress.toLowerCase().trim();
-    const matchingEmails = allReceivedEmails.filter((email: any) => {
-      const toAddrs: string[] = Array.isArray(email.to) ? email.to : (email.to ? [email.to] : []);
-      return toAddrs.some((addr: string) => addr.toLowerCase().trim() === inboundAddr);
-    });
+    const triggered = await scheduler.triggerNow("ap-email-poll");
+    res.json({ triggered, message: triggered ? "Email check started in background. New invoices will appear shortly." : "Could not start email check" });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "[AP Inbox] Error triggering email check");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to check emails" });
+  }
+});
 
-    let processed = 0;
-    let skipped = 0;
-    const errors: string[] = [];
+router.get("/api/ap-inbox/background-status", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { scheduler } = await import("../lib/background-scheduler");
+    const { getLastPollResult, getLastExtractResult } = await import("../lib/ap-inbox-jobs");
 
-    for (const email of matchingEmails) {
-      const emailId = email.id;
-      if (!emailId) { skipped++; continue; }
+    const jobStatus = scheduler.getStatus();
+    const lastPoll = getLastPollResult();
+    const lastExtract = getLastExtractResult();
 
-      const [existing] = await db.select().from(apInboundEmails)
-        .where(eq(apInboundEmails.resendEmailId, emailId)).limit(1);
-
-      if (existing) {
-        if (existing.status === "PROCESSED" && !existing.invoiceId) {
-          try {
-            await db.delete(apInboundEmails).where(eq(apInboundEmails.id, existing.id));
-            logger.info({ emailId, inboundId: existing.id }, "[AP Inbox] Re-processing email whose invoice was deleted");
-          } catch (delErr) {
-            logger.error({ err: delErr, emailId }, "[AP Inbox] Failed to reset orphaned inbound record");
-            skipped++;
-            continue;
-          }
-        } else {
-          skipped++;
-          continue;
-        }
-      }
-
-      try {
-        const fromAddr = typeof email.from === "string" ? email.from : (email.from?.email || email.from?.address || JSON.stringify(email.from));
-        const toAddrs: string[] = Array.isArray(email.to) ? email.to : (email.to ? [email.to] : []);
-
-        const [inboundRecord] = await db.insert(apInboundEmails).values({
-          companyId: settings.companyId,
-          resendEmailId: emailId,
-          fromAddress: fromAddr,
-          toAddress: toAddrs[0] || null,
-          subject: email.subject || null,
-          status: "RECEIVED",
-          attachmentCount: 0,
-        }).returning();
-
-        let hasAttachments = false;
-        try {
-          const emailAttachments = Array.isArray(email.attachments) ? email.attachments : [];
-          if (emailAttachments.length > 0) {
-            hasAttachments = true;
-            await db.update(apInboundEmails)
-              .set({ attachmentCount: emailAttachments.length })
-              .where(eq(apInboundEmails.id, inboundRecord.id));
-          } else {
-            const attRes = await fetch(`https://api.resend.com/emails/${emailId}/receiving/attachments`, {
-              headers: { Authorization: `Bearer ${apiKey}` },
-            });
-            if (attRes.ok) {
-              const attData = await attRes.json();
-              const attachments = Array.isArray(attData.data) ? attData.data : (Array.isArray(attData) ? attData : []);
-              hasAttachments = attachments.length > 0;
-              await db.update(apInboundEmails)
-                .set({ attachmentCount: attachments.length })
-                .where(eq(apInboundEmails.id, inboundRecord.id));
-            }
-          }
-        } catch {}
-
-        if (hasAttachments) {
-          try {
-            await processInboundEmail(inboundRecord.id, emailId, settings);
-          } catch (err) {
-            logger.error({ err, inboundId: inboundRecord.id }, "[AP Inbox] Processing failed for polled email");
-          }
-        } else {
-          await db.update(apInboundEmails)
-            .set({ status: "NO_ATTACHMENTS", processedAt: new Date() })
-            .where(eq(apInboundEmails.id, inboundRecord.id));
-        }
-
-        processed++;
-        logger.info({ emailId, from: fromAddr, subject: email.subject }, "[AP Inbox] Processed email from poll");
-      } catch (emailErr: any) {
-        errors.push(`Email ${emailId}: ${emailErr.message}`);
-        logger.error({ err: emailErr, emailId }, "[AP Inbox] Failed to process polled email");
-      }
-    }
+    const [importedCount] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(apInvoices)
+      .where(eq(apInvoices.status, "IMPORTED"));
 
     res.json({
-      totalFound: matchingEmails.length,
-      processed,
-      skipped,
-      errors: errors.length > 0 ? errors : undefined,
+      emailPoll: {
+        ...jobStatus["ap-email-poll"],
+        lastResult: lastPoll,
+      },
+      invoiceExtraction: {
+        ...jobStatus["ap-invoice-extract"],
+        lastResult: lastExtract,
+      },
+      pendingExtraction: importedCount?.count || 0,
     });
   } catch (error: unknown) {
-    logger.error({ err: error }, "[AP Inbox] Error polling emails");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to check emails" });
+    res.status(500).json({ error: "Failed to get background status" });
   }
 });
 

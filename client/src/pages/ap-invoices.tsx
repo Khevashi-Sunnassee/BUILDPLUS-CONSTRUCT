@@ -469,21 +469,28 @@ export default function ApInvoicesPage() {
     },
   });
 
+  const { data: bgStatus } = useQuery<any>({
+    queryKey: [AP_INBOX_ROUTES.BACKGROUND_STATUS],
+    refetchInterval: 15000,
+  });
+
   const checkEmailsMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", AP_INBOX_ROUTES.CHECK_EMAILS);
       return res.json();
     },
-    onSuccess: (data: { totalFound: number; processed: number; skipped: number }) => {
-      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
-      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
-      if (data.processed > 0) {
-        toast({ title: `${data.processed} new invoice${data.processed > 1 ? "s" : ""} imported from email` });
-      } else if (data.totalFound > 0) {
-        toast({ title: "No new emails", description: `${data.skipped} email${data.skipped > 1 ? "s" : ""} already processed` });
-      } else {
-        toast({ title: "No emails found", description: "No matching emails found in your inbox" });
-      }
+    onSuccess: (data: { triggered: boolean; message: string }) => {
+      toast({ title: data.message });
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
+        queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
+        queryClient.invalidateQueries({ queryKey: [AP_INBOX_ROUTES.BACKGROUND_STATUS] });
+      }, 3000);
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
+        queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
+        queryClient.invalidateQueries({ queryKey: [AP_INBOX_ROUTES.BACKGROUND_STATUS] });
+      }, 10000);
     },
     onError: (err: Error) => {
       toast({ title: "Failed to check emails", description: err.message, variant: "destructive" });
@@ -542,11 +549,11 @@ export default function ApInvoicesPage() {
             <Button
               variant="outline"
               onClick={() => checkEmailsMutation.mutate()}
-              disabled={checkEmailsMutation.isPending}
+              disabled={checkEmailsMutation.isPending || bgStatus?.emailPoll?.isRunning}
               data-testid="button-check-emails"
             >
-              {checkEmailsMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-              Check Emails
+              {(checkEmailsMutation.isPending || bgStatus?.emailPoll?.isRunning) ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+              {bgStatus?.emailPoll?.isRunning ? "Checking..." : "Check Emails"}
             </Button>
             <Button variant="outline" size="icon" onClick={() => setInboxSettingsOpen(true)} data-testid="button-inbox-settings">
               <Mail className="h-4 w-4" />
@@ -562,6 +569,29 @@ export default function ApInvoicesPage() {
             </Button>
           </div>
         </div>
+
+        {(bgStatus?.emailPoll?.isRunning || bgStatus?.invoiceExtraction?.isRunning || (bgStatus?.pendingExtraction > 0)) && (
+          <div className="flex items-center gap-3 text-xs text-muted-foreground" data-testid="background-status">
+            {bgStatus?.emailPoll?.isRunning && (
+              <span className="flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Checking emails...
+              </span>
+            )}
+            {bgStatus?.invoiceExtraction?.isRunning && (
+              <span className="flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Extracting invoice data...
+              </span>
+            )}
+            {!bgStatus?.invoiceExtraction?.isRunning && bgStatus?.pendingExtraction > 0 && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {bgStatus.pendingExtraction} invoice{bgStatus.pendingExtraction > 1 ? "s" : ""} pending extraction
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

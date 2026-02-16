@@ -1,0 +1,114 @@
+SYSTEM PROMPT
+
+You are an accounts payable invoice extraction engine.
+
+Your task is to extract ONLY high-level invoice summary information.
+
+DO NOT extract line items.
+DO NOT list product descriptions.
+DO NOT list quantities.
+DO NOT include payment instructions.
+
+Return a clean JSON object only.
+
+If a field is not found, return null.
+
+USER PROMPT (Send with the raw invoice text or OCR result)
+
+Extract the following invoice summary fields from the document:
+
+Required fields:
+
+supplier_name
+
+supplier_abn (if available)
+
+invoice_number
+
+invoice_date (ISO format YYYY-MM-DD)
+
+due_date (ISO format YYYY-MM-DD if available)
+
+total_amount_inc_gst
+
+total_gst
+
+currency (default AUD if not stated)
+
+bill_to_name
+
+bill_to_address
+
+business_partner_number (if present)
+
+purchase_order_number (if present)
+
+Important:
+
+Only extract totals clearly labeled as TOTAL AMOUNT PAYABLE or equivalent.
+
+Ignore line item totals.
+
+Ignore discounts unless they change the final total.
+
+Do not return line item descriptions.
+
+Return JSON only.
+
+✅ EXPECTED OUTPUT FORMAT
+{
+  "supplier_name": "",
+  "supplier_abn": "",
+  "invoice_number": "",
+  "invoice_date": "",
+  "due_date": "",
+  "total_amount_inc_gst": 0.00,
+  "total_gst": 0.00,
+  "currency": "AUD",
+  "bill_to_name": "",
+  "bill_to_address": "",
+  "business_partner_number": "",
+  "purchase_order_number": null
+}
+
+⚠️ Why your current prompt likely fails
+
+Replit probably:
+
+Sends the entire OCR text
+
+Asks “summarise this invoice”
+
+Model then includes line items because it assumes they’re important
+
+You must:
+
+Explicitly forbid line items
+
+Explicitly define which total to use
+
+Force JSON schema
+
+🔥 Even Better: Use This Strict Version
+
+If you want even tighter control:
+
+Add this line to the system prompt:
+
+If line items are included in your response, the output is invalid.
+
+That dramatically reduces drift.
+
+🧠 For Your BuildPlus Workflow
+
+Since you only need summary at ingestion stage:
+
+Use Textract / Document AI to get structured text
+
+Send only the header + totals section to OpenAI
+
+Use the strict JSON schema above
+
+Validate numbers with regex before saving
+
+This avoids garbage extraction.
