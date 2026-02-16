@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Search, Link2, Unlink, Building2, Users, Truck, FileText, Package, DollarSign, RefreshCw, Loader2, ExternalLink, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { Search, Link2, Unlink, Building2, Users, Truck, FileText, Package, DollarSign, RefreshCw, Loader2, ExternalLink, CheckCircle2, XCircle, AlertTriangle, ClipboardList } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MYOB_ROUTES } from "@shared/api-routes";
@@ -163,6 +163,7 @@ export default function MyobIntegrationPage() {
               <TabsTrigger value="accounts" data-testid="tab-accounts">Accounts</TabsTrigger>
               <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
               <TabsTrigger value="items" data-testid="tab-items">Items</TabsTrigger>
+              <TabsTrigger value="export-log" data-testid="tab-export-log">Export Log</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview">
@@ -285,6 +286,10 @@ export default function MyobIntegrationPage() {
                 searchTerm={searchTerms.items || ""}
                 onSearchChange={(v) => setSearchTerms(prev => ({ ...prev, items: v }))}
               />
+            </TabsContent>
+
+            <TabsContent value="export-log">
+              <ExportLogTable />
             </TabsContent>
           </Tabs>
         </>
@@ -510,6 +515,179 @@ function MyobDataTable({
               </TableHeader>
               <TableBody>
                 {filtered.map(renderRow)}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface ExportLogEntry {
+  id: number;
+  invoiceId: string;
+  status: string;
+  invoiceNumber: string | null;
+  supplierName: string | null;
+  totalAmount: string | null;
+  errorMessage: string | null;
+  exportedAt: string;
+  userName: string | null;
+}
+
+function ExportLogTable() {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery<ExportLogEntry[]>({
+    queryKey: [MYOB_ROUTES.EXPORT_LOGS],
+  });
+
+  const logs = data || [];
+  const filtered = logs.filter((log) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      (log.invoiceNumber || "").toLowerCase().includes(term) ||
+      (log.supplierName || "").toLowerCase().includes(term) ||
+      (log.userName || "").toLowerCase().includes(term) ||
+      log.status.toLowerCase().includes(term)
+    );
+  });
+
+  const successCount = logs.filter((l) => l.status === "SUCCESS").length;
+  const failedCount = logs.filter((l) => l.status === "FAILED").length;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ClipboardList className="h-5 w-5" />
+            Export Log
+            {logs.length > 0 && (
+              <Badge variant="secondary" className="ml-1" data-testid="badge-count-export-log">
+                {logs.length}
+              </Badge>
+            )}
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            {logs.length > 0 && (
+              <div className="flex items-center gap-1.5 mr-2">
+                <Badge variant="default" className="gap-1" data-testid="badge-success-count">
+                  <CheckCircle2 className="h-3 w-3" />
+                  {successCount}
+                </Badge>
+                {failedCount > 0 && (
+                  <Badge variant="destructive" className="gap-1" data-testid="badge-failed-count">
+                    <XCircle className="h-3 w-3" />
+                    {failedCount}
+                  </Badge>
+                )}
+              </div>
+            )}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search exports..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 w-48"
+                data-testid="input-search-export-log"
+              />
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              data-testid="button-refresh-export-log"
+            >
+              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </div>
+        ) : isError ? (
+          <div className="text-center py-8 space-y-2">
+            <XCircle className="h-8 w-8 mx-auto text-destructive" />
+            <p className="text-sm text-muted-foreground">
+              {(error as Error)?.message || "Failed to load export logs"}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-retry-export-log">
+              Retry
+            </Button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-muted-foreground">
+              {searchTerm ? "No matching export records found" : "No invoices have been exported to MYOB yet"}
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-md border overflow-auto max-h-[500px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Invoice #</TableHead>
+                  <TableHead>Supplier</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Exported By</TableHead>
+                  <TableHead>Date/Time</TableHead>
+                  <TableHead>Error</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((log) => (
+                  <TableRow key={log.id} data-testid={`row-export-log-${log.id}`}>
+                    <TableCell>
+                      <Badge
+                        variant={log.status === "SUCCESS" ? "default" : "destructive"}
+                        className="gap-1"
+                        data-testid={`badge-export-status-${log.id}`}
+                      >
+                        {log.status === "SUCCESS" ? (
+                          <CheckCircle2 className="h-3 w-3" />
+                        ) : (
+                          <XCircle className="h-3 w-3" />
+                        )}
+                        {log.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-sm" data-testid={`text-export-invoice-${log.id}`}>
+                      {log.invoiceNumber || "-"}
+                    </TableCell>
+                    <TableCell data-testid={`text-export-supplier-${log.id}`}>
+                      {log.supplierName || "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {log.totalAmount != null
+                        ? `$${Number(log.totalAmount).toLocaleString("en-AU", { minimumFractionDigits: 2 })}`
+                        : "-"}
+                    </TableCell>
+                    <TableCell>{log.userName || "-"}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {new Date(log.exportedAt).toLocaleString("en-AU", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate text-sm text-destructive" title={log.errorMessage || undefined}>
+                      {log.errorMessage || "-"}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
