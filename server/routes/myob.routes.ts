@@ -11,8 +11,8 @@ import {
 } from "../myob";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { myobTokens } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { myobTokens, myobExportLogs, users } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
 
 const router = Router();
 
@@ -216,6 +216,40 @@ router.get("/api/myob/items", requireAuth, async (req: Request, res: Response) =
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: "MYOB request failed", details: message });
+  }
+});
+
+router.get("/api/myob/export-logs", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const logs = await db.select({
+      id: myobExportLogs.id,
+      invoiceId: myobExportLogs.invoiceId,
+      status: myobExportLogs.status,
+      invoiceNumber: myobExportLogs.invoiceNumber,
+      supplierName: myobExportLogs.supplierName,
+      totalAmount: myobExportLogs.totalAmount,
+      errorMessage: myobExportLogs.errorMessage,
+      exportedAt: myobExportLogs.exportedAt,
+      userName: users.name,
+    })
+      .from(myobExportLogs)
+      .leftJoin(users, eq(myobExportLogs.userId, users.id))
+      .where(eq(myobExportLogs.companyId, companyId))
+      .orderBy(desc(myobExportLogs.exportedAt))
+      .limit(limit)
+      .offset(offset);
+
+    res.json(logs);
+  } catch (err) {
+    logger.error({ err }, "Error fetching MYOB export logs");
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: "Failed to fetch export logs", details: message });
   }
 });
 

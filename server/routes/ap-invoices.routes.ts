@@ -12,7 +12,7 @@ import {
   apInvoices, apInvoiceDocuments, apInvoiceExtractedFields,
   apInvoiceSplits, apInvoiceActivity, apInvoiceComments,
   apInvoiceApprovals, apApprovalRules, users, suppliers,
-  costCodes, jobs, companies
+  costCodes, jobs, companies, myobExportLogs
 } from "@shared/schema";
 import type { ApApprovalCondition } from "@shared/schema";
 
@@ -1480,6 +1480,17 @@ router.post("/api/ap-invoices/:id/export/myob", requireAuth, async (req: Request
         .set({ status: "EXPORTED", updatedAt: new Date() })
         .where(eq(apInvoices.id, id));
 
+      await db.insert(myobExportLogs).values({
+        companyId,
+        invoiceId: id,
+        userId,
+        status: "SUCCESS",
+        invoiceNumber: invoice.invoiceNumber || null,
+        supplierName: supplierInfo?.name || null,
+        totalAmount: invoice.totalInc || null,
+        myobResponse: result || null,
+      });
+
       await logActivity(id, "exported", "Invoice exported to MYOB", userId, { myobResult: result });
 
       res.json({ success: true, myobResult: result });
@@ -1487,6 +1498,17 @@ router.post("/api/ap-invoices/:id/export/myob", requireAuth, async (req: Request
       await db.update(apInvoices)
         .set({ status: "FAILED_EXPORT", updatedAt: new Date() })
         .where(eq(apInvoices.id, id));
+
+      await db.insert(myobExportLogs).values({
+        companyId,
+        invoiceId: id,
+        userId,
+        status: "FAILED",
+        invoiceNumber: invoice.invoiceNumber || null,
+        supplierName: supplierInfo?.name || null,
+        totalAmount: invoice.totalInc || null,
+        errorMessage: myobError.message || "Unknown MYOB error",
+      });
 
       await logActivity(id, "export_failed", `MYOB export failed: ${myobError.message}`, userId);
 
