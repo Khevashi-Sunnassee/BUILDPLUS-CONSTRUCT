@@ -186,27 +186,27 @@ function EditableField({ label, value, fieldKey, onSave, onFocus, type = "text" 
 
   return (
     <div
-      className="flex items-center justify-between gap-2 py-1.5 px-2 rounded-md hover-elevate cursor-pointer group"
+      className="flex items-start gap-2 py-1.5 px-2 rounded-md hover-elevate cursor-pointer group"
       onFocus={() => onFocus(fieldKey)}
       onClick={() => { onFocus(fieldKey); if (!editing) setEditing(true); }}
       data-testid={`field-${fieldKey}`}
     >
-      <span className="text-sm text-muted-foreground whitespace-nowrap min-w-[100px]">{label}</span>
+      <span className="text-sm text-muted-foreground whitespace-nowrap min-w-[100px] pt-0.5">{label}</span>
       {editing ? (
-        <div className="flex items-center gap-1 flex-1 justify-end">
+        <div className="flex items-center gap-1 flex-1">
           <Input
             type={type}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={handleSave}
             onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setEditValue(value); setEditing(false); } }}
-            className="h-7 text-sm max-w-[200px]"
+            className="h-7 text-sm flex-1"
             autoFocus
             data-testid={`input-${fieldKey}`}
           />
         </div>
       ) : (
-        <span className="text-sm font-medium text-right truncate" data-testid={`value-${fieldKey}`}>
+        <span className="text-sm font-medium text-left break-words min-w-0" data-testid={`value-${fieldKey}`}>
           {value || "—"}
         </span>
       )}
