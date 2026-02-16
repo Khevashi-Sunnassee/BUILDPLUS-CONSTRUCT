@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Filter, Loader2, Eye, Send, Settings, Mail, Copy, Check } from "lucide-react";
+import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Filter, Loader2, Eye, Send, Settings, Mail, Copy, Check, RefreshCw } from "lucide-react";
 
 interface ApInvoice {
   id: string;
@@ -457,6 +457,27 @@ export default function ApInvoicesPage() {
     },
   });
 
+  const checkEmailsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", AP_INBOX_ROUTES.CHECK_EMAILS);
+      return res.json();
+    },
+    onSuccess: (data: { totalFound: number; processed: number; skipped: number }) => {
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
+      if (data.processed > 0) {
+        toast({ title: `${data.processed} new invoice${data.processed > 1 ? "s" : ""} imported from email` });
+      } else if (data.totalFound > 0) {
+        toast({ title: "No new emails", description: `${data.skipped} email${data.skipped > 1 ? "s" : ""} already processed` });
+      } else {
+        toast({ title: "No emails found", description: "No matching emails found in your inbox" });
+      }
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to check emails", description: err.message, variant: "destructive" });
+    },
+  });
+
   const toggleRow = useCallback((id: string) => {
     setSelectedRows((prev) => {
       const next = new Set(prev);
@@ -487,6 +508,15 @@ export default function ApInvoicesPage() {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <h1 className="text-2xl font-semibold" data-testid="text-page-title">Invoices</h1>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => checkEmailsMutation.mutate()}
+              disabled={checkEmailsMutation.isPending}
+              data-testid="button-check-emails"
+            >
+              {checkEmailsMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+              Check Emails
+            </Button>
             <Button variant="outline" size="icon" onClick={() => setInboxSettingsOpen(true)} data-testid="button-inbox-settings">
               <Mail className="h-4 w-4" />
             </Button>
