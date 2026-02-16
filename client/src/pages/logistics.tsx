@@ -742,6 +742,15 @@ export default function LogisticsPage() {
     }
   };
 
+  const filteredLoadLists = useMemo(() => loadLists?.filter(ll => {
+    if (factoryFilter !== "all" && ll.factory !== factoryFilter) {
+      return false;
+    }
+    return true;
+  }) || [], [loadLists, factoryFilter]);
+  const pendingLoadLists = useMemo(() => filteredLoadLists.filter(ll => ll.status === "PENDING"), [filteredLoadLists]);
+  const completedLoadLists = useMemo(() => filteredLoadLists.filter(ll => ll.status === "COMPLETE"), [filteredLoadLists]);
+
   if (loadListsLoading) {
     return (
       <div className="space-y-6" aria-busy="true">
@@ -755,15 +764,6 @@ export default function LogisticsPage() {
       </div>
     );
   }
-
-  const filteredLoadLists = useMemo(() => loadLists?.filter(ll => {
-    if (factoryFilter !== "all" && ll.factory !== factoryFilter) {
-      return false;
-    }
-    return true;
-  }) || [], [loadLists, factoryFilter]);
-  const pendingLoadLists = useMemo(() => filteredLoadLists.filter(ll => ll.status === "PENDING"), [filteredLoadLists]);
-  const completedLoadLists = useMemo(() => filteredLoadLists.filter(ll => ll.status === "COMPLETE"), [filteredLoadLists]);
 
   return (
     <div className="space-y-6" role="main" aria-label="Logistics">
