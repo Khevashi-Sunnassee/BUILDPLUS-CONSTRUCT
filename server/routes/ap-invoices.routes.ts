@@ -610,6 +610,30 @@ router.post("/api/ap-invoices/:id/confirm", requireAuth, async (req: Request, re
       });
     }
 
+    if (existing.invoiceNumber && existing.supplierId) {
+      const [duplicate] = await db
+        .select({ id: apInvoices.id, invoiceNumber: apInvoices.invoiceNumber, status: apInvoices.status })
+        .from(apInvoices)
+        .where(
+          and(
+            eq(apInvoices.companyId, companyId),
+            eq(apInvoices.invoiceNumber, existing.invoiceNumber),
+            eq(apInvoices.supplierId, existing.supplierId),
+            sql`${apInvoices.id} != ${id}`,
+            sql`${apInvoices.status} NOT IN ('REJECTED')`
+          )
+        )
+        .limit(1);
+
+      if (duplicate) {
+        return res.status(409).json({
+          error: `Potential duplicate: invoice ${existing.invoiceNumber} from this supplier already exists (ID: ${duplicate.id}, status: ${duplicate.status})`,
+          duplicateInvoiceId: duplicate.id,
+          duplicateStatus: duplicate.status,
+        });
+      }
+    }
+
     const [updated] = await db
       .update(apInvoices)
       .set({ status: "CONFIRMED", updatedAt: new Date() })

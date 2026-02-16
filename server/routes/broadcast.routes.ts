@@ -161,7 +161,8 @@ router.get("/api/broadcasts/recipients", requireAuth, async (req, res) => {
               and(isNotNull(customers.phone), ne(customers.phone, ""))
             )
           )
-        ),
+        )
+        .limit(5000),
       db.select({
         id: suppliers.id,
         name: suppliers.name,
@@ -179,7 +180,8 @@ router.get("/api/broadcasts/recipients", requireAuth, async (req, res) => {
               and(isNotNull(suppliers.phone), ne(suppliers.phone, ""))
             )
           )
-        ),
+        )
+        .limit(5000),
       db.select({
         id: employees.id,
         firstName: employees.firstName,
@@ -197,7 +199,8 @@ router.get("/api/broadcasts/recipients", requireAuth, async (req, res) => {
               and(isNotNull(employees.phone), ne(employees.phone, ""))
             )
           )
-        ),
+        )
+        .limit(5000),
     ]);
 
     res.json({

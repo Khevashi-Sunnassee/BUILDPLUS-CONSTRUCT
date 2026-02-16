@@ -108,7 +108,8 @@ export const capexMethods = {
   async getAllCapexRequests(companyId: string): Promise<CapexRequestWithDetails[]> {
     const rows = await db.select().from(capexRequests)
       .where(eq(capexRequests.companyId, companyId))
-      .orderBy(desc(capexRequests.createdAt));
+      .orderBy(desc(capexRequests.createdAt))
+      .limit(1000);
 
     const results: CapexRequestWithDetails[] = [];
     for (const row of rows) {
@@ -121,7 +122,8 @@ export const capexMethods = {
   async getCapexRequestsByStatus(status: string, companyId: string): Promise<CapexRequestWithDetails[]> {
     const rows = await db.select().from(capexRequests)
       .where(and(eq(capexRequests.companyId, companyId), eq(capexRequests.status, status as any)))
-      .orderBy(desc(capexRequests.createdAt));
+      .orderBy(desc(capexRequests.createdAt))
+      .limit(1000);
 
     const results: CapexRequestWithDetails[] = [];
     for (const row of rows) {
@@ -148,7 +150,8 @@ export const capexMethods = {
         eq(capexRequests.status, "SUBMITTED"),
         eq(capexRequests.approvingManagerId, userId),
       ))
-      .orderBy(desc(capexRequests.createdAt));
+      .orderBy(desc(capexRequests.createdAt))
+      .limit(1000);
 
     const results: CapexRequestWithDetails[] = [];
     for (const row of rows) {
@@ -223,7 +226,8 @@ export const capexMethods = {
   async getCapexAuditHistory(capexRequestId: string): Promise<CapexAuditEvent[]> {
     return db.select().from(capexAuditEvents)
       .where(eq(capexAuditEvents.capexRequestId, capexRequestId))
-      .orderBy(desc(capexAuditEvents.createdAt));
+      .orderBy(desc(capexAuditEvents.createdAt))
+      .limit(1000);
   },
 
   async getCapexApprovers(companyId: string): Promise<User[]> {
@@ -233,6 +237,7 @@ export const capexMethods = {
         eq(users.isActive, true),
         eq(users.capexApprover, true),
       ))
-      .orderBy(asc(users.name));
+      .orderBy(asc(users.name))
+      .limit(1000);
   },
 };

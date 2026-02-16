@@ -90,9 +90,9 @@ Full-system audit covering all subsystems for enterprise readiness at 300+ simul
 7. **Caching** — LRU cache with TTL (settings: 5min/100, users: 2min/500, jobs: 3min/200, queries: 30s/2000), auto-prune every 60s, credential caching for email service
 8. **Rate Limiting** — API (300/min per session), Auth (20/15min per IP), Uploads (30/min per IP)
 9. **Request Monitoring** — Metrics collection, event loop lag measurement, request timing, error monitoring
-10. **Security** — Helmet CSP, input sanitization, content type validation, request ID tracing, RBAC
+10. **Security** — Helmet CSP, input sanitization, content type validation, request ID tracing, RBAC, CSRF double-submit cookie protection
 11. **Graceful Shutdown** — SIGTERM/SIGINT handlers, 15s force exit timeout, scheduler stop, job queue drain, pool draining, HTTP server close
-12. **AP Invoice Processing** — Upload → OCR extraction (GPT-4o) → supplier matching → auto-split → approval path assignment → multi-step approval → MYOB export, startup recovery for orphaned invoices
+12. **AP Invoice Processing** — Upload → OCR extraction (GPT-4o) → supplier matching → auto-split → approval path assignment → multi-step approval → MYOB export, startup recovery for orphaned invoices, duplicate invoice detection on confirm (supplier+invoiceNumber)
 13. **Broadcast System** — Template-based mass notifications via email/SMS/WhatsApp with delivery tracking
 14. **MYOB Integration** — OAuth 2.0 with auto-refresh, multi-tenant token isolation, data sync endpoints
 15. **Query Safety** — All list endpoints across 25+ route files have `.limit()` safeguards (1000 standard, 5000 for exports/reports) to prevent unbounded result sets
@@ -108,6 +108,7 @@ Full-system audit covering all subsystems for enterprise readiness at 300+ simul
 - `server/services/email.service.ts` — Resend email integration with circuit breaker and credential caching
 - `server/chat/chat.routes.ts` — Chat system routes (1265 lines) with query limits
 - `server/routes/broadcast.routes.ts` — Mass notification system
+- `server/middleware/csrf.ts` — CSRF double-submit cookie protection with webhook/auth exemptions
 
 ### Scalability Targets
 - 300+ simultaneous users

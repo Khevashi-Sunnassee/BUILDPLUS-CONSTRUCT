@@ -288,6 +288,26 @@ app.get("/api/admin/metrics", (req, res) => {
   res.json(requestMetrics.getSummary());
 });
 
+app.get("/api/admin/pool-metrics", (req, res) => {
+  if (!req.session?.userId || (req.session as unknown as Record<string, unknown>).role !== "ADMIN") {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+  res.json({
+    totalCount: pool.totalCount,
+    idleCount: pool.idleCount,
+    waitingCount: pool.waitingCount,
+    maxConnections: 100,
+    utilization: pool.totalCount > 0 ? ((pool.totalCount - pool.idleCount) / pool.totalCount * 100).toFixed(1) + "%" : "0%",
+    activeConnections: pool.totalCount - pool.idleCount,
+    cache: getAllCacheStats(),
+    circuitBreakers: getAllCircuitStats(),
+    queues: getAllQueueStats(),
+    eventLoopLagMs: getEventLoopLag(),
+    memory: process.memoryUsage(),
+    uptime: Math.round(process.uptime()),
+  });
+});
+
 process.on("unhandledRejection", (reason, promise) => {
   const err = reason instanceof Error ? reason : new Error(String(reason));
   errorMonitor.track(err, { route: "unhandledRejection" });

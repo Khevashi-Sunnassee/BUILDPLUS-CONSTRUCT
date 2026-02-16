@@ -9,10 +9,13 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const EXEMPT_PATHS = new Set([
   "/auth/login",
   "/auth/register",
+  "/auth/logout",
+  "/ap-inbox/webhook",
 ]);
 
 const EXEMPT_PATH_PREFIXES = [
   "/invitations/",
+  "/webhooks/",
 ];
 
 function isExemptPath(path: string): boolean {

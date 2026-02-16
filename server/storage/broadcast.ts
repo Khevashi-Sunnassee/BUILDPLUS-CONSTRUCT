@@ -11,7 +11,8 @@ export const broadcastMethods = {
   async getBroadcastTemplates(companyId: string): Promise<BroadcastTemplate[]> {
     return db.select().from(broadcastTemplates)
       .where(eq(broadcastTemplates.companyId, companyId))
-      .orderBy(desc(broadcastTemplates.createdAt));
+      .orderBy(desc(broadcastTemplates.createdAt))
+      .limit(1000);
   },
 
   async getBroadcastTemplate(id: string): Promise<BroadcastTemplate | undefined> {
@@ -45,7 +46,8 @@ export const broadcastMethods = {
   async getBroadcastMessages(companyId: string): Promise<BroadcastMessageWithDetails[]> {
     const messages = await db.select().from(broadcastMessages)
       .where(eq(broadcastMessages.companyId, companyId))
-      .orderBy(desc(broadcastMessages.createdAt));
+      .orderBy(desc(broadcastMessages.createdAt))
+      .limit(1000);
     
     const results: BroadcastMessageWithDetails[] = [];
     for (const msg of messages) {
@@ -77,6 +79,7 @@ export const broadcastMethods = {
   async getBroadcastDeliveries(broadcastMessageId: string): Promise<BroadcastDelivery[]> {
     return db.select().from(broadcastDeliveries)
       .where(eq(broadcastDeliveries.broadcastMessageId, broadcastMessageId))
-      .orderBy(desc(broadcastDeliveries.createdAt));
+      .orderBy(desc(broadcastDeliveries.createdAt))
+      .limit(5000);
   },
 };
