@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { useAuth } from "@/lib/auth";
@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   ChevronDown, ChevronRight, Briefcase, Search, FileText, 
   Cpu, CheckCircle2, XCircle, Clock, ShoppingCart, Loader2, Plus,
-  X, FileImage, Ruler, Package, Layers, Download, Eye, ZoomIn, ZoomOut
+  X, FileImage, Ruler, Package, Layers, Download, Eye, ZoomIn, ZoomOut, Save, Edit
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { Job, PanelRegister, ReoSchedule, ReoScheduleItem, ReoScheduleWithDetails, Supplier } from "@shared/schema";
@@ -82,6 +82,10 @@ function ReoScheduleBuilderDialog({
   const [showPoDialog, setShowPoDialog] = useState(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
   const [poNotes, setPoNotes] = useState("");
+  const [panelEdits, setPanelEdits] = useState<Record<string, string | null>>({});
+  const [hasPanelChanges, setHasPanelChanges] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["basic", "dimensions"]));
+  const { toast } = useToast();
 
   useEffect(() => {
     const panelForPdf = panel || (schedule?.panel ? { ...schedule.panel, job: schedule.job } as IfcPanelWithSchedule : null);
@@ -109,9 +113,53 @@ function ReoScheduleBuilderDialog({
     };
   }, [open, panel?.id, panel?.productionPdfUrl, schedule?.panel?.id, schedule?.panel?.productionPdfUrl]);
 
+  useEffect(() => {
+    if (open) {
+      setPanelEdits({});
+      setHasPanelChanges(false);
+    }
+  }, [open]);
+
+  const savePanelMutation = useMutation({
+    mutationFn: async (data: { panelId: string; updates: Record<string, string | null> }) => {
+      const res = await apiRequest("PUT", ADMIN_ROUTES.PANEL_BY_ID(data.panelId), data.updates);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Panel specifications saved" });
+      setPanelEdits({});
+      setHasPanelChanges(false);
+      queryClient.invalidateQueries({ queryKey: [REO_SCHEDULE_ROUTES.IFC_PANELS] });
+      queryClient.invalidateQueries({ queryKey: ['/api/reo-schedules'] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to save panel", description: err.message, variant: "destructive" });
+    },
+  });
+
   const hasSchedule = !!panel?.reoSchedule || !!schedule;
   const currentSchedule = schedule || (panel?.reoSchedule ? { ...panel.reoSchedule, items: [] } as ReoScheduleWithDetails : null);
   const effectivePanel = panel || (schedule?.panel ? { ...schedule.panel, job: schedule.job } as IfcPanelWithSchedule : null);
+  const effectivePanelRef = effectivePanel as Record<string, unknown> | null;
+
+  const getPanelValue = useCallback((field: string): string => {
+    if (field in panelEdits) return panelEdits[field] || "";
+    return String(effectivePanelRef?.[field] ?? "");
+  }, [panelEdits, effectivePanelRef]);
+
+  const setPanelField = useCallback((field: string, value: string) => {
+    setPanelEdits(prev => ({ ...prev, [field]: value || null }));
+    setHasPanelChanges(true);
+  }, []);
+
+  const toggleSection = useCallback((section: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  }, []);
   const hasPdf = !!(effectivePanel?.productionPdfUrl);
 
   const approvedItems = currentSchedule?.items?.filter(i => i.status === "APPROVED") || [];
@@ -211,58 +259,401 @@ function ReoScheduleBuilderDialog({
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
               <TabsList className="mx-4 mt-3 shrink-0">
                 <TabsTrigger value="details" data-testid="tab-details">Panel Details</TabsTrigger>
-                <TabsTrigger value="items" data-testid="tab-items" disabled={!hasSchedule}>
+                <TabsTrigger value="items" data-testid="tab-items">
                   Reo Items {currentSchedule?.items?.length ? `(${currentSchedule.items.length})` : ""}
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="details" className="flex-1 overflow-auto px-4 pb-4 mt-0">
-                <div className="space-y-4 py-4">
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Ruler className="w-4 h-4" />
-                        Panel Specifications
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Panel Mark:</span>
-                        <span className="ml-2 font-medium">{effectivePanel?.panelMark || "-"}</span>
+                <div className="space-y-3 py-4">
+                  {hasPanelChanges && effectivePanel && (
+                    <div className="flex items-center justify-between bg-blue-500/10 border border-blue-500/20 rounded-md px-3 py-2">
+                      <span className="text-sm text-blue-700 dark:text-blue-300">You have unsaved panel changes</span>
+                      <Button
+                        size="sm"
+                        onClick={() => savePanelMutation.mutate({ panelId: effectivePanel.id, updates: panelEdits })}
+                        disabled={savePanelMutation.isPending}
+                        data-testid="button-save-panel-specs"
+                      >
+                        {savePanelMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+                        Save Panel
+                      </Button>
+                    </div>
+                  )}
+
+                  <Collapsible open={expandedSections.has("basic")} onOpenChange={() => toggleSection("basic")}>
+                    <CollapsibleTrigger className="flex items-center gap-2 w-full py-2 text-sm font-medium" data-testid="section-basic-info">
+                      {expandedSections.has("basic") ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      <Ruler className="w-4 h-4" />
+                      Basic Information
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid grid-cols-2 gap-3 pb-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Panel Mark</Label>
+                          <Input value={getPanelValue("panelMark")} onChange={e => setPanelField("panelMark", e.target.value)} data-testid="input-panel-mark" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Panel Type</Label>
+                          <Input value={getPanelValue("panelType")} onChange={e => setPanelField("panelType", e.target.value)} data-testid="input-panel-type" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Level</Label>
+                          <Input value={getPanelValue("level")} onChange={e => setPanelField("level", e.target.value)} data-testid="input-panel-level" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Building</Label>
+                          <Input value={getPanelValue("building")} onChange={e => setPanelField("building", e.target.value)} data-testid="input-panel-building" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Zone</Label>
+                          <Input value={getPanelValue("zone")} onChange={e => setPanelField("zone", e.target.value)} data-testid="input-panel-zone" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Drawing Code</Label>
+                          <Input value={getPanelValue("drawingCode")} onChange={e => setPanelField("drawingCode", e.target.value)} data-testid="input-drawing-code" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Sheet Number</Label>
+                          <Input value={getPanelValue("sheetNumber")} onChange={e => setPanelField("sheetNumber", e.target.value)} data-testid="input-sheet-number" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Structural Elevation</Label>
+                          <Input value={getPanelValue("structuralElevation")} onChange={e => setPanelField("structuralElevation", e.target.value)} data-testid="input-structural-elevation" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Qty</Label>
+                          <Input value={getPanelValue("qty")} onChange={e => setPanelField("qty", e.target.value)} data-testid="input-panel-qty" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Concrete Strength (MPa)</Label>
+                          <Input value={getPanelValue("concreteStrengthMpa")} onChange={e => setPanelField("concreteStrengthMpa", e.target.value)} data-testid="input-concrete-strength" />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <Label className="text-xs text-muted-foreground">Description</Label>
+                          <Textarea value={getPanelValue("description")} onChange={e => setPanelField("description", e.target.value)} rows={2} data-testid="input-panel-description" />
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Level:</span>
-                        <span className="ml-2 font-medium">{effectivePanel?.level || "-"}</span>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <Separator />
+
+                  <Collapsible open={expandedSections.has("dimensions")} onOpenChange={() => toggleSection("dimensions")}>
+                    <CollapsibleTrigger className="flex items-center gap-2 w-full py-2 text-sm font-medium" data-testid="section-dimensions">
+                      {expandedSections.has("dimensions") ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      <Ruler className="w-4 h-4" />
+                      Dimensions & Weight
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid grid-cols-2 gap-3 pb-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Width (mm)</Label>
+                          <Input value={getPanelValue("loadWidth")} onChange={e => setPanelField("loadWidth", e.target.value)} data-testid="input-load-width" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Height (mm)</Label>
+                          <Input value={getPanelValue("loadHeight")} onChange={e => setPanelField("loadHeight", e.target.value)} data-testid="input-load-height" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Thickness (mm)</Label>
+                          <Input value={getPanelValue("panelThickness")} onChange={e => setPanelField("panelThickness", e.target.value)} data-testid="input-panel-thickness" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Volume</Label>
+                          <Input value={getPanelValue("panelVolume")} onChange={e => setPanelField("panelVolume", e.target.value)} data-testid="input-panel-volume" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Mass</Label>
+                          <Input value={getPanelValue("panelMass")} onChange={e => setPanelField("panelMass", e.target.value)} data-testid="input-panel-mass" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Net Weight</Label>
+                          <Input value={getPanelValue("netWeight")} onChange={e => setPanelField("netWeight", e.target.value)} data-testid="input-net-weight" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Gross Area</Label>
+                          <Input value={getPanelValue("grossArea")} onChange={e => setPanelField("grossArea", e.target.value)} data-testid="input-gross-area" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Panel Area</Label>
+                          <Input value={getPanelValue("panelArea")} onChange={e => setPanelField("panelArea", e.target.value)} data-testid="input-panel-area" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Crane Capacity Weight</Label>
+                          <Input value={getPanelValue("craneCapacityWeight")} onChange={e => setPanelField("craneCapacityWeight", e.target.value)} data-testid="input-crane-weight" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Crane Check</Label>
+                          <Input value={getPanelValue("craneCheck")} onChange={e => setPanelField("craneCheck", e.target.value)} data-testid="input-crane-check" />
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Dimensions:</span>
-                        <span className="ml-2 font-medium">
-                          {effectivePanel?.loadWidth && effectivePanel?.loadHeight 
-                            ? `${effectivePanel.loadWidth} × ${effectivePanel.loadHeight} mm`
-                            : "-"}
-                        </span>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <Separator />
+
+                  <Collapsible open={expandedSections.has("reo")} onOpenChange={() => toggleSection("reo")}>
+                    <CollapsibleTrigger className="flex items-center gap-2 w-full py-2 text-sm font-medium" data-testid="section-reinforcement">
+                      {expandedSections.has("reo") ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      <Layers className="w-4 h-4" />
+                      Reinforcement
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid grid-cols-2 gap-3 pb-3">
+                        {[
+                          { label: "Vertical Reo", qtyField: "verticalReoQty", typeField: "verticalReoType" },
+                          { label: "Horizontal Reo", qtyField: "horizontalReoQty", typeField: "horizontalReoType" },
+                          { label: "Mesh", qtyField: "meshQty", typeField: "meshType" },
+                          { label: "Fitments Reo", qtyField: "fitmentsReoQty", typeField: "fitmentsReoType" },
+                          { label: "U Bars", qtyField: "uBarsQty", typeField: "uBarsType" },
+                          { label: "Ligs", qtyField: "ligsQty", typeField: "ligsType" },
+                          { label: "Blockout Bars", qtyField: "blockoutBarsQty", typeField: "blockoutBarsType" },
+                          { label: "Top Fixing", qtyField: "topFixingQty", typeField: "topFixingType" },
+                          { label: "Trimmer Bars", qtyField: "trimmerBarsQty", typeField: "trimmerBarsType" },
+                          { label: "Ligs Reo", qtyField: "ligsReoQty", typeField: "ligsReoType" },
+                        ].map(({ label, qtyField, typeField }) => (
+                          <div key={qtyField} className="col-span-2 grid grid-cols-3 gap-2 items-end">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">{label} Qty</Label>
+                              <Input value={getPanelValue(qtyField)} onChange={e => setPanelField(qtyField, e.target.value)} data-testid={`input-${qtyField}`} />
+                            </div>
+                            <div className="col-span-2 space-y-1">
+                              <Label className="text-xs text-muted-foreground">{label} Type</Label>
+                              <Input value={getPanelValue(typeField)} onChange={e => setPanelField(typeField, e.target.value)} data-testid={`input-${typeField}`} />
+                            </div>
+                          </div>
+                        ))}
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Tie Reinforcement</Label>
+                          <Input value={getPanelValue("tieReinforcement")} onChange={e => setPanelField("tieReinforcement", e.target.value)} data-testid="input-tie-reinforcement" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Reckli Detail</Label>
+                          <Input value={getPanelValue("reckliDetail")} onChange={e => setPanelField("reckliDetail", e.target.value)} data-testid="input-reckli-detail" />
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Thickness:</span>
-                        <span className="ml-2 font-medium">{effectivePanel?.panelThickness || "-"} mm</span>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <Separator />
+
+                  <Collapsible open={expandedSections.has("additional")} onOpenChange={() => toggleSection("additional")}>
+                    <CollapsibleTrigger className="flex items-center gap-2 w-full py-2 text-sm font-medium" data-testid="section-additional-reo">
+                      {expandedSections.has("additional") ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      <Plus className="w-4 h-4" />
+                      Additional Reo & Dowels
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid grid-cols-2 gap-3 pb-3">
+                        {[
+                          { label: "Additional Reo 1", qtyField: "additionalReoQty1", typeField: "additionalReoType1" },
+                          { label: "Additional Reo 2", qtyField: "additionalReoQty2", typeField: "additionalReoType2" },
+                          { label: "Additional Reo 3", qtyField: "additionalReoQty3", typeField: "additionalReoType3" },
+                          { label: "Additional Reo 4", qtyField: "additionalReoQty4", typeField: "additionalReoType4" },
+                          { label: "Typical Dowel Bars", qtyField: "dowelBarsQty", typeField: "dowelBarsType" },
+                          { label: "End Dowel Bars", qtyField: "dowelBarsQty2", typeField: "dowelBarsType2" },
+                        ].map(({ label, qtyField, typeField }) => (
+                          <div key={qtyField} className="col-span-2 grid grid-cols-3 gap-2 items-end">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">{label} Qty</Label>
+                              <Input value={getPanelValue(qtyField)} onChange={e => setPanelField(qtyField, e.target.value)} data-testid={`input-${qtyField}`} />
+                            </div>
+                            <div className="col-span-2 space-y-1">
+                              <Label className="text-xs text-muted-foreground">{label} Type</Label>
+                              <Input value={getPanelValue(typeField)} onChange={e => setPanelField(typeField, e.target.value)} data-testid={`input-${typeField}`} />
+                            </div>
+                          </div>
+                        ))}
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Dowel Bars Length (Typical)</Label>
+                          <Input value={getPanelValue("dowelBarsLength")} onChange={e => setPanelField("dowelBarsLength", e.target.value)} data-testid="input-dowel-length" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Dowel Bars Length (End)</Label>
+                          <Input value={getPanelValue("dowelBarsLength2")} onChange={e => setPanelField("dowelBarsLength2", e.target.value)} data-testid="input-dowel-length-2" />
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Panel Type:</span>
-                        <span className="ml-2 font-medium">{effectivePanel?.panelType || "-"}</span>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <Separator />
+
+                  <Collapsible open={expandedSections.has("fitments")} onOpenChange={() => toggleSection("fitments")}>
+                    <CollapsibleTrigger className="flex items-center gap-2 w-full py-2 text-sm font-medium" data-testid="section-fitments-plates">
+                      {expandedSections.has("fitments") ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      <Package className="w-4 h-4" />
+                      Fitments, Plates & Lifters
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid grid-cols-2 gap-3 pb-3">
+                        {[
+                          { label: "Ferrules", qtyField: "ferrulesQty", typeField: "ferrulesType" },
+                          { label: "Fitments 2", qtyField: "fitmentsQty2", typeField: "fitmentsType2" },
+                          { label: "Fitments 3", qtyField: "fitmentsQty3", typeField: "fitmentsType3" },
+                          { label: "Fitments 4", qtyField: "fitmentsQty4", typeField: "fitmentsType4" },
+                          { label: "Plates 1", qtyField: "platesQty", typeField: "platesType" },
+                          { label: "Plates 2", qtyField: "platesQty2", typeField: "platesType2" },
+                          { label: "Plates 3", qtyField: "platesQty3", typeField: "platesType3" },
+                          { label: "Plates 4", qtyField: "platesQty4", typeField: "platesType4" },
+                        ].map(({ label, qtyField, typeField }) => (
+                          <div key={qtyField} className="col-span-2 grid grid-cols-3 gap-2 items-end">
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">{label} Qty</Label>
+                              <Input value={getPanelValue(qtyField)} onChange={e => setPanelField(qtyField, e.target.value)} data-testid={`input-${qtyField}`} />
+                            </div>
+                            <div className="col-span-2 space-y-1">
+                              <Label className="text-xs text-muted-foreground">{label} Type</Label>
+                              <Input value={getPanelValue(typeField)} onChange={e => setPanelField(typeField, e.target.value)} data-testid={`input-${typeField}`} />
+                            </div>
+                          </div>
+                        ))}
+                        <Separator className="col-span-2 my-1" />
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Lifter Qty A</Label>
+                          <Input value={getPanelValue("lifterQtyA")} onChange={e => setPanelField("lifterQtyA", e.target.value)} data-testid="input-lifter-qty-a" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Lifters Type</Label>
+                          <Input value={getPanelValue("liftersType")} onChange={e => setPanelField("liftersType", e.target.value)} data-testid="input-lifters-type" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Lifter Qty B</Label>
+                          <Input value={getPanelValue("lifterQtyB")} onChange={e => setPanelField("lifterQtyB", e.target.value)} data-testid="input-lifter-qty-b" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Safety Lifters Type</Label>
+                          <Input value={getPanelValue("safetyLiftersType")} onChange={e => setPanelField("safetyLiftersType", e.target.value)} data-testid="input-safety-lifters" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Lifter Qty C</Label>
+                          <Input value={getPanelValue("lifterQtyC")} onChange={e => setPanelField("lifterQtyC", e.target.value)} data-testid="input-lifter-qty-c" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Face Lifters Type</Label>
+                          <Input value={getPanelValue("faceLiftersType")} onChange={e => setPanelField("faceLiftersType", e.target.value)} data-testid="input-face-lifters" />
+                        </div>
+                        <Separator className="col-span-2 my-1" />
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Grout Tubes Bottom Qty</Label>
+                          <Input value={getPanelValue("groutTubesBottomQty")} onChange={e => setPanelField("groutTubesBottomQty", e.target.value)} data-testid="input-grout-bottom-qty" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Grout Tubes Bottom Type</Label>
+                          <Input value={getPanelValue("groutTubesBottomType")} onChange={e => setPanelField("groutTubesBottomType", e.target.value)} data-testid="input-grout-bottom-type" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Grout Tubes Top Qty</Label>
+                          <Input value={getPanelValue("groutTubesTopQty")} onChange={e => setPanelField("groutTubesTopQty", e.target.value)} data-testid="input-grout-top-qty" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Grout Tubes Top Type</Label>
+                          <Input value={getPanelValue("groutTubesTopType")} onChange={e => setPanelField("groutTubesTopType", e.target.value)} data-testid="input-grout-top-type" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Other Inserts Qty D</Label>
+                          <Input value={getPanelValue("insertsQtyD")} onChange={e => setPanelField("insertsQtyD", e.target.value)} data-testid="input-inserts-qty-d" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Insert Type D</Label>
+                          <Input value={getPanelValue("insertTypeD")} onChange={e => setPanelField("insertTypeD", e.target.value)} data-testid="input-insert-type-d" />
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">IFC Approved:</span>
-                        <span className="ml-2 font-medium">
-                          {effectivePanel?.approvedAt 
-                            ? format(parseISO(String(effectivePanel.approvedAt)), "dd/MM/yyyy")
-                            : "-"}
-                        </span>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <Separator />
+
+                  <Collapsible open={expandedSections.has("concrete")} onOpenChange={() => toggleSection("concrete")}>
+                    <CollapsibleTrigger className="flex items-center gap-2 w-full py-2 text-sm font-medium" data-testid="section-concrete-grout">
+                      {expandedSections.has("concrete") ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      <Package className="w-4 h-4" />
+                      Concrete & Grout
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid grid-cols-2 gap-3 pb-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Fire Rate</Label>
+                          <Input value={getPanelValue("fireRate")} onChange={e => setPanelField("fireRate", e.target.value)} data-testid="input-fire-rate" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Caulking Fire</Label>
+                          <Input value={getPanelValue("caulkingFire")} onChange={e => setPanelField("caulkingFire", e.target.value)} data-testid="input-caulking-fire" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Num Rebates</Label>
+                          <Input value={getPanelValue("numRebates")} onChange={e => setPanelField("numRebates", e.target.value)} data-testid="input-num-rebates" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Openings</Label>
+                          <Input value={getPanelValue("openings")} onChange={e => setPanelField("openings", e.target.value)} data-testid="input-openings" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Grout Table Manual</Label>
+                          <Input value={getPanelValue("groutTableManual")} onChange={e => setPanelField("groutTableManual", e.target.value)} data-testid="input-grout-table" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Grout to Use</Label>
+                          <Input value={getPanelValue("groutToUse")} onChange={e => setPanelField("groutToUse", e.target.value)} data-testid="input-grout-to-use" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Grout Strength</Label>
+                          <Input value={getPanelValue("groutStrength")} onChange={e => setPanelField("groutStrength", e.target.value)} data-testid="input-grout-strength" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Day 28 Fc</Label>
+                          <Input value={getPanelValue("day28Fc")} onChange={e => setPanelField("day28Fc", e.target.value)} data-testid="input-day28-fc" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Lift Fcm</Label>
+                          <Input value={getPanelValue("liftFcm")} onChange={e => setPanelField("liftFcm", e.target.value)} data-testid="input-lift-fcm" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Rotational Lifters</Label>
+                          <Input value={getPanelValue("rotationalLifters")} onChange={e => setPanelField("rotationalLifters", e.target.value)} data-testid="input-rotational-lifters" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Primary Lifters</Label>
+                          <Input value={getPanelValue("primaryLifters")} onChange={e => setPanelField("primaryLifters", e.target.value)} data-testid="input-primary-lifters" />
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <Separator />
+
+                  <Collapsible open={expandedSections.has("totals")} onOpenChange={() => toggleSection("totals")}>
+                    <CollapsibleTrigger className="flex items-center gap-2 w-full py-2 text-sm font-medium" data-testid="section-reo-totals">
+                      {expandedSections.has("totals") ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      <Ruler className="w-4 h-4" />
+                      Reo Totals
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="grid grid-cols-2 gap-3 pb-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Reo Tons</Label>
+                          <Input value={getPanelValue("reoTons")} onChange={e => setPanelField("reoTons", e.target.value)} data-testid="input-reo-tons" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Dowels Tons</Label>
+                          <Input value={getPanelValue("dowelsTons")} onChange={e => setPanelField("dowelsTons", e.target.value)} data-testid="input-dowels-tons" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Total Reo</Label>
+                          <Input value={getPanelValue("totalReo")} onChange={e => setPanelField("totalReo", e.target.value)} data-testid="input-total-reo" />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Total kg/m3</Label>
+                          <Input value={getPanelValue("totalKgM3")} onChange={e => setPanelField("totalKgM3", e.target.value)} data-testid="input-total-kg-m3" />
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <Separator />
 
                   <div className="space-y-2">
-                    <Label htmlFor="schedule-notes">Notes (optional)</Label>
+                    <Label htmlFor="schedule-notes">Schedule Notes (optional)</Label>
                     <Textarea
                       id="schedule-notes"
                       placeholder="Any notes for this reo schedule..."
@@ -521,7 +912,19 @@ function ReoScheduleBuilderDialog({
           </div>
         </div>
 
-        <DialogFooter className="px-6 py-4 border-t shrink-0">
+        <DialogFooter className="px-6 py-4 border-t shrink-0 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {hasPanelChanges && effectivePanel && (
+              <Button
+                onClick={() => savePanelMutation.mutate({ panelId: effectivePanel.id, updates: panelEdits })}
+                disabled={savePanelMutation.isPending}
+                data-testid="button-save-panel-footer"
+              >
+                {savePanelMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+                Save Panel Changes
+              </Button>
+            )}
+          </div>
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)}
