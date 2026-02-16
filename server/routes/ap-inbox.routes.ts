@@ -214,9 +214,11 @@ router.post("/api/ap-inbox/check-emails", requireAuth, async (req: Request, res:
         } catch {}
 
         if (hasAttachments) {
-          processInboundEmail(inboundRecord.id, emailId, settings).catch(err => {
-            logger.error({ err, inboundId: inboundRecord.id }, "[AP Inbox] Background processing failed");
-          });
+          try {
+            await processInboundEmail(inboundRecord.id, emailId, settings);
+          } catch (err) {
+            logger.error({ err, inboundId: inboundRecord.id }, "[AP Inbox] Processing failed for polled email");
+          }
         } else {
           await db.update(apInboundEmails)
             .set({ status: "NO_ATTACHMENTS", processedAt: new Date() })
@@ -411,10 +413,14 @@ async function processInboundEmail(
       att.filename?.toLowerCase().endsWith(".pdf")
     );
 
-    const imageAttachments = attachments.filter((att: any) =>
-      att.content_type?.startsWith("image/") &&
-      (att.content_type.includes("jpeg") || att.content_type.includes("png") || att.content_type.includes("tiff"))
-    );
+    const imageAttachments = attachments.filter((att: any) => {
+      if (!att.content_type?.startsWith("image/")) return false;
+      if (!(att.content_type.includes("jpeg") || att.content_type.includes("png") || att.content_type.includes("tiff"))) return false;
+      if (att.content_disposition === "inline" || att.content_id) return false;
+      const fname = (att.filename || "").toLowerCase();
+      if (fname.startsWith("outlook-") || fname.startsWith("image0") || fname.includes("signature") || fname.includes("banner") || fname.includes("logo")) return false;
+      return true;
+    });
 
     const relevantAttachments = [...pdfAttachments, ...imageAttachments];
 
