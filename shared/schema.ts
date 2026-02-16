@@ -1997,6 +1997,50 @@ export type InsertTaskNotification = z.infer<typeof insertTaskNotificationSchema
 export type TaskNotification = typeof taskNotifications.$inferSelect;
 
 // ===============================
+// OPPORTUNITY UPDATES & FILES
+// ===============================
+
+export const opportunityUpdates = pgTable("opportunity_updates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  content: text("content").notNull(),
+  contentType: varchar("content_type", { length: 20 }).default("note"),
+  emailSubject: text("email_subject"),
+  emailFrom: text("email_from"),
+  emailTo: text("email_to"),
+  emailDate: text("email_date"),
+  emailBody: text("email_body"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdx: index("opp_updates_job_idx").on(table.jobId),
+  createdAtIdx: index("opp_updates_created_at_idx").on(table.createdAt),
+}));
+
+export const opportunityFiles = pgTable("opportunity_files", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  updateId: varchar("update_id", { length: 36 }).references(() => opportunityUpdates.id, { onDelete: "set null" }),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
+  uploadedById: varchar("uploaded_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdx: index("opp_files_job_idx").on(table.jobId),
+  updateIdx: index("opp_files_update_idx").on(table.updateId),
+}));
+
+export const insertOpportunityUpdateSchema = createInsertSchema(opportunityUpdates).omit({ id: true, createdAt: true });
+export type InsertOpportunityUpdate = z.infer<typeof insertOpportunityUpdateSchema>;
+export type OpportunityUpdate = typeof opportunityUpdates.$inferSelect;
+
+export const insertOpportunityFileSchema = createInsertSchema(opportunityFiles).omit({ id: true, createdAt: true });
+export type InsertOpportunityFile = z.infer<typeof insertOpportunityFileSchema>;
+export type OpportunityFile = typeof opportunityFiles.$inferSelect;
+
+// ===============================
 // CHAT SYSTEM TABLES
 // ===============================
 
