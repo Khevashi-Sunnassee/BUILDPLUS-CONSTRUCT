@@ -3,6 +3,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AP_INVOICE_ROUTES } from "@shared/api-routes";
+import { Document as PdfDocument, Page as PdfPage, pdfjs } from "react-pdf";
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
+
 import { useRoute, useLocation } from "wouter";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +27,8 @@ import {
   Clock, Pause, AlertTriangle, X, Pencil, Check, ChevronLeft, ChevronRight,
   ZoomIn, ZoomOut, FolderOpen, Loader2, BarChart3
 } from "lucide-react";
+
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
 interface InvoiceDetail {
   id: string;
@@ -560,13 +566,18 @@ function CommentsSection({ invoiceId }: { invoiceId: string }) {
 
 function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedField: string | null }) {
   const [zoom, setZoom] = useState(100);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [fileData, setFileData] = useState<{ url: string; blob: Blob } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [numPages, setNumPages] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(600);
 
   const doc = invoice.documents?.[0];
   const focusedFieldData = focusedField ? invoice.extractedFields?.find(f => f.fieldKey === focusedField) : null;
   const bbox = focusedFieldData ? focusedFieldData.bboxJson : null;
+  const isPdf = doc?.mimeType?.includes("pdf");
 
   useEffect(() => {
     if (!doc) return;
@@ -581,7 +592,7 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
       .then(blob => {
         if (cancelled) return;
         const url = URL.createObjectURL(blob);
-        setBlobUrl(url);
+        setFileData({ url, blob });
         setLoading(false);
       })
       .catch(err => {
@@ -591,20 +602,36 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
       });
     return () => {
       cancelled = true;
-      setBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+      setFileData(prev => { if (prev) URL.revokeObjectURL(prev.url); return null; });
     };
   }, [doc?.id, invoice.id]);
 
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width - 32);
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   const handleDownload = useCallback(() => {
-    if (!blobUrl || !doc) return;
+    if (!fileData || !doc) return;
     const a = document.createElement("a");
-    a.href = blobUrl;
+    a.href = fileData.url;
     a.download = doc.fileName || "invoice";
     a.click();
-  }, [blobUrl, doc]);
+  }, [fileData, doc]);
+
+  const onDocLoadSuccess = useCallback(({ numPages: n }: { numPages: number }) => {
+    setNumPages(n);
+    setCurrentPage(1);
+  }, []);
 
   return (
-    <div className="flex flex-col h-full bg-muted/30" data-testid="panel-pdf-viewer">
+    <div className="flex flex-col h-full bg-muted/30" ref={containerRef} data-testid="panel-pdf-viewer">
       <div className="flex-1 relative overflow-auto p-4">
         {doc ? (
           loading ? (
@@ -617,40 +644,73 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
               <AlertTriangle className="h-8 w-8 text-destructive mb-2" />
               <p className="text-sm text-destructive">{loadError}</p>
             </div>
-          ) : blobUrl ? (
-            <div className="relative w-full h-full" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top left" }}>
-              {doc.mimeType?.includes("pdf") ? (
-                <iframe
-                  src={blobUrl}
-                  className="w-full h-full min-h-[600px] border-0"
-                  title="Invoice PDF"
-                  data-testid="iframe-pdf-viewer"
-                />
+          ) : fileData ? (
+            <div className="relative" style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top left" }}>
+              {isPdf && PdfDocument ? (
+                <PdfDocument
+                  file={fileData.url}
+                  onLoadSuccess={onDocLoadSuccess}
+                  loading={
+                    <div className="flex items-center justify-center min-h-[400px]">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  }
+                  error={
+                    <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+                      <AlertTriangle className="h-8 w-8 text-destructive mb-2" />
+                      <p className="text-sm text-destructive">Failed to render PDF</p>
+                    </div>
+                  }
+                >
+                  <div className="relative">
+                    <PdfPage
+                      pageNumber={currentPage}
+                      width={containerWidth * (zoom / 100) > 300 ? containerWidth : 300}
+                      renderTextLayer={false}
+                      renderAnnotationLayer={false}
+                      data-testid="pdf-page-canvas"
+                    />
+                    {bbox && (
+                      <div
+                        className="absolute border-2 border-red-500 bg-red-500/10 pointer-events-none z-10"
+                        style={{
+                          left: `${(bbox.x1 || 0) * 100}%`,
+                          top: `${(bbox.y1 || 0) * 100}%`,
+                          width: `${((bbox.x2 || 0) - (bbox.x1 || 0)) * 100}%`,
+                          height: `${((bbox.y2 || 0) - (bbox.y1 || 0)) * 100}%`,
+                        }}
+                        data-testid="bbox-highlight"
+                      />
+                    )}
+                  </div>
+                </PdfDocument>
               ) : doc.mimeType?.startsWith("image/") ? (
-                <img
-                  src={blobUrl}
-                  alt="Invoice document"
-                  className="max-w-full"
-                  data-testid="img-document"
-                />
+                <div className="relative">
+                  <img
+                    src={fileData.url}
+                    alt="Invoice document"
+                    className="max-w-full"
+                    data-testid="img-document"
+                  />
+                  {bbox && (
+                    <div
+                      className="absolute border-2 border-red-500 bg-red-500/10 pointer-events-none z-10"
+                      style={{
+                        left: `${(bbox.x1 || 0) * 100}%`,
+                        top: `${(bbox.y1 || 0) * 100}%`,
+                        width: `${((bbox.x2 || 0) - (bbox.x1 || 0)) * 100}%`,
+                        height: `${((bbox.y2 || 0) - (bbox.y1 || 0)) * 100}%`,
+                      }}
+                      data-testid="bbox-highlight"
+                    />
+                  )}
+                </div>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
                   <FileText className="h-16 w-16 text-muted-foreground mb-4" />
                   <p className="text-sm font-medium mb-1">{doc.fileName}</p>
                   <Badge variant="outline">Unsupported format</Badge>
                 </div>
-              )}
-              {bbox && (
-                <div
-                  className="absolute border-2 border-red-500 bg-red-500/10 pointer-events-none z-10"
-                  style={{
-                    left: `${(bbox.x1 || 0) * 100}%`,
-                    top: `${(bbox.y1 || 0) * 100}%`,
-                    width: `${((bbox.x2 || 0) - (bbox.x1 || 0)) * 100}%`,
-                    height: `${((bbox.y2 || 0) - (bbox.y1 || 0)) * 100}%`,
-                  }}
-                  data-testid="bbox-highlight"
-                />
               )}
             </div>
           ) : null
@@ -664,7 +724,7 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
       </div>
       <div className="flex items-center justify-between gap-2 px-4 py-2 border-t bg-background flex-wrap">
         <div className="flex items-center gap-1">
-          <Button variant="outline" size="sm" disabled={!blobUrl} onClick={handleDownload} data-testid="button-download-invoice">
+          <Button variant="outline" size="sm" disabled={!fileData} onClick={handleDownload} data-testid="button-download-invoice">
             <Download className="h-3 w-3 mr-1" />
             Download
           </Button>
@@ -673,8 +733,19 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
             Documents
           </Button>
         </div>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <span>Page 1 of 1</span>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {isPdf && numPages > 1 && (
+            <>
+              <Button variant="ghost" size="icon" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} data-testid="button-prev-page">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span>Page {currentPage} of {numPages}</span>
+              <Button variant="ghost" size="icon" onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))} disabled={currentPage >= numPages} data-testid="button-next-page">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+          {(!isPdf || numPages <= 1) && <span>Page 1 of 1</span>}
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" onClick={() => setZoom(Math.max(50, zoom - 10))} data-testid="button-zoom-out">
