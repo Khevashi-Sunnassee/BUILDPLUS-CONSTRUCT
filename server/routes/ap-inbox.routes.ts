@@ -3,12 +3,12 @@ import { z } from "zod";
 import { requireAuth } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, ilike } from "drizzle-orm";
 import crypto from "crypto";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import {
   apInboundEmails, apInboxSettings, apInvoices, apInvoiceDocuments,
-  apInvoiceActivity, companies
+  apInvoiceActivity, apInvoiceSplits, companies, suppliers
 } from "@shared/schema";
 import { getResendApiKey } from "../services/email.service";
 
@@ -401,14 +401,34 @@ For each field, return an object with:
 - key: the field name (use snake_case)
 - value: the extracted value
 - confidence: a number from 0 to 1 indicating extraction confidence
-- bounding_box: approximate bounding box as {x, y, width, height} in percentage (0-100) of the image dimensions, or null if not locatable
+- bbox: approximate bounding box as {x1, y1, x2, y2} in normalized coordinates (0-1 range relative to page dimensions), or null if you cannot determine the location
 
-Extract these fields: invoice_number, invoice_date, due_date, supplier_name, supplier_abn, total_amount, gst_amount, subtotal, purchase_order_number, description, payment_terms
+Extract these fields:
+1. "invoice_number" - The invoice number/reference
+2. "supplier_name" - The supplier/vendor company name
+3. "supplier_abn" - The supplier ABN (Australian Business Number) if present
+4. "invoice_date" - The invoice date (return in YYYY-MM-DD format)
+5. "due_date" - The due/payment date if present (YYYY-MM-DD format)
+6. "subtotal" - The subtotal/amount before tax
+7. "gst" - The GST/tax amount
+8. "total" - The total amount including tax
+9. "po_number" - Purchase order number if present
+10. "description" - Brief description of goods/services
 
 Also extract line items if visible as an array called "line_items" where each item has:
-- description, quantity, unit_price, amount, gst, account_code
+- description, quantity, unit_price, amount
 
-Return as JSON: { "fields": [...], "line_items": [...] }`;
+Return your response as valid JSON with this exact structure:
+{
+  "fields": [
+    {"key": "invoice_number", "value": "...", "confidence": 0.95, "bbox": {"x1": 0.5, "y1": 0.1, "x2": 0.8, "y2": 0.15}},
+    ...
+  ],
+  "line_items": [
+    {"description": "...", "quantity": "...", "unit_price": "...", "amount": "..."},
+    ...
+  ]
+}`;
 
     const messages: any[] = [{
       role: "user",
@@ -425,6 +445,7 @@ Return as JSON: { "fields": [...], "line_items": [...] }`;
       model: "gpt-4o",
       messages,
       max_tokens: 4096,
+      temperature: 0,
       response_format: { type: "json_object" },
     });
 
@@ -446,7 +467,7 @@ Return as JSON: { "fields": [...], "line_items": [...] }`;
         fieldKey: field.key,
         fieldValue: field.value || null,
         confidence: field.confidence != null ? Number(field.confidence) : null,
-        bboxJson: field.bounding_box || null,
+        bboxJson: field.bbox || null,
         source: "extraction",
       });
     }
@@ -458,16 +479,64 @@ Return as JSON: { "fields": [...], "line_items": [...] }`;
 
     const updateData: any = {};
     if (fieldMap.invoice_number) updateData.invoiceNumber = fieldMap.invoice_number;
-    if (fieldMap.invoice_date) updateData.invoiceDate = fieldMap.invoice_date;
-    if (fieldMap.due_date) updateData.dueDate = fieldMap.due_date;
-    if (fieldMap.total_amount) updateData.totalAmount = fieldMap.total_amount;
-    if (fieldMap.gst_amount) updateData.gstAmount = fieldMap.gst_amount;
-    if (fieldMap.subtotal) updateData.subtotal = fieldMap.subtotal;
+    if (fieldMap.invoice_date) {
+      try { updateData.invoiceDate = new Date(fieldMap.invoice_date); } catch {}
+    }
+    if (fieldMap.due_date) {
+      try { updateData.dueDate = new Date(fieldMap.due_date); } catch {}
+    }
+    if (fieldMap.total) updateData.totalInc = fieldMap.total.replace(/[^0-9.-]/g, "");
+    if (fieldMap.gst) updateData.totalTax = fieldMap.gst.replace(/[^0-9.-]/g, "");
+    if (fieldMap.subtotal) updateData.totalEx = fieldMap.subtotal.replace(/[^0-9.-]/g, "");
     if (fieldMap.description) updateData.description = fieldMap.description;
-    if (fieldMap.supplier_name) updateData.supplierName = fieldMap.supplier_name;
 
-    if (Object.keys(updateData).length > 0) {
-      await db.update(apInvoices).set(updateData).where(eq(apInvoices.id, invoiceId));
+    if (fieldMap.supplier_name) {
+      const matchingSuppliers = await db.select().from(suppliers)
+        .where(and(eq(suppliers.companyId, companyId), ilike(suppliers.name, `%${fieldMap.supplier_name}%`)))
+        .limit(1);
+      if (matchingSuppliers.length > 0) {
+        updateData.supplierId = matchingSuppliers[0].id;
+      }
+    }
+
+    let riskScore = 0;
+    const riskReasons: string[] = [];
+    for (const field of fields) {
+      if (field.confidence !== null && field.confidence < 0.7) {
+        riskScore += 15;
+        riskReasons.push(`Low confidence on ${field.key}: ${(field.confidence * 100).toFixed(0)}%`);
+      }
+    }
+    if (!fieldMap.invoice_number) {
+      riskScore += 20;
+      riskReasons.push("Missing invoice number");
+    }
+    if (!fieldMap.total) {
+      riskScore += 20;
+      riskReasons.push("Missing total amount");
+    }
+    updateData.riskScore = Math.min(riskScore, 100);
+    updateData.riskReasons = riskReasons;
+    updateData.updatedAt = new Date();
+
+    await db.update(apInvoices).set(updateData).where(eq(apInvoices.id, invoiceId));
+
+    const totalInc = parseFloat(updateData.totalInc || "0");
+    if (totalInc > 0) {
+      const gstAmount = parseFloat(updateData.totalTax || "0");
+      const subtotal = parseFloat(updateData.totalEx || String(totalInc));
+      const taxCodeLabel = gstAmount > 0 ? "GST" : "FRE";
+
+      await db.insert(apInvoiceSplits).values({
+        invoiceId,
+        description: fieldMap.description || "Invoice total",
+        percentage: "100",
+        amount: subtotal > 0 ? subtotal.toFixed(2) : totalInc.toFixed(2),
+        taxCodeId: taxCodeLabel,
+        sortOrder: 0,
+      });
+
+      logger.info({ invoiceId, taxCode: taxCodeLabel, amount: subtotal || totalInc }, "[AP Inbox] Auto-created split with lowest applicable tax code");
     }
 
     await logActivity(invoiceId, "auto_extraction_completed", "AI extraction completed automatically from email", undefined, {
