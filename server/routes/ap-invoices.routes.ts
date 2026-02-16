@@ -926,13 +926,24 @@ router.post("/api/ap-invoices/:id/on-hold", requireAuth, async (req: Request, re
     if (!existing) return res.status(404).json({ error: "Invoice not found" });
 
     const newValue = !existing.isOnHold;
+    const updateData: Record<string, any> = { isOnHold: newValue, updatedAt: new Date() };
+
+    if (newValue) {
+      updateData.status = "ON_HOLD";
+    } else {
+      const previousStatus = existing.status === "ON_HOLD"
+        ? (existing.totalInc ? "PROCESSED" : "IMPORTED")
+        : existing.status;
+      updateData.status = previousStatus;
+    }
+
     const [updated] = await db
       .update(apInvoices)
-      .set({ isOnHold: newValue, updatedAt: new Date() })
+      .set(updateData)
       .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
       .returning();
 
-    await logActivity(id, "on_hold_toggled", newValue ? "Invoice placed on hold" : "Invoice taken off hold", userId);
+    await logActivity(id, "on_hold_toggled", newValue ? `Invoice placed on hold (was ${existing.status})` : `Invoice taken off hold (restored to ${updateData.status})`, userId);
 
     res.json(updated);
   } catch (error: unknown) {

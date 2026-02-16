@@ -1187,6 +1187,8 @@ export default function ApInvoiceDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId!)] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
       toast({ title: invoice?.isOnHold ? "Removed from hold" : "Placed on hold" });
     },
     onError: (err: Error) => {

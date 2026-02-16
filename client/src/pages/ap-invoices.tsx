@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -403,6 +403,7 @@ export default function ApInvoicesPage() {
   const [, navigate] = useLocation();
 
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -415,17 +416,25 @@ export default function ApInvoicesPage() {
   const [sortBy, setSortBy] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const queryParams = useMemo(() => {
     const params: Record<string, string> = { page: String(page), limit: "50" };
     if (activeTab !== "all" && activeTab !== "waiting_on_me") params.status = activeTab.toUpperCase();
-    if (search.trim()) params.q = search.trim();
+    if (debouncedSearch.trim()) params.q = debouncedSearch.trim();
     if (flagFilter !== "all") params.flagged = flagFilter;
     if (uploadedByFilter !== "all") params.uploadedBy = uploadedByFilter;
     if (companyFilter !== "all") params.companyId = companyFilter;
     if (supplierFilter) params.supplierId = supplierFilter.id;
     if (sortBy) { params.sortBy = sortBy; params.sortOrder = sortOrder; }
     return params;
-  }, [activeTab, search, page, flagFilter, uploadedByFilter, companyFilter, supplierFilter, sortBy, sortOrder]);
+  }, [activeTab, debouncedSearch, page, flagFilter, uploadedByFilter, companyFilter, supplierFilter, sortBy, sortOrder]);
 
   const { data: invoiceData, isLoading } = useQuery<InvoiceListResponse>({
     queryKey: [AP_INVOICE_ROUTES.LIST, queryParams],
