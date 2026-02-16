@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ComponentType } from "react";
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -1073,10 +1073,23 @@ function Router() {
 function RouteAnnouncer() {
   const [location] = useLocation();
   const [announcement, setAnnouncement] = useState("");
+  const prevLocation = useRef(location);
 
   useEffect(() => {
-    const pageName = location === "/" ? "Dashboard" : location.split("/").filter(Boolean).map(s => s.replace(/-/g, " ")).join(" - ");
-    setAnnouncement(`Navigated to ${pageName}`);
+    if (prevLocation.current === location) return;
+    prevLocation.current = location;
+
+    const timer = setTimeout(() => {
+      const title = document.title;
+      if (title) {
+        setAnnouncement(`Navigated to ${title.split("|")[0].trim()}`);
+      } else {
+        const segments = location.split("/").filter(Boolean).filter(s => !/^[0-9a-f-]{8,}$/i.test(s));
+        const pageName = segments.length === 0 ? "Dashboard" : segments.map(s => s.replace(/-/g, " ")).join(" - ");
+        setAnnouncement(`Navigated to ${pageName}`);
+      }
+    }, 100);
+    return () => clearTimeout(timer);
   }, [location]);
 
   return (
