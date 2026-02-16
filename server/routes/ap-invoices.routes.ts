@@ -907,6 +907,50 @@ const splitSchema = z.object({
   sortOrder: z.number().optional(),
 });
 
+router.get("/api/ap-invoices/:id/splits", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [invoice] = await db
+      .select({ id: apInvoices.id })
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+
+    const splits = await db
+      .select({
+        id: apInvoiceSplits.id,
+        invoiceId: apInvoiceSplits.invoiceId,
+        description: apInvoiceSplits.description,
+        percentage: apInvoiceSplits.percentage,
+        amount: apInvoiceSplits.amount,
+        costCodeId: apInvoiceSplits.costCodeId,
+        jobId: apInvoiceSplits.jobId,
+        taxCodeId: apInvoiceSplits.taxCodeId,
+        sortOrder: apInvoiceSplits.sortOrder,
+        createdAt: apInvoiceSplits.createdAt,
+        costCodeCode: costCodes.code,
+        costCodeName: costCodes.name,
+        jobNumber: jobs.jobNumber,
+        jobName: jobs.name,
+      })
+      .from(apInvoiceSplits)
+      .leftJoin(costCodes, eq(apInvoiceSplits.costCodeId, costCodes.id))
+      .leftJoin(jobs, eq(apInvoiceSplits.jobId, jobs.id))
+      .where(eq(apInvoiceSplits.invoiceId, id))
+      .orderBy(asc(apInvoiceSplits.sortOrder));
+
+    res.json(splits);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching AP invoice splits");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch splits" });
+  }
+});
+
 router.put("/api/ap-invoices/:id/splits", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
