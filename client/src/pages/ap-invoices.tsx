@@ -2,19 +2,23 @@ import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { AP_INVOICE_ROUTES } from "@shared/api-routes";
+import { AP_INVOICE_ROUTES, AP_APPROVAL_RULES_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import { Link, useLocation } from "wouter";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Filter, Loader2, Eye, Send } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Filter, Loader2, Eye, Send, Settings, Plus, Pencil, Users, Zap } from "lucide-react";
 
 interface ApInvoice {
   id: string;
@@ -198,6 +202,404 @@ function UploadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
   );
 }
 
+interface ApprovalRule {
+  id: string;
+  companyId: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  priority: number;
+  conditions: { minAmount?: string; maxAmount?: string; supplierId?: string } | null;
+  approverUserIds: string[];
+  autoApprove: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface UserOption {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
+function ApprovalRuleForm({
+  rule,
+  onSave,
+  onCancel,
+  isSaving,
+}: {
+  rule: ApprovalRule | null;
+  onSave: (data: any) => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}) {
+  const [name, setName] = useState(rule?.name || "");
+  const [description, setDescription] = useState(rule?.description || "");
+  const [priority, setPriority] = useState(rule?.priority ?? 1);
+  const [isActive, setIsActive] = useState(rule?.isActive ?? true);
+  const [autoApprove, setAutoApprove] = useState(rule?.autoApprove ?? false);
+  const [minAmount, setMinAmount] = useState(rule?.conditions?.minAmount || "");
+  const [maxAmount, setMaxAmount] = useState(rule?.conditions?.maxAmount || "");
+  const [selectedApprovers, setSelectedApprovers] = useState<Set<string>>(
+    new Set(rule?.approverUserIds || [])
+  );
+
+  const { data: usersList } = useQuery<UserOption[]>({
+    queryKey: [USER_ROUTES.LIST],
+  });
+
+  const users = usersList || [];
+
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    const conditions: any = {};
+    if (minAmount) conditions.minAmount = minAmount;
+    if (maxAmount) conditions.maxAmount = maxAmount;
+    onSave({
+      name: name.trim(),
+      description: description.trim() || null,
+      priority,
+      isActive,
+      autoApprove,
+      conditions: Object.keys(conditions).length > 0 ? conditions : null,
+      approverUserIds: Array.from(selectedApprovers),
+    });
+  };
+
+  const toggleApprover = (userId: string) => {
+    setSelectedApprovers((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="rule-name">Name *</Label>
+        <Input
+          id="rule-name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Rule name"
+          data-testid="input-rule-name"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="rule-description">Description</Label>
+        <Textarea
+          id="rule-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Optional description"
+          data-testid="input-rule-description"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="rule-priority">Priority</Label>
+        <Input
+          id="rule-priority"
+          type="number"
+          value={priority}
+          onChange={(e) => setPriority(parseInt(e.target.value) || 1)}
+          min={1}
+          data-testid="input-rule-priority"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="rule-active"
+          checked={isActive}
+          onCheckedChange={(v) => setIsActive(!!v)}
+          data-testid="checkbox-rule-active"
+        />
+        <Label htmlFor="rule-active">Active</Label>
+      </div>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="rule-auto-approve"
+          checked={autoApprove}
+          onCheckedChange={(v) => setAutoApprove(!!v)}
+          data-testid="checkbox-rule-auto-approve"
+        />
+        <Label htmlFor="rule-auto-approve">Auto-Approve</Label>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="rule-min-amount">Min Amount</Label>
+          <Input
+            id="rule-min-amount"
+            type="number"
+            value={minAmount}
+            onChange={(e) => setMinAmount(e.target.value)}
+            placeholder="0.00"
+            min={0}
+            step="0.01"
+            data-testid="input-rule-min-amount"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="rule-max-amount">Max Amount</Label>
+          <Input
+            id="rule-max-amount"
+            type="number"
+            value={maxAmount}
+            onChange={(e) => setMaxAmount(e.target.value)}
+            placeholder="0.00"
+            min={0}
+            step="0.01"
+            data-testid="input-rule-max-amount"
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Approvers</Label>
+        <div className="border rounded-md max-h-40 overflow-y-auto p-2 space-y-1">
+          {users.length === 0 && (
+            <p className="text-sm text-muted-foreground p-2">No users available</p>
+          )}
+          {users.map((user) => (
+            <div
+              key={user.id}
+              className="flex items-center gap-2 p-1 rounded hover-elevate cursor-pointer"
+              onClick={() => toggleApprover(user.id)}
+              data-testid={`checkbox-approver-${user.id}`}
+            >
+              <Checkbox
+                checked={selectedApprovers.has(user.id)}
+                onCheckedChange={() => toggleApprover(user.id)}
+              />
+              <span className="text-sm">{user.name || user.email}</span>
+            </div>
+          ))}
+        </div>
+        {selectedApprovers.size > 0 && (
+          <p className="text-xs text-muted-foreground" data-testid="text-approver-count">
+            {selectedApprovers.size} approver{selectedApprovers.size > 1 ? "s" : ""} selected
+          </p>
+        )}
+      </div>
+      <div className="flex justify-end gap-2 pt-2">
+        <Button variant="outline" onClick={onCancel} data-testid="button-cancel-rule">
+          Cancel
+        </Button>
+        <Button onClick={handleSubmit} disabled={!name.trim() || isSaving} data-testid="button-save-rule">
+          {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          {rule ? "Update Rule" : "Create Rule"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ApprovalRulesSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+  const [editingRule, setEditingRule] = useState<ApprovalRule | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const { data: rules, isLoading } = useQuery<ApprovalRule[]>({
+    queryKey: [AP_APPROVAL_RULES_ROUTES.LIST],
+    enabled: open,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      await apiRequest("POST", AP_APPROVAL_RULES_ROUTES.LIST, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [AP_APPROVAL_RULES_ROUTES.LIST] });
+      toast({ title: "Approval rule created" });
+      setShowForm(false);
+      setEditingRule(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to create rule", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      await apiRequest("PATCH", AP_APPROVAL_RULES_ROUTES.BY_ID(id), data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [AP_APPROVAL_RULES_ROUTES.LIST] });
+      toast({ title: "Approval rule updated" });
+      setShowForm(false);
+      setEditingRule(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to update rule", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", AP_APPROVAL_RULES_ROUTES.BY_ID(id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [AP_APPROVAL_RULES_ROUTES.LIST] });
+      toast({ title: "Approval rule deleted" });
+      setDeleteConfirmId(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to delete rule", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleSave = (data: any) => {
+    if (editingRule) {
+      updateMutation.mutate({ id: editingRule.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const handleEdit = (rule: ApprovalRule) => {
+    setEditingRule(rule);
+    setShowForm(true);
+  };
+
+  const handleAddNew = () => {
+    setEditingRule(null);
+    setShowForm(true);
+  };
+
+  const handleCancelForm = () => {
+    setShowForm(false);
+    setEditingRule(null);
+  };
+
+  const rulesList = rules || [];
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:max-w-lg w-full flex flex-col" data-testid="sheet-approval-rules">
+        <SheetHeader>
+          <SheetTitle>Approval Rules</SheetTitle>
+          <SheetDescription>Configure rules that determine who must approve invoices before export.</SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto mt-4">
+          {showForm ? (
+            <ApprovalRuleForm
+              rule={editingRule}
+              onSave={handleSave}
+              onCancel={handleCancelForm}
+              isSaving={createMutation.isPending || updateMutation.isPending}
+            />
+          ) : (
+            <div className="space-y-3">
+              <Button onClick={handleAddNew} data-testid="button-add-rule">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Rule
+              </Button>
+
+              {isLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-20 w-full" />
+                  ))}
+                </div>
+              ) : rulesList.length === 0 ? (
+                <div className="text-center py-8" data-testid="empty-rules">
+                  <Settings className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">No approval rules configured yet.</p>
+                </div>
+              ) : (
+                rulesList.map((rule) => (
+                  <Card
+                    key={rule.id}
+                    className="p-4 cursor-pointer hover-elevate"
+                    onClick={() => handleEdit(rule)}
+                    data-testid={`card-rule-${rule.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm" data-testid={`text-rule-name-${rule.id}`}>
+                            {rule.name}
+                          </span>
+                          <Badge variant={rule.isActive ? "default" : "secondary"} className="text-xs" data-testid={`badge-rule-status-${rule.id}`}>
+                            {rule.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                          {rule.autoApprove && (
+                            <Badge variant="outline" className="text-xs" data-testid={`badge-rule-auto-${rule.id}`}>
+                              <Zap className="h-3 w-3 mr-1" />
+                              Auto
+                            </Badge>
+                          )}
+                        </div>
+                        {rule.description && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-1" data-testid={`text-rule-desc-${rule.id}`}>
+                            {rule.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                          <span data-testid={`text-rule-priority-${rule.id}`}>Priority: {rule.priority}</span>
+                          <span className="flex items-center gap-1" data-testid={`text-rule-approvers-${rule.id}`}>
+                            <Users className="h-3 w-3" />
+                            {rule.approverUserIds.length} approver{rule.approverUserIds.length !== 1 ? "s" : ""}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(rule)}
+                          data-testid={`button-edit-rule-${rule.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeleteConfirmId(rule.id)}
+                          data-testid={`button-delete-rule-${rule.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </SheetContent>
+
+      <Dialog open={deleteConfirmId !== null} onOpenChange={(v) => !v && setDeleteConfirmId(null)}>
+        <DialogContent data-testid="dialog-delete-rule-confirm">
+          <DialogHeader>
+            <DialogTitle>Delete Approval Rule</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete this approval rule? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)} data-testid="button-cancel-delete-rule">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmId && deleteMutation.mutate(deleteConfirmId)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-rule"
+            >
+              {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Sheet>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="space-y-4 p-6">
@@ -229,6 +631,7 @@ export default function ApInvoicesPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [approvalRulesOpen, setApprovalRulesOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [flagFilter, setFlagFilter] = useState("all");
   const [uploadedByFilter, setUploadedByFilter] = useState("all");
@@ -315,10 +718,15 @@ export default function ApInvoicesPage() {
       <div className="p-6 space-y-4 flex-1 overflow-auto">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <h1 className="text-2xl font-semibold" data-testid="text-page-title">Invoices</h1>
-          <Button onClick={() => setUploadOpen(true)} data-testid="button-upload-invoices">
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Invoices
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={() => setApprovalRulesOpen(true)} data-testid="button-approval-rules">
+              <Settings className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => setUploadOpen(true)} data-testid="button-upload-invoices">
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Invoices
+            </Button>
+          </div>
         </div>
 
         <div className="relative max-w-md">
@@ -596,6 +1004,7 @@ export default function ApInvoicesPage() {
       </div>
 
       <UploadDialog open={uploadOpen} onOpenChange={setUploadOpen} />
+      <ApprovalRulesSheet open={approvalRulesOpen} onOpenChange={setApprovalRulesOpen} />
     </div>
   );
 }

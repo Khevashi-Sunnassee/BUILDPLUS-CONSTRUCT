@@ -164,6 +164,12 @@ function EditableField({ label, value, fieldKey, onSave, onFocus, type = "text" 
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
 
+  useEffect(() => {
+    if (!editing) {
+      setEditValue(value);
+    }
+  }, [value, editing]);
+
   const handleSave = () => {
     setEditing(false);
     if (editValue !== value) {
