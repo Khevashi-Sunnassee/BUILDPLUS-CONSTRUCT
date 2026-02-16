@@ -75,6 +75,46 @@ The lifecycle testing skill (`.agents/skills/lifecycle-testing/SKILL.md`) docume
 - **Date-Sensitive Data:** Daily log dates must be within the current week for the Drafting Register page; production entry dates must be within 30 days for the Production Schedule page.
 - **Schema Gotchas:** `production_entries` uses `production_date` (not `pour_date`); `daily_logs` has no `company_id` column (filter by `user_id`); `job_activities` status enum uses `DONE` not `COMPLETED`; `document_status` is an enum requiring `::text` cast in SQL aggregations.
 
+## Comprehensive System Audit (Feb 2026)
+
+### Audit Scope
+Full-system audit covering all subsystems for enterprise readiness at 300+ simultaneous users and 10,000+ documents.
+
+### Subsystems Audited
+1. **Database Layer** — Connection pooling (max 100), indexes, query safety, statement timeouts, transient retry logic
+2. **Background Job System** — BackgroundScheduler (setInterval-based), AP email poll (5min), AP invoice extraction (2min), overlap prevention, error tracking
+3. **Job Queue System** — In-memory priority queue with concurrency control (email: 2, AI: 1, PDF: 2), retry with backoff, queue size limits (10,000), auto-cleanup
+4. **Email System** — Resend integration via Replit connector, email sending with attachments, AP inbox polling for inbound invoices, attachment processing
+5. **Communication System** — Teams-style chat with conversations, DMs, groups, channels, @mentions, notifications, file attachments
+6. **Circuit Breakers** — OpenAI (threshold: 3, reset: 60s), Twilio (threshold: 5, reset: 30s), Mailgun (threshold: 5, reset: 30s)
+7. **Caching** — LRU cache with TTL (settings: 5min/100, users: 2min/500, jobs: 3min/200, queries: 30s/2000), auto-prune every 60s
+8. **Rate Limiting** — API (300/min per session), Auth (20/15min per IP), Uploads (30/min per IP)
+9. **Request Monitoring** — Metrics collection, event loop lag measurement, request timing, error monitoring
+10. **Security** — Helmet CSP, input sanitization, content type validation, request ID tracing, RBAC
+11. **Graceful Shutdown** — SIGTERM/SIGINT handlers, 15s force exit timeout, pool draining, HTTP server close
+12. **AP Invoice Processing** — Upload → OCR extraction (GPT-4o) → supplier matching → auto-split → approval path assignment → multi-step approval → MYOB export
+13. **Broadcast System** — Template-based mass notifications via email/SMS/WhatsApp with delivery tracking
+14. **MYOB Integration** — OAuth 2.0 with auto-refresh, multi-tenant token isolation, data sync endpoints
+
+### Key Infrastructure Files
+- `server/db.ts` — PostgreSQL pool config (max: 100, min: 5, statement_timeout: 60s)
+- `server/lib/background-scheduler.ts` — Interval-based job scheduler with overlap prevention
+- `server/lib/job-queue.ts` — In-memory priority job queue (email, AI, PDF queues)
+- `server/lib/circuit-breaker.ts` — Circuit breakers for external services
+- `server/lib/cache.ts` — LRU cache with TTL and pruning
+- `server/lib/metrics.ts` — Request metrics and event loop lag monitoring
+- `server/lib/ap-inbox-jobs.ts` — Email polling and invoice extraction background jobs
+- `server/services/email.service.ts` — Resend email integration
+- `server/chat/chat.routes.ts` — Chat system routes (1265 lines)
+- `server/routes/broadcast.routes.ts` — Mass notification system
+
+### Scalability Targets
+- 300+ simultaneous users
+- 10,000+ documents and files
+- Minimal API response latency (<500ms for list endpoints)
+- Background jobs must not block request handling
+- Multi-company data isolation on all queries
+
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.
 - **OpenAI**: AI services for PDF analysis and visual comparisons.
