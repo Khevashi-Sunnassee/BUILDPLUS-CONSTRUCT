@@ -4773,7 +4773,7 @@ export type MyobToken = typeof myobTokens.$inferSelect;
 // AP INVOICE PROCESSING (Traild-style)
 // ============================================================================
 
-export const apInvoiceStatusEnum = pgEnum("ap_invoice_status", ["DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED", "EXPORTED", "FAILED_EXPORT"]);
+export const apInvoiceStatusEnum = pgEnum("ap_invoice_status", ["DRAFT", "IMPORTED", "CONFIRMED", "PENDING_REVIEW", "APPROVED", "REJECTED", "EXPORTED", "FAILED_EXPORT"]);
 export const apApprovalStatusEnum = pgEnum("ap_approval_status", ["PENDING", "APPROVED", "REJECTED"]);
 export const apApprovalRuleFieldEnum = pgEnum("ap_approval_rule_field", ["AMOUNT", "SUPPLIER", "GL_CODE", "JOB", "COMPANY"]);
 export const apApprovalRuleTypeEnum = pgEnum("ap_approval_rule_type", ["USER_CATCH_ALL", "USER", "AUTO_APPROVE"]);
