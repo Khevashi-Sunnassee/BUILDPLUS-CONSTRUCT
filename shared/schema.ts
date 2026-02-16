@@ -4776,6 +4776,8 @@ export type MyobToken = typeof myobTokens.$inferSelect;
 export const apInvoiceStatusEnum = pgEnum("ap_invoice_status", ["DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED", "EXPORTED", "FAILED_EXPORT"]);
 export const apApprovalStatusEnum = pgEnum("ap_approval_status", ["PENDING", "APPROVED", "REJECTED"]);
 export const apApprovalRuleFieldEnum = pgEnum("ap_approval_rule_field", ["AMOUNT", "SUPPLIER", "GL_CODE", "JOB", "COMPANY"]);
+export const apApprovalRuleTypeEnum = pgEnum("ap_approval_rule_type", ["USER_CATCH_ALL", "USER", "AUTO_APPROVE"]);
+export const apApprovalConditionOperatorEnum = pgEnum("ap_approval_condition_operator", ["EQUALS", "NOT_EQUALS", "GREATER_THAN", "LESS_THAN", "GREATER_THAN_OR_EQUALS", "LESS_THAN_OR_EQUALS"]);
 
 export const apInvoices = pgTable("ap_invoices", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -4907,6 +4909,7 @@ export const apApprovalRules = pgTable("ap_approval_rules", {
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   name: text("name").notNull(),
   description: text("description"),
+  ruleType: text("rule_type").default("USER").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   priority: integer("priority").default(0).notNull(),
   conditions: jsonb("conditions").notNull(),
@@ -4922,6 +4925,12 @@ export const apApprovalRules = pgTable("ap_approval_rules", {
 export const insertApApprovalRuleSchema = createInsertSchema(apApprovalRules).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertApApprovalRule = z.infer<typeof insertApApprovalRuleSchema>;
 export type ApApprovalRule = typeof apApprovalRules.$inferSelect;
+
+export interface ApApprovalCondition {
+  field: "COMPANY" | "AMOUNT" | "JOB" | "SUPPLIER" | "GL_CODE";
+  operator: "EQUALS" | "NOT_EQUALS" | "GREATER_THAN" | "LESS_THAN" | "GREATER_THAN_OR_EQUALS" | "LESS_THAN_OR_EQUALS";
+  values: string[];
+}
 
 export const apInvoiceApprovals = pgTable("ap_invoice_approvals", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
