@@ -174,7 +174,21 @@ router.post("/api/ap-inbox/check-emails", requireAuth, async (req: Request, res:
       const [existing] = await db.select().from(apInboundEmails)
         .where(eq(apInboundEmails.resendEmailId, emailId)).limit(1);
 
-      if (existing) { skipped++; continue; }
+      if (existing) {
+        if (existing.status === "PROCESSED" && !existing.invoiceId) {
+          try {
+            await db.delete(apInboundEmails).where(eq(apInboundEmails.id, existing.id));
+            logger.info({ emailId, inboundId: existing.id }, "[AP Inbox] Re-processing email whose invoice was deleted");
+          } catch (delErr) {
+            logger.error({ err: delErr, emailId }, "[AP Inbox] Failed to reset orphaned inbound record");
+            skipped++;
+            continue;
+          }
+        } else {
+          skipped++;
+          continue;
+        }
+      }
 
       try {
         const fromAddr = typeof email.from === "string" ? email.from : (email.from?.email || email.from?.address || JSON.stringify(email.from));
