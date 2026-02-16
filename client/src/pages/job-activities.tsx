@@ -954,6 +954,7 @@ export default function JobActivitiesPage() {
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="bg-muted/50 text-left">
+                                <th className="px-3 py-2 font-medium w-[40px]">#</th>
                                 <th className="px-3 py-2 font-medium">Activity</th>
                                 <th className="px-3 py-2 font-medium w-[100px]">Category</th>
                                 <th className="px-3 py-2 font-medium w-[120px]">Status</th>
@@ -1106,6 +1107,9 @@ function ActivityRow({
         onClick={() => onSelect(activity)}
         data-testid={`activity-row-${activity.id}`}
       >
+        <td className="px-3 py-2 text-muted-foreground font-mono text-xs w-[40px]" data-testid={`text-sort-order-${activity.id}`}>
+          {activity.sortOrder}
+        </td>
         <td className="px-3 py-2">
           <div className="flex items-center gap-2">
             {children.length > 0 && (
@@ -1261,7 +1265,7 @@ function ActivityRow({
 
       {tasksExpanded && (
         <tr data-testid={`activity-tasks-row-${activity.id}`}>
-          <td colSpan={10} className="px-4 py-2 bg-muted/30">
+          <td colSpan={11} className="px-4 py-2 bg-muted/30">
             <ActivityTasksPanel
               activityId={activity.id}
               jobId={jobId}
@@ -1286,6 +1290,9 @@ function ActivityRow({
             onClick={() => onSelect(child)}
             data-testid={`activity-row-child-${child.id}`}
           >
+            <td className="px-3 py-1.5 text-muted-foreground font-mono text-xs w-[40px]" data-testid={`text-sort-order-child-${child.id}`}>
+              {child.sortOrder}
+            </td>
             <td className="px-3 py-1.5 pl-10">
               <div className="flex items-center gap-2">
                 <span className="text-sm">{child.name}</span>
