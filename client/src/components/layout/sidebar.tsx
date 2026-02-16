@@ -65,6 +65,7 @@ import {
   Phone,
   Landmark,
   Hash,
+  Link2,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -126,6 +127,7 @@ const adminFinanceNavItems = [
   { title: "Scope of Works", url: "/scopes", icon: Layers },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Asset Register", url: "/admin/asset-register", icon: Boxes },
+  { title: "MYOB Integration", url: "/myob-integration", icon: Link2 },
 ];
 
 const managerNavItems = [

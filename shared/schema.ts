@@ -4701,3 +4701,26 @@ export type TenderNote = typeof tenderNotes.$inferSelect;
 export const insertTenderFileSchema = createInsertSchema(tenderFiles).omit({ id: true, createdAt: true });
 export type InsertTenderFile = z.infer<typeof insertTenderFileSchema>;
 export type TenderFile = typeof tenderFiles.$inferSelect;
+
+// ============================================================================
+// MYOB INTEGRATION
+// ============================================================================
+
+export const myobTokens = pgTable("myob_tokens", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  businessId: text("business_id").notNull(),
+  connectedBy: varchar("connected_by", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: uniqueIndex("myob_tokens_company_idx").on(table.companyId),
+  connectedByIdx: index("myob_tokens_connected_by_idx").on(table.connectedBy),
+}));
+
+export const insertMyobTokenSchema = createInsertSchema(myobTokens).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMyobToken = z.infer<typeof insertMyobTokenSchema>;
+export type MyobToken = typeof myobTokens.$inferSelect;

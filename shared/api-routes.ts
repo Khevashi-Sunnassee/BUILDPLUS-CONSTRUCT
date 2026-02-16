@@ -919,3 +919,20 @@ export const BUDGET_LINE_ROUTES = {
   EMAIL_DROP: (id: string | number) => `/api/budget-lines/${id}/email-drop`,
 } as const;
 export type BudgetLineRoutes = typeof BUDGET_LINE_ROUTES;
+
+// ============================================================================
+// MYOB INTEGRATION
+// ============================================================================
+export const MYOB_ROUTES = {
+  AUTH: '/api/myob/auth',
+  CALLBACK: '/api/myob/callback',
+  STATUS: '/api/myob/status',
+  DISCONNECT: '/api/myob/disconnect',
+  COMPANY: '/api/myob/company',
+  CUSTOMERS: '/api/myob/customers',
+  SUPPLIERS: '/api/myob/suppliers',
+  ACCOUNTS: '/api/myob/accounts',
+  INVOICES: '/api/myob/invoices',
+  ITEMS: '/api/myob/items',
+} as const;
+export type MyobRoutes = typeof MYOB_ROUTES;

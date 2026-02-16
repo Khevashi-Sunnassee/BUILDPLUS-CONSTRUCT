@@ -115,6 +115,7 @@ const JobTendersPage = lazyWithRetry(() => import("@/pages/job-tenders"));
 const JobBoqPage = lazyWithRetry(() => import("@/pages/job-boq"));
 const WorkflowBuilderPage = lazyWithRetry(() => import("@/pages/admin/workflow-builder"));
 const JobActivitiesPage = lazyWithRetry(() => import("@/pages/job-activities"));
+const MyobIntegrationPage = lazyWithRetry(() => import("@/pages/myob-integration"));
 
 const RegisterPage = lazyWithRetry(() => import("@/pages/register"));
 const MobileLoginPage = lazyWithRetry(() => import("@/pages/mobile/login"));
@@ -508,6 +509,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <JobBoqPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/myob-integration">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <MyobIntegrationPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
