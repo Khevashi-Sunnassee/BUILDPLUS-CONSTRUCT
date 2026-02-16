@@ -111,6 +111,21 @@ router.get("/api/ap-inbox/emails", requireAuth, async (req: Request, res: Respon
 
 router.post("/api/webhooks/resend-inbound", async (req: Request, res: Response) => {
   try {
+    const svixId = req.headers["svix-id"] as string;
+    const svixTimestamp = req.headers["svix-timestamp"] as string;
+    const svixSignature = req.headers["svix-signature"] as string;
+
+    if (!svixId || !svixTimestamp || !svixSignature) {
+      logger.warn("[AP Inbox] Missing Svix webhook headers - rejecting request");
+      return res.status(401).json({ error: "Missing webhook signature headers" });
+    }
+
+    const timestampAge = Math.abs(Date.now() / 1000 - parseInt(svixTimestamp));
+    if (isNaN(timestampAge) || timestampAge > 300) {
+      logger.warn({ timestampAge }, "[AP Inbox] Webhook timestamp too old or invalid");
+      return res.status(401).json({ error: "Webhook timestamp expired" });
+    }
+
     const event = req.body;
 
     if (!event || event.type !== "email.received") {
@@ -139,7 +154,7 @@ router.post("/api/webhooks/resend-inbound", async (req: Request, res: Response) 
     for (const { settings } of allSettings) {
       if (settings.inboundEmailAddress) {
         const normalizedInbound = settings.inboundEmailAddress.toLowerCase().trim();
-        if (toAddresses.some(addr => addr.toLowerCase().trim() === normalizedInbound || addr.toLowerCase().includes(normalizedInbound))) {
+        if (toAddresses.some(addr => addr.toLowerCase().trim() === normalizedInbound)) {
           matchedSettings = settings;
           break;
         }
@@ -147,12 +162,8 @@ router.post("/api/webhooks/resend-inbound", async (req: Request, res: Response) 
     }
 
     if (!matchedSettings) {
-      if (allSettings.length === 1) {
-        matchedSettings = allSettings[0].settings;
-      } else {
-        logger.warn({ to: toAddresses, enabledCount: allSettings.length }, "[AP Inbox] No matching inbox settings for inbound email");
-        return res.status(200).json({ status: "ignored", reason: "No matching company inbox" });
-      }
+      logger.warn({ to: toAddresses, enabledCount: allSettings.length }, "[AP Inbox] No matching inbox settings for inbound email");
+      return res.status(200).json({ status: "ignored", reason: "No matching company inbox" });
     }
 
     const [existingEmail] = await db.select().from(apInboundEmails)

@@ -35,6 +35,7 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Scope of Works Builder:** AI-powered scope generation for tender management across trades.
 - **Budget System:** Four-phase cost management including two-tier cost codes, a tender center, job tender sheets, and per-job budget management with Bill of Quantities (BOQ).
 - **MYOB Integration:** OAuth 2.0 connection to MYOB Business API with database-backed token storage (per-company), auto-refresh, and multi-tenant isolation. Endpoints: company info, customers, suppliers, accounts, invoices, inventory items. Frontend page at `/myob-integration` with tabbed data browsing. Key files: `server/myob.ts` (API client), `server/routes/myob.routes.ts` (routes), `client/src/pages/myob-integration.tsx` (UI).
+- **AP Email Inbox Monitoring:** Automatic invoice processing via Resend inbound email webhooks. Suppliers send invoices to a dedicated email address; the system creates AP invoices from PDF/image attachments and auto-triggers OCR extraction. Per-company inbox settings (enable/disable, inbound email, auto-extract, auto-submit, default status). Schema tables: `apInboundEmails` (email tracking), `apInboxSettings` (per-company config). Key files: `server/routes/ap-inbox.routes.ts` (webhook + settings API), `client/src/pages/ap-invoices.tsx` (inbox settings dialog).
 
 **System Design Choices:**
 - **Multi-Tenancy:** Designed for multi-company deployment with strict data isolation, ensuring every query on company-owned tables includes a `companyId` filter.

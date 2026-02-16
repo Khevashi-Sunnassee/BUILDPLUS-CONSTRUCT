@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { AP_INVOICE_ROUTES } from "@shared/api-routes";
+import { AP_INVOICE_ROUTES, AP_INBOX_ROUTES } from "@shared/api-routes";
 import { Link, useLocation } from "wouter";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
-import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Filter, Loader2, Eye, Send, Settings } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Card } from "@/components/ui/card";
+import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Filter, Loader2, Eye, Send, Settings, Mail, Copy, Check } from "lucide-react";
 
 interface ApInvoice {
   id: string;
@@ -201,6 +203,171 @@ function UploadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
 }
 
 
+interface InboxSettings {
+  isEnabled: boolean;
+  inboundEmailAddress: string | null;
+  autoExtract: boolean;
+  autoSubmit: boolean;
+  defaultStatus: string;
+}
+
+function InboxSettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+  const [emailDraft, setEmailDraft] = useState("");
+
+  const { data: settings, isLoading } = useQuery<InboxSettings>({
+    queryKey: [AP_INBOX_ROUTES.SETTINGS],
+    enabled: open,
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (updates: Partial<InboxSettings>) => {
+      await apiRequest("PUT", AP_INBOX_ROUTES.SETTINGS, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [AP_INBOX_ROUTES.SETTINGS] });
+      toast({ title: "Inbox settings updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to update settings", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleCopy = () => {
+    if (settings?.inboundEmailAddress) {
+      navigator.clipboard.writeText(settings.inboundEmailAddress);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]" data-testid="dialog-inbox-settings">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Email Inbox Monitoring
+          </DialogTitle>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="space-y-4 py-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : settings ? (
+          <div className="space-y-6 py-2">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <Label className="text-sm font-medium" data-testid="label-inbox-enabled">Enable Email Inbox</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Receive invoices via email automatically
+                </p>
+              </div>
+              <Switch
+                checked={settings.isEnabled}
+                onCheckedChange={(checked) => updateMutation.mutate({ isEnabled: checked })}
+                disabled={updateMutation.isPending}
+                data-testid="switch-inbox-enabled"
+              />
+            </div>
+
+            {settings.isEnabled && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Inbound Email Address</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Forward supplier invoices to this address for automatic processing
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={emailDraft || settings.inboundEmailAddress || ""}
+                      onChange={(e) => setEmailDraft(e.target.value)}
+                      onBlur={() => {
+                        if (emailDraft && emailDraft !== settings.inboundEmailAddress) {
+                          updateMutation.mutate({ inboundEmailAddress: emailDraft });
+                        }
+                      }}
+                      onFocus={() => setEmailDraft(settings.inboundEmailAddress || "")}
+                      placeholder="invoices@your-domain.com"
+                      data-testid="input-inbound-email"
+                    />
+                    {settings.inboundEmailAddress && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleCopy}
+                        data-testid="button-copy-email"
+                      >
+                        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">Auto-Extract Data</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Run OCR extraction automatically when invoices arrive
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.autoExtract}
+                      onCheckedChange={(checked) => updateMutation.mutate({ autoExtract: checked })}
+                      disabled={updateMutation.isPending}
+                      data-testid="switch-auto-extract"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <Label className="text-sm font-medium">Auto-Submit for Review</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Automatically submit invoices for approval after extraction
+                      </p>
+                    </div>
+                    <Switch
+                      checked={settings.autoSubmit}
+                      onCheckedChange={(checked) => updateMutation.mutate({ autoSubmit: checked })}
+                      disabled={updateMutation.isPending}
+                      data-testid="switch-auto-submit"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Default Invoice Status</Label>
+                  <Select
+                    value={settings.defaultStatus}
+                    onValueChange={(value) => updateMutation.mutate({ defaultStatus: value })}
+                  >
+                    <SelectTrigger data-testid="select-default-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="DRAFT">Draft</SelectItem>
+                      <SelectItem value="PENDING_REVIEW">Pending Review</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="py-8 text-center text-sm text-muted-foreground" data-testid="text-inbox-no-settings">
+            Unable to load inbox settings. Please try again.
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="space-y-4 p-6">
@@ -232,6 +399,7 @@ export default function ApInvoicesPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [inboxSettingsOpen, setInboxSettingsOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [flagFilter, setFlagFilter] = useState("all");
   const [uploadedByFilter, setUploadedByFilter] = useState("all");
@@ -319,6 +487,9 @@ export default function ApInvoicesPage() {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <h1 className="text-2xl font-semibold" data-testid="text-page-title">Invoices</h1>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={() => setInboxSettingsOpen(true)} data-testid="button-inbox-settings">
+              <Mail className="h-4 w-4" />
+            </Button>
             <Link href="/ap-invoices/approval-rules">
               <Button variant="outline" size="icon" data-testid="button-approval-rules">
                 <Settings className="h-4 w-4" />
@@ -606,6 +777,7 @@ export default function ApInvoicesPage() {
       </div>
 
       <UploadDialog open={uploadOpen} onOpenChange={setUploadOpen} />
+      <InboxSettingsDialog open={inboxSettingsOpen} onOpenChange={setInboxSettingsOpen} />
     </div>
   );
 }
