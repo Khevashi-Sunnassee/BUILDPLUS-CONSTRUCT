@@ -222,13 +222,15 @@ router.post("/api/webhooks/resend-inbound", async (req: Request, res: Response) 
       return res.status(200).json({ status: "ignored", reason: "Not an email.received event" });
     }
 
-    const { email_id, from, to, subject, has_attachments } = event.data || {};
+    const { email_id, from, to, subject, has_attachments, attachments: webhookAttachments } = event.data || {};
 
     if (!email_id || !from) {
       return res.status(200).json({ status: "ignored", reason: "Missing email data" });
     }
 
-    logger.info({ emailId: email_id, from, to, subject }, "[AP Inbox] Received inbound email webhook");
+    const effectiveHasAttachments = has_attachments || (Array.isArray(webhookAttachments) && webhookAttachments.length > 0);
+
+    logger.info({ emailId: email_id, from, to, subject, has_attachments, webhookAttachmentCount: Array.isArray(webhookAttachments) ? webhookAttachments.length : 0 }, "[AP Inbox] Received inbound email webhook");
 
     const toAddresses: string[] = Array.isArray(to) ? to : (to ? [to] : []);
 
@@ -271,7 +273,7 @@ router.post("/api/webhooks/resend-inbound", async (req: Request, res: Response) 
     }
 
     if (matchedTenderSettings) {
-      return await handleTenderInboundEmail(res, email_id, from, toAddresses, subject, has_attachments, matchedTenderSettings);
+      return await handleTenderInboundEmail(res, email_id, from, toAddresses, subject, effectiveHasAttachments, matchedTenderSettings);
     }
 
     if (!matchedApSettings) {
@@ -297,7 +299,7 @@ router.post("/api/webhooks/resend-inbound", async (req: Request, res: Response) 
       attachmentCount: 0,
     }).returning();
 
-    if (has_attachments) {
+    if (effectiveHasAttachments) {
       processInboundEmail(inboundRecord.id, email_id, matchedApSettings).catch(err => {
         logger.error({ err, inboundId: inboundRecord.id }, "[AP Inbox] Background processing failed");
       });
