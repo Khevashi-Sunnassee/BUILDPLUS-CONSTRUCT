@@ -1,8 +1,8 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { PageHelpButton } from "@/components/help/page-help-button";
-import { CONTRACT_ROUTES, DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
+import { CONTRACT_ROUTES, DOCUMENT_ROUTES, JOBS_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
 import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { MultiFileDropZone } from "@/components/MultiFileDropZone";
@@ -137,12 +137,32 @@ interface Contract {
   updatedAt: string;
 }
 
+interface Customer {
+  id: string;
+  name: string;
+  keyContact: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
 interface Job {
   id: string;
   jobNumber: string;
   name: string;
   client: string | null;
+  customerId: string | null;
   address: string | null;
+  city: string | null;
+  state: string | null;
+  siteContact: string | null;
+  siteContactPhone: string | null;
+  description: string | null;
+  craneCapacity: string | null;
+  estimatedValue: string | null;
+  productionStartDate: string | null;
+  engineerOnJob: string | null;
+  referrer: string | null;
+  primaryContact: string | null;
 }
 
 interface DocumentItem {
@@ -223,6 +243,57 @@ export default function ContractDetailPage() {
     },
     enabled: !!jobId,
   });
+
+  const { data: customer } = useQuery<Customer>({
+    queryKey: [PROCUREMENT_ROUTES.CUSTOMER_BY_ID(job?.customerId!), job?.customerId],
+    enabled: !!job?.customerId,
+  });
+
+  const [jobPopulated, setJobPopulated] = useState(false);
+
+  useEffect(() => {
+    if (!job || contractLoading || jobPopulated) return;
+    if (contract) {
+      setJobPopulated(true);
+      return;
+    }
+
+    const jobDefaults: Partial<Contract> = {};
+    if (job.name) jobDefaults.projectName = job.name;
+    if (job.address) {
+      const addressParts = [job.address, job.city, job.state].filter(Boolean);
+      jobDefaults.projectAddress = addressParts.join(", ");
+    }
+    if (job.client) jobDefaults.ownerClientName = job.client;
+    if (job.estimatedValue) jobDefaults.originalContractValue = job.estimatedValue;
+    if (job.craneCapacity) jobDefaults.craneTypeCapacity = job.craneCapacity;
+    if (job.engineerOnJob) jobDefaults.architectEngineer = job.engineerOnJob;
+    if (job.productionStartDate) jobDefaults.productionStartDate = job.productionStartDate;
+    if (job.description) jobDefaults.precastScopeDescription = job.description;
+
+    if (Object.keys(jobDefaults).length > 0) {
+      setFormData(prev => {
+        const merged: Partial<Contract> = {};
+        for (const [key, val] of Object.entries(jobDefaults)) {
+          const existing = prev[key as keyof Contract];
+          if (existing === undefined || existing === null) {
+            (merged as Record<string, unknown>)[key] = val;
+          }
+        }
+        return { ...prev, ...merged };
+      });
+    }
+    setJobPopulated(true);
+  }, [job, contract, contractLoading, jobPopulated]);
+
+  useEffect(() => {
+    if (!customer || !jobPopulated || contract) return;
+    setFormData(prev => {
+      const existing = prev.ownerClientName;
+      if (existing !== undefined && existing !== null) return prev;
+      return { ...prev, ownerClientName: customer.name };
+    });
+  }, [customer, jobPopulated, contract]);
 
   const isLoaded = !jobLoading && !contractLoading;
   const currentData = { ...contract, ...formData };
@@ -394,6 +465,24 @@ export default function ContractDetailPage() {
           )}
         </div>
       </div>
+
+      {!contract && jobPopulated && Object.keys(formData).length > 0 && (
+        <Card className="border-blue-500/30 bg-blue-500/5" data-testid="card-job-prepopulated">
+          <CardContent className="py-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-md bg-blue-500/20">
+                <Building2 className="h-4 w-4 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Contract fields pre-populated from job details</p>
+                <p className="text-xs text-muted-foreground">
+                  Project name, address, client, value, and other details have been filled in from {job?.jobNumber}. Review and save to create the contract.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {riskRating && (
         <Card className={riskRating >= 7 ? "border-red-500/30 bg-red-500/5" : riskRating >= 4 ? "border-amber-500/30 bg-amber-500/5" : "border-green-500/30 bg-green-500/5"} data-testid="card-risk-assessment">
