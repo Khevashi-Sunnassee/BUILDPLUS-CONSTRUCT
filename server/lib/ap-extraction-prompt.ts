@@ -12,7 +12,7 @@ If line items are included in your response, the output is invalid.
 Return a clean JSON object only.
 If a field is not found, return null for that field.`;
 
-export const AP_EXTRACTION_USER_PROMPT = `Extract the following invoice summary fields from this document.
+const EXTRACTION_INSTRUCTIONS = `Extract the following invoice summary fields from this document.
 
 Required fields:
 - supplier_name: The supplier/vendor company name
@@ -48,6 +48,18 @@ Return JSON only, matching this exact structure:
   "description": "",
   "purchase_order_number": null
 }`;
+
+export function buildExtractionUserPrompt(extractedText: string | null): string {
+  if (extractedText && extractedText.length > 100) {
+    const trimmedText = extractedText.length > 4000 
+      ? extractedText.substring(0, 2000) + "\n\n...[middle content omitted]...\n\n" + extractedText.substring(extractedText.length - 2000)
+      : extractedText;
+    return `${EXTRACTION_INSTRUCTIONS}\n\nThe following text was extracted from the document. Use this as the primary source for data extraction. The attached image(s) are for visual verification only.\n\n--- EXTRACTED DOCUMENT TEXT ---\n${trimmedText}\n--- END DOCUMENT TEXT ---`;
+  }
+  return EXTRACTION_INSTRUCTIONS;
+}
+
+export const AP_EXTRACTION_USER_PROMPT = EXTRACTION_INSTRUCTIONS;
 
 export interface ExtractedInvoiceData {
   supplier_name: string | null;

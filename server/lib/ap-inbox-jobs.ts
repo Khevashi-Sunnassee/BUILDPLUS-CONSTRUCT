@@ -435,31 +435,8 @@ async function extractInvoiceData(
   }
   const buffer = Buffer.concat(chunks);
 
-  let imageBuffers: { base64: string; mimeType: string }[] = [];
-
-  if (doc.mimeType?.includes("pdf")) {
-    const { execSync } = await import("child_process");
-    const fs = await import("fs");
-    const os = await import("os");
-    const path = await import("path");
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ap-bg-extract-"));
-    const pdfPath = path.join(tmpDir, "invoice.pdf");
-    fs.writeFileSync(pdfPath, buffer);
-    try {
-      execSync(`pdftoppm -png -r 300 -l 3 "${pdfPath}" "${path.join(tmpDir, 'page')}"`, { timeout: 30000 });
-      const pageFiles = fs.readdirSync(tmpDir)
-        .filter((f: string) => f.startsWith("page") && f.endsWith(".png"))
-        .sort();
-      for (const pageFile of pageFiles) {
-        const pageBuffer = fs.readFileSync(path.join(tmpDir, pageFile));
-        imageBuffers.push({ base64: pageBuffer.toString("base64"), mimeType: "image/png" });
-      }
-    } finally {
-      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-    }
-  } else {
-    imageBuffers.push({ base64: buffer.toString("base64"), mimeType: doc.mimeType || "image/jpeg" });
-  }
+  const { prepareDocumentForExtraction } = await import("./ap-document-prep");
+  const { extractedText, imageBuffers } = await prepareDocumentForExtraction(buffer, doc.mimeType);
 
   if (imageBuffers.length === 0) {
     logger.warn({ invoiceId }, "[AP Background] Could not convert document to images");
@@ -469,7 +446,12 @@ async function extractInvoiceData(
   const { default: OpenAI } = await import("openai");
   const openai = new OpenAI();
 
-  const { AP_EXTRACTION_SYSTEM_PROMPT, AP_EXTRACTION_USER_PROMPT, parseExtractedData, buildExtractedFieldRecords, buildInvoiceUpdateFromExtraction, sanitizeNumericValue } = await import("./ap-extraction-prompt");
+  const { AP_EXTRACTION_SYSTEM_PROMPT, buildExtractionUserPrompt, parseExtractedData, buildExtractedFieldRecords, buildInvoiceUpdateFromExtraction, sanitizeNumericValue } = await import("./ap-extraction-prompt");
+
+  const userPrompt = buildExtractionUserPrompt(extractedText);
+
+  const hasText = extractedText && extractedText.length > 100;
+  const imageDetail = hasText ? "low" as const : "high" as const;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -478,15 +460,15 @@ async function extractInvoiceData(
       {
         role: "user",
         content: [
-          { type: "text", text: AP_EXTRACTION_USER_PROMPT },
+          { type: "text", text: userPrompt },
           ...imageBuffers.map(img => ({
             type: "image_url" as const,
-            image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: "high" as const },
+            image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: imageDetail },
           })),
         ],
       },
     ],
-    max_tokens: 2048,
+    max_tokens: 1024,
     temperature: 0,
     response_format: { type: "json_object" },
   });

@@ -1875,6 +1875,8 @@ router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, re
     if (!docs.length) return res.status(400).json({ error: "No document to extract from" });
 
     const doc = docs[0];
+
+    let extractedText: string | null = null;
     let imageBuffers: { base64: string; mimeType: string }[] = [];
 
     try {
@@ -1886,31 +1888,13 @@ router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, re
       }
       const buffer = Buffer.concat(chunks);
 
-      if (doc.mimeType?.includes("pdf")) {
-        const { execSync } = await import("child_process");
-        const fs = await import("fs");
-        const os = await import("os");
-        const path = await import("path");
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ap-extract-"));
-        const pdfPath = path.join(tmpDir, "invoice.pdf");
-        fs.writeFileSync(pdfPath, buffer);
-        try {
-          execSync(`pdftoppm -png -r 300 -l 3 "${pdfPath}" "${path.join(tmpDir, 'page')}"`, { timeout: 30000 });
-          const pageFiles = fs.readdirSync(tmpDir)
-            .filter((f: string) => f.startsWith("page") && f.endsWith(".png"))
-            .sort();
-          for (const pageFile of pageFiles) {
-            const pageBuffer = fs.readFileSync(path.join(tmpDir, pageFile));
-            imageBuffers.push({ base64: pageBuffer.toString("base64"), mimeType: "image/png" });
-          }
-        } finally {
-          try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-        }
-        if (imageBuffers.length === 0) {
-          return res.status(500).json({ error: "Failed to convert PDF to images for extraction" });
-        }
-      } else {
-        imageBuffers.push({ base64: buffer.toString("base64"), mimeType: doc.mimeType || "image/png" });
+      const { prepareDocumentForExtraction } = await import("../lib/ap-document-prep");
+      const prepared = await prepareDocumentForExtraction(buffer, doc.mimeType);
+      extractedText = prepared.extractedText;
+      imageBuffers = prepared.imageBuffers;
+
+      if (imageBuffers.length === 0) {
+        return res.status(500).json({ error: "Failed to convert document to images for extraction" });
       }
     } catch (err: any) {
       logger.error({ err }, "Error reading document for extraction");
@@ -1919,7 +1903,11 @@ router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, re
 
     const OpenAI = (await import("openai")).default;
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const { AP_EXTRACTION_SYSTEM_PROMPT, AP_EXTRACTION_USER_PROMPT, parseExtractedData, buildExtractedFieldRecords, buildInvoiceUpdateFromExtraction, sanitizeNumericValue } = await import("../lib/ap-extraction-prompt");
+    const { AP_EXTRACTION_SYSTEM_PROMPT, buildExtractionUserPrompt, parseExtractedData, buildExtractedFieldRecords, buildInvoiceUpdateFromExtraction, sanitizeNumericValue } = await import("../lib/ap-extraction-prompt");
+
+    const userPrompt = buildExtractionUserPrompt(extractedText);
+    const hasText = extractedText && extractedText.length > 100;
+    const imageDetail = hasText ? "low" as const : "high" as const;
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -1928,15 +1916,15 @@ router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, re
         {
           role: "user",
           content: [
-            { type: "text", text: AP_EXTRACTION_USER_PROMPT },
+            { type: "text", text: userPrompt },
             ...imageBuffers.map(img => ({
               type: "image_url" as const,
-              image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: "high" as const },
+              image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: imageDetail },
             })),
           ],
         },
       ],
-      max_tokens: 2048,
+      max_tokens: 1024,
       temperature: 0,
       response_format: { type: "json_object" },
     });
