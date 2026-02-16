@@ -125,14 +125,13 @@ export async function createAutoSplit(
     return { created: false, costCodeId: null, costCodeSource: null, jobId: null };
   }
 
-  if (totalIncGst <= 0) {
+  const amount = totalIncGst > 0 ? totalIncGst : (subtotalExGst > 0 ? subtotalExGst : 0);
+  if (amount <= 0) {
     return { created: false, costCodeId: null, costCodeSource: null, jobId: null };
   }
 
   const costCodeResult = await resolveSupplierCostCode(supplierId, companyId);
   const historicJobId = await resolveSupplierHistoricJob(supplierId, companyId);
-
-  const amount = subtotalExGst > 0 ? subtotalExGst : totalIncGst;
   const taxCodeLabel = gstAmount > 0 ? "GST" : "FRE";
 
   await db.insert(apInvoiceSplits).values({

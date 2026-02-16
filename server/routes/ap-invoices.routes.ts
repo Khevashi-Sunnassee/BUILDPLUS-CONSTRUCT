@@ -996,6 +996,23 @@ router.put("/api/ap-invoices/:id/splits", requireAuth, async (req: Request, res:
       );
     }
 
+    if (existing.supplierId && body.length > 0) {
+      const firstCostCode = body.find(s => s.costCodeId)?.costCodeId;
+      if (firstCostCode) {
+        const [supplier] = await db
+          .select({ id: suppliers.id, defaultCostCodeId: suppliers.defaultCostCodeId })
+          .from(suppliers)
+          .where(and(eq(suppliers.id, existing.supplierId), eq(suppliers.companyId, companyId)))
+          .limit(1);
+        if (supplier && !supplier.defaultCostCodeId) {
+          await db.update(suppliers)
+            .set({ defaultCostCodeId: firstCostCode })
+            .where(eq(suppliers.id, supplier.id));
+          logger.info({ supplierId: supplier.id, costCodeId: firstCostCode }, "[AP Splits] Set supplier default cost code from first split save");
+        }
+      }
+    }
+
     await logActivity(id, "splits_updated", `Updated ${body.length} split lines`, userId);
 
     const splits = await db
