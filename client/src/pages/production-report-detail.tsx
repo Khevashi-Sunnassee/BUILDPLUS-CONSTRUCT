@@ -501,7 +501,7 @@ export default function ProductionReportDetailPage() {
       pdf.setTextColor(0, 0, 0);
       pdf.setFontSize(14);
       pdf.setFont("helvetica", "bold");
-      pdf.text("Production Schedule", margin + logoWidth + 6, 12);
+      pdf.text("Production Booking", margin + logoWidth + 6, 12);
       
       // Subtitle info
       pdf.setFontSize(10);
@@ -553,7 +553,7 @@ export default function ProductionReportDetailPage() {
 
   if (entriesLoading) {
     return (
-      <div className="space-y-6" role="main" aria-label="Production Report Detail">
+      <div className="space-y-6" role="main" aria-label="Production Booking Detail">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-[400px]" />
       </div>
@@ -561,7 +561,7 @@ export default function ProductionReportDetailPage() {
   }
 
   return (
-    <div className="space-y-6" role="main" aria-label="Production Report Detail">
+    <div className="space-y-6" role="main" aria-label="Production Booking Detail">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => setLocation("/production-report")} data-testid="button-back">
@@ -569,7 +569,7 @@ export default function ProductionReportDetailPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2" data-testid="text-production-title">
-              Production Schedule
+              Production Booking
               <Badge variant={factory === "QLD" ? "default" : "secondary"} className="text-sm">
                 {factory}
               </Badge>

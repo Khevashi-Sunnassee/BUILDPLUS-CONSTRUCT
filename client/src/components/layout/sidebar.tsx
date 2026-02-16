@@ -130,7 +130,7 @@ const adminFinanceNavItems = [
 const managerNavItems = [
   { title: "KPI Dashboard", url: "/kpi-dashboard", icon: BarChart3 },
   { title: "Manager Review", url: "/manager/review", icon: CheckSquare },
-  { title: "Production Report", url: "/production-report", icon: Factory },
+  { title: "Production Booking", url: "/production-report", icon: Factory },
   { title: "Checklist Reports", url: "/checklist-reports", icon: BarChart3 },
   { title: "Reports", url: "/reports", icon: Clock },
 ];

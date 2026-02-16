@@ -1149,9 +1149,9 @@ Approve or reject team member timesheets and daily logs. This page shows all sub
   {
     key: "page.production-report",
     scope: "PAGE",
-    title: "Production Report",
-    shortText: "Detailed production performance reports and analysis.",
-    bodyMd: `## Production Report
+    title: "Production Booking",
+    shortText: "Detailed production booking performance and analysis.",
+    bodyMd: `## Production Booking
 
 Analyse production output and efficiency. View daily summaries, track panel completion rates, and compare performance across time periods.
 
@@ -1160,8 +1160,8 @@ Analyse production output and efficiency. View daily summaries, track panel comp
 - **Date Range Selector** - Choose the period to analyse
 - **Factory Filter** - View production for a specific factory
 - **Job Filter** - View production for a specific job
-- **Export** - Download the production report as a PDF or Excel file
-- **Click a Day** - Open the detailed production report for that specific day
+- **Export** - Download the production booking as a PDF or Excel file
+- **Click a Day** - Open the detailed production booking for that specific day
 
 ### What You Will See
 - Daily panel counts and volumes
@@ -1174,22 +1174,22 @@ Analyse production output and efficiency. View daily summaries, track panel comp
 - Use the factory filter to compare performance between locations
 - Click individual days to drill down into detailed production data
 - Export reports for management presentations`,
-    keywords: ["production", "report", "analysis", "output"],
+    keywords: ["production", "booking", "analysis", "output"],
     category: "Reports",
     pageRoute: "/production-report",
   },
   {
     key: "page.production-report-detail",
     scope: "PAGE",
-    title: "Production Report Detail",
+    title: "Production Booking Detail",
     shortText: "View and manage detailed production entries for a specific day.",
-    bodyMd: `## Production Report Detail
+    bodyMd: `## Production Booking Detail
 
 Detailed view of production for a single day. Add, edit, and manage individual production entries.
 
 ### Buttons & Actions
 
-- **Back** (arrow icon) - Return to the Production Report list
+- **Back** (arrow icon) - Return to the Production Booking list
 - **Export PDF** - Generate a PDF report of this day's production for printing or records
 - **Add Entry** - Create a new production entry for this day, specifying the panel, job, and production details
 - **Delete Day** - Remove the entire day's production record (requires confirmation)
@@ -1253,7 +1253,7 @@ Access various system reports and data exports for analysis and record-keeping.
 ### Available Reports
 - **Time Tracking Summaries** - Total hours by user, job, or work type
 - **Job Performance Reports** - Productivity metrics by job
-- **Production Reports** - Panel output and manufacturing data
+- **Production Booking** - Panel output and manufacturing data
 - **Financial Reports** - Revenue, costs, and profit analysis
 
 ### Export Options
