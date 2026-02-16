@@ -926,7 +926,9 @@ export type TenderMemberRoutes = typeof TENDER_MEMBER_ROUTES;
 
 export const BUDGET_LINE_ROUTES = {
   UPDATES: (id: string | number) => `/api/budget-lines/${id}/updates`,
+  UPDATE_BY_ID: (id: string | number) => `/api/budget-line-updates/${id}`,
   FILES: (id: string | number) => `/api/budget-lines/${id}/files`,
+  FILE_BY_ID: (id: string | number) => `/api/budget-line-files/${id}`,
   EMAIL_DROP: (id: string | number) => `/api/budget-lines/${id}/email-drop`,
 } as const;
 export type BudgetLineRoutes = typeof BUDGET_LINE_ROUTES;
