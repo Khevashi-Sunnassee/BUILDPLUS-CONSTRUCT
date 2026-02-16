@@ -4,7 +4,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { eq, and, desc, asc, sql, ilike, or, inArray, count } from "drizzle-orm";
+import { eq, and, desc, asc, sql, ilike, or, inArray, count, isNull } from "drizzle-orm";
 import multer from "multer";
 import crypto from "crypto";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
@@ -914,12 +914,41 @@ router.get("/api/ap-invoices/:id/splits", requireAuth, async (req: Request, res:
     const id = req.params.id;
 
     const [invoice] = await db
-      .select({ id: apInvoices.id })
+      .select({ id: apInvoices.id, supplierId: apInvoices.supplierId })
       .from(apInvoices)
       .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
       .limit(1);
 
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+
+    let supplierDefaultCostCodeId: string | null = null;
+    if (invoice.supplierId) {
+      const [sup] = await db
+        .select({ defaultCostCodeId: suppliers.defaultCostCodeId })
+        .from(suppliers)
+        .where(eq(suppliers.id, invoice.supplierId))
+        .limit(1);
+      supplierDefaultCostCodeId = sup?.defaultCostCodeId || null;
+    }
+
+    if (supplierDefaultCostCodeId) {
+      const blanks = await db
+        .select({ id: apInvoiceSplits.id })
+        .from(apInvoiceSplits)
+        .where(and(
+          eq(apInvoiceSplits.invoiceId, id),
+          isNull(apInvoiceSplits.costCodeId)
+        ));
+
+      if (blanks.length > 0) {
+        await db.update(apInvoiceSplits)
+          .set({ costCodeId: supplierDefaultCostCodeId })
+          .where(and(
+            eq(apInvoiceSplits.invoiceId, id),
+            isNull(apInvoiceSplits.costCodeId)
+          ));
+      }
+    }
 
     const splits = await db
       .select({
