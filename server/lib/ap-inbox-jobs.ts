@@ -8,6 +8,7 @@ import {
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import { getResendApiKey } from "../services/email.service";
 import { assignApprovalPathToInvoice } from "./ap-approval-assign";
+import { createAutoSplit } from "./ap-auto-split";
 import crypto from "crypto";
 
 const objectStorageService = new ObjectStorageService();
@@ -457,8 +458,14 @@ async function extractInvoiceDataFromBuffer(
   const openai = new OpenAI();
 
   const { AP_EXTRACTION_SYSTEM_PROMPT, buildExtractionUserPrompt, parseExtractedData, buildExtractedFieldRecords, buildInvoiceUpdateFromExtraction, sanitizeNumericValue } = await import("./ap-extraction-prompt");
+  const { getSupplierCostCodeContext } = await import("./ap-auto-split");
 
-  const userPrompt = buildExtractionUserPrompt(extractedText);
+  const [invoiceRecord] = await db.select({ supplierId: apInvoices.supplierId }).from(apInvoices).where(eq(apInvoices.id, invoiceId)).limit(1);
+  let supplierContext = "";
+  if (invoiceRecord?.supplierId) {
+    supplierContext = await getSupplierCostCodeContext(invoiceRecord.supplierId, companyId);
+  }
+  const userPrompt = buildExtractionUserPrompt(extractedText, supplierContext);
   const hasText = extractedText && extractedText.length > 100;
   const imageDetail = hasText ? "low" as const : "high" as const;
 
@@ -543,27 +550,21 @@ async function extractInvoiceDataFromBuffer(
 
   await db.update(apInvoices).set(updateData).where(eq(apInvoices.id, invoiceId));
 
-  const [existingSplit] = await db.select({ id: apInvoiceSplits.id })
-    .from(apInvoiceSplits)
-    .where(eq(apInvoiceSplits.invoiceId, invoiceId))
-    .limit(1);
+  const totalInc = parseFloat(sanitizeNumericValue(data.total_amount_inc_gst) || "0");
+  const gstAmount = parseFloat(sanitizeNumericValue(data.total_gst) || "0");
+  const subtotal = parseFloat(sanitizeNumericValue(data.subtotal_ex_gst) || String(totalInc));
 
-  if (!existingSplit) {
-    const totalInc = parseFloat(sanitizeNumericValue(data.total_amount_inc_gst) || "0");
-    if (totalInc > 0) {
-      const gstAmount = parseFloat(sanitizeNumericValue(data.total_gst) || "0");
-      const subtotal = parseFloat(sanitizeNumericValue(data.subtotal_ex_gst) || String(totalInc));
-      const taxCodeLabel = gstAmount > 0 ? "GST" : "FRE";
-
-      await db.insert(apInvoiceSplits).values({
-        invoiceId,
-        description: data.description || "Invoice total",
-        percentage: "100",
-        amount: subtotal > 0 ? subtotal.toFixed(2) : totalInc.toFixed(2),
-        taxCodeId: taxCodeLabel,
-        sortOrder: 0,
-      });
-    }
+  const autoSplitResult = await createAutoSplit(
+    invoiceId,
+    companyId,
+    updateData.supplierId || invoiceRecord?.supplierId || null,
+    totalInc,
+    gstAmount,
+    subtotal,
+    data.description
+  );
+  if (autoSplitResult.created) {
+    logger.info({ invoiceId, ...autoSplitResult }, "[AP Extract] Auto-split created with cost code");
   }
 
   await logActivity(invoiceId, "auto_extraction_completed", "AI extraction completed inline during import", undefined, {

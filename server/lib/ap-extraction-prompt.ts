@@ -49,14 +49,21 @@ Return JSON only, matching this exact structure:
   "purchase_order_number": null
 }`;
 
-export function buildExtractionUserPrompt(extractedText: string | null): string {
+export function buildExtractionUserPrompt(extractedText: string | null, supplierContext?: string): string {
+  let prompt = EXTRACTION_INSTRUCTIONS;
+
+  if (supplierContext) {
+    prompt += `\n\n--- SUPPLIER CONTEXT ---\n${supplierContext}\nUse this context to write a more specific description of what this invoice is for.\n--- END SUPPLIER CONTEXT ---`;
+  }
+
   if (extractedText && extractedText.length > 100) {
     const trimmedText = extractedText.length > 4000 
       ? extractedText.substring(0, 2000) + "\n\n...[middle content omitted]...\n\n" + extractedText.substring(extractedText.length - 2000)
       : extractedText;
-    return `${EXTRACTION_INSTRUCTIONS}\n\nThe following text was extracted from the document. Use this as the primary source for data extraction. The attached image(s) are for visual verification only.\n\n--- EXTRACTED DOCUMENT TEXT ---\n${trimmedText}\n--- END DOCUMENT TEXT ---`;
+    prompt += `\n\nThe following text was extracted from the document. Use this as the primary source for data extraction. The attached image(s) are for visual verification only.\n\n--- EXTRACTED DOCUMENT TEXT ---\n${trimmedText}\n--- END DOCUMENT TEXT ---`;
   }
-  return EXTRACTION_INSTRUCTIONS;
+
+  return prompt;
 }
 
 export const AP_EXTRACTION_USER_PROMPT = EXTRACTION_INSTRUCTIONS;

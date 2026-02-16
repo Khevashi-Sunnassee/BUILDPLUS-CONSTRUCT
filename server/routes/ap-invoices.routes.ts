@@ -113,8 +113,18 @@ router.get("/api/ap-invoices", requireAuth, async (req: Request, res: Response) 
           createdAt: apInvoices.createdAt,
           updatedAt: apInvoices.updatedAt,
           supplierName: suppliers.name,
-          assigneeName: sql<string>`assignee_u.name`,
-          assigneeEmail: sql<string>`assignee_u.email`,
+          assigneeName: sql<string>`COALESCE(assignee_u.name, (
+            SELECT u2.name FROM ap_invoice_approvals aia
+            JOIN users u2 ON aia.approver_user_id = u2.id
+            WHERE aia.invoice_id = ${apInvoices.id} AND aia.status = 'PENDING'
+            ORDER BY aia.step_index ASC LIMIT 1
+          ))`,
+          assigneeEmail: sql<string>`COALESCE(assignee_u.email, (
+            SELECT u2.email FROM ap_invoice_approvals aia
+            JOIN users u2 ON aia.approver_user_id = u2.id
+            WHERE aia.invoice_id = ${apInvoices.id} AND aia.status = 'PENDING'
+            ORDER BY aia.step_index ASC LIMIT 1
+          ))`,
           createdByName: sql<string>`creator_u.name`,
           createdByEmail: sql<string>`creator_u.email`,
         })
@@ -1840,8 +1850,13 @@ router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, re
     const OpenAI = (await import("openai")).default;
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const { AP_EXTRACTION_SYSTEM_PROMPT, buildExtractionUserPrompt, parseExtractedData, buildExtractedFieldRecords, buildInvoiceUpdateFromExtraction, sanitizeNumericValue } = await import("../lib/ap-extraction-prompt");
+    const { getSupplierCostCodeContext } = await import("../lib/ap-auto-split");
 
-    const userPrompt = buildExtractionUserPrompt(extractedText);
+    let supplierContext = "";
+    if (invoice.supplierId) {
+      supplierContext = await getSupplierCostCodeContext(invoice.supplierId, companyId);
+    }
+    const userPrompt = buildExtractionUserPrompt(extractedText, supplierContext);
     const hasText = extractedText && extractedText.length > 100;
     const imageDetail = hasText ? "low" as const : "high" as const;
 
@@ -1909,6 +1924,24 @@ router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, re
     if (Object.keys(updateData).length > 0) {
       updateData.updatedAt = new Date();
       await db.update(apInvoices).set(updateData).where(eq(apInvoices.id, id));
+    }
+
+    const { createAutoSplit } = await import("../lib/ap-auto-split");
+    const totalInc = parseFloat(sanitizeNumericValue(data.total_amount_inc_gst) || "0");
+    const gstAmount = parseFloat(sanitizeNumericValue(data.total_gst) || "0");
+    const subtotal = parseFloat(sanitizeNumericValue(data.subtotal_ex_gst) || String(totalInc));
+
+    const autoSplitResult = await createAutoSplit(
+      id,
+      companyId,
+      updateData.supplierId || invoice.supplierId || null,
+      totalInc,
+      gstAmount,
+      subtotal,
+      data.description
+    );
+    if (autoSplitResult.created) {
+      logger.info({ invoiceId: id, ...autoSplitResult }, "Auto-split created with cost code after extraction");
     }
 
     await logActivity(id, "extraction_completed", "AI extraction completed", userId, {
