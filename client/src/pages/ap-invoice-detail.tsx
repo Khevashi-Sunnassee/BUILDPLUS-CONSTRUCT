@@ -46,7 +46,7 @@ interface InvoiceDetail {
   isUrgent: boolean;
   isOnHold: boolean;
   postPeriod: string | null;
-  supplier?: { id: string; name: string } | null;
+  supplier?: { id: string; name: string; defaultCostCodeId?: string | null } | null;
   assigneeUser?: { id: string; name: string; email: string } | null;
   createdByUser?: { id: string; name: string; email: string } | null;
   documents?: Array<{ id: string; fileName: string; mimeType: string; storageKey: string; fileSize?: number }>;
@@ -392,11 +392,13 @@ function InvoiceSummaryCard({ invoice, onFieldSave, onFieldFocus }: {
   );
 }
 
-function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
+function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplierId, supplierDefaultCostCodeId }: {
   invoiceId: string;
   invoiceTotal: number;
   splits: InvoiceSplit[];
   onSplitsChange: (splits: InvoiceSplit[]) => void;
+  supplierId?: string | null;
+  supplierDefaultCostCodeId?: string | null;
 }) {
   const { toast } = useToast();
 
@@ -412,8 +414,12 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
   const variance = invoiceTotal - totalAmount;
   const allocatedPercent = invoiceTotal > 0 ? (totalAmount / invoiceTotal) * 100 : 0;
 
+  const doSave = useCallback((updatedSplits: InvoiceSplit[], updateSupplierDefault: boolean) => {
+    saveMutation.mutate({ splits: updatedSplits, updateSupplierDefault });
+  }, []);
+
   const saveMutation = useMutation({
-    mutationFn: async (updatedSplits: InvoiceSplit[]) => {
+    mutationFn: async ({ splits: updatedSplits, updateSupplierDefault }: { splits: InvoiceSplit[]; updateSupplierDefault: boolean }) => {
       const payload = updatedSplits.map((s, idx) => ({
         description: s.description || null,
         percentage: s.percentage || null,
@@ -423,7 +429,7 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
         taxCodeId: s.taxCodeId || null,
         sortOrder: idx,
       }));
-      await apiRequest("PUT", AP_INVOICE_ROUTES.SPLITS(invoiceId), payload);
+      await apiRequest("PUT", AP_INVOICE_ROUTES.SPLITS(invoiceId), { splits: payload, updateSupplierDefault });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId)] });
@@ -581,7 +587,18 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
                   toast({ title: "Variance too high", description: `Split total ($${totalAmount.toFixed(2)}) does not match invoice total ($${invoiceTotal.toFixed(2)})`, variant: "destructive" });
                   return;
                 }
-                saveMutation.mutate(splits);
+                const firstCostCode = splits.find(s => s.costCodeId)?.costCodeId;
+                const hasDifferentCostCode = supplierId && firstCostCode && supplierDefaultCostCodeId && firstCostCode !== supplierDefaultCostCodeId;
+                const hasNewCostCode = supplierId && firstCostCode && !supplierDefaultCostCodeId;
+                if (hasDifferentCostCode) {
+                  const ccName = (costCodes || []).find(c => c.id === firstCostCode);
+                  const shouldUpdate = window.confirm(
+                    `Update supplier default cost code to "${ccName ? ccName.code + " - " + ccName.name : "selected code"}"?\n\nThis will apply to future invoices from this supplier.`
+                  );
+                  doSave(splits, shouldUpdate);
+                } else {
+                  doSave(splits, !!hasNewCostCode);
+                }
               }}
               disabled={saveMutation.isPending}
               data-testid="button-save-splits"
@@ -1459,6 +1476,8 @@ export default function ApInvoiceDetailPage() {
                 invoiceTotal={invoiceTotal}
                 splits={splits}
                 onSplitsChange={setSplits}
+                supplierId={invoice.supplierId}
+                supplierDefaultCostCodeId={invoice.supplier?.defaultCostCodeId}
               />
 
               <ActivitiesFeed invoiceId={invoiceId} />
