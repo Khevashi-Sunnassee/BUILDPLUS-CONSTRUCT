@@ -100,7 +100,7 @@ export default function MobilePmCallLogDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-screen bg-[#070B12] text-white" role="main" aria-label="Mobile PM Call Log Detail">
+      <div className="flex flex-col h-screen-safe bg-[#070B12] text-white" role="main" aria-label="Mobile PM Call Log Detail">
         <div className="px-4 py-6 space-y-4">
           <Skeleton className="h-8 w-48 bg-white/5" />
           <Skeleton className="h-32 w-full bg-white/5" />
@@ -112,7 +112,7 @@ export default function MobilePmCallLogDetailPage() {
 
   if (!log) {
     return (
-      <div className="flex flex-col h-screen bg-[#070B12] text-white items-center justify-center" role="main" aria-label="Mobile PM Call Log Detail">
+      <div className="flex flex-col h-screen-safe bg-[#070B12] text-white items-center justify-center" role="main" aria-label="Mobile PM Call Log Detail">
         <p className="text-white/50">Call log not found.</p>
         <Button
           variant="outline"
@@ -130,7 +130,7 @@ export default function MobilePmCallLogDetailPage() {
   const onTimeCount = log.levels.filter((l) => l.status === "ON_TIME").length;
 
   return (
-    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile PM Call Log Detail">
+    <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile PM Call Log Detail">
       <div
         className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}

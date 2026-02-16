@@ -238,7 +238,7 @@ export default function MobileHireBookingForm() {
   const selectedAsset = activeAssets.find(a => a.id === form.assetId);
 
   return (
-    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Hire Booking Form">
+    <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Hire Booking Form">
       <div
         className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}

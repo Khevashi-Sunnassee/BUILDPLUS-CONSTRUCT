@@ -185,8 +185,29 @@ function getMobileEquivalentRoute(desktopPath: string): string {
     '/chat': '/mobile/chat',
     '/logistics': '/mobile/logistics',
     '/purchase-orders': '/mobile/purchase-orders',
+    '/panels': '/mobile/panels',
+    '/documents': '/mobile/documents',
+    '/document-register': '/mobile/documents',
+    '/checklists': '/mobile/checklists',
+    '/broadcast': '/mobile/broadcast',
+    '/photo-gallery': '/mobile/photo-gallery',
+    '/hire-bookings': '/mobile/hire-bookings',
+    '/pm-call-logs': '/mobile/pm-call-logs',
+    '/capex-requests': '/mobile/capex-requests',
+    '/jobs': '/mobile/jobs',
+    '/sales-pipeline': '/mobile/more',
+    '/profile': '/mobile/profile',
   };
-  return routeMap[desktopPath] || '/mobile/dashboard';
+  if (routeMap[desktopPath]) return routeMap[desktopPath];
+  if (desktopPath.startsWith('/jobs/')) {
+    const jobId = desktopPath.split('/')[2];
+    if (jobId) return `/mobile/jobs/${jobId}`;
+  }
+  if (desktopPath.startsWith('/panels/')) {
+    const panelId = desktopPath.split('/')[2];
+    if (panelId) return `/mobile/panels/${panelId}`;
+  }
+  return '/mobile/dashboard';
 }
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {

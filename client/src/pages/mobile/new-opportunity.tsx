@@ -233,7 +233,7 @@ export default function MobileNewOpportunity() {
   );
 
   return (
-    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile New Opportunity">
+    <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile New Opportunity">
       <div
         className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}

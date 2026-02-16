@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+.h-screen-safe {
+  height: 100vh;
+  height: 100dvh;
+}
+
 .leaflet-container {
   isolation: isolate;
 }

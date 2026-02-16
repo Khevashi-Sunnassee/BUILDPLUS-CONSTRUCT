@@ -222,7 +222,7 @@ export default function MobileChecklistFillPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-screen bg-[#070B12] text-white items-center justify-center" role="main" aria-label="Mobile Checklist" aria-busy="true">
+      <div className="flex flex-col h-screen-safe bg-[#070B12] text-white items-center justify-center" role="main" aria-label="Mobile Checklist" aria-busy="true">
         <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
       </div>
     );
@@ -230,7 +230,7 @@ export default function MobileChecklistFillPage() {
 
   if (!instance || !template) {
     return (
-      <div className="flex flex-col h-screen bg-[#070B12] text-white items-center justify-center px-4" role="main" aria-label="Mobile Checklist">
+      <div className="flex flex-col h-screen-safe bg-[#070B12] text-white items-center justify-center px-4" role="main" aria-label="Mobile Checklist">
         <AlertCircle className="h-12 w-12 text-white/20 mb-3" />
         <p className="text-white/40 text-sm mb-4">Checklist not found</p>
         <button
@@ -245,7 +245,7 @@ export default function MobileChecklistFillPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Checklist">
+    <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Checklist">
       <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="px-4 py-3">
           <div className="flex items-center gap-3 mb-2">
