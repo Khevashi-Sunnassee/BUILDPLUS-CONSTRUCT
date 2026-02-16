@@ -18,6 +18,10 @@ async function doLogin(email: string, password: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
+  if (!res.ok) {
+    await res.text();
+    return { sessionCookie: "", csrfToken: "", userId: "" };
+  }
   const cookies = res.headers.getSetCookie?.() || [];
   const sessionCookie = cookies.map((c: string) => c.split(";")[0]).join("; ");
   const csrfCookie = cookies.find((c: string) => c.includes("csrf_token"));
@@ -31,15 +35,23 @@ export function isAdminLoggedIn() { return adminLoggedIn; }
 
 export async function loginAdmin() {
   if (adminLoggedIn && adminCookie) return;
-  try {
-    const result = await doLogin("admin@buildplus.ai", "admin123");
-    if (!result.sessionCookie) return;
-    adminCookie = result.sessionCookie;
-    adminCsrfToken = result.csrfToken;
-    adminUserId = result.userId;
-    adminLoggedIn = true;
-  } catch {
-    // admin login not available
+  const adminEmails = [
+    "admin@salvo.com.au",
+    "admin@lte.com.au",
+    "admin@buildplus.ai",
+  ];
+  for (const email of adminEmails) {
+    try {
+      const result = await doLogin(email, "admin123");
+      if (!result.sessionCookie) continue;
+      adminCookie = result.sessionCookie;
+      adminCsrfToken = result.csrfToken;
+      adminUserId = result.userId;
+      adminLoggedIn = true;
+      return;
+    } catch {
+      continue;
+    }
   }
 }
 

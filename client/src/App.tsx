@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ComponentType } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -205,16 +205,23 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+        data-testid="link-skip-navigation"
+      >
+        Skip to main content
+      </a>
       <div className="flex h-screen w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+          <header className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60" role="banner">
             <SidebarTrigger data-testid="button-sidebar-toggle" aria-label="Toggle sidebar navigation" />
             <div className="flex items-center gap-2">
               <UserSettingsPopover />
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-6 bg-background">
+          <main id="main-content" className="flex-1 overflow-auto p-6 bg-background" role="main" tabIndex={-1}>
             {children}
           </main>
         </div>
@@ -1063,6 +1070,28 @@ function Router() {
   );
 }
 
+function RouteAnnouncer() {
+  const [location] = useLocation();
+  const [announcement, setAnnouncement] = useState("");
+
+  useEffect(() => {
+    const pageName = location === "/" ? "Dashboard" : location.split("/").filter(Boolean).map(s => s.replace(/-/g, " ")).join(" - ");
+    setAnnouncement(`Navigated to ${pageName}`);
+  }, [location]);
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="sr-only"
+      data-testid="text-route-announcer"
+    >
+      {announcement}
+    </div>
+  );
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -1071,6 +1100,7 @@ function App() {
           <AuthProvider>
             <TooltipProvider>
               <HelpProvider>
+                <RouteAnnouncer />
                 <Router />
                 <HelpDrawer />
                 <Toaster />
