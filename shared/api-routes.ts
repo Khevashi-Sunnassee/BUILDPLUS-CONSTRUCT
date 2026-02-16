@@ -998,3 +998,19 @@ export const AP_INBOX_ROUTES = {
   WEBHOOK: '/api/webhooks/resend-inbound',
 } as const;
 export type ApInboxRoutes = typeof AP_INBOX_ROUTES;
+
+export const TENDER_INBOX_ROUTES = {
+  SETTINGS: '/api/tender-inbox/settings',
+  LIST: '/api/tender-inbox/emails',
+  BY_ID: (id: string | number) => `/api/tender-inbox/emails/${id}`,
+  CHECK_EMAILS: '/api/tender-inbox/check-emails',
+  BACKGROUND_STATUS: '/api/tender-inbox/background-status',
+  UPLOAD: '/api/tender-inbox/upload',
+  DOCUMENT_VIEW: (id: string | number) => `/api/tender-inbox/emails/${id}/document-view`,
+  EXTRACTED_FIELDS: (id: string | number) => `/api/tender-inbox/emails/${id}/extracted-fields`,
+  EXTRACT: (id: string | number) => `/api/tender-inbox/emails/${id}/extract`,
+  MATCH_TENDER: (id: string | number) => `/api/tender-inbox/emails/${id}/match`,
+  ACTIVITY: (id: string | number) => `/api/tender-inbox/emails/${id}/activity`,
+  COUNTS: '/api/tender-inbox/counts',
+} as const;
+export type TenderInboxRoutes = typeof TENDER_INBOX_ROUTES;

@@ -4992,6 +4992,105 @@ export type InsertApInboxSettings = z.infer<typeof insertApInboxSettingsSchema>;
 export type ApInboxSettings = typeof apInboxSettings.$inferSelect;
 
 // ============================================================================
+// TENDER EMAIL INBOX
+// ============================================================================
+
+export const tenderInboxSettings = pgTable("tender_inbox_settings", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  companyId: varchar("company_id", { length: 36 }).notNull().unique().references(() => companies.id),
+  isEnabled: boolean("is_enabled").default(false).notNull(),
+  inboundEmailAddress: varchar("inbound_email_address", { length: 255 }),
+  autoExtract: boolean("auto_extract").default(true).notNull(),
+  notifyUserIds: jsonb("notify_user_ids").$type<string[]>().default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTenderInboxSettingsSchema = createInsertSchema(tenderInboxSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTenderInboxSettings = z.infer<typeof insertTenderInboxSettingsSchema>;
+export type TenderInboxSettings = typeof tenderInboxSettings.$inferSelect;
+
+export const tenderInboundEmailStatusEnum = pgEnum("tender_inbound_email_status", [
+  "RECEIVED", "PROCESSING", "PROCESSED", "MATCHED", "ARCHIVED", "FAILED", "NO_ATTACHMENTS", "NO_PDF_ATTACHMENTS"
+]);
+
+export const tenderInboundEmails = pgTable("tender_inbound_emails", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  resendEmailId: varchar("resend_email_id", { length: 255 }).notNull(),
+  fromAddress: varchar("from_address", { length: 255 }).notNull(),
+  toAddress: varchar("to_address", { length: 255 }),
+  subject: varchar("subject", { length: 500 }),
+  status: varchar("status", { length: 50 }).notNull().default("RECEIVED"),
+  supplierId: varchar("supplier_id", { length: 36 }).references(() => suppliers.id),
+  tenderId: varchar("tender_id", { length: 36 }).references(() => tenders.id),
+  tenderSubmissionId: varchar("tender_submission_id", { length: 36 }).references(() => tenderSubmissions.id),
+  attachmentCount: integer("attachment_count").default(0),
+  processingError: text("processing_error"),
+  processedAt: timestamp("processed_at"),
+  matchedAt: timestamp("matched_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("tender_inbound_emails_company_idx").on(table.companyId),
+  resendIdx: index("tender_inbound_emails_resend_idx").on(table.resendEmailId),
+  statusIdx: index("tender_inbound_emails_status_idx").on(table.status),
+  supplierIdx: index("tender_inbound_emails_supplier_idx").on(table.supplierId),
+  tenderIdx: index("tender_inbound_emails_tender_idx").on(table.tenderId),
+}));
+
+export const insertTenderInboundEmailSchema = createInsertSchema(tenderInboundEmails).omit({ id: true, createdAt: true });
+export type InsertTenderInboundEmail = z.infer<typeof insertTenderInboundEmailSchema>;
+export type TenderInboundEmail = typeof tenderInboundEmails.$inferSelect;
+
+export const tenderEmailDocuments = pgTable("tender_email_documents", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  inboundEmailId: varchar("inbound_email_id", { length: 36 }).notNull().references(() => tenderInboundEmails.id, { onDelete: "cascade" }),
+  storageKey: text("storage_key").notNull(),
+  fileName: varchar("file_name", { length: 500 }).notNull(),
+  mimeType: varchar("mime_type", { length: 100 }),
+  fileSize: integer("file_size"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  emailIdx: index("tender_email_docs_email_idx").on(table.inboundEmailId),
+}));
+
+export const insertTenderEmailDocumentSchema = createInsertSchema(tenderEmailDocuments).omit({ id: true, createdAt: true });
+export type InsertTenderEmailDocument = z.infer<typeof insertTenderEmailDocumentSchema>;
+export type TenderEmailDocument = typeof tenderEmailDocuments.$inferSelect;
+
+export const tenderEmailExtractedFields = pgTable("tender_email_extracted_fields", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  inboundEmailId: varchar("inbound_email_id", { length: 36 }).notNull().references(() => tenderInboundEmails.id, { onDelete: "cascade" }),
+  fieldKey: varchar("field_key", { length: 100 }).notNull(),
+  fieldValue: text("field_value"),
+  confidence: numeric("confidence", { precision: 5, scale: 4 }),
+  source: varchar("source", { length: 50 }).default("extraction"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  emailIdx: index("tender_email_fields_email_idx").on(table.inboundEmailId),
+}));
+
+export const insertTenderEmailExtractedFieldSchema = createInsertSchema(tenderEmailExtractedFields).omit({ id: true, createdAt: true });
+export type InsertTenderEmailExtractedField = z.infer<typeof insertTenderEmailExtractedFieldSchema>;
+export type TenderEmailExtractedField = typeof tenderEmailExtractedFields.$inferSelect;
+
+export const tenderEmailActivity = pgTable("tender_email_activity", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  inboundEmailId: varchar("inbound_email_id", { length: 36 }).notNull().references(() => tenderInboundEmails.id, { onDelete: "cascade" }),
+  activityType: varchar("activity_type", { length: 50 }).notNull(),
+  message: text("message").notNull(),
+  actorUserId: varchar("actor_user_id", { length: 36 }).references(() => users.id),
+  metaJson: jsonb("meta_json"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  emailIdx: index("tender_email_activity_email_idx").on(table.inboundEmailId),
+}));
+
+export const insertTenderEmailActivitySchema = createInsertSchema(tenderEmailActivity).omit({ id: true, createdAt: true });
+export type InsertTenderEmailActivity = z.infer<typeof insertTenderEmailActivitySchema>;
+export type TenderEmailActivity = typeof tenderEmailActivity.$inferSelect;
+
+// ============================================================================
 // MYOB EXPORT LOGS
 // ============================================================================
 export const myobExportLogs = pgTable("myob_export_logs", {
