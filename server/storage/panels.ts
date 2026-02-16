@@ -1,4 +1,4 @@
-import { eq, and, asc, sql, ne, inArray, notInArray } from "drizzle-orm";
+import { eq, and, asc, sql, ne, gte, lt, inArray, notInArray } from "drizzle-orm";
 import { db } from "../db";
 import {
   panelRegister, jobs, productionEntries, loadListPanels,
@@ -332,9 +332,8 @@ export const panelMethods = {
     const panelsOnLoadListsSubquery = db.select({ panelId: loadListPanels.panelId }).from(loadListPanels);
     
     const conditions = [
-      eq(panelRegister.approvedForProduction, true),
-      eq(panelRegister.status, "COMPLETED"),
-      ne(panelRegister.lifecycleStatus, 0),
+      gte(panelRegister.lifecycleStatus, 8),
+      lt(panelRegister.lifecycleStatus, 11),
       notInArray(panelRegister.id, panelsOnLoadListsSubquery)
     ];
     if (companyId) {
