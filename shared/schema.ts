@@ -4990,3 +4990,24 @@ export const apInboxSettings = pgTable("ap_inbox_settings", {
 export const insertApInboxSettingsSchema = createInsertSchema(apInboxSettings).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertApInboxSettings = z.infer<typeof insertApInboxSettingsSchema>;
 export type ApInboxSettings = typeof apInboxSettings.$inferSelect;
+
+// ============================================================================
+// MYOB EXPORT LOGS
+// ============================================================================
+export const myobExportLogs = pgTable("myob_export_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  invoiceId: varchar("invoice_id").notNull().references(() => apInvoices.id),
+  userId: varchar("user_id").references(() => users.id),
+  status: varchar("status", { length: 50 }).notNull().default("PENDING"),
+  invoiceNumber: varchar("invoice_number", { length: 100 }),
+  supplierName: varchar("supplier_name", { length: 255 }),
+  totalAmount: numeric("total_amount", { precision: 12, scale: 2 }),
+  errorMessage: text("error_message"),
+  myobResponse: jsonb("myob_response"),
+  exportedAt: timestamp("exported_at").defaultNow().notNull(),
+});
+
+export const insertMyobExportLogSchema = createInsertSchema(myobExportLogs).omit({ id: true });
+export type InsertMyobExportLog = z.infer<typeof insertMyobExportLogSchema>;
+export type MyobExportLog = typeof myobExportLogs.$inferSelect;
