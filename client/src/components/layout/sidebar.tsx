@@ -107,6 +107,7 @@ const mainNavItems = [
 const productionNavItems = [
   { title: "Production Slots", url: "/production-slots", icon: Calendar },
   { title: "Production Schedule", url: "/production-schedule", icon: CalendarDays },
+  { title: "Production Booking", url: "/production-report", icon: Factory },
   { title: "Drafting Program", url: "/drafting-program", icon: Clock },
   { title: "Drafting Register", url: "/daily-reports", icon: FileText },
   { title: "Reo Scheduling", url: "/procurement-reo", icon: Layers },
@@ -130,7 +131,6 @@ const adminFinanceNavItems = [
 const managerNavItems = [
   { title: "KPI Dashboard", url: "/kpi-dashboard", icon: BarChart3 },
   { title: "Manager Review", url: "/manager/review", icon: CheckSquare },
-  { title: "Production Booking", url: "/production-report", icon: Factory },
   { title: "Checklist Reports", url: "/checklist-reports", icon: BarChart3 },
   { title: "Reports", url: "/reports", icon: Clock },
 ];
