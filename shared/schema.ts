@@ -4793,7 +4793,7 @@ export const apInvoices = pgTable("ap_invoices", {
   currency: text("currency").default("AUD"),
   status: apInvoiceStatusEnum("status").default("DRAFT").notNull(),
   assigneeUserId: varchar("assignee_user_id", { length: 36 }).references(() => users.id),
-  createdByUserId: varchar("created_by_user_id", { length: 36 }).notNull().references(() => users.id),
+  createdByUserId: varchar("created_by_user_id", { length: 36 }).references(() => users.id),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
   riskScore: integer("risk_score"),
   riskReasons: jsonb("risk_reasons"),
@@ -4803,6 +4803,7 @@ export const apInvoices = pgTable("ap_invoices", {
   myobBillId: text("myob_bill_id"),
   exportedAt: timestamp("exported_at"),
   exportError: jsonb("export_error"),
+  sourceEmail: varchar("source_email", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

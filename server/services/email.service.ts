@@ -140,3 +140,8 @@ class EmailService {
 }
 
 export const emailService = new EmailService();
+
+export async function getResendApiKey(): Promise<string> {
+  const { apiKey } = await getCredentials();
+  return apiKey;
+}
