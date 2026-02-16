@@ -420,7 +420,16 @@ router.post("/api/ap-invoices/upload", requireAuth, upload.array("files", 20), a
       });
 
       await logActivity(invoice.id, "uploaded", "Invoice uploaded", userId);
-      createdInvoices.push(invoice);
+
+      try {
+        const { extractInvoiceInline } = await import("../lib/ap-inbox-jobs");
+        await extractInvoiceInline(invoice.id, companyId, file.buffer, file.mimetype);
+        const [updated] = await db.select().from(apInvoices).where(eq(apInvoices.id, invoice.id)).limit(1);
+        createdInvoices.push(updated || invoice);
+      } catch (extractErr: any) {
+        logger.warn({ err: extractErr, invoiceId: invoice.id }, "Inline extraction failed during upload, will retry in background");
+        createdInvoices.push(invoice);
+      }
     }
 
     res.json(createdInvoices.length === 1 ? createdInvoices[0] : { invoices: createdInvoices, count: createdInvoices.length });

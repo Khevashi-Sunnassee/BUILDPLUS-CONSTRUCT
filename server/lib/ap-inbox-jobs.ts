@@ -299,19 +299,26 @@ async function processInboundEmail(
         sourceEmail: typeof emailDetail.from === "string" ? emailDetail.from : (emailDetail.from?.email || null),
       }).returning();
 
-      await db.insert(apInvoiceDocuments).values({
+      const [docRecord] = await db.insert(apInvoiceDocuments).values({
         invoiceId: invoice.id,
         storageKey,
         fileName: attachment.filename || `invoice-${Date.now()}.${fileExt}`,
         mimeType,
         fileSize: fileBuffer.length,
-      });
+      }).returning();
 
       await logActivity(invoice.id, "email_received", `Invoice received via email from ${emailDetail.from?.email || emailDetail.from || "unknown"}`, undefined, {
         inboundEmailId: inboundId,
         subject: emailDetail.subject,
         fromAddress: emailDetail.from,
       });
+
+      try {
+        await extractInvoiceDataFromBuffer(invoice.id, settings.companyId, fileBuffer, mimeType);
+        logger.info({ invoiceId: invoice.id }, "[AP Import] Inline extraction completed during email import");
+      } catch (extractErr: any) {
+        logger.warn({ err: extractErr, invoiceId: invoice.id }, "[AP Import] Inline extraction failed, will retry in background");
+      }
 
       if (!firstInvoiceId) firstInvoiceId = invoice.id;
     } catch (attErr: any) {
@@ -422,24 +429,26 @@ export async function processImportedInvoicesJob(): Promise<void> {
   }
 }
 
-async function extractInvoiceData(
+export async function extractInvoiceInline(
   invoiceId: string,
   companyId: string,
-  doc: typeof apInvoiceDocuments.$inferSelect
+  buffer: Buffer,
+  mimeType: string | null
 ): Promise<void> {
-  const file = await objectStorageService.getObjectEntityFile(doc.storageKey);
-  const chunks: Buffer[] = [];
-  const stream = file.createReadStream();
-  for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  }
-  const buffer = Buffer.concat(chunks);
+  return extractInvoiceDataFromBuffer(invoiceId, companyId, buffer, mimeType);
+}
 
+async function extractInvoiceDataFromBuffer(
+  invoiceId: string,
+  companyId: string,
+  buffer: Buffer,
+  mimeType: string | null
+): Promise<void> {
   const { prepareDocumentForExtraction } = await import("./ap-document-prep");
-  const { extractedText, imageBuffers } = await prepareDocumentForExtraction(buffer, doc.mimeType);
+  const { extractedText, imageBuffers } = await prepareDocumentForExtraction(buffer, mimeType);
 
   if (imageBuffers.length === 0) {
-    logger.warn({ invoiceId }, "[AP Background] Could not convert document to images");
+    logger.warn({ invoiceId }, "[AP Extract] Could not convert document to images");
     return;
   }
 
@@ -449,7 +458,6 @@ async function extractInvoiceData(
   const { AP_EXTRACTION_SYSTEM_PROMPT, buildExtractionUserPrompt, parseExtractedData, buildExtractedFieldRecords, buildInvoiceUpdateFromExtraction, sanitizeNumericValue } = await import("./ap-extraction-prompt");
 
   const userPrompt = buildExtractionUserPrompt(extractedText);
-
   const hasText = extractedText && extractedText.length > 100;
   const imageDetail = hasText ? "low" as const : "high" as const;
 
@@ -478,22 +486,31 @@ async function extractInvoiceData(
   try {
     rawData = JSON.parse(responseText);
   } catch {
-    logger.error({ invoiceId }, "[AP Background] Failed to parse extraction response");
+    logger.error({ invoiceId }, "[AP Extract] Failed to parse extraction response");
     return;
   }
 
   const data = parseExtractedData(rawData);
   const fieldRecords = buildExtractedFieldRecords(invoiceId, data);
 
-  for (const field of fieldRecords) {
-    await db.insert(apInvoiceExtractedFields).values({
-      invoiceId,
-      fieldKey: field.fieldKey,
-      fieldValue: field.fieldValue,
-      confidence: field.confidence,
-      bboxJson: null,
-      source: "extraction",
-    });
+  const [existingField] = await db.select({ id: apInvoiceExtractedFields.id })
+    .from(apInvoiceExtractedFields)
+    .where(eq(apInvoiceExtractedFields.invoiceId, invoiceId))
+    .limit(1);
+
+  if (existingField) {
+    logger.info({ invoiceId }, "[AP Extract] Extracted fields already exist, skipping insert");
+  } else {
+    for (const field of fieldRecords) {
+      await db.insert(apInvoiceExtractedFields).values({
+        invoiceId,
+        fieldKey: field.fieldKey,
+        fieldValue: field.fieldValue,
+        confidence: field.confidence,
+        bboxJson: null,
+        source: "extraction",
+      });
+    }
   }
 
   const updateData = buildInvoiceUpdateFromExtraction(data);
@@ -512,25 +529,47 @@ async function extractInvoiceData(
 
   await db.update(apInvoices).set(updateData).where(eq(apInvoices.id, invoiceId));
 
-  const totalInc = parseFloat(sanitizeNumericValue(data.total_amount_inc_gst) || "0");
-  if (totalInc > 0) {
-    const gstAmount = parseFloat(sanitizeNumericValue(data.total_gst) || "0");
-    const subtotal = parseFloat(sanitizeNumericValue(data.subtotal_ex_gst) || String(totalInc));
-    const taxCodeLabel = gstAmount > 0 ? "GST" : "FRE";
+  const [existingSplit] = await db.select({ id: apInvoiceSplits.id })
+    .from(apInvoiceSplits)
+    .where(eq(apInvoiceSplits.invoiceId, invoiceId))
+    .limit(1);
 
-    await db.insert(apInvoiceSplits).values({
-      invoiceId,
-      description: data.description || "Invoice total",
-      percentage: "100",
-      amount: subtotal > 0 ? subtotal.toFixed(2) : totalInc.toFixed(2),
-      taxCodeId: taxCodeLabel,
-      sortOrder: 0,
-    });
+  if (!existingSplit) {
+    const totalInc = parseFloat(sanitizeNumericValue(data.total_amount_inc_gst) || "0");
+    if (totalInc > 0) {
+      const gstAmount = parseFloat(sanitizeNumericValue(data.total_gst) || "0");
+      const subtotal = parseFloat(sanitizeNumericValue(data.subtotal_ex_gst) || String(totalInc));
+      const taxCodeLabel = gstAmount > 0 ? "GST" : "FRE";
+
+      await db.insert(apInvoiceSplits).values({
+        invoiceId,
+        description: data.description || "Invoice total",
+        percentage: "100",
+        amount: subtotal > 0 ? subtotal.toFixed(2) : totalInc.toFixed(2),
+        taxCodeId: taxCodeLabel,
+        sortOrder: 0,
+      });
+    }
   }
 
-  await logActivity(invoiceId, "auto_extraction_completed", "AI extraction completed automatically in background", undefined, {
+  await logActivity(invoiceId, "auto_extraction_completed", "AI extraction completed inline during import", undefined, {
     fieldsExtracted: fieldRecords.length,
   });
 
-  logger.info({ invoiceId, fieldsExtracted: fieldRecords.length }, "[AP Background] Extraction complete");
+  logger.info({ invoiceId, fieldsExtracted: fieldRecords.length }, "[AP Extract] Extraction complete");
+}
+
+async function extractInvoiceData(
+  invoiceId: string,
+  companyId: string,
+  doc: typeof apInvoiceDocuments.$inferSelect
+): Promise<void> {
+  const file = await objectStorageService.getObjectEntityFile(doc.storageKey);
+  const chunks: Buffer[] = [];
+  const stream = file.createReadStream();
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  const buffer = Buffer.concat(chunks);
+  await extractInvoiceDataFromBuffer(invoiceId, companyId, buffer, doc.mimeType);
 }
