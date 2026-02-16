@@ -13,7 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Search, Plus, MoreHorizontal, Trash2, Pencil, ChevronUp, ChevronDown, X, Loader2, HelpCircle } from "lucide-react";
+import { Search, Plus, MoreHorizontal, Trash2, Pencil, ChevronUp, ChevronDown, X, Loader2, HelpCircle, ArrowLeft } from "lucide-react";
+import { Link } from "wouter";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { ApApprovalCondition } from "@shared/schema";
 
@@ -773,16 +774,22 @@ export default function ApApprovalRulesPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-bold text-primary" data-testid="text-page-title">Approval Rules</h1>
-          <HelpCircle className="h-5 w-5 text-muted-foreground" />
+    <div className="flex flex-col h-full">
+      <div className="p-6 space-y-4 flex-1 overflow-auto">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <Link href="/ap-invoices">
+              <Button variant="ghost" size="sm" data-testid="button-back-invoices">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-semibold" data-testid="text-page-title">Approval Rules</h1>
+          </div>
+          <Button onClick={handleCreate} data-testid="button-create-rule">
+            Create approval rule
+          </Button>
         </div>
-        <Button onClick={handleCreate} data-testid="button-create-rule">
-          Create approval rule
-        </Button>
-      </div>
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-6">
@@ -869,7 +876,7 @@ export default function ApApprovalRulesPage() {
             >
               <div>
                 <button
-                  className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline text-left"
+                  className="text-sm font-medium text-primary hover:underline text-left"
                   onClick={() => handleEdit(rule)}
                   data-testid={`link-rule-name-${rule.id}`}
                 >
@@ -933,38 +940,39 @@ export default function ApApprovalRulesPage() {
         )}
       </div>
 
-      {formOpen && (
-        <RuleFormDialog
-          open={formOpen}
-          onOpenChange={handleFormClose}
-          rule={editingRule}
-        />
-      )}
+        {formOpen && (
+          <RuleFormDialog
+            open={formOpen}
+            onOpenChange={handleFormClose}
+            rule={editingRule}
+          />
+        )}
 
-      <Dialog open={deleteConfirmId !== null} onOpenChange={(v) => !v && setDeleteConfirmId(null)}>
-        <DialogContent data-testid="dialog-delete-rule-confirm">
-          <DialogHeader>
-            <DialogTitle>Delete Approval Rule</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Are you sure you want to delete this approval rule? This action cannot be undone.
-          </p>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setDeleteConfirmId(null)} data-testid="button-cancel-delete">
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => deleteConfirmId && deleteMutation.mutate(deleteConfirmId)}
-              disabled={deleteMutation.isPending}
-              data-testid="button-confirm-delete"
-            >
-              {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        <Dialog open={deleteConfirmId !== null} onOpenChange={(v) => !v && setDeleteConfirmId(null)}>
+          <DialogContent data-testid="dialog-delete-rule-confirm">
+            <DialogHeader>
+              <DialogTitle>Delete Approval Rule</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete this approval rule? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setDeleteConfirmId(null)} data-testid="button-cancel-delete">
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => deleteConfirmId && deleteMutation.mutate(deleteConfirmId)}
+                disabled={deleteMutation.isPending}
+                data-testid="button-confirm-delete"
+              >
+                {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Delete
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 }
