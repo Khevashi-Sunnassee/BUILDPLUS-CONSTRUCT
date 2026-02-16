@@ -15,6 +15,7 @@ import {
   costCodes, jobs, companies, myobExportLogs, apInboundEmails
 } from "@shared/schema";
 import type { ApApprovalCondition } from "@shared/schema";
+import { assignApprovalPathToInvoice, reassignApprovalPathsForCompany } from "../lib/ap-approval-assign";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -628,134 +629,20 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
       return res.status(400).json({ error: "Invoice must be confirmed before submitting for approval" });
     }
 
-    await db.delete(apInvoiceApprovals).where(eq(apInvoiceApprovals.invoiceId, id));
+    const approvalResult = await assignApprovalPathToInvoice(id, companyId, userId);
 
-    const rules = await db
-      .select()
-      .from(apApprovalRules)
-      .where(and(eq(apApprovalRules.companyId, companyId), eq(apApprovalRules.isActive, true)))
-      .orderBy(asc(apApprovalRules.priority));
-
-    const invoiceTotal = parseFloat(existing.totalInc || "0");
-
-    const splits = await db
-      .select()
-      .from(apInvoiceSplits)
-      .where(eq(apInvoiceSplits.invoiceId, id));
-
-    const splitJobIds = splits.map(s => s.jobId).filter(Boolean) as string[];
-    const splitCostCodeIds = splits.map(s => s.costCodeId).filter(Boolean) as string[];
-
-    function evaluateCondition(cond: ApApprovalCondition): boolean {
-      const { field, operator, values } = cond;
-      if (!values || values.length === 0) return true;
-
-      if (field === "COMPANY") {
-        const invoiceVal = existing.companyId;
-        if (operator === "EQUALS") return values.some(v => v === invoiceVal);
-        if (operator === "NOT_EQUALS") return values.every(v => v !== invoiceVal);
-        return false;
-      }
-
-      if (field === "AMOUNT") {
-        const condVal = parseFloat(values[0]);
-        if (isNaN(condVal)) return false;
-        switch (operator) {
-          case "EQUALS": return invoiceTotal === condVal;
-          case "NOT_EQUALS": return invoiceTotal !== condVal;
-          case "GREATER_THAN": return invoiceTotal > condVal;
-          case "LESS_THAN": return invoiceTotal < condVal;
-          case "GREATER_THAN_OR_EQUALS": return invoiceTotal >= condVal;
-          case "LESS_THAN_OR_EQUALS": return invoiceTotal <= condVal;
-          default: return false;
-        }
-      }
-
-      if (field === "JOB") {
-        if (operator === "EQUALS") return splitJobIds.some(jId => values.includes(jId));
-        return false;
-      }
-
-      if (field === "SUPPLIER") {
-        const invoiceVal = existing.supplierId || "";
-        if (operator === "EQUALS") return values.some(v => v === invoiceVal);
-        if (operator === "NOT_EQUALS") return values.every(v => v !== invoiceVal);
-        return false;
-      }
-
-      if (field === "GL_CODE") {
-        if (operator === "EQUALS") return splitCostCodeIds.some(ccId => values.includes(ccId));
-        return false;
-      }
-
-      return false;
-    }
-
-    function ruleMatchesInvoice(rule: typeof rules[number]): boolean {
-      const ruleType = (rule as any).ruleType || "USER";
-      if (ruleType === "USER_CATCH_ALL") return true;
-
-      const conditionsData = rule.conditions as any;
-      if (!conditionsData) return true;
-
-      if (Array.isArray(conditionsData)) {
-        if (conditionsData.length === 0) return true;
-        return conditionsData.every((cond: ApApprovalCondition) => evaluateCondition(cond));
-      }
-
-      if (typeof conditionsData === "object" && conditionsData !== null) {
-        if (conditionsData.minAmount && invoiceTotal < parseFloat(conditionsData.minAmount)) return false;
-        if (conditionsData.maxAmount && invoiceTotal > parseFloat(conditionsData.maxAmount)) return false;
-        if (conditionsData.supplierId && conditionsData.supplierId !== existing.supplierId) return false;
-        return true;
-      }
-
-      return true;
-    }
-
-    logger.info({ invoiceId: id, rulesCount: rules.length, invoiceTotal, companyId }, "Evaluating approval rules for invoice");
-
-    let matchedRule: typeof rules[number] | null = null;
-    for (const rule of rules) {
-      const matches = ruleMatchesInvoice(rule);
-      logger.info({ ruleId: rule.id, ruleName: rule.name, ruleType: (rule as any).ruleType, matches, conditions: rule.conditions }, "Rule evaluation result");
-      if (matches && !matchedRule) {
-        matchedRule = rule;
-      }
-    }
-
-    let approvalStepIndex = 0;
-    let autoApproved = false;
-
-    if (matchedRule) {
-      const ruleType = (matchedRule as any).ruleType || "USER";
-      logger.info({ matchedRuleId: matchedRule.id, matchedRuleName: matchedRule.name, ruleType, approverCount: matchedRule.approverUserIds.length }, "Matched approval rule");
-      if (ruleType === "AUTO_APPROVE" || matchedRule.autoApprove) {
-        autoApproved = true;
-      } else {
-        for (let i = 0; i < matchedRule.approverUserIds.length; i++) {
-          const approverUserId = matchedRule.approverUserIds[i];
-          await db.insert(apInvoiceApprovals).values({
-            invoiceId: id,
-            stepIndex: i,
-            approverUserId,
-            status: "PENDING",
-            ruleId: matchedRule.id,
-          });
-          approvalStepIndex++;
-          logger.info({ invoiceId: id, stepIndex: i, approverUserId }, "Created approval step");
-        }
-      }
-    } else {
-      logger.warn({ invoiceId: id, companyId }, "No approval rule matched invoice - submitting without approvers");
-    }
+    const existingApprovals = await db.select().from(apInvoiceApprovals)
+      .where(eq(apInvoiceApprovals.invoiceId, id));
 
     let newStatus: string;
-    if (autoApproved && approvalStepIndex === 0) {
+    if (approvalResult.matched && approvalResult.approverCount === 0) {
       newStatus = "APPROVED";
       await logActivity(id, "auto_approved", "Invoice auto-approved by rule", userId);
+    } else if (existingApprovals.length > 0) {
+      newStatus = "PARTIALLY_APPROVED";
     } else {
       newStatus = "PARTIALLY_APPROVED";
+      logger.warn({ invoiceId: id, companyId }, "No approval path found - submitting as partially approved");
     }
 
     const [updated] = await db
@@ -764,7 +651,7 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
       .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
       .returning();
 
-    await logActivity(id, "submitted", `Invoice submitted for approval (${approvalStepIndex} approver(s) assigned via rule: ${matchedRule?.name || 'none'})`, userId);
+    await logActivity(id, "submitted", `Invoice submitted for approval (${existingApprovals.length} approver(s) via rule: ${approvalResult.ruleName || 'none'})`, userId);
 
     res.json(updated);
   } catch (error: unknown) {
@@ -1564,6 +1451,10 @@ router.post("/api/ap-approval-rules", requireAuth, async (req: Request, res: Res
       })
       .returning();
 
+    reassignApprovalPathsForCompany(companyId).catch(err =>
+      logger.error({ err }, "Failed to reassign approval paths after rule creation")
+    );
+
     res.json(rule);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating AP approval rule");
@@ -1606,6 +1497,10 @@ router.patch("/api/ap-approval-rules/:id", requireAuth, async (req: Request, res
       .where(and(eq(apApprovalRules.id, id), eq(apApprovalRules.companyId, companyId)))
       .returning();
 
+    reassignApprovalPathsForCompany(companyId).catch(err =>
+      logger.error({ err }, "Failed to reassign approval paths after rule update")
+    );
+
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating AP approval rule");
@@ -1628,6 +1523,10 @@ router.delete("/api/ap-approval-rules/:id", requireAuth, async (req: Request, re
     if (!existing) return res.status(404).json({ error: "Approval rule not found" });
 
     await db.delete(apApprovalRules).where(and(eq(apApprovalRules.id, id), eq(apApprovalRules.companyId, companyId)));
+
+    reassignApprovalPathsForCompany(companyId).catch(err =>
+      logger.error({ err }, "Failed to reassign approval paths after rule deletion")
+    );
 
     res.json({ success: true });
   } catch (error: unknown) {
@@ -2015,6 +1914,13 @@ router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, re
     await logActivity(id, "extraction_completed", "AI extraction completed", userId, {
       fieldsExtracted: fieldRecords.length,
     });
+
+    try {
+      const approvalResult = await assignApprovalPathToInvoice(id, companyId, userId);
+      logger.info({ invoiceId: id, matched: approvalResult.matched, ruleName: approvalResult.ruleName }, "Approval path assigned after extraction");
+    } catch (approvalErr) {
+      logger.warn({ err: approvalErr, invoiceId: id }, "Failed to assign approval path after extraction (non-fatal)");
+    }
 
     res.json({
       success: true,

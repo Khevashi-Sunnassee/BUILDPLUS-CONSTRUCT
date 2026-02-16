@@ -7,6 +7,7 @@ import {
 } from "@shared/schema";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import { getResendApiKey } from "../services/email.service";
+import { assignApprovalPathToInvoice } from "./ap-approval-assign";
 import crypto from "crypto";
 
 const objectStorageService = new ObjectStorageService();
@@ -568,6 +569,13 @@ async function extractInvoiceDataFromBuffer(
   await logActivity(invoiceId, "auto_extraction_completed", "AI extraction completed inline during import", undefined, {
     fieldsExtracted: fieldRecords.length,
   });
+
+  try {
+    const result = await assignApprovalPathToInvoice(invoiceId, companyId);
+    logger.info({ invoiceId, matched: result.matched, ruleName: result.ruleName, approverCount: result.approverCount }, "[AP Extract] Approval path assignment after extraction");
+  } catch (approvalErr) {
+    logger.warn({ err: approvalErr, invoiceId }, "[AP Extract] Failed to assign approval path (non-fatal)");
+  }
 
   logger.info({ invoiceId, fieldsExtracted: fieldRecords.length }, "[AP Extract] Extraction complete");
 }

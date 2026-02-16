@@ -1105,7 +1105,7 @@ export default function ApInvoiceDetailPage() {
 
   const { data: approvalData } = useQuery<ApprovalPathResponse>({
     queryKey: [AP_INVOICE_ROUTES.APPROVAL_PATH(invoiceId || "")],
-    enabled: !!invoiceId && ["PARTIALLY_APPROVED", "APPROVED", "REJECTED", "EXPORTED"].includes(invoice?.status || ""),
+    enabled: !!invoiceId,
   });
 
   const isCurrentApprover = useMemo(() => {
