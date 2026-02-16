@@ -491,18 +491,17 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">#</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead className="w-40">Job</TableHead>
+                <TableHead className="w-40">Cost Code</TableHead>
                 <TableHead className="w-20">%</TableHead>
                 <TableHead className="w-28 text-right">Amount</TableHead>
-                <TableHead className="w-36">Cost Code</TableHead>
-                <TableHead className="w-36">Job</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {splits.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-6">
+                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">
                     No splits added yet
                   </TableCell>
                 </TableRow>
@@ -511,13 +510,30 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
                   <TableRow key={i} data-testid={`row-split-${i}`}>
                     <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
                     <TableCell>
-                      <Input
-                        value={split.description || ""}
-                        onChange={(e) => updateSplit(i, "description", e.target.value)}
-                        className="h-7 text-sm border-0 bg-transparent p-0 focus-visible:ring-1"
-                        placeholder="Description"
-                        data-testid={`input-split-desc-${i}`}
-                      />
+                      <Select value={split.jobId || "none"} onValueChange={(v) => updateSplit(i, "jobId", v === "none" ? null : v)}>
+                        <SelectTrigger className="h-7 text-sm border-0 bg-transparent p-0" data-testid={`select-split-job-${i}`}>
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {(jobs || []).map(j => (
+                            <SelectItem key={j.id} value={j.id}>{j.jobNumber} - {j.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Select value={split.costCodeId || "none"} onValueChange={(v) => updateSplit(i, "costCodeId", v === "none" ? null : v)}>
+                        <SelectTrigger className="h-7 text-sm border-0 bg-transparent p-0" data-testid={`select-split-costcode-${i}`}>
+                          <SelectValue placeholder="Select..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {(costCodes || []).map(cc => (
+                            <SelectItem key={cc.id} value={cc.id}>{cc.code} - {cc.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
                       <Input
@@ -536,32 +552,6 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange }: {
                         className="h-7 text-sm border-0 bg-transparent p-0 w-24 text-right focus-visible:ring-1"
                         data-testid={`input-split-amount-${i}`}
                       />
-                    </TableCell>
-                    <TableCell>
-                      <Select value={split.costCodeId || "none"} onValueChange={(v) => updateSplit(i, "costCodeId", v === "none" ? null : v)}>
-                        <SelectTrigger className="h-7 text-sm border-0 bg-transparent p-0" data-testid={`select-split-costcode-${i}`}>
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {(costCodes || []).map(cc => (
-                            <SelectItem key={cc.id} value={cc.id}>{cc.code} - {cc.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Select value={split.jobId || "none"} onValueChange={(v) => updateSplit(i, "jobId", v === "none" ? null : v)}>
-                        <SelectTrigger className="h-7 text-sm border-0 bg-transparent p-0" data-testid={`select-split-job-${i}`}>
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          {(jobs || []).map(j => (
-                            <SelectItem key={j.id} value={j.id}>{j.jobNumber} - {j.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                     </TableCell>
                     <TableCell>
                       <Button size="icon" variant="ghost" onClick={() => removeSplit(i)} data-testid={`button-remove-split-${i}`}>
