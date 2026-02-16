@@ -131,8 +131,8 @@ router.post("/api/ap-inbox/check-emails", requireAuth, async (req: Request, res:
     const maxPages = 10;
 
     while (hasMore && pageCount < maxPages) {
-      const url = new URL("https://api.resend.com/received-emails");
-      if (cursor) url.searchParams.set("starting_after", cursor);
+      const url = new URL("https://api.resend.com/emails/receiving/list");
+      if (cursor) url.searchParams.set("after", cursor);
 
       const listRes = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${apiKey}` },
@@ -192,16 +192,24 @@ router.post("/api/ap-inbox/check-emails", requireAuth, async (req: Request, res:
 
         let hasAttachments = false;
         try {
-          const attRes = await fetch(`https://api.resend.com/received-emails/${emailId}/attachments`, {
-            headers: { Authorization: `Bearer ${apiKey}` },
-          });
-          if (attRes.ok) {
-            const attData = await attRes.json();
-            const attachments = attData.data || attData || [];
-            hasAttachments = attachments.length > 0;
+          const emailAttachments = Array.isArray(email.attachments) ? email.attachments : [];
+          if (emailAttachments.length > 0) {
+            hasAttachments = true;
             await db.update(apInboundEmails)
-              .set({ attachmentCount: attachments.length })
+              .set({ attachmentCount: emailAttachments.length })
               .where(eq(apInboundEmails.id, inboundRecord.id));
+          } else {
+            const attRes = await fetch(`https://api.resend.com/emails/${emailId}/receiving/attachments`, {
+              headers: { Authorization: `Bearer ${apiKey}` },
+            });
+            if (attRes.ok) {
+              const attData = await attRes.json();
+              const attachments = Array.isArray(attData.data) ? attData.data : (Array.isArray(attData) ? attData : []);
+              hasAttachments = attachments.length > 0;
+              await db.update(apInboundEmails)
+                .set({ attachmentCount: attachments.length })
+                .where(eq(apInboundEmails.id, inboundRecord.id));
+            }
           }
         } catch {}
 
@@ -373,7 +381,7 @@ async function processInboundEmail(
 
     const apiKey = await getResendApiKey();
 
-    const emailDetailRes = await fetch(`https://api.resend.com/emails/${resendEmailId}`, {
+    const emailDetailRes = await fetch(`https://api.resend.com/emails/${resendEmailId}/receiving`, {
       headers: { Authorization: `Bearer ${apiKey}` },
     });
 
@@ -383,14 +391,19 @@ async function processInboundEmail(
 
     const emailDetail = await emailDetailRes.json();
 
-    const attachmentsRes = await fetch(`https://api.resend.com/emails/${resendEmailId}/attachments`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-
     let attachments: any[] = [];
-    if (attachmentsRes.ok) {
-      const attachData = await attachmentsRes.json();
-      attachments = attachData.data || attachData || [];
+    if (Array.isArray(emailDetail.attachments) && emailDetail.attachments.length > 0) {
+      for (const att of emailDetail.attachments) {
+        const attDetailRes = await fetch(`https://api.resend.com/emails/${resendEmailId}/receiving/attachments/${att.id}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (attDetailRes.ok) {
+          const attDetail = await attDetailRes.json();
+          attachments.push({ ...att, ...attDetail });
+        } else {
+          attachments.push(att);
+        }
+      }
     }
 
     const pdfAttachments = attachments.filter((att: any) =>
