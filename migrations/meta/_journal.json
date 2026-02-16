@@ -50,6 +50,13 @@
       "when": 1770857010235,
       "tag": "0006_military_red_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1770940200000,
+      "tag": "0007_add_performance_indexes",
+      "breakpoints": true
     }
   ]
 }

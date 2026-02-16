@@ -40,9 +40,10 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Scalability:** Supports 300+ simultaneous users.
 - **Robustness:** Extensive input validation using Zod, comprehensive error handling, and consistent API response structures.
 - **Security:** Role-Based Access Control (RBAC), authentication via `bcrypt` and `express-session`, and UUID validation.
-- **Data Integrity:** Enforced through 142 CHECK constraints, 61 unique constraints, and 390 foreign keys.
+- **Data Integrity:** Enforced through 142 CHECK constraints, 61 unique constraints, and 390 foreign keys. Performance indexes on all user_id and created_at columns.
+- **Query Safety:** All list endpoints and multi-row queries have pagination limits to prevent unbounded result sets at scale.
 - **Accessibility:** All interactive elements and pages adhere to accessibility standards (`aria-label`, `aria-required`, `role="alert"`).
-- **Testing:** Frontend tested with React Testing Library + Vitest (135 files, 562+ tests); data integrity verified with comprehensive company isolation tests.
+- **Testing:** Frontend tested with React Testing Library + Vitest (135 files, 562+ tests); backend tested with 43+ API integration tests covering company isolation, data integrity, pagination, rate limiting, and input sanitization.
 
 ## Lifecycle Testing
 

@@ -342,7 +342,8 @@ router.post("/api/purchase-orders/:id/receive", requireAuth, async (req, res) =>
     }
 
     const allItems = await db.select().from(purchaseOrderItems)
-      .where(eq(purchaseOrderItems.purchaseOrderId, String(req.params.id)));
+      .where(eq(purchaseOrderItems.purchaseOrderId, String(req.params.id)))
+      .limit(1000);
 
     if (allItems.length === 0) {
       return res.status(400).json({ error: "No items found for this purchase order" });

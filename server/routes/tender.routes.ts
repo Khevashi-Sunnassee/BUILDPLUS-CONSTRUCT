@@ -2799,11 +2799,13 @@ router.get("/api/tender-members/:id/updates", requireAuth, requirePermission("te
     }).from(tenderMemberUpdates)
       .leftJoin(users, eq(tenderMemberUpdates.userId, users.id))
       .where(eq(tenderMemberUpdates.tenderMemberId, memberId))
-      .orderBy(desc(tenderMemberUpdates.createdAt));
+      .orderBy(desc(tenderMemberUpdates.createdAt))
+      .limit(1000);
 
     const updatesWithFiles = await Promise.all(updates.map(async (update) => {
       const files = await db.select().from(tenderMemberFiles)
-        .where(eq(tenderMemberFiles.updateId, update.id));
+        .where(eq(tenderMemberFiles.updateId, update.id))
+        .limit(100);
       return { ...update, files };
     }));
 

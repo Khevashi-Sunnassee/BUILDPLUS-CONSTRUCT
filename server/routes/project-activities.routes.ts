@@ -115,9 +115,11 @@ const upload = multer({
 router.get("/api/job-types", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const result = await db.select().from(jobTypes)
       .where(eq(jobTypes.companyId, companyId!))
-      .orderBy(asc(jobTypes.sortOrder), asc(jobTypes.name));
+      .orderBy(asc(jobTypes.sortOrder), asc(jobTypes.name))
+      .limit(safeLimit);
 
     const templateCounts = await db
       .select({ jobTypeId: activityTemplates.jobTypeId, count: count() })
@@ -221,9 +223,11 @@ router.delete("/api/job-types/:id", requireAuth, requireRole("ADMIN"), async (re
 router.get("/api/activity-stages", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const result = await db.select().from(activityStages)
       .where(eq(activityStages.companyId, companyId!))
-      .orderBy(asc(activityStages.sortOrder), asc(activityStages.stageNumber));
+      .orderBy(asc(activityStages.sortOrder), asc(activityStages.stageNumber))
+      .limit(safeLimit);
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching activity stages");
@@ -299,9 +303,11 @@ router.delete("/api/activity-stages/:id", requireAuth, requireRole("ADMIN"), asy
 router.get("/api/activity-consultants", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const result = await db.select().from(activityConsultants)
       .where(eq(activityConsultants.companyId, companyId!))
-      .orderBy(asc(activityConsultants.sortOrder), asc(activityConsultants.name));
+      .orderBy(asc(activityConsultants.sortOrder), asc(activityConsultants.name))
+      .limit(safeLimit);
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching consultants");
@@ -384,7 +390,8 @@ router.get("/api/job-types/:jobTypeId/templates", requireAuth, async (req, res) 
 
     const templates = await db.select().from(activityTemplates)
       .where(and(eq(activityTemplates.jobTypeId, jobTypeId), eq(activityTemplates.companyId, companyId!)))
-      .orderBy(asc(activityTemplates.sortOrder));
+      .orderBy(asc(activityTemplates.sortOrder))
+      .limit(1000);
 
     const templateIds = templates.map(t => t.id);
 
@@ -392,10 +399,12 @@ router.get("/api/job-types/:jobTypeId/templates", requireAuth, async (req, res) 
       ? await Promise.all([
           db.select().from(activityTemplateSubtasks)
             .where(inArray(activityTemplateSubtasks.templateId, templateIds))
-            .orderBy(asc(activityTemplateSubtasks.sortOrder)),
+            .orderBy(asc(activityTemplateSubtasks.sortOrder))
+            .limit(1000),
           db.select().from(activityTemplateChecklists)
             .where(inArray(activityTemplateChecklists.templateId, templateIds))
-            .orderBy(asc(activityTemplateChecklists.sortOrder)),
+            .orderBy(asc(activityTemplateChecklists.sortOrder))
+            .limit(1000),
         ])
       : [[], []] as [typeof activityTemplateSubtasks.$inferSelect[], typeof activityTemplateChecklists.$inferSelect[]];
 
@@ -518,9 +527,11 @@ router.post("/api/job-types/:jobTypeId/templates/reorder", requireAuth, requireR
 
 router.get("/api/activity-templates/:templateId/subtasks", requireAuth, async (req, res) => {
   try {
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const result = await db.select().from(activityTemplateSubtasks)
       .where(eq(activityTemplateSubtasks.templateId, String(req.params.templateId)))
-      .orderBy(asc(activityTemplateSubtasks.sortOrder));
+      .orderBy(asc(activityTemplateSubtasks.sortOrder))
+      .limit(safeLimit);
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching template subtasks");
@@ -592,9 +603,11 @@ router.get("/api/activity-templates/:templateId/checklists", requireAuth, async 
       .where(and(eq(activityTemplates.id, templateId), eq(activityTemplates.companyId, companyId!)));
     if (!tmpl) return res.status(404).json({ error: "Template not found" });
 
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const result = await db.select().from(activityTemplateChecklists)
       .where(eq(activityTemplateChecklists.templateId, templateId))
-      .orderBy(asc(activityTemplateChecklists.sortOrder));
+      .orderBy(asc(activityTemplateChecklists.sortOrder))
+      .limit(safeLimit);
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching template checklists");
@@ -662,7 +675,8 @@ router.get("/api/jobs/:jobId/activities", requireAuth, async (req, res) => {
 
     const activities = await db.select().from(jobActivities)
       .where(and(eq(jobActivities.jobId, jobId), eq(jobActivities.companyId, companyId!)))
-      .orderBy(asc(jobActivities.sortOrder));
+      .orderBy(asc(jobActivities.sortOrder))
+      .limit(1000);
 
     const activityIds = activities.map(a => a.id);
 
@@ -671,7 +685,8 @@ router.get("/api/jobs/:jobId/activities", requireAuth, async (req, res) => {
     if (activityIds.length > 0) {
       const [assigneesResult, clRows] = await Promise.all([
         db.select().from(jobActivityAssignees)
-          .where(inArray(jobActivityAssignees.activityId, activityIds)),
+          .where(inArray(jobActivityAssignees.activityId, activityIds))
+          .limit(1000),
         db.select({
           activityId: jobActivityChecklists.activityId,
           total: count(),
@@ -720,7 +735,8 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
 
     const templates = await db.select().from(activityTemplates)
       .where(and(eq(activityTemplates.jobTypeId, jobTypeId), eq(activityTemplates.companyId, companyId!)))
-      .orderBy(asc(activityTemplates.sortOrder));
+      .orderBy(asc(activityTemplates.sortOrder))
+      .limit(1000);
 
     if (templates.length === 0) {
       return res.status(400).json({ error: "No templates found for this job type. Build the workflow first." });
@@ -731,12 +747,14 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
       ? await db.select().from(activityTemplateSubtasks)
           .where(inArray(activityTemplateSubtasks.templateId, templateIds))
           .orderBy(asc(activityTemplateSubtasks.sortOrder))
+          .limit(1000)
       : [];
 
     const filteredChecklists = templateIds.length > 0
       ? await db.select().from(activityTemplateChecklists)
           .where(inArray(activityTemplateChecklists.templateId, templateIds))
           .orderBy(asc(activityTemplateChecklists.sortOrder))
+          .limit(1000)
       : [];
 
     function addWorkingDays(from: Date, days: number): Date {
@@ -913,7 +931,8 @@ router.post("/api/jobs/:jobId/activities/sync-predecessors", requireAuth, requir
         eq(jobActivities.companyId, companyId!),
         isNull(jobActivities.parentId)
       ))
-      .orderBy(asc(jobActivities.sortOrder));
+      .orderBy(asc(jobActivities.sortOrder))
+      .limit(1000);
 
     if (activities.length === 0) {
       return res.status(404).json({ error: "No activities found for this job" });
@@ -925,7 +944,8 @@ router.post("/api/jobs/:jobId/activities/sync-predecessors", requireAuth, requir
     }
 
     const templates = await db.select().from(activityTemplates)
-      .where(inArray(activityTemplates.id, templateIds));
+      .where(inArray(activityTemplates.id, templateIds))
+      .limit(1000);
 
     const templateMap = new Map(templates.map(t => [t.id, t]));
 
@@ -1008,7 +1028,8 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
 
     if (updateData.status === "DONE") {
       const checklists = await db.select().from(jobActivityChecklists)
-        .where(eq(jobActivityChecklists.activityId, id));
+        .where(eq(jobActivityChecklists.activityId, id))
+        .limit(1000);
       if (checklists.length > 0) {
         const incomplete = checklists.filter(c => !c.isCompleted);
         if (incomplete.length > 0) {
@@ -1133,7 +1154,8 @@ router.post("/api/jobs/:jobId/activities/recalculate", requireAuth, async (req, 
         eq(jobActivities.companyId, companyId!),
         sql`${jobActivities.parentId} IS NULL`
       ))
-      .orderBy(asc(jobActivities.sortOrder));
+      .orderBy(asc(jobActivities.sortOrder))
+      .limit(1000);
 
     if (activities.length === 0) {
       return res.json({ success: true, updated: 0 });
@@ -1213,7 +1235,8 @@ router.get("/api/job-activities/:id/assignees", requireAuth, async (req, res) =>
   try {
     const id = req.params.id as string;
     const result = await db.select().from(jobActivityAssignees)
-      .where(eq(jobActivityAssignees.activityId, id));
+      .where(eq(jobActivityAssignees.activityId, id))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching activity assignees");
@@ -1236,7 +1259,8 @@ router.put("/api/job-activities/:id/assignees", requireAuth, async (req, res) =>
     });
 
     const result = await db.select().from(jobActivityAssignees)
-      .where(eq(jobActivityAssignees.activityId, activityId));
+      .where(eq(jobActivityAssignees.activityId, activityId))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error setting activity assignees");
@@ -1251,12 +1275,15 @@ router.put("/api/job-activities/:id/assignees", requireAuth, async (req, res) =>
 router.get("/api/job-activities/:id/updates", requireAuth, async (req, res) => {
   try {
     const id = req.params.id as string;
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const updates = await db.select().from(jobActivityUpdates)
       .where(eq(jobActivityUpdates.activityId, id))
-      .orderBy(asc(jobActivityUpdates.createdAt));
+      .orderBy(asc(jobActivityUpdates.createdAt))
+      .limit(safeLimit);
 
     const files = await db.select().from(jobActivityFiles)
-      .where(eq(jobActivityFiles.activityId, id));
+      .where(eq(jobActivityFiles.activityId, id))
+      .limit(1000);
 
     const result = updates.map(u => ({
       ...u,
@@ -1312,7 +1339,8 @@ router.get("/api/job-activities/:id/files", requireAuth, async (req, res) => {
     const id = req.params.id as string;
     const result = await db.select().from(jobActivityFiles)
       .where(eq(jobActivityFiles.activityId, id))
-      .orderBy(desc(jobActivityFiles.createdAt));
+      .orderBy(desc(jobActivityFiles.createdAt))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching activity files");
@@ -1375,7 +1403,8 @@ router.get("/api/job-activities/:activityId/checklists", requireAuth, async (req
     const activityId = req.params.activityId as string;
     const result = await db.select().from(jobActivityChecklists)
       .where(eq(jobActivityChecklists.activityId, activityId))
-      .orderBy(asc(jobActivityChecklists.sortOrder));
+      .orderBy(asc(jobActivityChecklists.sortOrder))
+      .limit(1000);
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching activity checklists");
@@ -1415,7 +1444,8 @@ router.post("/api/activity-seed", requireAuth, requireRole("ADMIN"), async (req,
     const companyId = req.companyId;
 
     const existingStages = await db.select().from(activityStages)
-      .where(eq(activityStages.companyId, companyId!));
+      .where(eq(activityStages.companyId, companyId!))
+      .limit(1000);
     if (existingStages.length > 0) {
       return res.status(400).json({ error: "Seed data already exists for this company" });
     }
@@ -1579,11 +1609,13 @@ router.get("/api/job-types/:jobTypeId/templates/download-template", requireAuth,
 
     const allStages = await db.select().from(activityStages)
       .where(eq(activityStages.companyId, companyId!))
-      .orderBy(asc(activityStages.stageNumber));
+      .orderBy(asc(activityStages.stageNumber))
+      .limit(1000);
 
     const allConsultants = await db.select().from(activityConsultants)
       .where(eq(activityConsultants.companyId, companyId!))
-      .orderBy(asc(activityConsultants.sortOrder));
+      .orderBy(asc(activityConsultants.sortOrder))
+      .limit(1000);
 
     const workbook = new ExcelJS.Workbook();
 
@@ -1677,12 +1709,14 @@ router.post("/api/job-types/:jobTypeId/templates/import", requireAuth, requireRo
     }
 
     const allStages = await db.select().from(activityStages)
-      .where(eq(activityStages.companyId, companyId!));
+      .where(eq(activityStages.companyId, companyId!))
+      .limit(1000);
     const stageByNumber = new Map(allStages.map(s => [s.stageNumber, s]));
     const stageByName = new Map(allStages.map(s => [s.name.toLowerCase().trim(), s]));
 
     const allConsultants = await db.select().from(activityConsultants)
-      .where(eq(activityConsultants.companyId, companyId!));
+      .where(eq(activityConsultants.companyId, companyId!))
+      .limit(1000);
     const consultantByName = new Map(allConsultants.map(c => [c.name.toLowerCase().trim(), c]));
 
     const workbook = new ExcelJS.Workbook();

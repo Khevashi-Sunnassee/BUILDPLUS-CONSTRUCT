@@ -969,12 +969,14 @@ router.get("/api/checklist/instances/:instanceId/work-orders", requireAuth, asyn
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const orders = await db.select().from(checklistWorkOrders)
       .where(and(
         eq(checklistWorkOrders.checklistInstanceId, instanceId),
         eq(checklistWorkOrders.companyId, companyId!)
       ))
-      .orderBy(desc(checklistWorkOrders.createdAt));
+      .orderBy(desc(checklistWorkOrders.createdAt))
+      .limit(safeLimit);
 
     res.json(orders);
   } catch (error: unknown) {
@@ -991,9 +993,11 @@ router.get("/api/checklist/work-orders", requireAuth, async (req: Request, res: 
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const orders = await db.select().from(checklistWorkOrders)
       .where(eq(checklistWorkOrders.companyId, companyId!))
-      .orderBy(desc(checklistWorkOrders.createdAt));
+      .orderBy(desc(checklistWorkOrders.createdAt))
+      .limit(safeLimit);
 
     res.json(orders);
   } catch (error: unknown) {
