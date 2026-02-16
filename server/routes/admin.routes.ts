@@ -23,6 +23,7 @@ import {
   tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks,
   jobBudgets, budgetLines, budgetLineFiles,
   boqGroups, boqItems,
+  apInvoices, apInvoiceDocuments, apInvoiceSplits, apInvoiceComments, apInvoiceApprovals, apInboundEmails, myobExportLogs,
 } from "@shared/schema";
 import { sql, isNotNull, eq, and, inArray } from "drizzle-orm";
 import logger from "../lib/logger";
@@ -156,6 +157,7 @@ const dataDeletionCategories = [
   "tenders",
   "budgets",
   "boq",
+  "ap_invoices",
 ] as const;
 
 type DeletionCategory = typeof dataDeletionCategories[number];
@@ -232,6 +234,9 @@ router.get("/api/admin/data-deletion/counts", requireRole("ADMIN"), async (req, 
     const [boqGroupCount] = await db.select({ count: sql<number>`count(*)` }).from(boqGroups).where(eq(boqGroups.companyId, companyId));
     const [boqItemCount] = await db.select({ count: sql<number>`count(*)` }).from(boqItems).where(eq(boqItems.companyId, companyId));
     counts.boq = Number(boqGroupCount.count) + Number(boqItemCount.count);
+    
+    const [apInvoiceCount] = await db.select({ count: sql<number>`count(*)` }).from(apInvoices).where(eq(apInvoices.companyId, companyId));
+    counts.ap_invoices = Number(apInvoiceCount.count);
     
     res.json(counts);
   } catch (error: unknown) {
@@ -509,6 +514,20 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
       const totalRelated = Number(boqItemCountVal.count) + Number(boqGroupCountVal.count);
       if (totalRelated > 0) {
         warnings.push(`${totalRelated} BOQ group(s) and item(s) will be permanently deleted.`);
+      }
+    }
+    
+    if (selected.has("ap_invoices")) {
+      const companyInvoiceIds = (await db.select({ id: apInvoices.id }).from(apInvoices).where(eq(apInvoices.companyId, cid))).map(r => r.id);
+      if (companyInvoiceIds.length > 0) {
+        const [docCount] = await db.select({ count: sql<number>`count(*)` }).from(apInvoiceDocuments).where(inArray(apInvoiceDocuments.invoiceId, companyInvoiceIds));
+        const [splitCount] = await db.select({ count: sql<number>`count(*)` }).from(apInvoiceSplits).where(inArray(apInvoiceSplits.invoiceId, companyInvoiceIds));
+        const [commentCount] = await db.select({ count: sql<number>`count(*)` }).from(apInvoiceComments).where(inArray(apInvoiceComments.invoiceId, companyInvoiceIds));
+        const [approvalCount] = await db.select({ count: sql<number>`count(*)` }).from(apInvoiceApprovals).where(inArray(apInvoiceApprovals.invoiceId, companyInvoiceIds));
+        const totalRelated = Number(docCount.count) + Number(splitCount.count) + Number(commentCount.count) + Number(approvalCount.count);
+        if (totalRelated > 0) {
+          warnings.push(`${totalRelated} invoice document(s), split(s), comment(s), and approval(s) will also be deleted.`);
+        }
       }
     }
     
@@ -876,6 +895,22 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
           }
           const result = await tx.delete(costCodes).where(eq(costCodes.companyId, delCompanyId));
           deletedCounts.cost_codes = result.rowCount || 0;
+        }
+      }
+      
+      if (selected.has("ap_invoices")) {
+        if (delCompanyId) {
+          const companyInvoiceIds = (await tx.select({ id: apInvoices.id }).from(apInvoices).where(eq(apInvoices.companyId, delCompanyId))).map(r => r.id);
+          if (companyInvoiceIds.length > 0) {
+            await tx.update(apInboundEmails).set({ invoiceId: null }).where(inArray(apInboundEmails.invoiceId, companyInvoiceIds));
+            await tx.delete(myobExportLogs).where(inArray(myobExportLogs.invoiceId, companyInvoiceIds));
+            await tx.delete(apInvoiceApprovals).where(inArray(apInvoiceApprovals.invoiceId, companyInvoiceIds));
+            await tx.delete(apInvoiceComments).where(inArray(apInvoiceComments.invoiceId, companyInvoiceIds));
+            await tx.delete(apInvoiceSplits).where(inArray(apInvoiceSplits.invoiceId, companyInvoiceIds));
+            await tx.delete(apInvoiceDocuments).where(inArray(apInvoiceDocuments.invoiceId, companyInvoiceIds));
+          }
+          const result = await tx.delete(apInvoices).where(eq(apInvoices.companyId, delCompanyId));
+          deletedCounts.ap_invoices = result.rowCount || 0;
         }
       }
     });

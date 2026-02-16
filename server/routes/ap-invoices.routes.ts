@@ -12,7 +12,7 @@ import {
   apInvoices, apInvoiceDocuments, apInvoiceExtractedFields,
   apInvoiceSplits, apInvoiceActivity, apInvoiceComments,
   apInvoiceApprovals, apApprovalRules, users, suppliers,
-  costCodes, jobs, companies, myobExportLogs
+  costCodes, jobs, companies, myobExportLogs, apInboundEmails
 } from "@shared/schema";
 import type { ApApprovalCondition } from "@shared/schema";
 
@@ -1449,6 +1449,8 @@ router.delete("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Res
 
     if (!existing) return res.status(404).json({ error: "Invoice not found" });
 
+    await db.update(apInboundEmails).set({ invoiceId: null }).where(eq(apInboundEmails.invoiceId, id));
+    await db.delete(myobExportLogs).where(eq(myobExportLogs.invoiceId, id));
     await db.delete(apInvoices).where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)));
 
     res.json({ success: true });

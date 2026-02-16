@@ -119,6 +119,7 @@ export default function AdminSettingsPage() {
     { key: "tasks", label: "Tasks", description: "Task groups and tasks" },
     { key: "tenders", label: "Tenders", description: "Tenders, submissions, line items and packages" },
     { key: "weekly_wages", label: "Weekly Wages", description: "Weekly wage reports" },
+    { key: "ap_invoices", label: "Invoices", description: "AP invoices, documents, splits, approvals and comments" },
   ], []);
 
   const dayNames = useMemo(() => ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], []);
