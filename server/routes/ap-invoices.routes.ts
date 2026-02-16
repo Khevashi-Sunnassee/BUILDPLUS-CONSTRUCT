@@ -201,6 +201,51 @@ router.get("/api/ap-invoices/counts", requireAuth, async (req: Request, res: Res
   }
 });
 
+router.get("/api/ap-invoices/my-approvals", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+
+    const invoiceRows = await db
+      .select({
+        id: apInvoices.id,
+        invoiceNumber: apInvoices.invoiceNumber,
+        invoiceDate: apInvoices.invoiceDate,
+        dueDate: apInvoices.dueDate,
+        description: apInvoices.description,
+        totalEx: apInvoices.totalEx,
+        totalTax: apInvoices.totalTax,
+        totalInc: apInvoices.totalInc,
+        currency: apInvoices.currency,
+        status: apInvoices.status,
+        isUrgent: apInvoices.isUrgent,
+        isOnHold: apInvoices.isOnHold,
+        uploadedAt: apInvoices.uploadedAt,
+        riskScore: apInvoices.riskScore,
+        supplierName: suppliers.name,
+        supplierId: apInvoices.supplierId,
+      })
+      .from(apInvoiceApprovals)
+      .innerJoin(apInvoices, eq(apInvoiceApprovals.invoiceId, apInvoices.id))
+      .leftJoin(suppliers, eq(apInvoices.supplierId, suppliers.id))
+      .where(
+        and(
+          eq(apInvoices.companyId, companyId),
+          eq(apInvoiceApprovals.approverUserId, userId),
+          eq(apInvoiceApprovals.status, "PENDING"),
+        )
+      )
+      .orderBy(desc(apInvoices.uploadedAt))
+      .limit(100);
+
+    res.json(invoiceRows);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching my AP approvals");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch approvals" });
+  }
+});
+
 router.get("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
