@@ -466,7 +466,7 @@ async function processInboundEmail(
 
         await objectStorageService.uploadFile(storageKey, fileBuffer, mimeType);
 
-        const invoiceStatus = (settings.defaultStatus === "PENDING_REVIEW" ? "PENDING_REVIEW" : "DRAFT") as "DRAFT" | "PENDING_REVIEW";
+        const invoiceStatus = "IMPORTED" as const;
         const [invoice] = await db.insert(apInvoices).values({
           companyId: settings.companyId,
           status: invoiceStatus,
