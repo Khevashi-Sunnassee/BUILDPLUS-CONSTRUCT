@@ -1,0 +1,1456 @@
+import { Router, Request, Response } from "express";
+import { z } from "zod";
+import { requireAuth } from "./middleware/auth.middleware";
+import { requirePermission } from "./middleware/permissions.middleware";
+import logger from "../lib/logger";
+import { db } from "../db";
+import { eq, and, desc, asc, sql, ilike, or, inArray, count } from "drizzle-orm";
+import multer from "multer";
+import crypto from "crypto";
+import { ObjectStorageService } from "../replit_integrations/object_storage";
+import {
+  apInvoices, apInvoiceDocuments, apInvoiceExtractedFields,
+  apInvoiceSplits, apInvoiceActivity, apInvoiceComments,
+  apInvoiceApprovals, apApprovalRules, users, suppliers,
+  costCodes, jobs
+} from "@shared/schema";
+
+const router = Router();
+const objectStorageService = new ObjectStorageService();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/tiff'];
+    cb(null, allowed.includes(file.mimetype));
+  },
+});
+
+async function logActivity(invoiceId: string, type: string, message: string, actorUserId: string, meta?: any) {
+  await db.insert(apInvoiceActivity).values({
+    invoiceId,
+    activityType: type,
+    message,
+    actorUserId,
+    metaJson: meta || null,
+  });
+}
+
+const assigneeUser = db.$with("assignee_user").as(
+  db.select({ id: users.id, name: users.name, email: users.email }).from(users)
+);
+const creatorUser = db.$with("creator_user").as(
+  db.select({ id: users.id, name: users.name, email: users.email }).from(users)
+);
+
+router.get("/api/ap-invoices", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const status = req.query.status as string | undefined;
+    const q = req.query.q as string | undefined;
+    const supplierId = req.query.supplierId as string | undefined;
+    const assignee = req.query.assignee as string | undefined;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const offset = (page - 1) * limit;
+
+    const conditions: any[] = [eq(apInvoices.companyId, companyId)];
+
+    if (status) {
+      conditions.push(eq(apInvoices.status, status as any));
+    }
+    if (supplierId) {
+      conditions.push(eq(apInvoices.supplierId, supplierId));
+    }
+    if (assignee) {
+      conditions.push(eq(apInvoices.assigneeUserId, assignee));
+    }
+    if (q) {
+      const search = `%${q}%`;
+      conditions.push(
+        or(
+          ilike(apInvoices.invoiceNumber, search),
+          ilike(apInvoices.description, search),
+          ilike(suppliers.name, search),
+        )
+      );
+    }
+
+    const whereClause = and(...conditions);
+
+    const supplierAlias = suppliers;
+    const assigneeAlias = users;
+
+    const [invoiceRows, countResult] = await Promise.all([
+      db
+        .select({
+          id: apInvoices.id,
+          companyId: apInvoices.companyId,
+          supplierId: apInvoices.supplierId,
+          invoiceNumber: apInvoices.invoiceNumber,
+          invoiceDate: apInvoices.invoiceDate,
+          dueDate: apInvoices.dueDate,
+          description: apInvoices.description,
+          totalEx: apInvoices.totalEx,
+          totalTax: apInvoices.totalTax,
+          totalInc: apInvoices.totalInc,
+          currency: apInvoices.currency,
+          status: apInvoices.status,
+          assigneeUserId: apInvoices.assigneeUserId,
+          createdByUserId: apInvoices.createdByUserId,
+          uploadedAt: apInvoices.uploadedAt,
+          riskScore: apInvoices.riskScore,
+          isUrgent: apInvoices.isUrgent,
+          isOnHold: apInvoices.isOnHold,
+          postPeriod: apInvoices.postPeriod,
+          createdAt: apInvoices.createdAt,
+          updatedAt: apInvoices.updatedAt,
+          supplierName: suppliers.name,
+          assigneeName: sql<string>`assignee_u.name`,
+          assigneeEmail: sql<string>`assignee_u.email`,
+          createdByName: sql<string>`creator_u.name`,
+          createdByEmail: sql<string>`creator_u.email`,
+        })
+        .from(apInvoices)
+        .leftJoin(suppliers, eq(apInvoices.supplierId, suppliers.id))
+        .leftJoin(
+          sql`${users} as assignee_u`,
+          sql`${apInvoices.assigneeUserId} = assignee_u.id`
+        )
+        .leftJoin(
+          sql`${users} as creator_u`,
+          sql`${apInvoices.createdByUserId} = creator_u.id`
+        )
+        .where(whereClause)
+        .orderBy(desc(apInvoices.uploadedAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ total: count() })
+        .from(apInvoices)
+        .leftJoin(suppliers, eq(apInvoices.supplierId, suppliers.id))
+        .where(whereClause),
+    ]);
+
+    res.json({
+      invoices: invoiceRows,
+      total: countResult[0]?.total || 0,
+      page,
+      limit,
+    });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching AP invoices");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch AP invoices" });
+  }
+});
+
+router.get("/api/ap-invoices/counts", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+
+    const [statusCounts, waitingOnMe] = await Promise.all([
+      db
+        .select({
+          status: apInvoices.status,
+          count: count(),
+        })
+        .from(apInvoices)
+        .where(eq(apInvoices.companyId, companyId))
+        .groupBy(apInvoices.status),
+      db
+        .select({ count: count() })
+        .from(apInvoices)
+        .where(
+          and(
+            eq(apInvoices.companyId, companyId),
+            eq(apInvoices.assigneeUserId, userId),
+            inArray(apInvoices.status, ["DRAFT", "PENDING_REVIEW"] as any),
+          )
+        ),
+    ]);
+
+    const counts: Record<string, number> = {};
+    for (const row of statusCounts) {
+      counts[row.status] = row.count;
+    }
+    counts.waitingOnMe = waitingOnMe[0]?.count || 0;
+
+    res.json(counts);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching AP invoice counts");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch counts" });
+  }
+});
+
+router.get("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [invoice] = await db
+      .select()
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+
+    const [
+      supplier,
+      assigneeUserRow,
+      createdByUserRow,
+      splits,
+      extractedFields,
+      documents,
+      approvals,
+      activity,
+      comments,
+    ] = await Promise.all([
+      invoice.supplierId
+        ? db.select().from(suppliers).where(eq(suppliers.id, invoice.supplierId)).limit(1).then(r => r[0])
+        : Promise.resolve(null),
+      invoice.assigneeUserId
+        ? db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq(users.id, invoice.assigneeUserId)).limit(1).then(r => r[0])
+        : Promise.resolve(null),
+      db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq(users.id, invoice.createdByUserId)).limit(1).then(r => r[0]),
+      db
+        .select({
+          id: apInvoiceSplits.id,
+          invoiceId: apInvoiceSplits.invoiceId,
+          description: apInvoiceSplits.description,
+          percentage: apInvoiceSplits.percentage,
+          amount: apInvoiceSplits.amount,
+          costCodeId: apInvoiceSplits.costCodeId,
+          jobId: apInvoiceSplits.jobId,
+          taxCodeId: apInvoiceSplits.taxCodeId,
+          sortOrder: apInvoiceSplits.sortOrder,
+          createdAt: apInvoiceSplits.createdAt,
+          costCodeCode: costCodes.code,
+          costCodeName: costCodes.name,
+          jobNumber: jobs.jobNumber,
+          jobName: jobs.name,
+        })
+        .from(apInvoiceSplits)
+        .leftJoin(costCodes, eq(apInvoiceSplits.costCodeId, costCodes.id))
+        .leftJoin(jobs, eq(apInvoiceSplits.jobId, jobs.id))
+        .where(eq(apInvoiceSplits.invoiceId, id))
+        .orderBy(asc(apInvoiceSplits.sortOrder)),
+      db.select().from(apInvoiceExtractedFields).where(eq(apInvoiceExtractedFields.invoiceId, id)),
+      db.select().from(apInvoiceDocuments).where(eq(apInvoiceDocuments.invoiceId, id)),
+      db
+        .select({
+          id: apInvoiceApprovals.id,
+          invoiceId: apInvoiceApprovals.invoiceId,
+          stepIndex: apInvoiceApprovals.stepIndex,
+          approverUserId: apInvoiceApprovals.approverUserId,
+          status: apInvoiceApprovals.status,
+          decisionAt: apInvoiceApprovals.decisionAt,
+          note: apInvoiceApprovals.note,
+          ruleId: apInvoiceApprovals.ruleId,
+          createdAt: apInvoiceApprovals.createdAt,
+          approverName: users.name,
+          approverEmail: users.email,
+        })
+        .from(apInvoiceApprovals)
+        .leftJoin(users, eq(apInvoiceApprovals.approverUserId, users.id))
+        .where(eq(apInvoiceApprovals.invoiceId, id))
+        .orderBy(asc(apInvoiceApprovals.stepIndex)),
+      db
+        .select({
+          id: apInvoiceActivity.id,
+          invoiceId: apInvoiceActivity.invoiceId,
+          activityType: apInvoiceActivity.activityType,
+          message: apInvoiceActivity.message,
+          actorUserId: apInvoiceActivity.actorUserId,
+          metaJson: apInvoiceActivity.metaJson,
+          createdAt: apInvoiceActivity.createdAt,
+          actorName: users.name,
+          actorEmail: users.email,
+        })
+        .from(apInvoiceActivity)
+        .leftJoin(users, eq(apInvoiceActivity.actorUserId, users.id))
+        .where(eq(apInvoiceActivity.invoiceId, id))
+        .orderBy(desc(apInvoiceActivity.createdAt))
+        .limit(50),
+      db
+        .select({
+          id: apInvoiceComments.id,
+          invoiceId: apInvoiceComments.invoiceId,
+          userId: apInvoiceComments.userId,
+          body: apInvoiceComments.body,
+          createdAt: apInvoiceComments.createdAt,
+          userName: users.name,
+          userEmail: users.email,
+        })
+        .from(apInvoiceComments)
+        .leftJoin(users, eq(apInvoiceComments.userId, users.id))
+        .where(eq(apInvoiceComments.invoiceId, id))
+        .orderBy(asc(apInvoiceComments.createdAt)),
+    ]);
+
+    res.json({
+      ...invoice,
+      supplier: supplier || null,
+      assigneeUser: assigneeUserRow || null,
+      createdByUser: createdByUserRow || null,
+      splits,
+      extractedFields,
+      documents,
+      approvals,
+      activity,
+      comments,
+    });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching AP invoice detail");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch invoice" });
+  }
+});
+
+router.post("/api/ap-invoices/upload", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(400).json({ error: "Company context required" });
+
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: "File is required" });
+
+    const fileExt = file.originalname.split(".").pop() || "pdf";
+    const storageKey = `ap-invoices/${companyId}/${crypto.randomUUID()}.${fileExt}`;
+
+    await objectStorageService.uploadFile(storageKey, file.buffer, file.mimetype);
+
+    const [invoice] = await db
+      .insert(apInvoices)
+      .values({
+        companyId,
+        createdByUserId: userId,
+        status: "DRAFT",
+        uploadedAt: new Date(),
+      })
+      .returning();
+
+    await db.insert(apInvoiceDocuments).values({
+      invoiceId: invoice.id,
+      storageKey,
+      fileName: file.originalname,
+      mimeType: file.mimetype,
+      fileSize: file.size,
+    });
+
+    await logActivity(invoice.id, "uploaded", "Invoice uploaded", userId);
+
+    res.json(invoice);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error uploading AP invoice");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload invoice" });
+  }
+});
+
+const updateInvoiceSchema = z.object({
+  invoiceNumber: z.string().nullable().optional(),
+  invoiceDate: z.string().nullable().optional(),
+  dueDate: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  supplierId: z.string().nullable().optional(),
+  totalEx: z.string().nullable().optional(),
+  totalTax: z.string().nullable().optional(),
+  totalInc: z.string().nullable().optional(),
+  postPeriod: z.string().nullable().optional(),
+});
+
+router.patch("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select()
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const parsed = updateInvoiceSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid request" });
+    }
+
+    const updates: any = { updatedAt: new Date() };
+    const changedFields: string[] = [];
+
+    if (parsed.data.invoiceNumber !== undefined) {
+      updates.invoiceNumber = parsed.data.invoiceNumber;
+      changedFields.push("invoiceNumber");
+    }
+    if (parsed.data.invoiceDate !== undefined) {
+      updates.invoiceDate = parsed.data.invoiceDate ? new Date(parsed.data.invoiceDate) : null;
+      changedFields.push("invoiceDate");
+    }
+    if (parsed.data.dueDate !== undefined) {
+      updates.dueDate = parsed.data.dueDate ? new Date(parsed.data.dueDate) : null;
+      changedFields.push("dueDate");
+    }
+    if (parsed.data.description !== undefined) {
+      updates.description = parsed.data.description;
+      changedFields.push("description");
+    }
+    if (parsed.data.supplierId !== undefined) {
+      updates.supplierId = parsed.data.supplierId;
+      changedFields.push("supplierId");
+    }
+    if (parsed.data.totalEx !== undefined) {
+      updates.totalEx = parsed.data.totalEx;
+      changedFields.push("totalEx");
+    }
+    if (parsed.data.totalTax !== undefined) {
+      updates.totalTax = parsed.data.totalTax;
+      changedFields.push("totalTax");
+    }
+    if (parsed.data.totalInc !== undefined) {
+      updates.totalInc = parsed.data.totalInc;
+      changedFields.push("totalInc");
+    }
+    if (parsed.data.postPeriod !== undefined) {
+      updates.postPeriod = parsed.data.postPeriod;
+      changedFields.push("postPeriod");
+    }
+
+    const [updated] = await db
+      .update(apInvoices)
+      .set(updates)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .returning();
+
+    if (changedFields.length > 0) {
+      await logActivity(id, "fields_updated", `Updated fields: ${changedFields.join(", ")}`, userId, { changedFields });
+    }
+
+    res.json(updated);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error updating AP invoice");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update invoice" });
+  }
+});
+
+router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select()
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+    if (existing.status !== "DRAFT") return res.status(400).json({ error: "Only draft invoices can be submitted" });
+
+    if (!existing.invoiceNumber) {
+      return res.status(400).json({ error: "Invoice number is required before submitting" });
+    }
+
+    const [updated] = await db
+      .update(apInvoices)
+      .set({ status: "PENDING_REVIEW", updatedAt: new Date() })
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .returning();
+
+    await logActivity(id, "submitted", "Invoice submitted for review", userId);
+
+    res.json(updated);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error submitting AP invoice");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to submit invoice" });
+  }
+});
+
+router.post("/api/ap-invoices/:id/assign", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+    const id = req.params.id;
+
+    const { assigneeUserId } = z.object({ assigneeUserId: z.string() }).parse(req.body);
+
+    const [existing] = await db
+      .select()
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const [updated] = await db
+      .update(apInvoices)
+      .set({ assigneeUserId, updatedAt: new Date() })
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .returning();
+
+    await logActivity(id, "assigned", `Invoice assigned to user`, userId, { assigneeUserId });
+
+    res.json(updated);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error assigning AP invoice");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to assign invoice" });
+  }
+});
+
+router.post("/api/ap-invoices/:id/approve", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+    const id = req.params.id;
+
+    const body = z.object({ note: z.string().optional() }).parse(req.body || {});
+
+    const [existing] = await db
+      .select()
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const [updated] = await db
+      .update(apInvoices)
+      .set({ status: "APPROVED", updatedAt: new Date() })
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .returning();
+
+    const pendingApprovals = await db
+      .select()
+      .from(apInvoiceApprovals)
+      .where(
+        and(
+          eq(apInvoiceApprovals.invoiceId, id),
+          eq(apInvoiceApprovals.approverUserId, userId),
+          eq(apInvoiceApprovals.status, "PENDING"),
+        )
+      );
+
+    for (const approval of pendingApprovals) {
+      await db
+        .update(apInvoiceApprovals)
+        .set({ status: "APPROVED", decisionAt: new Date(), note: body.note || null })
+        .where(eq(apInvoiceApprovals.id, approval.id));
+    }
+
+    await logActivity(id, "approved", "Invoice approved", userId, { note: body.note });
+
+    res.json(updated);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error approving AP invoice");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to approve invoice" });
+  }
+});
+
+router.post("/api/ap-invoices/:id/reject", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+    const id = req.params.id;
+
+    const body = z.object({ note: z.string().min(1, "Rejection note is required") }).parse(req.body);
+
+    const [existing] = await db
+      .select()
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const [updated] = await db
+      .update(apInvoices)
+      .set({ status: "REJECTED", updatedAt: new Date() })
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .returning();
+
+    const pendingApprovals = await db
+      .select()
+      .from(apInvoiceApprovals)
+      .where(
+        and(
+          eq(apInvoiceApprovals.invoiceId, id),
+          eq(apInvoiceApprovals.approverUserId, userId),
+          eq(apInvoiceApprovals.status, "PENDING"),
+        )
+      );
+
+    for (const approval of pendingApprovals) {
+      await db
+        .update(apInvoiceApprovals)
+        .set({ status: "REJECTED", decisionAt: new Date(), note: body.note })
+        .where(eq(apInvoiceApprovals.id, approval.id));
+    }
+
+    await logActivity(id, "rejected", `Invoice rejected: ${body.note}`, userId, { note: body.note });
+
+    res.json(updated);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error rejecting AP invoice");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to reject invoice" });
+  }
+});
+
+router.post("/api/ap-invoices/:id/on-hold", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select()
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const newValue = !existing.isOnHold;
+    const [updated] = await db
+      .update(apInvoices)
+      .set({ isOnHold: newValue, updatedAt: new Date() })
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .returning();
+
+    await logActivity(id, "on_hold_toggled", newValue ? "Invoice placed on hold" : "Invoice taken off hold", userId);
+
+    res.json(updated);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error toggling AP invoice on-hold");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to toggle on-hold" });
+  }
+});
+
+router.post("/api/ap-invoices/:id/urgent", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select()
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const newValue = !existing.isUrgent;
+    const [updated] = await db
+      .update(apInvoices)
+      .set({ isUrgent: newValue, updatedAt: new Date() })
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .returning();
+
+    await logActivity(id, "urgent_toggled", newValue ? "Invoice marked as urgent" : "Invoice unmarked as urgent", userId);
+
+    res.json(updated);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error toggling AP invoice urgent");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to toggle urgent" });
+  }
+});
+
+const splitSchema = z.object({
+  description: z.string().nullable().optional(),
+  percentage: z.string().nullable().optional(),
+  amount: z.string(),
+  costCodeId: z.string().nullable().optional(),
+  jobId: z.string().nullable().optional(),
+  taxCodeId: z.string().nullable().optional(),
+  sortOrder: z.number().optional(),
+});
+
+router.put("/api/ap-invoices/:id/splits", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select()
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const body = z.array(splitSchema).parse(req.body);
+
+    if (existing.totalInc) {
+      const totalInc = parseFloat(existing.totalInc);
+      const splitSum = body.reduce((sum, s) => sum + parseFloat(s.amount), 0);
+      const tolerance = 0.02;
+      if (Math.abs(totalInc - splitSum) > tolerance) {
+        return res.status(400).json({
+          error: `Split total ($${splitSum.toFixed(2)}) does not match invoice total ($${totalInc.toFixed(2)})`,
+        });
+      }
+    }
+
+    await db.delete(apInvoiceSplits).where(eq(apInvoiceSplits.invoiceId, id));
+
+    if (body.length > 0) {
+      await db.insert(apInvoiceSplits).values(
+        body.map((s, idx) => ({
+          invoiceId: id,
+          description: s.description || null,
+          percentage: s.percentage || null,
+          amount: s.amount,
+          costCodeId: s.costCodeId || null,
+          jobId: s.jobId || null,
+          taxCodeId: s.taxCodeId || null,
+          sortOrder: s.sortOrder ?? idx,
+        }))
+      );
+    }
+
+    await logActivity(id, "splits_updated", `Updated ${body.length} split lines`, userId);
+
+    const splits = await db
+      .select()
+      .from(apInvoiceSplits)
+      .where(eq(apInvoiceSplits.invoiceId, id))
+      .orderBy(asc(apInvoiceSplits.sortOrder));
+
+    res.json(splits);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error updating AP invoice splits");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update splits" });
+  }
+});
+
+router.get("/api/ap-invoices/:id/extracted-fields", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select({ id: apInvoices.id })
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const fields = await db
+      .select()
+      .from(apInvoiceExtractedFields)
+      .where(eq(apInvoiceExtractedFields.invoiceId, id));
+
+    res.json(fields);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching extracted fields");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch extracted fields" });
+  }
+});
+
+router.post("/api/ap-invoices/:id/field-map", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+    const id = req.params.id;
+
+    const body = z.object({
+      fieldKey: z.string(),
+      fieldValue: z.string().nullable(),
+      source: z.string().optional(),
+    }).parse(req.body);
+
+    const [existing] = await db
+      .select({ id: apInvoices.id })
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const [existingField] = await db
+      .select()
+      .from(apInvoiceExtractedFields)
+      .where(
+        and(
+          eq(apInvoiceExtractedFields.invoiceId, id),
+          eq(apInvoiceExtractedFields.fieldKey, body.fieldKey),
+        )
+      )
+      .limit(1);
+
+    if (existingField) {
+      await db
+        .update(apInvoiceExtractedFields)
+        .set({
+          fieldValue: body.fieldValue,
+          source: body.source || "manual",
+        })
+        .where(eq(apInvoiceExtractedFields.id, existingField.id));
+    } else {
+      await db.insert(apInvoiceExtractedFields).values({
+        invoiceId: id,
+        fieldKey: body.fieldKey,
+        fieldValue: body.fieldValue,
+        source: body.source || "manual",
+      });
+    }
+
+    await logActivity(id, "field_mapped", `Field "${body.fieldKey}" updated`, userId, { fieldKey: body.fieldKey });
+
+    res.json({ success: true });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error mapping AP invoice field");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to map field" });
+  }
+});
+
+router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select({ id: apInvoices.id })
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    res.json({ message: "extraction queued" });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error triggering AP invoice extraction");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to trigger extraction" });
+  }
+});
+
+router.get("/api/ap-invoices/:id/document", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select({ id: apInvoices.id })
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const [doc] = await db
+      .select()
+      .from(apInvoiceDocuments)
+      .where(eq(apInvoiceDocuments.invoiceId, id))
+      .orderBy(desc(apInvoiceDocuments.createdAt))
+      .limit(1);
+
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+
+    res.json({
+      storageKey: doc.storageKey,
+      fileName: doc.fileName,
+      mimeType: doc.mimeType,
+      fileSize: doc.fileSize,
+    });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching AP invoice document");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document" });
+  }
+});
+
+router.get("/api/ap-invoices/:id/comments", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select({ id: apInvoices.id })
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const comments = await db
+      .select({
+        id: apInvoiceComments.id,
+        invoiceId: apInvoiceComments.invoiceId,
+        userId: apInvoiceComments.userId,
+        body: apInvoiceComments.body,
+        createdAt: apInvoiceComments.createdAt,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(apInvoiceComments)
+      .leftJoin(users, eq(apInvoiceComments.userId, users.id))
+      .where(eq(apInvoiceComments.invoiceId, id))
+      .orderBy(asc(apInvoiceComments.createdAt));
+
+    res.json(comments);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching AP invoice comments");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch comments" });
+  }
+});
+
+router.post("/api/ap-invoices/:id/comments", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+    const id = req.params.id;
+
+    const body = z.object({ body: z.string().min(1, "Comment body is required") }).parse(req.body);
+
+    const [existing] = await db
+      .select({ id: apInvoices.id })
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const [comment] = await db
+      .insert(apInvoiceComments)
+      .values({
+        invoiceId: id,
+        userId,
+        body: body.body,
+      })
+      .returning();
+
+    await logActivity(id, "comment_added", "Comment added", userId);
+
+    res.json(comment);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error adding AP invoice comment");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to add comment" });
+  }
+});
+
+router.get("/api/ap-invoices/:id/activity", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select({ id: apInvoices.id })
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const activity = await db
+      .select({
+        id: apInvoiceActivity.id,
+        invoiceId: apInvoiceActivity.invoiceId,
+        activityType: apInvoiceActivity.activityType,
+        message: apInvoiceActivity.message,
+        actorUserId: apInvoiceActivity.actorUserId,
+        metaJson: apInvoiceActivity.metaJson,
+        createdAt: apInvoiceActivity.createdAt,
+        actorName: users.name,
+        actorEmail: users.email,
+      })
+      .from(apInvoiceActivity)
+      .leftJoin(users, eq(apInvoiceActivity.actorUserId, users.id))
+      .where(eq(apInvoiceActivity.invoiceId, id))
+      .orderBy(desc(apInvoiceActivity.createdAt));
+
+    res.json(activity);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching AP invoice activity");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity" });
+  }
+});
+
+router.get("/api/ap-invoices/:id/approval-path", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select({ id: apInvoices.id })
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    const approvals = await db
+      .select({
+        id: apInvoiceApprovals.id,
+        invoiceId: apInvoiceApprovals.invoiceId,
+        stepIndex: apInvoiceApprovals.stepIndex,
+        approverUserId: apInvoiceApprovals.approverUserId,
+        status: apInvoiceApprovals.status,
+        decisionAt: apInvoiceApprovals.decisionAt,
+        note: apInvoiceApprovals.note,
+        ruleId: apInvoiceApprovals.ruleId,
+        createdAt: apInvoiceApprovals.createdAt,
+        approverName: users.name,
+        approverEmail: users.email,
+        ruleName: apApprovalRules.name,
+      })
+      .from(apInvoiceApprovals)
+      .leftJoin(users, eq(apInvoiceApprovals.approverUserId, users.id))
+      .leftJoin(apApprovalRules, eq(apInvoiceApprovals.ruleId, apApprovalRules.id))
+      .where(eq(apInvoiceApprovals.invoiceId, id))
+      .orderBy(asc(apInvoiceApprovals.stepIndex));
+
+    res.json(approvals);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching AP invoice approval path");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch approval path" });
+  }
+});
+
+router.post("/api/ap-invoices/bulk-approve", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+
+    const body = z.object({ invoiceIds: z.array(z.string()).min(1) }).parse(req.body);
+
+    const invoices = await db
+      .select()
+      .from(apInvoices)
+      .where(
+        and(
+          eq(apInvoices.companyId, companyId),
+          inArray(apInvoices.id, body.invoiceIds),
+        )
+      );
+
+    const approved: string[] = [];
+    const errors: Array<{ id: string; error: string }> = [];
+
+    for (const invoice of invoices) {
+      try {
+        await db
+          .update(apInvoices)
+          .set({ status: "APPROVED", updatedAt: new Date() })
+          .where(eq(apInvoices.id, invoice.id));
+
+        await logActivity(invoice.id, "approved", "Invoice bulk approved", userId);
+        approved.push(invoice.id);
+      } catch (err) {
+        errors.push({ id: invoice.id, error: "Failed to approve" });
+      }
+    }
+
+    res.json({ approved, errors });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error bulk approving AP invoices");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to bulk approve" });
+  }
+});
+
+router.delete("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select()
+      .from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Invoice not found" });
+
+    await db.delete(apInvoices).where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)));
+
+    res.json({ success: true });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error deleting AP invoice");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete invoice" });
+  }
+});
+
+router.get("/api/ap-approval-rules", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const rules = await db
+      .select()
+      .from(apApprovalRules)
+      .where(eq(apApprovalRules.companyId, companyId))
+      .orderBy(asc(apApprovalRules.priority));
+
+    res.json(rules);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching AP approval rules");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch approval rules" });
+  }
+});
+
+const approvalRuleSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+  priority: z.number().optional(),
+  conditions: z.any(),
+  approverUserIds: z.array(z.string()),
+  autoApprove: z.boolean().optional(),
+});
+
+router.post("/api/ap-approval-rules", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const parsed = approvalRuleSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid request" });
+    }
+
+    const [rule] = await db
+      .insert(apApprovalRules)
+      .values({
+        companyId,
+        name: parsed.data.name,
+        description: parsed.data.description || null,
+        isActive: parsed.data.isActive ?? true,
+        priority: parsed.data.priority ?? 0,
+        conditions: parsed.data.conditions,
+        approverUserIds: parsed.data.approverUserIds,
+        autoApprove: parsed.data.autoApprove ?? false,
+      })
+      .returning();
+
+    res.json(rule);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error creating AP approval rule");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create approval rule" });
+  }
+});
+
+router.patch("/api/ap-approval-rules/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select()
+      .from(apApprovalRules)
+      .where(and(eq(apApprovalRules.id, id), eq(apApprovalRules.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Approval rule not found" });
+
+    const parsed = approvalRuleSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid request" });
+    }
+
+    const updates: any = { updatedAt: new Date() };
+    if (parsed.data.name !== undefined) updates.name = parsed.data.name;
+    if (parsed.data.description !== undefined) updates.description = parsed.data.description;
+    if (parsed.data.isActive !== undefined) updates.isActive = parsed.data.isActive;
+    if (parsed.data.priority !== undefined) updates.priority = parsed.data.priority;
+    if (parsed.data.conditions !== undefined) updates.conditions = parsed.data.conditions;
+    if (parsed.data.approverUserIds !== undefined) updates.approverUserIds = parsed.data.approverUserIds;
+    if (parsed.data.autoApprove !== undefined) updates.autoApprove = parsed.data.autoApprove;
+
+    const [updated] = await db
+      .update(apApprovalRules)
+      .set(updates)
+      .where(and(eq(apApprovalRules.id, id), eq(apApprovalRules.companyId, companyId)))
+      .returning();
+
+    res.json(updated);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error updating AP approval rule");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update approval rule" });
+  }
+});
+
+router.delete("/api/ap-approval-rules/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [existing] = await db
+      .select()
+      .from(apApprovalRules)
+      .where(and(eq(apApprovalRules.id, id), eq(apApprovalRules.companyId, companyId)))
+      .limit(1);
+
+    if (!existing) return res.status(404).json({ error: "Approval rule not found" });
+
+    await db.delete(apApprovalRules).where(and(eq(apApprovalRules.id, id), eq(apApprovalRules.companyId, companyId)));
+
+    res.json({ success: true });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error deleting AP approval rule");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete approval rule" });
+  }
+});
+
+// ============================================================================
+// DOCUMENT SERVING - Stream PDF/image for the viewer
+// ============================================================================
+router.get("/api/ap-invoices/:id/document-view", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id;
+
+    const [invoice] = await db.select().from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId))).limit(1);
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+
+    const docs = await db.select().from(apInvoiceDocuments)
+      .where(eq(apInvoiceDocuments.invoiceId, id)).limit(1);
+    if (!docs.length) return res.status(404).json({ error: "No document found" });
+
+    const doc = docs[0];
+    try {
+      const file = await objectStorageService.getObjectEntityFile(doc.storageKey);
+      const [metadata] = await file.getMetadata();
+      res.set({
+        "Content-Type": doc.mimeType || metadata.contentType || "application/octet-stream",
+        "Content-Disposition": `inline; filename="${doc.fileName}"`,
+        "Cache-Control": "private, max-age=3600",
+      });
+      const stream = file.createReadStream();
+      stream.on("error", (err: any) => {
+        logger.error({ err }, "Stream error serving AP invoice document");
+        if (!res.headersSent) res.status(500).json({ error: "Error streaming file" });
+      });
+      stream.pipe(res);
+    } catch (storageErr: any) {
+      logger.error({ err: storageErr }, "Error retrieving AP invoice document from storage");
+      res.status(404).json({ error: "Document file not found in storage" });
+    }
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error serving AP invoice document");
+    res.status(500).json({ error: "Failed to serve document" });
+  }
+});
+
+// ============================================================================
+// OPENAI VISION EXTRACTION - Extract fields from invoice PDF/image
+// ============================================================================
+router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId!;
+    const id = req.params.id;
+
+    const [invoice] = await db.select().from(apInvoices)
+      .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId))).limit(1);
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+
+    const docs = await db.select().from(apInvoiceDocuments)
+      .where(eq(apInvoiceDocuments.invoiceId, id)).limit(1);
+    if (!docs.length) return res.status(400).json({ error: "No document to extract from" });
+
+    const doc = docs[0];
+    let imageBase64: string;
+    let mimeType = doc.mimeType;
+
+    try {
+      const file = await objectStorageService.getObjectEntityFile(doc.storageKey);
+      const chunks: Buffer[] = [];
+      const stream = file.createReadStream();
+      for await (const chunk of stream) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const buffer = Buffer.concat(chunks);
+      imageBase64 = buffer.toString("base64");
+    } catch (err: any) {
+      logger.error({ err }, "Error reading document for extraction");
+      return res.status(500).json({ error: "Cannot read document file" });
+    }
+
+    const OpenAI = (await import("openai")).default;
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    const extractionPrompt = `You are an expert invoice data extraction system. Analyze this invoice image/document and extract the following fields.
+
+For each field, provide:
+- key: the field identifier
+- value: the extracted value
+- confidence: your confidence level from 0.0 to 1.0
+- bbox: approximate bounding box as {x1, y1, x2, y2} in normalized coordinates (0-1 range relative to page dimensions), or null if you cannot determine the location
+
+Extract these fields:
+1. "invoice_number" - The invoice number/reference
+2. "supplier_name" - The supplier/vendor company name
+3. "supplier_abn" - The supplier ABN (Australian Business Number) if present
+4. "invoice_date" - The invoice date (return in YYYY-MM-DD format)
+5. "due_date" - The due/payment date if present (YYYY-MM-DD format)
+6. "subtotal" - The subtotal/amount before tax
+7. "gst" - The GST/tax amount
+8. "total" - The total amount including tax
+9. "po_number" - Purchase order number if present
+10. "description" - Brief description of goods/services
+
+Also extract line items if visible as an array called "line_items" where each item has:
+- description, quantity, unit_price, amount
+
+Return your response as valid JSON with this exact structure:
+{
+  "fields": [
+    {"key": "invoice_number", "value": "...", "confidence": 0.95, "bbox": {"x1": 0.5, "y1": 0.1, "x2": 0.8, "y2": 0.15}},
+    ...
+  ],
+  "line_items": [
+    {"description": "...", "quantity": "...", "unit_price": "...", "amount": "..."},
+    ...
+  ]
+}`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: extractionPrompt },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mimeType};base64,${imageBase64}`,
+                detail: "high",
+              },
+            },
+          ],
+        },
+      ],
+      max_tokens: 4096,
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    const responseText = response.choices[0]?.message?.content || "{}";
+    let extractedData: any;
+    try {
+      extractedData = JSON.parse(responseText);
+    } catch {
+      logger.error("Failed to parse extraction response as JSON");
+      return res.status(500).json({ error: "Extraction produced invalid response" });
+    }
+
+    await db.delete(apInvoiceExtractedFields).where(eq(apInvoiceExtractedFields.invoiceId, id));
+
+    const fields = extractedData.fields || [];
+    for (const field of fields) {
+      await db.insert(apInvoiceExtractedFields).values({
+        invoiceId: id,
+        fieldKey: field.key,
+        fieldValue: field.value || null,
+        confidence: field.confidence || null,
+        page: 1,
+        bboxJson: field.bbox || null,
+        source: "extraction",
+      });
+    }
+
+    const updateData: any = {};
+    for (const field of fields) {
+      if (field.value) {
+        switch (field.key) {
+          case "invoice_number": updateData.invoiceNumber = field.value; break;
+          case "invoice_date":
+            try { updateData.invoiceDate = new Date(field.value); } catch {}
+            break;
+          case "due_date":
+            try { updateData.dueDate = new Date(field.value); } catch {}
+            break;
+          case "total": updateData.totalInc = field.value.replace(/[^0-9.-]/g, ""); break;
+          case "subtotal": updateData.totalEx = field.value.replace(/[^0-9.-]/g, ""); break;
+          case "gst": updateData.totalTax = field.value.replace(/[^0-9.-]/g, ""); break;
+          case "description": updateData.description = field.value; break;
+        }
+      }
+    }
+
+    const supplierNameField = fields.find((f: any) => f.key === "supplier_name");
+    if (supplierNameField?.value) {
+      const matchingSuppliers = await db.select().from(suppliers)
+        .where(and(eq(suppliers.companyId, companyId), ilike(suppliers.name, `%${supplierNameField.value}%`)))
+        .limit(1);
+      if (matchingSuppliers.length > 0) {
+        updateData.supplierId = matchingSuppliers[0].id;
+      }
+    }
+
+    let riskScore = 0;
+    const riskReasons: string[] = [];
+    for (const field of fields) {
+      if (field.confidence !== null && field.confidence < 0.7) {
+        riskScore += 15;
+        riskReasons.push(`Low confidence on ${field.key}: ${(field.confidence * 100).toFixed(0)}%`);
+      }
+    }
+    if (!fields.find((f: any) => f.key === "invoice_number")?.value) {
+      riskScore += 20;
+      riskReasons.push("Missing invoice number");
+    }
+    if (!fields.find((f: any) => f.key === "total")?.value) {
+      riskScore += 20;
+      riskReasons.push("Missing total amount");
+    }
+    updateData.riskScore = Math.min(riskScore, 100);
+    updateData.riskReasons = riskReasons;
+
+    if (Object.keys(updateData).length > 0) {
+      updateData.updatedAt = new Date();
+      await db.update(apInvoices).set(updateData).where(eq(apInvoices.id, id));
+    }
+
+    await logActivity(id, "extraction_completed", "AI extraction completed", userId, {
+      fieldsExtracted: fields.length,
+      lineItemsFound: (extractedData.line_items || []).length,
+    });
+
+    res.json({
+      success: true,
+      fields,
+      lineItems: extractedData.line_items || [],
+      riskScore: updateData.riskScore,
+      riskReasons,
+    });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error extracting AP invoice fields");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Extraction failed" });
+  }
+});
+
+export { router as apInvoicesRouter };

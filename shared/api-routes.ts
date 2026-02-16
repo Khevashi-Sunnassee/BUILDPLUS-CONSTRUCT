@@ -949,3 +949,37 @@ export const MYOB_ROUTES = {
   ITEMS: '/api/myob/items',
 } as const;
 export type MyobRoutes = typeof MYOB_ROUTES;
+
+// ============================================================================
+// AP INVOICE PROCESSING
+// ============================================================================
+export const AP_INVOICE_ROUTES = {
+  LIST: '/api/ap-invoices',
+  COUNTS: '/api/ap-invoices/counts',
+  BY_ID: (id: string | number) => `/api/ap-invoices/${id}`,
+  UPLOAD: '/api/ap-invoices/upload',
+  SUBMIT: (id: string | number) => `/api/ap-invoices/${id}/submit`,
+  ASSIGN: (id: string | number) => `/api/ap-invoices/${id}/assign`,
+  APPROVE: (id: string | number) => `/api/ap-invoices/${id}/approve`,
+  REJECT: (id: string | number) => `/api/ap-invoices/${id}/reject`,
+  ON_HOLD: (id: string | number) => `/api/ap-invoices/${id}/on-hold`,
+  URGENT: (id: string | number) => `/api/ap-invoices/${id}/urgent`,
+  SPLITS: (id: string | number) => `/api/ap-invoices/${id}/splits`,
+  EXPORT_MYOB: (id: string | number) => `/api/ap-invoices/${id}/export/myob`,
+  EXTRACTED_FIELDS: (id: string | number) => `/api/ap-invoices/${id}/extracted-fields`,
+  FIELD_MAP: (id: string | number) => `/api/ap-invoices/${id}/field-map`,
+  EXTRACT: (id: string | number) => `/api/ap-invoices/${id}/extract`,
+  DOCUMENT: (id: string | number) => `/api/ap-invoices/${id}/document-view`,
+  COMMENTS: (id: string | number) => `/api/ap-invoices/${id}/comments`,
+  ACTIVITY: (id: string | number) => `/api/ap-invoices/${id}/activity`,
+  APPROVAL_PATH: (id: string | number) => `/api/ap-invoices/${id}/approval-path`,
+  BULK_APPROVE: '/api/ap-invoices/bulk-approve',
+  BULK_DELETE: '/api/ap-invoices/bulk-delete',
+} as const;
+export type ApInvoiceRoutes = typeof AP_INVOICE_ROUTES;
+
+export const AP_APPROVAL_RULES_ROUTES = {
+  LIST: '/api/ap-approval-rules',
+  BY_ID: (id: string | number) => `/api/ap-approval-rules/${id}`,
+} as const;
+export type ApApprovalRulesRoutes = typeof AP_APPROVAL_RULES_ROUTES;

@@ -78,6 +78,8 @@ const DraftingProgramPage = lazyWithRetry(() => import("@/pages/drafting-program
 const PurchaseOrdersPage = lazyWithRetry(() => import("@/pages/purchase-orders"));
 const PurchaseOrderFormPage = lazyWithRetry(() => import("@/pages/purchase-order-form"));
 const CapexRequestsPage = lazyWithRetry(() => import("@/pages/capex-requests"));
+const ApInvoicesPage = lazyWithRetry(() => import("@/pages/ap-invoices"));
+const ApInvoiceDetailPage = lazyWithRetry(() => import("@/pages/ap-invoice-detail"));
 const HireBookingsPage = lazyWithRetry(() => import("@/pages/hire-bookings"));
 const HireBookingFormPage = lazyWithRetry(() => import("@/pages/hire-booking-form"));
 const TasksPage = lazyWithRetry(() => import("@/pages/tasks"));
@@ -445,6 +447,22 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <CapexRequestsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/ap-invoices/:id">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <ApInvoiceDetailPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/ap-invoices">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <ApInvoicesPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

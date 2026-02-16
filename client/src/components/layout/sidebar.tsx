@@ -66,6 +66,7 @@ import {
   Landmark,
   Hash,
   Link2,
+  Receipt,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -127,6 +128,7 @@ const adminFinanceNavItems = [
   { title: "Scope of Works", url: "/scopes", icon: Layers },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Asset Register", url: "/admin/asset-register", icon: Boxes },
+  { title: "AP Invoices", url: "/ap-invoices", icon: Receipt },
   { title: "MYOB Integration", url: "/myob-integration", icon: Link2 },
 ];
 

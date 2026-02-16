@@ -4768,3 +4768,176 @@ export const myobTokens = pgTable("myob_tokens", {
 export const insertMyobTokenSchema = createInsertSchema(myobTokens).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertMyobToken = z.infer<typeof insertMyobTokenSchema>;
 export type MyobToken = typeof myobTokens.$inferSelect;
+
+// ============================================================================
+// AP INVOICE PROCESSING (Traild-style)
+// ============================================================================
+
+export const apInvoiceStatusEnum = pgEnum("ap_invoice_status", ["DRAFT", "PENDING_REVIEW", "APPROVED", "REJECTED", "EXPORTED", "FAILED_EXPORT"]);
+export const apApprovalStatusEnum = pgEnum("ap_approval_status", ["PENDING", "APPROVED", "REJECTED"]);
+export const apApprovalRuleFieldEnum = pgEnum("ap_approval_rule_field", ["AMOUNT", "SUPPLIER", "GL_CODE", "JOB", "COMPANY"]);
+
+export const apInvoices = pgTable("ap_invoices", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  supplierId: varchar("supplier_id", { length: 36 }).references(() => suppliers.id),
+  invoiceNumber: text("invoice_number"),
+  invoiceDate: timestamp("invoice_date"),
+  dueDate: timestamp("due_date"),
+  description: text("description"),
+  totalEx: numeric("total_ex", { precision: 12, scale: 2 }),
+  totalTax: numeric("total_tax", { precision: 12, scale: 2 }),
+  totalInc: numeric("total_inc", { precision: 12, scale: 2 }),
+  currency: text("currency").default("AUD"),
+  status: apInvoiceStatusEnum("status").default("DRAFT").notNull(),
+  assigneeUserId: varchar("assignee_user_id", { length: 36 }).references(() => users.id),
+  createdByUserId: varchar("created_by_user_id", { length: 36 }).notNull().references(() => users.id),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+  riskScore: integer("risk_score"),
+  riskReasons: jsonb("risk_reasons"),
+  isUrgent: boolean("is_urgent").default(false).notNull(),
+  isOnHold: boolean("is_on_hold").default(false).notNull(),
+  postPeriod: text("post_period"),
+  myobBillId: text("myob_bill_id"),
+  exportedAt: timestamp("exported_at"),
+  exportError: jsonb("export_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("ap_invoices_company_idx").on(table.companyId),
+  supplierIdx: index("ap_invoices_supplier_idx").on(table.supplierId),
+  statusIdx: index("ap_invoices_status_idx").on(table.status),
+  assigneeIdx: index("ap_invoices_assignee_idx").on(table.assigneeUserId),
+  createdByIdx: index("ap_invoices_created_by_idx").on(table.createdByUserId),
+  invoiceNumberCompanyIdx: index("ap_invoices_invoice_number_company_idx").on(table.invoiceNumber, table.companyId),
+}));
+
+export const insertApInvoiceSchema = createInsertSchema(apInvoices).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertApInvoice = z.infer<typeof insertApInvoiceSchema>;
+export type ApInvoice = typeof apInvoices.$inferSelect;
+
+export const apInvoiceDocuments = pgTable("ap_invoice_documents", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id", { length: 36 }).notNull().references(() => apInvoices.id, { onDelete: "cascade" }),
+  storageKey: text("storage_key").notNull(),
+  fileName: text("file_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSize: integer("file_size"),
+  pageCount: integer("page_count"),
+  checksum: text("checksum"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  invoiceIdx: index("ap_invoice_documents_invoice_idx").on(table.invoiceId),
+}));
+
+export const insertApInvoiceDocumentSchema = createInsertSchema(apInvoiceDocuments).omit({ id: true, createdAt: true });
+export type InsertApInvoiceDocument = z.infer<typeof insertApInvoiceDocumentSchema>;
+export type ApInvoiceDocument = typeof apInvoiceDocuments.$inferSelect;
+
+export const apInvoiceExtractedFields = pgTable("ap_invoice_extracted_fields", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id", { length: 36 }).notNull().references(() => apInvoices.id, { onDelete: "cascade" }),
+  fieldKey: text("field_key").notNull(),
+  fieldValue: text("field_value"),
+  confidence: real("confidence"),
+  page: integer("page"),
+  bboxJson: jsonb("bbox_json"),
+  source: text("source").default("extraction"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  invoiceIdx: index("ap_invoice_extracted_fields_invoice_idx").on(table.invoiceId),
+  fieldKeyIdx: index("ap_invoice_extracted_fields_field_key_idx").on(table.fieldKey),
+}));
+
+export const insertApInvoiceExtractedFieldSchema = createInsertSchema(apInvoiceExtractedFields).omit({ id: true, createdAt: true });
+export type InsertApInvoiceExtractedField = z.infer<typeof insertApInvoiceExtractedFieldSchema>;
+export type ApInvoiceExtractedField = typeof apInvoiceExtractedFields.$inferSelect;
+
+export const apInvoiceSplits = pgTable("ap_invoice_splits", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id", { length: 36 }).notNull().references(() => apInvoices.id, { onDelete: "cascade" }),
+  description: text("description"),
+  percentage: numeric("percentage", { precision: 8, scale: 4 }),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  costCodeId: varchar("cost_code_id", { length: 36 }).references(() => costCodes.id),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
+  taxCodeId: varchar("tax_code_id", { length: 36 }),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  invoiceIdx: index("ap_invoice_splits_invoice_idx").on(table.invoiceId),
+}));
+
+export const insertApInvoiceSplitSchema = createInsertSchema(apInvoiceSplits).omit({ id: true, createdAt: true });
+export type InsertApInvoiceSplit = z.infer<typeof insertApInvoiceSplitSchema>;
+export type ApInvoiceSplit = typeof apInvoiceSplits.$inferSelect;
+
+export const apInvoiceActivity = pgTable("ap_invoice_activity", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id", { length: 36 }).notNull().references(() => apInvoices.id, { onDelete: "cascade" }),
+  activityType: text("activity_type").notNull(),
+  message: text("message").notNull(),
+  actorUserId: varchar("actor_user_id", { length: 36 }).references(() => users.id),
+  metaJson: jsonb("meta_json"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  invoiceIdx: index("ap_invoice_activity_invoice_idx").on(table.invoiceId),
+}));
+
+export const insertApInvoiceActivitySchema = createInsertSchema(apInvoiceActivity).omit({ id: true, createdAt: true });
+export type InsertApInvoiceActivity = z.infer<typeof insertApInvoiceActivitySchema>;
+export type ApInvoiceActivity = typeof apInvoiceActivity.$inferSelect;
+
+export const apInvoiceComments = pgTable("ap_invoice_comments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id", { length: 36 }).notNull().references(() => apInvoices.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  invoiceIdx: index("ap_invoice_comments_invoice_idx").on(table.invoiceId),
+}));
+
+export const insertApInvoiceCommentSchema = createInsertSchema(apInvoiceComments).omit({ id: true, createdAt: true });
+export type InsertApInvoiceComment = z.infer<typeof insertApInvoiceCommentSchema>;
+export type ApInvoiceComment = typeof apInvoiceComments.$inferSelect;
+
+export const apApprovalRules = pgTable("ap_approval_rules", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  priority: integer("priority").default(0).notNull(),
+  conditions: jsonb("conditions").notNull(),
+  approverUserIds: text("approver_user_ids").array().notNull(),
+  autoApprove: boolean("auto_approve").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("ap_approval_rules_company_idx").on(table.companyId),
+  activeIdx: index("ap_approval_rules_active_idx").on(table.isActive),
+}));
+
+export const insertApApprovalRuleSchema = createInsertSchema(apApprovalRules).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertApApprovalRule = z.infer<typeof insertApApprovalRuleSchema>;
+export type ApApprovalRule = typeof apApprovalRules.$inferSelect;
+
+export const apInvoiceApprovals = pgTable("ap_invoice_approvals", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id", { length: 36 }).notNull().references(() => apInvoices.id, { onDelete: "cascade" }),
+  stepIndex: integer("step_index").notNull(),
+  approverUserId: varchar("approver_user_id", { length: 36 }).notNull().references(() => users.id),
+  status: apApprovalStatusEnum("status").default("PENDING").notNull(),
+  decisionAt: timestamp("decision_at"),
+  note: text("note"),
+  ruleId: varchar("rule_id", { length: 36 }).references(() => apApprovalRules.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  invoiceIdx: index("ap_invoice_approvals_invoice_idx").on(table.invoiceId),
+  approverIdx: index("ap_invoice_approvals_approver_idx").on(table.approverUserId),
+}));
+
+export const insertApInvoiceApprovalSchema = createInsertSchema(apInvoiceApprovals).omit({ id: true, createdAt: true });
+export type InsertApInvoiceApproval = z.infer<typeof insertApInvoiceApprovalSchema>;
+export type ApInvoiceApproval = typeof apInvoiceApprovals.$inferSelect;
