@@ -1113,7 +1113,7 @@ export default function ApInvoiceDetailPage() {
 
   const { data: approvalData } = useQuery<ApprovalPathResponse>({
     queryKey: [AP_INVOICE_ROUTES.APPROVAL_PATH(invoiceId || "")],
-    enabled: !!invoiceId && invoice?.status === "PENDING_REVIEW",
+    enabled: !!invoiceId && ["PENDING_REVIEW", "APPROVED", "REJECTED", "EXPORTED"].includes(invoice?.status || ""),
   });
 
   const isCurrentApprover = useMemo(() => {
@@ -1383,7 +1383,7 @@ export default function ApInvoiceDetailPage() {
               Confirm
             </Button>
           )}
-          {invoice.status === "CONFIRMED" && (
+          {(invoice.status === "DRAFT" || invoice.status === "IMPORTED" || invoice.status === "CONFIRMED") && (
             <Button size="sm" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending} data-testid="button-submit-invoice">
               {submitMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Send className="h-3 w-3 mr-1" />}
               Submit for Approval

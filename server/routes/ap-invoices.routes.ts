@@ -581,8 +581,8 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
       .limit(1);
 
     if (!existing) return res.status(404).json({ error: "Invoice not found" });
-    if (existing.status !== "CONFIRMED") {
-      return res.status(400).json({ error: "Only confirmed invoices can be submitted for approval" });
+    if (!["DRAFT", "IMPORTED", "CONFIRMED"].includes(existing.status)) {
+      return res.status(400).json({ error: "Only draft, imported, or confirmed invoices can be submitted for approval" });
     }
 
     if (!existing.invoiceNumber) {
@@ -674,11 +674,14 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
       return true;
     }
 
+    logger.info({ invoiceId: id, rulesCount: rules.length, invoiceTotal, companyId }, "Evaluating approval rules for invoice");
+
     let matchedRule: typeof rules[number] | null = null;
     for (const rule of rules) {
-      if (ruleMatchesInvoice(rule)) {
+      const matches = ruleMatchesInvoice(rule);
+      logger.info({ ruleId: rule.id, ruleName: rule.name, ruleType: (rule as any).ruleType, matches, conditions: rule.conditions }, "Rule evaluation result");
+      if (matches && !matchedRule) {
         matchedRule = rule;
-        break;
       }
     }
 
@@ -687,6 +690,7 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
 
     if (matchedRule) {
       const ruleType = (matchedRule as any).ruleType || "USER";
+      logger.info({ matchedRuleId: matchedRule.id, matchedRuleName: matchedRule.name, ruleType, approverCount: matchedRule.approverUserIds.length }, "Matched approval rule");
       if (ruleType === "AUTO_APPROVE" || matchedRule.autoApprove) {
         autoApproved = true;
       } else {
@@ -700,8 +704,11 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
             ruleId: matchedRule.id,
           });
           approvalStepIndex++;
+          logger.info({ invoiceId: id, stepIndex: i, approverUserId }, "Created approval step");
         }
       }
+    } else {
+      logger.warn({ invoiceId: id, companyId }, "No approval rule matched invoice - submitting without approvers");
     }
 
     let newStatus: string;
@@ -718,7 +725,7 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
       .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
       .returning();
 
-    await logActivity(id, "submitted", `Invoice submitted for approval (${approvalStepIndex} approver(s) assigned)`, userId);
+    await logActivity(id, "submitted", `Invoice submitted for approval (${approvalStepIndex} approver(s) assigned via rule: ${matchedRule?.name || 'none'})`, userId);
 
     res.json(updated);
   } catch (error: unknown) {
