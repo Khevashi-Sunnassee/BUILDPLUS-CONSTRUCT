@@ -4950,3 +4950,42 @@ export const apInvoiceApprovals = pgTable("ap_invoice_approvals", {
 export const insertApInvoiceApprovalSchema = createInsertSchema(apInvoiceApprovals).omit({ id: true, createdAt: true });
 export type InsertApInvoiceApproval = z.infer<typeof insertApInvoiceApprovalSchema>;
 export type ApInvoiceApproval = typeof apInvoiceApprovals.$inferSelect;
+
+export const apInboundEmails = pgTable("ap_inbound_emails", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  resendEmailId: varchar("resend_email_id", { length: 255 }).notNull(),
+  fromAddress: varchar("from_address", { length: 255 }).notNull(),
+  toAddress: varchar("to_address", { length: 255 }),
+  subject: varchar("subject", { length: 500 }),
+  status: varchar("status", { length: 50 }).notNull().default("RECEIVED"),
+  invoiceId: varchar("invoice_id", { length: 36 }).references(() => apInvoices.id),
+  attachmentCount: integer("attachment_count").default(0),
+  processingError: text("processing_error"),
+  processedAt: timestamp("processed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("ap_inbound_emails_company_idx").on(table.companyId),
+  resendIdx: index("ap_inbound_emails_resend_idx").on(table.resendEmailId),
+}));
+
+export const insertApInboundEmailSchema = createInsertSchema(apInboundEmails).omit({ id: true, createdAt: true });
+export type InsertApInboundEmail = z.infer<typeof insertApInboundEmailSchema>;
+export type ApInboundEmail = typeof apInboundEmails.$inferSelect;
+
+export const apInboxSettings = pgTable("ap_inbox_settings", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  companyId: varchar("company_id", { length: 36 }).notNull().unique().references(() => companies.id),
+  isEnabled: boolean("is_enabled").default(false).notNull(),
+  inboundEmailAddress: varchar("inbound_email_address", { length: 255 }),
+  autoExtract: boolean("auto_extract").default(true).notNull(),
+  autoSubmit: boolean("auto_submit").default(false).notNull(),
+  defaultStatus: varchar("default_status", { length: 50 }).default("DRAFT").notNull(),
+  notifyUserIds: jsonb("notify_user_ids").$type<string[]>().default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertApInboxSettingsSchema = createInsertSchema(apInboxSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertApInboxSettings = z.infer<typeof insertApInboxSettingsSchema>;
+export type ApInboxSettings = typeof apInboxSettings.$inferSelect;

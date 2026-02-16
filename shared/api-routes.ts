@@ -984,3 +984,10 @@ export const AP_APPROVAL_RULES_ROUTES = {
   BY_ID: (id: string | number) => `/api/ap-approval-rules/${id}`,
 } as const;
 export type ApApprovalRulesRoutes = typeof AP_APPROVAL_RULES_ROUTES;
+
+export const AP_INBOX_ROUTES = {
+  SETTINGS: '/api/ap-inbox/settings',
+  EMAILS: '/api/ap-inbox/emails',
+  WEBHOOK: '/api/webhooks/resend-inbound',
+} as const;
+export type ApInboxRoutes = typeof AP_INBOX_ROUTES;
