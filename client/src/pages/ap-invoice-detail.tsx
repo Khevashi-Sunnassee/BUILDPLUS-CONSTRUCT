@@ -22,7 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, Download, FileText, Plus, Send, Shield, ShieldAlert, ShieldCheck,
   Clock, Pause, AlertTriangle, X, Pencil, Check, ChevronLeft, ChevronRight,
-  ZoomIn, ZoomOut, FolderOpen, Loader2, BarChart3
+  ZoomIn, ZoomOut, FolderOpen, Loader2, BarChart3, Filter
 } from "lucide-react";
 
 interface InvoiceDetail {
@@ -85,6 +85,13 @@ interface CommentItem {
   createdAt: string;
 }
 
+interface ResolvedCondition {
+  field: string;
+  operator: string;
+  values: string[];
+  resolvedValues: string[];
+}
+
 interface ApprovalPathStep {
   id: string;
   approverUserId: string;
@@ -95,6 +102,8 @@ interface ApprovalPathStep {
   decisionAt: string | null;
   note: string | null;
   ruleName: string | null;
+  ruleType: string | null;
+  ruleConditionsResolved: ResolvedCondition[] | null;
   isCurrent: boolean;
 }
 
@@ -757,6 +766,75 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
   );
 }
 
+const CONDITION_FIELD_LABELS: Record<string, string> = {
+  COMPANY: "Company",
+  AMOUNT: "Invoice Total",
+  JOB: "Job",
+  SUPPLIER: "Supplier",
+  GL_CODE: "GL Code",
+};
+
+const CONDITION_OPERATOR_LABELS: Record<string, string> = {
+  EQUALS: "equals",
+  NOT_EQUALS: "does not equal",
+  GREATER_THAN: "greater than",
+  LESS_THAN: "less than",
+  GREATER_THAN_OR_EQUALS: "greater than or equal to",
+  LESS_THAN_OR_EQUALS: "less than or equal to",
+};
+
+function formatConditionValue(field: string, values: string[]) {
+  if (!values || values.length === 0) return "";
+  if (field === "AMOUNT") {
+    return `$${parseFloat(values[0] || "0").toLocaleString()}`;
+  }
+  return values.join(", ");
+}
+
+function RuleConditionsDisplay({ conditions, ruleType }: { conditions: ResolvedCondition[] | null; ruleType: string | null }) {
+  if (ruleType === "USER_CATCH_ALL") {
+    return (
+      <div className="rounded-md bg-muted/50 p-3 space-y-1.5" data-testid="rule-conditions-display">
+        <div className="flex items-center gap-2">
+          <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-xs font-medium text-muted-foreground uppercase">Matching Conditions</span>
+        </div>
+        <p className="text-sm text-muted-foreground">Catch-all rule: applies to all invoices</p>
+      </div>
+    );
+  }
+
+  if (!conditions || !Array.isArray(conditions) || conditions.length === 0) return null;
+
+  return (
+    <div className="rounded-md bg-muted/50 p-3 space-y-1.5" data-testid="rule-conditions-display">
+      <div className="flex items-center gap-2">
+        <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <span className="text-xs font-medium text-muted-foreground uppercase">Matching Conditions</span>
+      </div>
+      <div className="space-y-1">
+        {conditions.map((cond, i) => {
+          const displayValues = cond.resolvedValues && cond.resolvedValues.length > 0
+            ? cond.resolvedValues
+            : cond.values;
+          const valueStr = cond.field === "AMOUNT"
+            ? formatConditionValue(cond.field, displayValues)
+            : displayValues.join(", ");
+
+          return (
+            <div key={i} className="flex items-center gap-1.5 text-sm" data-testid={`condition-row-${i}`}>
+              {i > 0 && <span className="text-xs font-semibold text-muted-foreground mr-1">AND</span>}
+              <span className="font-medium">{CONDITION_FIELD_LABELS[cond.field] || cond.field}</span>
+              <span className="text-muted-foreground">{CONDITION_OPERATOR_LABELS[cond.operator] || cond.operator}</span>
+              <span className="font-medium">{valueStr}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ApprovalPathSheet({ invoiceId, open, onOpenChange }: { invoiceId: string; open: boolean; onOpenChange: (v: boolean) => void }) {
   const { data: approvalData } = useQuery<ApprovalPathResponse>({
     queryKey: [AP_INVOICE_ROUTES.APPROVAL_PATH(invoiceId)],
@@ -767,6 +845,10 @@ function ApprovalPathSheet({ invoiceId, open, onOpenChange }: { invoiceId: strin
   const totalSteps = approvalData?.totalSteps || 0;
   const completedSteps = approvalData?.completedSteps || 0;
   const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+
+  const firstStepWithRule = steps.find(s => s.ruleName);
+  const ruleConditions = firstStepWithRule?.ruleConditionsResolved || null;
+  const ruleType = firstStepWithRule?.ruleType || null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -779,6 +861,19 @@ function ApprovalPathSheet({ invoiceId, open, onOpenChange }: { invoiceId: strin
             <p className="text-sm text-muted-foreground text-center py-8" data-testid="text-no-approval-path">No approval path configured</p>
           ) : (
             <>
+              {firstStepWithRule?.ruleName && (
+                <div className="space-y-2" data-testid="rule-info-section">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Rule: {firstStepWithRule.ruleName}</span>
+                    <Badge variant="secondary" className="text-xs" data-testid="badge-rule-type">
+                      {ruleType === "USER_CATCH_ALL" ? "Catch All" : ruleType === "AUTO_APPROVE" ? "Auto" : "Conditional"}
+                    </Badge>
+                  </div>
+                  <RuleConditionsDisplay conditions={ruleConditions} ruleType={ruleType} />
+                </div>
+              )}
+
               <div className="space-y-2" data-testid="approval-progress">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Progress</span>
@@ -799,7 +894,6 @@ function ApprovalPathSheet({ invoiceId, open, onOpenChange }: { invoiceId: strin
                 {steps.map((step, i) => {
                   const isApproved = step.status === "APPROVED";
                   const isRejected = step.status === "REJECTED";
-                  const isPending = step.status === "PENDING";
 
                   return (
                     <div key={step.id} data-testid={`approval-step-${i}`}>
@@ -830,11 +924,6 @@ function ApprovalPathSheet({ invoiceId, open, onOpenChange }: { invoiceId: strin
                               </Badge>
                             )}
                           </div>
-                          {step.ruleName && (
-                            <p className="text-xs text-muted-foreground" data-testid={`text-rule-name-${i}`}>
-                              Rule: {step.ruleName}
-                            </p>
-                          )}
                           {step.decisionAt && (
                             <p className="text-xs text-muted-foreground mt-0.5">
                               {isApproved ? "Approved" : "Rejected"} {formatDate(step.decisionAt)}

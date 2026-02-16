@@ -1206,12 +1206,67 @@ router.get("/api/ap-invoices/:id/approval-path", requireAuth, async (req: Reques
         approverName: users.name,
         approverEmail: users.email,
         ruleName: apApprovalRules.name,
+        ruleConditions: apApprovalRules.conditions,
+        ruleType: apApprovalRules.ruleType,
       })
       .from(apInvoiceApprovals)
       .leftJoin(users, eq(apInvoiceApprovals.approverUserId, users.id))
       .leftJoin(apApprovalRules, eq(apInvoiceApprovals.ruleId, apApprovalRules.id))
       .where(eq(apInvoiceApprovals.invoiceId, id))
       .orderBy(asc(apInvoiceApprovals.stepIndex));
+
+    const ruleIds = [...new Set(approvals.map(a => a.ruleId).filter(Boolean))] as string[];
+    let resolvedConditionLabels: Record<string, any[]> = {};
+
+    if (ruleIds.length > 0) {
+      const firstApproval = approvals.find(a => a.ruleConditions);
+      if (firstApproval?.ruleConditions) {
+        const conditions = firstApproval.ruleConditions as any[];
+        if (Array.isArray(conditions)) {
+          const resolvedConds = [];
+          for (const cond of conditions) {
+            const resolved: any = { field: cond.field, operator: cond.operator, values: cond.values, resolvedValues: [] };
+            if (cond.values && cond.values.length > 0) {
+              switch (cond.field) {
+                case "COMPANY": {
+                  const companyRows = await db.select({ id: companies.id, name: companies.name }).from(companies)
+                    .where(inArray(companies.id, cond.values));
+                  resolved.resolvedValues = cond.values.map((v: string) => {
+                    const c = companyRows.find(r => r.id === v);
+                    return c?.name || v;
+                  });
+                  break;
+                }
+                case "SUPPLIER": {
+                  const supplierRows = await db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers)
+                    .where(inArray(suppliers.id, cond.values));
+                  resolved.resolvedValues = cond.values.map((v: string) => {
+                    const s = supplierRows.find(r => r.id === v);
+                    return s?.name || v;
+                  });
+                  break;
+                }
+                case "JOB": {
+                  const jobRows = await db.select({ id: jobs.id, name: jobs.name, jobNumber: jobs.jobNumber }).from(jobs)
+                    .where(inArray(jobs.id, cond.values));
+                  resolved.resolvedValues = cond.values.map((v: string) => {
+                    const j = jobRows.find(r => r.id === v);
+                    return j ? `${j.jobNumber} - ${j.name}` : v;
+                  });
+                  break;
+                }
+                default:
+                  resolved.resolvedValues = cond.values;
+              }
+            }
+            resolvedConds.push(resolved);
+          }
+          if (firstApproval.ruleId) {
+            resolvedConditionLabels[firstApproval.ruleId] = resolvedConds;
+          }
+        }
+      }
+    }
 
     const totalSteps = approvals.length;
     const completedSteps = approvals.filter(a => a.status === "APPROVED").length;
@@ -1221,6 +1276,7 @@ router.get("/api/ap-invoices/:id/approval-path", requireAuth, async (req: Reques
     const steps = approvals.map(a => ({
       ...a,
       isCurrent: a.status === "PENDING" && a.stepIndex === currentStepIndex,
+      ruleConditionsResolved: a.ruleId ? (resolvedConditionLabels[a.ruleId] || a.ruleConditions) : null,
     }));
 
     res.json({ steps, totalSteps, completedSteps, currentStepIndex });

@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
-import { ChevronLeft, ChevronRight, Check, X, Pause, Loader2, FileText, AlertTriangle, DollarSign, Calendar, Building2, Hash } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, Pause, Loader2, FileText, AlertTriangle, DollarSign, Calendar, Building2, Hash, Filter, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
@@ -65,6 +65,15 @@ interface InvoiceDetail {
     approverEmail: string | null;
     decisionAt: string | null;
     note: string | null;
+    ruleName: string | null;
+    ruleType: string | null;
+    ruleConditionsResolved: Array<{
+      field: string;
+      operator: string;
+      values: string[];
+      resolvedValues: string[];
+    }> | null;
+    isCurrent: boolean;
   }>;
   documents: Array<{
     id: string;
@@ -165,13 +174,14 @@ function InvoiceDetailSheet({ invoice, onClose }: { invoice: ApprovalInvoice; on
       ]);
       const inv = invRes.ok ? await invRes.json() : {};
       const splits = splitsRes.ok ? await splitsRes.json() : [];
-      const approvals = approvalRes.ok ? await approvalRes.json() : [];
+      const approvalsData = approvalRes.ok ? await approvalRes.json() : { steps: [] };
+      const approvals = approvalsData.steps || approvalsData || [];
       let documents: any[] = [];
       if (docsRes.ok) {
         const docData = await docsRes.json();
         documents = docData.documents || [];
       }
-      return { ...inv, splits, approvalPath: approvals, documents };
+      return { ...inv, splits, approvalPath: Array.isArray(approvals) ? approvals : [], documents };
     },
     enabled: !!invoice.id,
   });
@@ -323,6 +333,50 @@ function InvoiceDetailSheet({ invoice, onClose }: { invoice: ApprovalInvoice; on
 
                   {detail?.approvalPath && detail.approvalPath.length > 0 && (
                     <DetailSection title="Approval Chain">
+                      {(() => {
+                        const firstWithRule = detail.approvalPath.find(s => s.ruleName);
+                        const conditions = firstWithRule?.ruleConditionsResolved;
+                        const ruleType = firstWithRule?.ruleType;
+                        return (
+                          <>
+                            {firstWithRule?.ruleName && (
+                              <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2 mb-3" data-testid="mobile-rule-info">
+                                <div className="flex items-center gap-2">
+                                  <Shield className="h-3.5 w-3.5 text-white/60" />
+                                  <span className="text-sm font-medium text-white">{firstWithRule.ruleName}</span>
+                                  <Badge variant="secondary" className="text-xs" data-testid="mobile-badge-rule-type">
+                                    {ruleType === "USER_CATCH_ALL" ? "Catch All" : ruleType === "AUTO_APPROVE" ? "Auto" : "Conditional"}
+                                  </Badge>
+                                </div>
+                                {ruleType === "USER_CATCH_ALL" ? (
+                                  <div className="text-xs text-white/50">Applies to all invoices</div>
+                                ) : conditions && Array.isArray(conditions) && conditions.length > 0 ? (
+                                  <div className="space-y-1" data-testid="mobile-rule-conditions">
+                                    <div className="flex items-center gap-1.5">
+                                      <Filter className="h-3 w-3 text-white/40" />
+                                      <span className="text-xs text-white/50 uppercase font-medium">Conditions</span>
+                                    </div>
+                                    {conditions.map((cond, ci) => {
+                                      const fieldLabels: Record<string, string> = { COMPANY: "Company", AMOUNT: "Invoice Total", JOB: "Job", SUPPLIER: "Supplier", GL_CODE: "GL Code" };
+                                      const opLabels: Record<string, string> = { EQUALS: "equals", NOT_EQUALS: "not equal to", GREATER_THAN: ">", LESS_THAN: "<", GREATER_THAN_OR_EQUALS: ">=", LESS_THAN_OR_EQUALS: "<=" };
+                                      const vals = cond.resolvedValues?.length > 0 ? cond.resolvedValues : cond.values;
+                                      const valueStr = cond.field === "AMOUNT" ? `$${parseFloat(vals[0] || "0").toLocaleString()}` : vals.join(", ");
+                                      return (
+                                        <div key={ci} className="text-xs text-white/70" data-testid={`mobile-condition-${ci}`}>
+                                          {ci > 0 && <span className="text-white/40 mr-1">AND</span>}
+                                          <span className="font-medium text-white/90">{fieldLabels[cond.field] || cond.field}</span>{" "}
+                                          <span className="text-white/50">{opLabels[cond.operator] || cond.operator}</span>{" "}
+                                          <span className="font-medium text-white/90">{valueStr}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                       <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-3">
                         {detail.approvalPath.map((step, idx) => {
                           const stepStatus = step.status;
