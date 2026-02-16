@@ -1113,7 +1113,7 @@ export default function ApInvoiceDetailPage() {
 
   const { data: approvalData } = useQuery<ApprovalPathResponse>({
     queryKey: [AP_INVOICE_ROUTES.APPROVAL_PATH(invoiceId || "")],
-    enabled: !!invoiceId && ["PENDING_REVIEW", "APPROVED", "REJECTED", "EXPORTED"].includes(invoice?.status || ""),
+    enabled: !!invoiceId && ["PARTIALLY_APPROVED", "APPROVED", "REJECTED", "EXPORTED"].includes(invoice?.status || ""),
   });
 
   const isCurrentApprover = useMemo(() => {
@@ -1271,7 +1271,7 @@ export default function ApInvoiceDetailPage() {
     if (autoExtractTriggered.current) return;
     const hasDoc = invoice.documents && invoice.documents.length > 0;
     const hasFields = invoice.extractedFields && invoice.extractedFields.length > 0;
-    if (hasDoc && !hasFields && ["DRAFT", "IMPORTED"].includes(invoice.status) && !extractMutation.isPending) {
+    if (hasDoc && !hasFields && ["IMPORTED"].includes(invoice.status) && !extractMutation.isPending) {
       autoExtractTriggered.current = true;
       extractMutation.mutate();
     }
@@ -1347,18 +1347,21 @@ export default function ApInvoiceDetailPage() {
           variant={
             invoice.status === "APPROVED" ? "default" :
             invoice.status === "REJECTED" || invoice.status === "FAILED_EXPORT" ? "destructive" :
+            invoice.status === "ON_HOLD" ? "outline" :
             invoice.status === "IMPORTED" ? "outline" : "secondary"
           }
           className={
             invoice.status === "APPROVED" ? "bg-green-600 text-white" :
             invoice.status === "CONFIRMED" ? "bg-teal-600 text-white" :
-            invoice.status === "EXPORTED" ? "bg-blue-600 text-white" : undefined
+            invoice.status === "EXPORTED" ? "bg-blue-600 text-white" :
+            invoice.status === "PARTIALLY_APPROVED" ? "bg-amber-500 text-white" :
+            invoice.status === "PROCESSED" ? "bg-indigo-500 text-white" :
+            invoice.status === "ON_HOLD" ? "text-amber-600 border-amber-300" : undefined
           }
           data-testid="badge-status"
         >
-          {(invoice.status || "draft").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
+          {(invoice.status || "imported").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
         </Badge>
-        {invoice.isOnHold && <Badge variant="outline" className="text-amber-600 border-amber-300">On Hold</Badge>}
         {invoice.isUrgent && <Badge variant="destructive">Urgent</Badge>}
         <div className="ml-auto flex items-center gap-2 flex-wrap">
           {invoice.documents && invoice.documents.length > 0 && (
@@ -1377,19 +1380,19 @@ export default function ApInvoiceDetailPage() {
               {extractMutation.isPending ? "Extracting..." : "Extract with AI"}
             </Button>
           )}
-          {(invoice.status === "DRAFT" || invoice.status === "IMPORTED") && (
+          {(invoice.status === "IMPORTED" || invoice.status === "PROCESSED") && (
             <Button size="sm" onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending} data-testid="button-confirm-invoice">
               {confirmMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
               Confirm
             </Button>
           )}
-          {(invoice.status === "DRAFT" || invoice.status === "IMPORTED" || invoice.status === "CONFIRMED") && (
+          {(invoice.status === "IMPORTED" || invoice.status === "PROCESSED" || invoice.status === "CONFIRMED") && (
             <Button size="sm" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending} data-testid="button-submit-invoice">
               {submitMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Send className="h-3 w-3 mr-1" />}
               Submit for Approval
             </Button>
           )}
-          {invoice.status === "PENDING_REVIEW" && (
+          {invoice.status === "PARTIALLY_APPROVED" && (
             <>
               <Button size="sm" onClick={() => { setGoToNext(false); approveMutation.mutate(); }} disabled={approveMutation.isPending || (approvalData && !isCurrentApprover)} data-testid="button-approve-invoice">
                 <Check className="h-3 w-3 mr-1" />

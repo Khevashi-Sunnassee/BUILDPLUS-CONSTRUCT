@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Filter, Loader2, Eye, Send, Settings, Mail, Copy, Check, RefreshCw } from "lucide-react";
+import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Filter, Loader2, Eye, Send, Settings, Mail, Copy, Check, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 
 interface ApInvoice {
   id: string;
@@ -56,10 +56,11 @@ interface InvoiceListResponse {
 interface StatusCounts {
   waiting_on_me: number;
   imported: number;
-  draft: number;
+  processed: number;
   confirmed: number;
-  pending_review: number;
+  partially_approved: number;
   approved: number;
+  on_hold: number;
   exported: number;
   failed_export: number;
   rejected: number;
@@ -69,27 +70,27 @@ interface StatusCounts {
 const STATUS_TABS = [
   { key: "waiting_on_me", label: "Waiting On Me", showCount: true },
   { key: "imported", label: "Imported", showCount: false },
-  { key: "draft", label: "Drafts", showCount: false },
+  { key: "processed", label: "Processed", showCount: false },
   { key: "confirmed", label: "Confirmed", showCount: false },
-  { key: "pending_review", label: "Pending Review", showCount: false },
+  { key: "partially_approved", label: "Partially Approved", showCount: false },
   { key: "approved", label: "Approved", showCount: false },
+  { key: "on_hold", label: "On Hold", showCount: true },
   { key: "exported", label: "Exported", showCount: false },
-  { key: "failed_export", label: "Failed Export", showCount: false },
   { key: "rejected", label: "Rejected", showCount: true },
   { key: "all", label: "All", showCount: false },
 ] as const;
 
 const STATUS_BADGE_CONFIG: Record<string, { variant: "secondary" | "default" | "destructive" | "outline"; className?: string }> = {
-  draft: { variant: "secondary" },
   imported: { variant: "outline" },
+  processed: { variant: "default", className: "bg-indigo-500 text-white" },
   confirmed: { variant: "default", className: "bg-teal-600 text-white" },
-  pending_review: { variant: "default" },
+  partially_approved: { variant: "default", className: "bg-amber-500 text-white" },
   waiting_on_me: { variant: "default", className: "bg-amber-500 text-white" },
   approved: { variant: "default", className: "bg-green-600 text-white" },
+  on_hold: { variant: "outline", className: "text-amber-600 border-amber-300" },
   exported: { variant: "default", className: "bg-blue-600 text-white" },
   failed_export: { variant: "destructive" },
   rejected: { variant: "destructive" },
-  on_hold: { variant: "outline" },
 };
 
 function formatDate(date: string | null | undefined): string {
@@ -356,8 +357,8 @@ function InboxSettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="DRAFT">Draft</SelectItem>
-                      <SelectItem value="PENDING_REVIEW">Pending Review</SelectItem>
+                      <SelectItem value="IMPORTED">Imported</SelectItem>
+                      <SelectItem value="PROCESSED">Processed</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -411,6 +412,8 @@ export default function ApInvoicesPage() {
   const [uploadedByFilter, setUploadedByFilter] = useState("all");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [supplierFilter, setSupplierFilter] = useState<{ id: string; name: string } | null>(null);
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const queryParams = useMemo(() => {
     const params: Record<string, string> = { page: String(page), limit: "50" };
@@ -420,8 +423,9 @@ export default function ApInvoicesPage() {
     if (uploadedByFilter !== "all") params.uploadedBy = uploadedByFilter;
     if (companyFilter !== "all") params.companyId = companyFilter;
     if (supplierFilter) params.supplierId = supplierFilter.id;
+    if (sortBy) { params.sortBy = sortBy; params.sortOrder = sortOrder; }
     return params;
-  }, [activeTab, search, page, flagFilter, uploadedByFilter, companyFilter, supplierFilter]);
+  }, [activeTab, search, page, flagFilter, uploadedByFilter, companyFilter, supplierFilter, sortBy, sortOrder]);
 
   const { data: invoiceData, isLoading } = useQuery<InvoiceListResponse>({
     queryKey: [AP_INVOICE_ROUTES.LIST, queryParams],
@@ -502,6 +506,23 @@ export default function ApInvoicesPage() {
       setSelectedRows(new Set(invoices.map((inv) => inv.id)));
     }
   }, [invoices, selectedRows.size]);
+
+  const handleSort = useCallback((column: string) => {
+    if (sortBy === column) {
+      setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("asc");
+    }
+    setPage(1);
+  }, [sortBy]);
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortBy !== column) return <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground" />;
+    return sortOrder === "asc"
+      ? <ArrowUp className="h-3 w-3 ml-1" />
+      : <ArrowDown className="h-3 w-3 ml-1" />;
+  };
 
   const getCount = (key: string): number => {
     if (!statusCounts) return 0;
@@ -674,11 +695,27 @@ export default function ApInvoicesPage() {
                       />
                     </TableHead>
                     <TableHead>Invoice Number</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Uploaded</TableHead>
-                    <TableHead>Invoice Date</TableHead>
+                    <TableHead>
+                      <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("supplier")} data-testid="sort-supplier">
+                        Supplier <SortIcon column="supplier" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("uploadedAt")} data-testid="sort-uploaded">
+                        Uploaded <SortIcon column="uploadedAt" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("invoiceDate")} data-testid="sort-invoice-date">
+                        Invoice Date <SortIcon column="invoiceDate" />
+                      </button>
+                    </TableHead>
                     <TableHead>Due Date</TableHead>
-                    <TableHead className="text-right">Invoice Total</TableHead>
+                    <TableHead className="text-right">
+                      <button type="button" className="flex items-center ml-auto hover:text-foreground" onClick={() => handleSort("totalInc")} data-testid="sort-total">
+                        Invoice Total <SortIcon column="totalInc" />
+                      </button>
+                    </TableHead>
                     <TableHead>Assignee</TableHead>
                     <TableHead>Risk Warning</TableHead>
                     <TableHead>Status</TableHead>

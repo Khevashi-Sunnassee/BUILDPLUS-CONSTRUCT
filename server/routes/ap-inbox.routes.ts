@@ -40,7 +40,7 @@ router.get("/api/ap-inbox/settings", requireAuth, async (req: Request, res: Resp
         inboundEmailAddress: null,
         autoExtract: true,
         autoSubmit: false,
-        defaultStatus: "DRAFT",
+        defaultStatus: "IMPORTED",
         notifyUserIds: [],
       });
     }
@@ -62,7 +62,7 @@ router.put("/api/ap-inbox/settings", requireAuth, async (req: Request, res: Resp
       inboundEmailAddress: z.string().nullable().optional(),
       autoExtract: z.boolean().optional(),
       autoSubmit: z.boolean().optional(),
-      defaultStatus: z.enum(["DRAFT", "PENDING_REVIEW"]).optional(),
+      defaultStatus: z.enum(["IMPORTED", "PROCESSED"]).optional(),
       notifyUserIds: z.array(z.string()).optional(),
     }).parse(req.body);
 

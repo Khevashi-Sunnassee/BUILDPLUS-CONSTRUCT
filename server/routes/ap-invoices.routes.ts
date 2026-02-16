@@ -54,6 +54,8 @@ router.get("/api/ap-invoices", requireAuth, async (req: Request, res: Response) 
     const q = req.query.q as string | undefined;
     const supplierId = req.query.supplierId as string | undefined;
     const assignee = req.query.assignee as string | undefined;
+    const sortBy = req.query.sortBy as string | undefined;
+    const sortOrder = (req.query.sortOrder as string || "desc").toLowerCase() === "asc" ? "asc" : "desc";
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
     const offset = (page - 1) * limit;
@@ -126,7 +128,18 @@ router.get("/api/ap-invoices", requireAuth, async (req: Request, res: Response) 
           sql`${apInvoices.createdByUserId} = creator_u.id`
         )
         .where(whereClause)
-        .orderBy(desc(apInvoices.uploadedAt))
+        .orderBy(
+          (() => {
+            const dir = sortOrder === "asc" ? asc : desc;
+            switch (sortBy) {
+              case "supplier": return dir(suppliers.name);
+              case "uploadedAt": return dir(apInvoices.uploadedAt);
+              case "invoiceDate": return dir(apInvoices.invoiceDate);
+              case "totalInc": return dir(apInvoices.totalInc);
+              default: return desc(apInvoices.uploadedAt);
+            }
+          })()
+        )
         .limit(limit)
         .offset(offset),
       db
@@ -170,7 +183,7 @@ router.get("/api/ap-invoices/counts", requireAuth, async (req: Request, res: Res
           and(
             eq(apInvoices.companyId, companyId),
             eq(apInvoices.assigneeUserId, userId),
-            inArray(apInvoices.status, ["DRAFT", "IMPORTED", "CONFIRMED", "PENDING_REVIEW"] as any),
+            inArray(apInvoices.status, ["IMPORTED", "PROCESSED", "CONFIRMED", "PARTIALLY_APPROVED"] as any),
           )
         ),
       db
@@ -393,7 +406,7 @@ router.post("/api/ap-invoices/upload", requireAuth, upload.array("files", 20), a
         .values({
           companyId,
           createdByUserId: userId,
-          status: "DRAFT",
+          status: "IMPORTED",
           uploadedAt: new Date(),
         })
         .returning();
@@ -544,8 +557,8 @@ router.post("/api/ap-invoices/:id/confirm", requireAuth, async (req: Request, re
       .limit(1);
 
     if (!existing) return res.status(404).json({ error: "Invoice not found" });
-    if (!["DRAFT", "IMPORTED"].includes(existing.status)) {
-      return res.status(400).json({ error: "Only draft or imported invoices can be confirmed" });
+    if (!["IMPORTED", "PROCESSED"].includes(existing.status)) {
+      return res.status(400).json({ error: "Only imported or processed invoices can be confirmed" });
     }
 
     if (!existing.invoiceNumber) {
@@ -581,8 +594,8 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
       .limit(1);
 
     if (!existing) return res.status(404).json({ error: "Invoice not found" });
-    if (!["DRAFT", "IMPORTED", "CONFIRMED"].includes(existing.status)) {
-      return res.status(400).json({ error: "Only draft, imported, or confirmed invoices can be submitted for approval" });
+    if (!["IMPORTED", "PROCESSED", "CONFIRMED"].includes(existing.status)) {
+      return res.status(400).json({ error: "Only imported, processed, or confirmed invoices can be submitted for approval" });
     }
 
     if (!existing.invoiceNumber) {
@@ -716,7 +729,7 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
       newStatus = "APPROVED";
       await logActivity(id, "auto_approved", "Invoice auto-approved by rule", userId);
     } else {
-      newStatus = "PENDING_REVIEW";
+      newStatus = "PARTIALLY_APPROVED";
     }
 
     const [updated] = await db
@@ -815,7 +828,7 @@ router.post("/api/ap-invoices/:id/approve", requireAuth, async (req: Request, re
       );
 
     const allApproved = (remainingPending[0]?.cnt || 0) === 0;
-    const newStatus = allApproved ? "APPROVED" : "PENDING_REVIEW";
+    const newStatus = allApproved ? "APPROVED" : "PARTIALLY_APPROVED";
 
     const [updated] = await db
       .update(apInvoices)
@@ -2034,6 +2047,10 @@ Return your response as valid JSON with this exact structure:
     }
     updateData.riskScore = Math.min(riskScore, 100);
     updateData.riskReasons = riskReasons;
+
+    if (invoice.status === "IMPORTED") {
+      updateData.status = "PROCESSED";
+    }
 
     if (Object.keys(updateData).length > 0) {
       updateData.updatedAt = new Date();

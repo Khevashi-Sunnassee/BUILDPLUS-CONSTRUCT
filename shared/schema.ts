@@ -4773,7 +4773,7 @@ export type MyobToken = typeof myobTokens.$inferSelect;
 // AP INVOICE PROCESSING (Traild-style)
 // ============================================================================
 
-export const apInvoiceStatusEnum = pgEnum("ap_invoice_status", ["DRAFT", "IMPORTED", "CONFIRMED", "PENDING_REVIEW", "APPROVED", "REJECTED", "EXPORTED", "FAILED_EXPORT"]);
+export const apInvoiceStatusEnum = pgEnum("ap_invoice_status", ["DRAFT", "IMPORTED", "PROCESSED", "CONFIRMED", "PENDING_REVIEW", "PARTIALLY_APPROVED", "APPROVED", "ON_HOLD", "REJECTED", "EXPORTED", "FAILED_EXPORT"]);
 export const apApprovalStatusEnum = pgEnum("ap_approval_status", ["PENDING", "APPROVED", "REJECTED"]);
 export const apApprovalRuleFieldEnum = pgEnum("ap_approval_rule_field", ["AMOUNT", "SUPPLIER", "GL_CODE", "JOB", "COMPANY"]);
 export const apApprovalRuleTypeEnum = pgEnum("ap_approval_rule_type", ["USER_CATCH_ALL", "USER", "AUTO_APPROVE"]);
@@ -4791,7 +4791,7 @@ export const apInvoices = pgTable("ap_invoices", {
   totalTax: numeric("total_tax", { precision: 12, scale: 2 }),
   totalInc: numeric("total_inc", { precision: 12, scale: 2 }),
   currency: text("currency").default("AUD"),
-  status: apInvoiceStatusEnum("status").default("DRAFT").notNull(),
+  status: apInvoiceStatusEnum("status").default("IMPORTED").notNull(),
   assigneeUserId: varchar("assignee_user_id", { length: 36 }).references(() => users.id),
   createdByUserId: varchar("created_by_user_id", { length: 36 }).references(() => users.id),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
