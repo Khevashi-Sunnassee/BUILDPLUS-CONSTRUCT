@@ -188,6 +188,7 @@ export default function LogisticsPage() {
   const [factoryFilterInitialized, setFactoryFilterInitialized] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedReadyPanels, setSelectedReadyPanels] = useState<Set<string>>(new Set());
+  const [readyPanelJobFilter, setReadyPanelJobFilter] = useState("all");
   const [readyPanelsExpanded, setReadyPanelsExpanded] = useState(true);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [returnLoadList, setReturnLoadList] = useState<LoadListWithDetails | null>(null);
@@ -253,11 +254,27 @@ export default function LogisticsPage() {
     return factory?.state || factory?.code || "QLD";
   }, [factoriesList]);
 
+  const readyPanelJobs = useMemo(() => {
+    if (!readyForLoadingPanels) return [];
+    const jobMap = new Map<string, { id: string; jobNumber: string; name: string }>();
+    for (const p of readyForLoadingPanels) {
+      if (p.job && !jobMap.has(p.job.id)) {
+        jobMap.set(p.job.id, { id: p.job.id, jobNumber: p.job.jobNumber || "", name: p.job.name });
+      }
+    }
+    return Array.from(jobMap.values()).sort((a, b) => a.jobNumber.localeCompare(b.jobNumber));
+  }, [readyForLoadingPanels]);
+
   const filteredReadyPanels = useMemo(() => readyForLoadingPanels?.filter(p => {
-    if (factoryFilter === "all") return true;
-    const factoryCode = getFactoryCode(p);
-    return factoryCode === factoryFilter;
-  }) || [], [readyForLoadingPanels, factoryFilter, getFactoryCode]);
+    if (factoryFilter !== "all") {
+      const factoryCode = getFactoryCode(p);
+      if (factoryCode !== factoryFilter) return false;
+    }
+    if (readyPanelJobFilter !== "all") {
+      if (p.jobId !== readyPanelJobFilter) return false;
+    }
+    return true;
+  }) || [], [readyForLoadingPanels, factoryFilter, readyPanelJobFilter, getFactoryCode]);
 
   const toggleReadyPanel = useCallback((panelId: string) => {
     setSelectedReadyPanels(prev => {
@@ -837,7 +854,20 @@ export default function LogisticsPage() {
               </div>
             )}
           </div>
-          <CardDescription>Completed panels approved for production that are not yet on a load list</CardDescription>
+          <div className="flex items-center gap-2 flex-wrap">
+            <CardDescription className="flex-1">Produced panels not yet on a load list</CardDescription>
+            <Select value={readyPanelJobFilter} onValueChange={(v) => { setReadyPanelJobFilter(v); setSelectedReadyPanels(new Set()); }}>
+              <SelectTrigger className="w-[220px]" data-testid="select-ready-panel-job-filter">
+                <SelectValue placeholder="Filter by job" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Jobs</SelectItem>
+                {readyPanelJobs.map(j => (
+                  <SelectItem key={j.id} value={j.id}>{j.jobNumber} - {j.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         {readyPanelsExpanded && (
           <CardContent>
