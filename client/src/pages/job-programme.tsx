@@ -145,7 +145,7 @@ function SortableRow({
     .filter(e => e.sequenceOrder < entry.sequenceOrder)
     .map(e => ({
       value: String(e.sequenceOrder),
-      label: `${e.sequenceOrder + 1} - ${formatLevelDisplay(e.level, e.pourLabel)}`,
+      label: `Row ${e.sequenceOrder + 1} - ${formatLevelDisplay(e.level, e.pourLabel)}`,
     }));
 
   const predValue = entry.predecessorSequenceOrder != null ? String(entry.predecessorSequenceOrder) : "";
@@ -214,7 +214,9 @@ function SortableRow({
             disabled={isSaving}
           >
             <SelectTrigger className="h-8 text-xs w-28" data-testid={`select-pred-${entry.id}`}>
-              <SelectValue placeholder="None" />
+              <SelectValue placeholder="None">
+                {predValue ? `Row ${parseInt(predValue) + 1}` : "None"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">None</SelectItem>
@@ -394,11 +396,15 @@ export default function JobProgrammePage() {
   const splitMutation = useMutation({
     mutationFn: async (entryId: string) => {
       const res = await apiRequest("POST", ADMIN_ROUTES.JOB_PROGRAMME_SPLIT(jobId!), { entryId });
-      return res.json();
+      const splitResult = await res.json();
+      if (job?.productionStartDate) {
+        await apiRequest("POST", ADMIN_ROUTES.JOB_PROGRAMME_RECALC(jobId!), {});
+      }
+      return splitResult;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/jobs', jobId, 'programme'] });
-      toast({ title: "Level split into pours" });
+      toast({ title: "Level split into pours", description: job?.productionStartDate ? "Dates recalculated automatically." : undefined });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to split level", variant: "destructive" });
@@ -753,11 +759,11 @@ export default function JobProgrammePage() {
                       <thead>
                         <tr className="border-b border-border text-xs text-muted-foreground">
                           <th className="px-2 py-2 w-8"></th>
-                          <th className="px-2 py-2 w-8 text-center">#</th>
+                          <th className="px-2 py-2 w-8 text-center">Row</th>
                           <th className="px-2 py-2 min-w-[80px]">Building</th>
                           <th className="px-2 py-2 min-w-[120px]">Level / Pour</th>
                           <th className="px-2 py-2 w-16">Days</th>
-                          <th className="px-2 py-2 w-28">Pred</th>
+                          <th className="px-2 py-2 w-28">Predecessor</th>
                           <th className="px-2 py-2 w-16">Rel</th>
                           <th className="px-2 py-2 w-28">Start</th>
                           <th className="px-2 py-2 w-28">End</th>

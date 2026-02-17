@@ -727,6 +727,7 @@ export const productionMethods = {
     if (entryIndex === -1) throw new Error("Programme entry not found");
 
     const entry = entries[entryIndex];
+    const originalSequenceOrder = entry.sequenceOrder;
 
     const existingSplits = entries.filter(e => e.level === entry.level && e.buildingNumber === entry.buildingNumber);
     
@@ -750,12 +751,20 @@ export const productionMethods = {
     const halfCycleDays = Math.max(1, Math.ceil(entry.cycleDays / 2));
 
     const newEntries = [...entries];
-    newEntries[entryIndex] = { ...entry, pourLabel: newPourLabelA, cycleDays: halfCycleDays };
+    newEntries[entryIndex] = {
+      ...entry,
+      pourLabel: newPourLabelA,
+      cycleDays: halfCycleDays,
+      predecessorSequenceOrder: entry.predecessorSequenceOrder,
+      relationship: entry.relationship,
+    };
     newEntries.splice(entryIndex + 1, 0, {
       ...entry,
       id: '',
       pourLabel: newPourLabelB,
       cycleDays: halfCycleDays,
+      predecessorSequenceOrder: originalSequenceOrder,
+      relationship: "FS",
       estimatedStartDate: null,
       estimatedEndDate: null,
       manualStartDate: null,
@@ -763,6 +772,36 @@ export const productionMethods = {
     });
 
     const resequenced = newEntries.map((e, idx) => ({ ...e, sequenceOrder: idx }));
+
+    const oldToNewSeq = new Map<number, number>();
+    for (let i = 0; i < entries.length; i++) {
+      const oldSeq = entries[i].sequenceOrder;
+      const newIdx = resequenced.findIndex(r => r.id === entries[i].id);
+      if (newIdx !== -1) {
+        oldToNewSeq.set(oldSeq, newIdx);
+      }
+    }
+    const splitEntryANewSeq = entryIndex;
+    oldToNewSeq.set(originalSequenceOrder, splitEntryANewSeq);
+
+    for (let i = 0; i < resequenced.length; i++) {
+      const e = resequenced[i];
+      if (e.predecessorSequenceOrder != null && i !== entryIndex + 1) {
+        if (e.predecessorSequenceOrder === originalSequenceOrder) {
+          resequenced[i] = { ...e, predecessorSequenceOrder: splitEntryANewSeq };
+        } else {
+          const mapped = oldToNewSeq.get(e.predecessorSequenceOrder);
+          if (mapped != null) {
+            resequenced[i] = { ...e, predecessorSequenceOrder: mapped };
+          }
+        }
+      }
+    }
+
+    resequenced[entryIndex + 1] = {
+      ...resequenced[entryIndex + 1],
+      predecessorSequenceOrder: splitEntryANewSeq,
+    };
 
     await db.delete(jobLevelCycleTimes).where(eq(jobLevelCycleTimes.jobId, jobId));
     
@@ -775,6 +814,8 @@ export const productionMethods = {
         pourLabel: e.pourLabel || null,
         sequenceOrder: e.sequenceOrder,
         cycleDays: e.cycleDays,
+        predecessorSequenceOrder: e.predecessorSequenceOrder ?? null,
+        relationship: e.predecessorSequenceOrder != null ? (e.relationship || "FS") : null,
         estimatedStartDate: e.estimatedStartDate || null,
         estimatedEndDate: e.estimatedEndDate || null,
         manualStartDate: e.manualStartDate || null,
