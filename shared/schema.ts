@@ -846,6 +846,8 @@ export const dailyLogs = pgTable("daily_logs", {
   userLogDayDisciplineFactoryIdx: uniqueIndex("user_log_day_discipline_factory_idx").on(table.userId, table.logDay, table.discipline, table.factory),
   logDayIdx: index("daily_logs_log_day_idx").on(table.logDay),
   factoryIdx: index("daily_logs_factory_idx").on(table.factory),
+  statusLogDayIdx: index("daily_logs_status_logday_idx").on(table.status, table.logDay),
+  userStatusIdx: index("daily_logs_user_status_idx").on(table.userId, table.status),
 }));
 
 export const logRows = pgTable("log_rows", {
@@ -2122,6 +2124,7 @@ export const conversationMembers = pgTable("conversation_members", {
   uniqMember: uniqueIndex("conv_member_unique").on(table.conversationId, table.userId),
   userIdx: index("conv_member_user_idx").on(table.userId),
   convIdx: index("conv_member_conv_idx").on(table.conversationId),
+  userLastReadIdx: index("conv_member_user_lastread_idx").on(table.userId, table.lastReadAt),
 }));
 
 export const chatMessages = pgTable("chat_messages", {
@@ -2184,6 +2187,7 @@ export const chatNotifications = pgTable("chat_notifications", {
   readAt: timestamp("read_at"),
 }, (table) => ({
   userCreatedIdx: index("chat_notif_user_created_idx").on(table.userId, table.createdAt),
+  userUnreadIdx: index("chat_notif_user_unread_idx").on(table.userId, table.readAt),
 }));
 
 // Chat Insert Schemas and Types
@@ -2925,7 +2929,11 @@ export const broadcastDeliveries = pgTable("broadcast_deliveries", {
   errorMessage: text("error_message"),
   sentAt: timestamp("sent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  messageIdx: index("broadcast_deliveries_message_idx").on(table.broadcastMessageId),
+  statusIdx: index("broadcast_deliveries_status_idx").on(table.status),
+  messageStatusIdx: index("broadcast_deliveries_msg_status_idx").on(table.broadcastMessageId, table.status),
+}));
 
 export const insertBroadcastDeliverySchema = createInsertSchema(broadcastDeliveries).omit({ id: true, createdAt: true });
 export type InsertBroadcastDelivery = z.infer<typeof insertBroadcastDeliverySchema>;
@@ -4926,6 +4934,7 @@ export const apInvoiceSplits = pgTable("ap_invoice_splits", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   invoiceIdx: index("ap_invoice_splits_invoice_idx").on(table.invoiceId),
+  invoiceSortIdx: index("ap_invoice_splits_inv_sort_idx").on(table.invoiceId, table.sortOrder),
 }));
 
 export const insertApInvoiceSplitSchema = createInsertSchema(apInvoiceSplits).omit({ id: true, createdAt: true });
@@ -4942,6 +4951,7 @@ export const apInvoiceActivity = pgTable("ap_invoice_activity", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   invoiceIdx: index("ap_invoice_activity_invoice_idx").on(table.invoiceId),
+  invoiceCreatedIdx: index("ap_invoice_activity_inv_created_idx").on(table.invoiceId, table.createdAt),
 }));
 
 export const insertApInvoiceActivitySchema = createInsertSchema(apInvoiceActivity).omit({ id: true, createdAt: true });
@@ -4956,6 +4966,7 @@ export const apInvoiceComments = pgTable("ap_invoice_comments", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   invoiceIdx: index("ap_invoice_comments_invoice_idx").on(table.invoiceId),
+  invoiceCreatedIdx: index("ap_invoice_comments_inv_created_idx").on(table.invoiceId, table.createdAt),
 }));
 
 export const insertApInvoiceCommentSchema = createInsertSchema(apInvoiceComments).omit({ id: true, createdAt: true });
@@ -5258,7 +5269,11 @@ export const myobExportLogs = pgTable("myob_export_logs", {
   errorMessage: text("error_message"),
   myobResponse: jsonb("myob_response"),
   exportedAt: timestamp("exported_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  companyIdx: index("myob_export_logs_company_idx").on(table.companyId),
+  invoiceIdx: index("myob_export_logs_invoice_idx").on(table.invoiceId),
+  companyDateIdx: index("myob_export_logs_company_date_idx").on(table.companyId, table.exportedAt),
+}));
 
 export const insertMyobExportLogSchema = createInsertSchema(myobExportLogs).omit({ id: true });
 export type InsertMyobExportLog = z.infer<typeof insertMyobExportLogSchema>;

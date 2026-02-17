@@ -175,6 +175,7 @@ export default function SalesPipelinePage() {
 
   const { data: opportunities = [], isLoading } = useQuery<Opportunity[]>({
     queryKey: [JOBS_ROUTES.OPPORTUNITIES],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: statusHistory = [], isLoading: historyLoading } = useQuery<StatusHistoryEntry[]>({

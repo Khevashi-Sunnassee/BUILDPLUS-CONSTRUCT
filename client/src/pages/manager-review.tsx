@@ -60,6 +60,7 @@ export default function ManagerReviewPage() {
 
   const { data: logs, isLoading } = useQuery<SubmittedLog[]>({
     queryKey: [DAILY_LOGS_ROUTES.SUBMITTED],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const approveMutation = useMutation({

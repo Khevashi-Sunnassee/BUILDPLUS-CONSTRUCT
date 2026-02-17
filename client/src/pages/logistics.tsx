@@ -233,6 +233,7 @@ export default function LogisticsPage() {
 
   const { data: loadLists, isLoading: loadListsLoading } = useQuery<LoadListWithDetails[]>({
     queryKey: [LOGISTICS_ROUTES.LOAD_LISTS],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: jobs } = useQuery<Job[]>({

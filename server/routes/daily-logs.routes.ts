@@ -6,6 +6,9 @@ import logger from "../lib/logger";
 import { logPanelChange, advancePanelLifecycleIfLower } from "../services/panel-audit.service";
 import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
 import { z } from "zod";
+import { db } from "../db";
+import { dailyLogs, logRows, users, jobs } from "@shared/schema";
+import { eq, and, desc, asc, gte, sql, count, inArray } from "drizzle-orm";
 
 const createDailyLogSchema = z.object({
   logDay: z.string(),
@@ -64,65 +67,120 @@ router.get("/api/daily-logs", requireAuth, requirePermission("daily_reports"), a
     const user = await storage.getUser(req.session.userId!);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-    const logs = await storage.getDailyLogsByUser(user.id, {
-      status: req.query.status as string,
-      dateRange: req.query.dateRange as string,
-    });
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const offset = (page - 1) * limit;
+    const statusFilter = req.query.status as string;
+    const dateRange = req.query.dateRange as string;
 
-    const enrichedLogs = await Promise.all(
-      logs.map(log => storage.getDailyLog(log.id))
-    );
+    const conditions: any[] = [eq(dailyLogs.userId, user.id)];
 
-    const logsWithStats = [];
-    for (const fullLog of enrichedLogs) {
-      if (!fullLog) continue;
-      const totalMinutes = fullLog.rows.reduce((sum, r) => sum + r.durationMin, 0);
-      const idleMinutes = fullLog.rows.reduce((sum, r) => sum + r.idleMin, 0);
-      const missingPanelMarkMinutes = fullLog.rows.filter(r => !r.panelMark).reduce((sum, r) => sum + r.durationMin, 0);
-      const missingJobMinutes = fullLog.rows.filter(r => !r.jobId).reduce((sum, r) => sum + r.durationMin, 0);
-      
+    if (statusFilter && statusFilter !== "all") {
+      conditions.push(eq(dailyLogs.status, statusFilter as any));
+    }
+
+    if (dateRange && dateRange !== "all") {
+      const today = new Date();
+      let startDate: Date | null = null;
+      if (dateRange === "today") {
+        startDate = today;
+      } else if (dateRange === "week") {
+        startDate = new Date(today);
+        startDate.setDate(today.getDate() - 7);
+      } else if (dateRange === "month") {
+        startDate = new Date(today);
+        startDate.setMonth(today.getMonth() - 1);
+      }
+      if (startDate) {
+        const startDateStr = startDate.toISOString().split("T")[0];
+        conditions.push(gte(dailyLogs.logDay, startDateStr));
+      }
+    }
+
+    const whereClause = and(...conditions);
+
+    const [{ total: totalCount }] = await db.select({ total: count() }).from(dailyLogs).where(whereClause);
+    const total = Number(totalCount);
+    const totalPages = Math.ceil(total / limit);
+
+    const pageLogs = await db.select().from(dailyLogs)
+      .where(whereClause)
+      .orderBy(desc(dailyLogs.logDay))
+      .limit(limit)
+      .offset(offset);
+
+    if (pageLogs.length === 0) {
+      return res.json({ data: [], pagination: { page, limit, total, totalPages } });
+    }
+
+    const pageIds = pageLogs.map(l => l.id);
+
+    const allRows = await db.select().from(logRows)
+      .leftJoin(jobs, eq(logRows.jobId, jobs.id))
+      .where(inArray(logRows.dailyLogId, pageIds))
+      .orderBy(asc(logRows.startAt));
+
+    const rowsByLogId = new Map<string, Array<typeof allRows[number]>>();
+    for (const row of allRows) {
+      const logId = row.log_rows.dailyLogId;
+      if (!rowsByLogId.has(logId)) {
+        rowsByLogId.set(logId, []);
+      }
+      rowsByLogId.get(logId)!.push(row);
+    }
+
+    const logsWithStats = pageLogs.map(log => {
+      const logRowEntries = rowsByLogId.get(log.id) || [];
+      const rows = logRowEntries.map(r => ({ ...r.log_rows, job: r.jobs || undefined }));
+
+      const totalMinutes = rows.reduce((sum, r) => sum + r.durationMin, 0);
+      const idleMinutes = rows.reduce((sum, r) => sum + r.idleMin, 0);
+      const missingPanelMarkMinutes = rows.filter(r => !r.panelMark).reduce((sum, r) => sum + r.durationMin, 0);
+      const missingJobMinutes = rows.filter(r => !r.jobId).reduce((sum, r) => sum + r.durationMin, 0);
+
       let lastEntryEndTime: string | null = null;
-      if (fullLog.rows.length > 0) {
-        const sortedRows = [...fullLog.rows].sort((a, b) => 
+      if (rows.length > 0) {
+        const sortedRows = [...rows].sort((a, b) =>
           new Date(b.endAt).getTime() - new Date(a.endAt).getTime()
         );
         lastEntryEndTime = sortedRows[0].endAt.toISOString();
       }
-      
-      logsWithStats.push({
-        id: fullLog.id,
-        logDay: fullLog.logDay,
-        factory: fullLog.factory,
-        status: fullLog.status,
+
+      return {
+        id: log.id,
+        logDay: log.logDay,
+        factory: log.factory,
+        status: log.status,
         totalMinutes,
         idleMinutes,
         missingPanelMarkMinutes,
         missingJobMinutes,
-        rowCount: fullLog.rows.length,
-        userName: fullLog.user.name,
-        userEmail: fullLog.user.email,
-        userId: fullLog.user.id,
+        rowCount: rows.length,
+        userName: user.name,
+        userEmail: user.email,
+        userId: user.id,
         lastEntryEndTime,
-        rows: fullLog.rows,
+        rows,
         userWorkHours: {
-          mondayStartTime: fullLog.user.mondayStartTime,
-          mondayHours: fullLog.user.mondayHours,
-          tuesdayStartTime: fullLog.user.tuesdayStartTime,
-          tuesdayHours: fullLog.user.tuesdayHours,
-          wednesdayStartTime: fullLog.user.wednesdayStartTime,
-          wednesdayHours: fullLog.user.wednesdayHours,
-          thursdayStartTime: fullLog.user.thursdayStartTime,
-          thursdayHours: fullLog.user.thursdayHours,
-          fridayStartTime: fullLog.user.fridayStartTime,
-          fridayHours: fullLog.user.fridayHours,
-          saturdayStartTime: fullLog.user.saturdayStartTime,
-          saturdayHours: fullLog.user.saturdayHours,
-          sundayStartTime: fullLog.user.sundayStartTime,
-          sundayHours: fullLog.user.sundayHours,
+          mondayStartTime: user.mondayStartTime,
+          mondayHours: user.mondayHours,
+          tuesdayStartTime: user.tuesdayStartTime,
+          tuesdayHours: user.tuesdayHours,
+          wednesdayStartTime: user.wednesdayStartTime,
+          wednesdayHours: user.wednesdayHours,
+          thursdayStartTime: user.thursdayStartTime,
+          thursdayHours: user.thursdayHours,
+          fridayStartTime: user.fridayStartTime,
+          fridayHours: user.fridayHours,
+          saturdayStartTime: user.saturdayStartTime,
+          saturdayHours: user.saturdayHours,
+          sundayStartTime: user.sundayStartTime,
+          sundayHours: user.sundayHours,
         },
-      });
-    }
-    res.json(logsWithStats);
+      };
+    });
+
+    res.json({ data: logsWithStats, pagination: { page, limit, total, totalPages } });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching daily logs");
     res.status(500).json({ error: "Failed to fetch daily logs" });
@@ -162,8 +220,66 @@ router.post("/api/daily-logs", requireAuth, requirePermission("daily_reports", "
 });
 
 router.get("/api/daily-logs/submitted", requireRole("MANAGER", "ADMIN"), async (req, res) => {
-  const logs = await storage.getSubmittedDailyLogs(req.companyId);
-  res.json(logs);
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const offset = (page - 1) * limit;
+
+    const conditions: any[] = [eq(dailyLogs.status, "SUBMITTED")];
+    if (req.companyId) {
+      conditions.push(eq(users.companyId, req.companyId));
+    }
+    const whereClause = and(...conditions);
+
+    const [{ total: totalCount }] = await db.select({ total: count() })
+      .from(dailyLogs)
+      .innerJoin(users, eq(dailyLogs.userId, users.id))
+      .where(whereClause);
+    const total = Number(totalCount);
+    const totalPages = Math.ceil(total / limit);
+
+    const pageLogs = await db.select().from(dailyLogs)
+      .innerJoin(users, eq(dailyLogs.userId, users.id))
+      .where(whereClause)
+      .orderBy(desc(dailyLogs.logDay))
+      .limit(limit)
+      .offset(offset);
+
+    if (pageLogs.length === 0) {
+      return res.json({ data: [], pagination: { page, limit, total, totalPages } });
+    }
+
+    const pageIds = pageLogs.map(l => l.daily_logs.id);
+
+    const allRows = await db.select().from(logRows)
+      .leftJoin(jobs, eq(logRows.jobId, jobs.id))
+      .where(inArray(logRows.dailyLogId, pageIds))
+      .orderBy(asc(logRows.startAt));
+
+    const rowsByLogId = new Map<string, Array<typeof allRows[number]>>();
+    for (const row of allRows) {
+      const logId = row.log_rows.dailyLogId;
+      if (!rowsByLogId.has(logId)) {
+        rowsByLogId.set(logId, []);
+      }
+      rowsByLogId.get(logId)!.push(row);
+    }
+
+    const data = pageLogs.map(logEntry => {
+      const logRowEntries = rowsByLogId.get(logEntry.daily_logs.id) || [];
+      const rows = logRowEntries.map(r => ({ ...r.log_rows, job: r.jobs || undefined }));
+      return {
+        ...logEntry.daily_logs,
+        user: logEntry.users,
+        rows,
+      };
+    });
+
+    res.json({ data, pagination: { page, limit, total, totalPages } });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching submitted daily logs");
+    res.status(500).json({ error: "Failed to fetch submitted daily logs" });
+  }
 });
 
 router.get("/api/daily-logs/:id", requireAuth, async (req, res) => {

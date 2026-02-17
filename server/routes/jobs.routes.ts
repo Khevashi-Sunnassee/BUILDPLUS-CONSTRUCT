@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import multer from "multer";
-import { eq, and, inArray, desc, sql } from "drizzle-orm";
+import { eq, and, inArray, desc, sql, count } from "drizzle-orm";
 import { storage, db, getFactoryWorkDays, getCfmeuHolidaysInRange, isWorkingDay, subtractWorkingDays, addWorkingDays } from "../storage";
 import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHistory, jobAuditLogs, jobLevelCycleTimes, jobMembers, users } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
@@ -52,6 +52,17 @@ router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Res
       return res.status(403).json({ error: "Company context required" });
     }
 
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const offset = (page - 1) * limit;
+
+    const whereClause = sql`(${inArray(jobs.jobPhase, [...OPPORTUNITY_PHASES])} OR ${eq(jobs.salesStage, 'AWARDED')}) AND ${eq(jobs.companyId, req.companyId)}`;
+
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(jobs)
+      .where(whereClause);
+
     const result = await db.select({
       id: jobs.id,
       jobNumber: jobs.jobNumber,
@@ -82,9 +93,10 @@ router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Res
       updatedAt: jobs.updatedAt,
     })
     .from(jobs)
-    .where(sql`(${inArray(jobs.jobPhase, [...OPPORTUNITY_PHASES])} OR ${eq(jobs.salesStage, 'AWARDED')}) AND ${eq(jobs.companyId, req.companyId)}`)
+    .where(whereClause)
     .orderBy(desc(jobs.createdAt))
-    .limit(1000);
+    .limit(limit)
+    .offset(offset);
 
     const customerIds = [...new Set(result.filter(j => j.customerId).map(j => j.customerId!))];
     let customerMap = new Map<string, { id: string; name: string }>();
@@ -104,7 +116,10 @@ router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Res
       customerName: j.customerId ? customerMap.get(j.customerId)?.name || null : null,
     }));
 
-    res.json(enriched);
+    res.json({
+      data: enriched,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching opportunities");
     res.status(500).json({ error: "Failed to fetch opportunities" });

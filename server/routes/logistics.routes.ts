@@ -5,8 +5,10 @@ import { requirePermission } from "./middleware/permissions.middleware";
 import { emailService } from "../services/email.service";
 import { buildBrandedEmail } from "../lib/email-template";
 import { logPanelChange, advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../services/panel-audit.service";
-import { PANEL_LIFECYCLE_STATUS, insertTrailerTypeSchema, insertZoneSchema, insertLoadListSchema, insertDeliveryRecordSchema } from "@shared/schema";
+import { PANEL_LIFECYCLE_STATUS, insertTrailerTypeSchema, insertZoneSchema, insertLoadListSchema, insertDeliveryRecordSchema, loadLists, loadListPanels, jobs, trailerTypes, deliveryRecords, loadReturns, panelRegister, users } from "@shared/schema";
 import type { JobPhase } from "@shared/job-phases";
+import { db } from "../db";
+import { eq, and, asc, desc, sql, count, inArray } from "drizzle-orm";
 
 const router = Router();
 
@@ -100,8 +102,118 @@ router.delete("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => 
 // =============== LOAD LISTS ===============
 
 router.get("/api/load-lists", requireAuth, requirePermission("logistics"), async (req, res) => {
-  const loadLists = await storage.getAllLoadLists(req.companyId);
-  res.json(loadLists);
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const queryLimit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const offset = (page - 1) * queryLimit;
+    const statusFilter = req.query.status as string | undefined;
+    const jobIdFilter = req.query.jobId as string | undefined;
+
+    const conditions = [eq(jobs.companyId, companyId)];
+    if (statusFilter) conditions.push(eq(loadLists.status, statusFilter as any));
+    if (jobIdFilter) conditions.push(eq(loadLists.jobId, jobIdFilter));
+
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(loadLists)
+      .innerJoin(jobs, eq(loadLists.jobId, jobs.id))
+      .where(and(...conditions));
+
+    const results = await db
+      .select({
+        id: loadLists.id,
+        jobId: loadLists.jobId,
+        loadNumber: loadLists.loadNumber,
+        loadDate: loadLists.loadDate,
+        loadTime: loadLists.loadTime,
+        trailerTypeId: loadLists.trailerTypeId,
+        factory: loadLists.factory,
+        factoryId: loadLists.factoryId,
+        uhf: loadLists.uhf,
+        status: loadLists.status,
+        notes: loadLists.notes,
+        createdById: loadLists.createdById,
+        createdAt: loadLists.createdAt,
+        updatedAt: loadLists.updatedAt,
+        jobNumber: jobs.jobNumber,
+        jobName: jobs.name,
+        jobCode: jobs.code,
+      })
+      .from(loadLists)
+      .innerJoin(jobs, eq(loadLists.jobId, jobs.id))
+      .where(and(...conditions))
+      .orderBy(desc(loadLists.createdAt))
+      .limit(queryLimit)
+      .offset(offset);
+
+    const loadListIds = results.map(r => r.id);
+
+    if (loadListIds.length === 0) {
+      return res.json({
+        data: [],
+        pagination: { page, limit: queryLimit, total, totalPages: Math.ceil(total / queryLimit) },
+      });
+    }
+
+    const [allPanelRows, allDeliveryRows, allLoadReturnRows] = await Promise.all([
+      db.select()
+        .from(loadListPanels)
+        .innerJoin(panelRegister, eq(loadListPanels.panelId, panelRegister.id))
+        .where(sql`${loadListPanels.loadListId} = ANY(${loadListIds})`)
+        .orderBy(asc(loadListPanels.sequence)),
+      db.select().from(deliveryRecords)
+        .where(sql`${deliveryRecords.loadListId} = ANY(${loadListIds})`),
+      db.select().from(loadReturns)
+        .where(sql`${loadReturns.loadListId} = ANY(${loadListIds})`),
+    ]);
+
+    const panelsByLoadList = new Map<string, typeof allPanelRows>();
+    for (const row of allPanelRows) {
+      const arr = panelsByLoadList.get(row.load_list_panels.loadListId) || [];
+      arr.push(row);
+      panelsByLoadList.set(row.load_list_panels.loadListId, arr);
+    }
+
+    const deliveryByLoadList = new Map(allDeliveryRows.map(d => [d.loadListId, d]));
+    const returnByLoadList = new Map(allLoadReturnRows.map(r => [r.loadListId, r]));
+
+    const trailerTypeIds = [...new Set(results.filter(r => r.trailerTypeId).map(r => r.trailerTypeId!))];
+    const allTrailerTypes = trailerTypeIds.length > 0
+      ? await db.select().from(trailerTypes).where(inArray(trailerTypes.id, trailerTypeIds))
+      : [];
+    const trailerTypeMap = new Map(allTrailerTypes.map(t => [t.id, t]));
+
+    const createdByIds = [...new Set(results.filter(r => r.createdById).map(r => r.createdById!))];
+    const allCreatedBy = createdByIds.length > 0
+      ? await db.select({ id: users.id, name: users.name, email: users.email })
+          .from(users).where(inArray(users.id, createdByIds))
+      : [];
+    const createdByMap = new Map(allCreatedBy.map(u => [u.id, u]));
+
+    const enriched = results.map(r => {
+      const panelRows = panelsByLoadList.get(r.id) || [];
+      return {
+        ...r,
+        job: { id: r.jobId, jobNumber: r.jobNumber, name: r.jobName, code: r.jobCode },
+        trailerType: r.trailerTypeId ? trailerTypeMap.get(r.trailerTypeId) || null : null,
+        panels: panelRows.map(p => ({ ...p.load_list_panels, panel: p.panel_register })),
+        deliveryRecord: deliveryByLoadList.get(r.id) || null,
+        loadReturn: returnByLoadList.get(r.id) || null,
+        createdBy: r.createdById ? createdByMap.get(r.createdById) || null : null,
+        panelCount: panelRows.length,
+      };
+    });
+
+    res.json({
+      data: enriched,
+      pagination: { page, limit: queryLimit, total, totalPages: Math.ceil(total / queryLimit) },
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch load lists" });
+  }
 });
 
 router.get("/api/load-lists/:id", requireAuth, requirePermission("logistics"), async (req, res) => {
@@ -118,8 +230,12 @@ router.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW
   try {
     const { panelIds, docketNumber, scheduledDate, ...data } = req.body;
     
-    const existingLoadLists = await storage.getAllLoadLists(req.companyId);
-    const loadNumber = `LL-${String(existingLoadLists.length + 1).padStart(4, '0')}`;
+    const [{ existingCount }] = await db
+      .select({ existingCount: count() })
+      .from(loadLists)
+      .innerJoin(jobs, eq(loadLists.jobId, jobs.id))
+      .where(eq(jobs.companyId, req.companyId!));
+    const loadNumber = `LL-${String(existingCount + 1).padStart(4, '0')}`;
     
     const date = scheduledDate ? new Date(scheduledDate) : new Date();
     const loadDate = date.toISOString().split('T')[0];

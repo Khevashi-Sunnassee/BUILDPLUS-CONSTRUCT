@@ -170,6 +170,7 @@ export default function DailyReportsPage() {
 
   const { data: logs, isLoading } = useQuery<DailyLogSummary[]>({
     queryKey: [DAILY_LOGS_ROUTES.LIST, { status: statusFilter, dateRange }],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: allocatedData } = useQuery<{

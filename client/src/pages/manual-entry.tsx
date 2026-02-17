@@ -189,6 +189,7 @@ export default function ManualEntryPage() {
   // Fetch existing daily logs to find the latest end time
   const { data: dailyLogs } = useQuery<DailyLogWithRows[]>({
     queryKey: [DAILY_LOGS_ROUTES.LIST],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   // Fetch active timer for this panel
