@@ -1,9 +1,9 @@
 import logger from "./logger";
 import { db } from "../db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import {
   tenderInboundEmails, tenderEmailDocuments, tenderEmailExtractedFields,
-  tenderEmailActivity, tenderInboxSettings, suppliers
+  tenderEmailActivity, tenderInboxSettings, suppliers, companies
 } from "@shared/schema";
 import OpenAI from "openai";
 import { getResendApiKey } from "../services/email.service";
@@ -39,11 +39,18 @@ export async function pollTenderEmailsJob(): Promise<void> {
   let totalSkipped = 0;
   const allErrors: string[] = [];
 
+  const companyIds = allSettings.map(s => s.companyId);
+  const companyRows = companyIds.length > 0 ? await db.select({ id: companies.id, tenderInboxEmail: companies.tenderInboxEmail })
+    .from(companies).where(inArray(companies.id, companyIds)).limit(100) : [];
+  const companyEmailMap = new Map(companyRows.map(c => [c.id, c.tenderInboxEmail]));
+
   for (const settings of allSettings) {
-    if (!settings.inboundEmailAddress) continue;
+    const emailAddr = companyEmailMap.get(settings.companyId) || settings.inboundEmailAddress;
+    if (!emailAddr) continue;
 
     try {
-      const result = await pollTenderEmailsForCompany(settings, apiKey);
+      const settingsWithEmail = { ...settings, inboundEmailAddress: emailAddr };
+      const result = await pollTenderEmailsForCompany(settingsWithEmail, apiKey);
       totalFound += result.found;
       totalProcessed += result.processed;
       totalSkipped += result.skipped;

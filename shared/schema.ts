@@ -48,12 +48,18 @@ export const companies = pgTable("companies", {
   email: text("email"),
   website: text("website"),
   abn: text("abn"),
+  apInboxEmail: varchar("ap_inbox_email", { length: 255 }),
+  tenderInboxEmail: varchar("tender_inbox_email", { length: 255 }),
+  draftingInboxEmail: varchar("drafting_inbox_email", { length: 255 }),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   codeIdx: uniqueIndex("companies_code_idx").on(table.code),
   activeIdx: index("companies_active_idx").on(table.isActive),
+  apInboxEmailIdx: uniqueIndex("companies_ap_inbox_email_idx").on(table.apInboxEmail),
+  tenderInboxEmailIdx: uniqueIndex("companies_tender_inbox_email_idx").on(table.tenderInboxEmail),
+  draftingInboxEmailIdx: uniqueIndex("companies_drafting_inbox_email_idx").on(table.draftingInboxEmail),
 }));
 
 export const insertCompanySchema = createInsertSchema(companies).omit({ id: true, createdAt: true, updatedAt: true });

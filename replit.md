@@ -36,6 +36,7 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Scope of Works Builder:** AI-powered scope generation for tender management across trades.
 - **Budget System:** Four-phase cost management including two-tier cost codes, a tender center, job tender sheets, and per-job budget management with Bill of Quantities (BOQ).
 - **MYOB Integration:** OAuth 2.0 connection to MYOB Business API with database-backed token storage (per-company), auto-refresh, and multi-tenant isolation.
+- **Centralized Email Inbox Addresses:** Per-company inbox email configuration (AP, Tender, Drafting) stored in companies table with unique constraints; polling jobs resolve addresses from company settings with backward-compatible fallback; individual inbox settings pages show read-only email sourced from company settings.
 - **AP Email Inbox Monitoring:** Automatic invoice processing via Resend inbound email webhooks.
 - **AP Invoice Status Workflow:** Multi-stage approval workflow for invoices: IMPORTED → PROCESSED → CONFIRMED → PARTIALLY_APPROVED → APPROVED.
 - **Opportunity Submission Date & Reminders:** Opportunities have a submission date (datetime) field for tender deadlines; automated 7-day reminder emails are sent to customer contacts when submission dates approach, with deduplication tracking via `opportunity_submission_reminders` table.

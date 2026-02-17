@@ -35,11 +35,15 @@ router.get("/api/ap-inbox/settings", requireAuth, async (req: Request, res: Resp
     const [settings] = await db.select().from(apInboxSettings)
       .where(eq(apInboxSettings.companyId, companyId)).limit(1);
 
+    const [company] = await db.select({ apInboxEmail: companies.apInboxEmail })
+      .from(companies).where(eq(companies.id, companyId)).limit(1);
+    const centralEmail = company?.apInboxEmail || null;
+
     if (!settings) {
       return res.json({
         companyId,
         isEnabled: false,
-        inboundEmailAddress: null,
+        inboundEmailAddress: centralEmail,
         autoExtract: true,
         autoSubmit: false,
         defaultStatus: "IMPORTED",
@@ -47,7 +51,7 @@ router.get("/api/ap-inbox/settings", requireAuth, async (req: Request, res: Resp
       });
     }
 
-    res.json(settings);
+    res.json({ ...settings, inboundEmailAddress: centralEmail || settings.inboundEmailAddress });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching inbox settings");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch inbox settings" });
@@ -59,7 +63,7 @@ router.put("/api/ap-inbox/settings", requireAuth, async (req: Request, res: Resp
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
 
-    const body = z.object({
+    const { inboundEmailAddress: _ignored, ...body } = z.object({
       isEnabled: z.boolean().optional(),
       inboundEmailAddress: z.string().nullable().optional(),
       autoExtract: z.boolean().optional(),

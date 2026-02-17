@@ -287,19 +287,13 @@ function InboxSettingsDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Inbound Email Address</Label>
                   <p className="text-xs text-muted-foreground">
-                    Forward supplier invoices to this address for automatic processing
+                    Configured in Company Settings &gt; Email tab
                   </p>
                   <div className="flex items-center gap-2">
                     <Input
-                      value={emailDraft || settings.inboundEmailAddress || ""}
-                      onChange={(e) => setEmailDraft(e.target.value)}
-                      onBlur={() => {
-                        if (emailDraft && emailDraft !== settings.inboundEmailAddress) {
-                          updateMutation.mutate({ inboundEmailAddress: emailDraft });
-                        }
-                      }}
-                      onFocus={() => setEmailDraft(settings.inboundEmailAddress || "")}
-                      placeholder="invoices@your-domain.com"
+                      value={settings.inboundEmailAddress || "Not configured"}
+                      readOnly
+                      className="bg-muted"
                       data-testid="input-inbound-email"
                     />
                     {settings.inboundEmailAddress && (

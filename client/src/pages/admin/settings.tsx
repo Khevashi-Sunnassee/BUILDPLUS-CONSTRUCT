@@ -96,6 +96,10 @@ export default function AdminSettingsPage() {
   const [editTemplateValue, setEditTemplateValue] = useState("");
   const [templateEditMode, setTemplateEditMode] = useState<"visual" | "source">("visual");
 
+  const [inboxApEmail, setInboxApEmail] = useState("");
+  const [inboxTenderEmail, setInboxTenderEmail] = useState("");
+  const [inboxDraftingEmail, setInboxDraftingEmail] = useState("");
+
   const deletionCategories = useMemo(() => [
     { key: "activity_templates", label: "Activity Templates", description: "Workflow activity templates and subtasks" },
     { key: "assets", label: "Assets", description: "Asset register entries, maintenance records and transfers" },
@@ -473,6 +477,32 @@ export default function AdminSettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to delete data", variant: "destructive" });
+    },
+  });
+
+  const { data: inboxEmailsData, isLoading: inboxEmailsLoading } = useQuery<{ apInboxEmail: string | null; tenderInboxEmail: string | null; draftingInboxEmail: string | null }>({
+    queryKey: ["/api/settings/inbox-emails"],
+  });
+
+  useEffect(() => {
+    if (inboxEmailsData) {
+      setInboxApEmail(inboxEmailsData.apInboxEmail || "");
+      setInboxTenderEmail(inboxEmailsData.tenderInboxEmail || "");
+      setInboxDraftingEmail(inboxEmailsData.draftingInboxEmail || "");
+    }
+  }, [inboxEmailsData]);
+
+  const saveInboxEmailsMutation = useMutation({
+    mutationFn: async (data: { apInboxEmail?: string | null; tenderInboxEmail?: string | null; draftingInboxEmail?: string | null }) => {
+      const res = await apiRequest("PUT", "/api/settings/inbox-emails", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/inbox-emails"] });
+      toast({ title: "Inbox email addresses saved successfully" });
+    },
+    onError: (err: any) => {
+      toast({ title: err.message || "Failed to save inbox emails", variant: "destructive" });
     },
   });
 
@@ -1584,6 +1614,76 @@ export default function AdminSettingsPage() {
 
         {/* ── Email Tab ── */}
         <TabsContent value="email" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Mail className="h-5 w-5" />
+                Email Inbox Addresses
+              </CardTitle>
+              <CardDescription>
+                Configure unique email addresses for each inbox type. These addresses determine which company receives incoming emails. Each address must be unique across all companies and inbox types.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {inboxEmailsLoading ? (
+                <Skeleton className="h-40 w-full" />
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="ap-inbox-email" data-testid="label-ap-inbox-email">AP Invoice Inbox</Label>
+                      <Input
+                        id="ap-inbox-email"
+                        type="email"
+                        placeholder="e.g. invoices@yourcompany.resend.app"
+                        value={inboxApEmail}
+                        onChange={(e) => setInboxApEmail(e.target.value)}
+                        data-testid="input-ap-inbox-email"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="tender-inbox-email" data-testid="label-tender-inbox-email">Tender Inbox</Label>
+                      <Input
+                        id="tender-inbox-email"
+                        type="email"
+                        placeholder="e.g. tenders@yourcompany.resend.app"
+                        value={inboxTenderEmail}
+                        onChange={(e) => setInboxTenderEmail(e.target.value)}
+                        data-testid="input-tender-inbox-email"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="drafting-inbox-email" data-testid="label-drafting-inbox-email">Drafting Inbox</Label>
+                      <Input
+                        id="drafting-inbox-email"
+                        type="email"
+                        placeholder="e.g. drafting@yourcompany.resend.app"
+                        value={inboxDraftingEmail}
+                        onChange={(e) => setInboxDraftingEmail(e.target.value)}
+                        data-testid="input-drafting-inbox-email"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => saveInboxEmailsMutation.mutate({
+                      apInboxEmail: inboxApEmail.trim() || null,
+                      tenderInboxEmail: inboxTenderEmail.trim() || null,
+                      draftingInboxEmail: inboxDraftingEmail.trim() || null,
+                    })}
+                    disabled={saveInboxEmailsMutation.isPending}
+                    data-testid="button-save-inbox-emails"
+                  >
+                    {saveInboxEmailsMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Save Inbox Emails
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

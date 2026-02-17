@@ -44,17 +44,21 @@ router.get("/api/tender-inbox/settings", requireAuth, async (req: Request, res: 
     const [settings] = await db.select().from(tenderInboxSettings)
       .where(eq(tenderInboxSettings.companyId, companyId)).limit(1);
 
+    const [company] = await db.select({ tenderInboxEmail: companies.tenderInboxEmail })
+      .from(companies).where(eq(companies.id, companyId)).limit(1);
+    const centralEmail = company?.tenderInboxEmail || null;
+
     if (!settings) {
       return res.json({
         companyId,
         isEnabled: false,
-        inboundEmailAddress: null,
+        inboundEmailAddress: centralEmail,
         autoExtract: true,
         notifyUserIds: [],
       });
     }
 
-    res.json(settings);
+    res.json({ ...settings, inboundEmailAddress: centralEmail || settings.inboundEmailAddress });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender inbox settings");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch tender inbox settings" });
@@ -66,7 +70,7 @@ router.put("/api/tender-inbox/settings", requireAuth, async (req: Request, res: 
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
 
-    const body = z.object({
+    const { inboundEmailAddress: _ignored, ...body } = z.object({
       isEnabled: z.boolean().optional(),
       inboundEmailAddress: z.string().nullable().optional(),
       autoExtract: z.boolean().optional(),

@@ -3,7 +3,7 @@ import { db } from "../db";
 import { eq, and, inArray } from "drizzle-orm";
 import {
   draftingInboundEmails, draftingEmailDocuments, draftingEmailExtractedFields,
-  draftingEmailActivity, draftingInboxSettings, jobs
+  draftingEmailActivity, draftingInboxSettings, jobs, companies
 } from "@shared/schema";
 import OpenAI from "openai";
 import { getResendApiKey } from "../services/email.service";
@@ -39,11 +39,18 @@ export async function pollDraftingEmailsJob(): Promise<void> {
   let totalSkipped = 0;
   const allErrors: string[] = [];
 
+  const companyIds = allSettings.map(s => s.companyId);
+  const companyRows = companyIds.length > 0 ? await db.select({ id: companies.id, draftingInboxEmail: companies.draftingInboxEmail })
+    .from(companies).where(inArray(companies.id, companyIds)).limit(100) : [];
+  const companyEmailMap = new Map(companyRows.map(c => [c.id, c.draftingInboxEmail]));
+
   for (const settings of allSettings) {
-    if (!settings.inboundEmailAddress) continue;
+    const emailAddr = companyEmailMap.get(settings.companyId) || settings.inboundEmailAddress;
+    if (!emailAddr) continue;
 
     try {
-      const result = await pollDraftingEmailsForCompany(settings, apiKey);
+      const settingsWithEmail = { ...settings, inboundEmailAddress: emailAddr };
+      const result = await pollDraftingEmailsForCompany(settingsWithEmail, apiKey);
       totalFound += result.found;
       totalProcessed += result.processed;
       totalSkipped += result.skipped;

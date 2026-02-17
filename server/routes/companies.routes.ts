@@ -1,5 +1,8 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import { eq, and, ne, or, sql } from "drizzle-orm";
+import { db } from "../db";
+import { companies } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 
@@ -10,6 +13,46 @@ const companySchema = z.object({
   code: z.string().min(1, "Company code is required").max(10),
   isActive: z.boolean().optional().default(true),
 });
+
+const inboxEmailsSchema = z.object({
+  apInboxEmail: z.string().email("Invalid AP inbox email").max(255).nullable().optional(),
+  tenderInboxEmail: z.string().email("Invalid tender inbox email").max(255).nullable().optional(),
+  draftingInboxEmail: z.string().email("Invalid drafting inbox email").max(255).nullable().optional(),
+});
+
+async function validateInboxEmailUniqueness(
+  emails: { apInboxEmail?: string | null; tenderInboxEmail?: string | null; draftingInboxEmail?: string | null },
+  excludeCompanyId: string
+): Promise<string | null> {
+  const emailsToCheck: string[] = [];
+  if (emails.apInboxEmail) emailsToCheck.push(emails.apInboxEmail.toLowerCase());
+  if (emails.tenderInboxEmail) emailsToCheck.push(emails.tenderInboxEmail.toLowerCase());
+  if (emails.draftingInboxEmail) emailsToCheck.push(emails.draftingInboxEmail.toLowerCase());
+
+  const uniqueEmails = [...new Set(emailsToCheck)];
+  if (uniqueEmails.length < emailsToCheck.length) {
+    return "The same email address cannot be used for multiple inbox types";
+  }
+
+  for (const email of uniqueEmails) {
+    const [conflict] = await db.select({ id: companies.id, name: companies.name })
+      .from(companies)
+      .where(and(
+        ne(companies.id, excludeCompanyId),
+        or(
+          eq(companies.apInboxEmail, email),
+          eq(companies.tenderInboxEmail, email),
+          eq(companies.draftingInboxEmail, email)
+        )
+      ))
+      .limit(1);
+    if (conflict) {
+      return `Email address "${email}" is already in use by company "${conflict.name}"`;
+    }
+  }
+
+  return null;
+}
 
 router.get("/api/admin/companies", requireRole("ADMIN"), async (req, res) => {
   try {
@@ -97,6 +140,61 @@ router.delete("/api/admin/companies/:id", requireRole("ADMIN"), async (req: Requ
     res.json({ ok: true });
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete company" });
+  }
+});
+
+router.get("/api/settings/inbox-emails", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = (req as any).companyId;
+    const [company] = await db.select({
+      apInboxEmail: companies.apInboxEmail,
+      tenderInboxEmail: companies.tenderInboxEmail,
+      draftingInboxEmail: companies.draftingInboxEmail,
+    }).from(companies).where(eq(companies.id, companyId)).limit(1);
+    if (!company) {
+      return res.status(404).json({ error: "Company not found" });
+    }
+    res.json(company);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch inbox emails" });
+  }
+});
+
+router.put("/api/settings/inbox-emails", requireRole("ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const companyId = (req as any).companyId;
+    const result = inboxEmailsSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: "Validation failed", details: result.error.flatten() });
+    }
+
+    const data = result.data;
+    const normalized: Record<string, string | null> = {};
+    if (data.apInboxEmail !== undefined) normalized.apInboxEmail = data.apInboxEmail ? data.apInboxEmail.toLowerCase().trim() : null;
+    if (data.tenderInboxEmail !== undefined) normalized.tenderInboxEmail = data.tenderInboxEmail ? data.tenderInboxEmail.toLowerCase().trim() : null;
+    if (data.draftingInboxEmail !== undefined) normalized.draftingInboxEmail = data.draftingInboxEmail ? data.draftingInboxEmail.toLowerCase().trim() : null;
+
+    const conflictError = await validateInboxEmailUniqueness(normalized, companyId);
+    if (conflictError) {
+      return res.status(400).json({ error: conflictError });
+    }
+
+    const [updated] = await db.update(companies)
+      .set({ ...normalized, updatedAt: new Date() })
+      .where(eq(companies.id, companyId))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "Company not found" });
+    }
+
+    res.json({
+      apInboxEmail: updated.apInboxEmail,
+      tenderInboxEmail: updated.tenderInboxEmail,
+      draftingInboxEmail: updated.draftingInboxEmail,
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update inbox emails" });
   }
 });
 

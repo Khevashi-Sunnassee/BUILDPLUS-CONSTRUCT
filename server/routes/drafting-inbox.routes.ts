@@ -9,7 +9,7 @@ import multer from "multer";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import {
   draftingInboundEmails, draftingInboxSettings, draftingEmailDocuments,
-  draftingEmailExtractedFields, draftingEmailActivity, jobs, taskGroups, users
+  draftingEmailExtractedFields, draftingEmailActivity, jobs, taskGroups, users, companies
 } from "@shared/schema";
 import { requireUUID, safeJsonParse } from "../lib/api-utils";
 import { storage } from "../storage";
@@ -43,17 +43,21 @@ router.get("/api/drafting-inbox/settings", requireAuth, async (req: Request, res
     const [settings] = await db.select().from(draftingInboxSettings)
       .where(eq(draftingInboxSettings.companyId, companyId)).limit(1);
 
+    const [company] = await db.select({ draftingInboxEmail: companies.draftingInboxEmail })
+      .from(companies).where(eq(companies.id, companyId)).limit(1);
+    const centralEmail = company?.draftingInboxEmail || null;
+
     if (!settings) {
       return res.json({
         companyId,
         isEnabled: false,
-        inboundEmailAddress: null,
+        inboundEmailAddress: centralEmail,
         autoExtract: true,
         notifyUserIds: [],
       });
     }
 
-    res.json(settings);
+    res.json({ ...settings, inboundEmailAddress: centralEmail || settings.inboundEmailAddress });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting inbox settings");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch drafting inbox settings" });
@@ -65,7 +69,7 @@ router.put("/api/drafting-inbox/settings", requireAuth, async (req: Request, res
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
 
-    const body = z.object({
+    const { inboundEmailAddress: _ignored, ...body } = z.object({
       isEnabled: z.boolean().optional(),
       inboundEmailAddress: z.string().nullable().optional(),
       autoExtract: z.boolean().optional(),

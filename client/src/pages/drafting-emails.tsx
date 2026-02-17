@@ -284,19 +284,13 @@ function DraftingInboxSettingsDialog({ open, onOpenChange }: { open: boolean; on
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Inbound Email Address</Label>
                   <p className="text-xs text-muted-foreground">
-                    Send drafting documents to this address
+                    Configured in Company Settings &gt; Email tab
                   </p>
                   <div className="flex items-center gap-2">
                     <Input
-                      value={emailDraft || settings.inboundEmailAddress || ""}
-                      onChange={(e) => setEmailDraft(e.target.value)}
-                      onBlur={() => {
-                        if (emailDraft && emailDraft !== settings.inboundEmailAddress) {
-                          updateMutation.mutate({ inboundEmailAddress: emailDraft });
-                        }
-                      }}
-                      onFocus={() => setEmailDraft(settings.inboundEmailAddress || "")}
-                      placeholder="drafting@your-domain.com"
+                      value={settings.inboundEmailAddress || "Not configured"}
+                      readOnly
+                      className="bg-muted"
                       data-testid="input-drafting-inbound-email"
                     />
                     {settings.inboundEmailAddress && (
