@@ -444,11 +444,54 @@ router.post("/api/tender-inbox/emails/:id/match", requireAuth, async (req: Reque
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
     if (!email) return res.status(404).json({ error: "Tender email not found" });
 
+    let submissionId = body.tenderSubmissionId || null;
+
+    if (!submissionId && email.tenderSubmissionId) {
+      submissionId = email.tenderSubmissionId;
+    }
+
+    if (!submissionId) {
+      const extractedFields = await db.select().from(tenderEmailExtractedFields)
+        .where(eq(tenderEmailExtractedFields.inboundEmailId, id)).limit(100);
+
+      let subtotal = "0";
+      let taxAmount = "0";
+      let totalPrice = "0";
+      let coverNote: string | null = null;
+
+      for (const field of extractedFields) {
+        const val = field.fieldValue || "0";
+        if (field.fieldKey === "subtotal") subtotal = val;
+        else if (field.fieldKey === "tax_amount" || field.fieldKey === "gst") taxAmount = val;
+        else if (field.fieldKey === "total" || field.fieldKey === "total_price") totalPrice = val;
+        else if (field.fieldKey === "cover_note" || field.fieldKey === "description") coverNote = field.fieldValue;
+      }
+
+      if (totalPrice === "0" && subtotal !== "0") {
+        totalPrice = (parseFloat(subtotal) + parseFloat(taxAmount)).toFixed(2);
+      }
+
+      const [newSubmission] = await db.insert(tenderSubmissions).values({
+        companyId,
+        tenderId: body.tenderId,
+        supplierId: body.supplierId,
+        status: "SUBMITTED",
+        subtotal,
+        taxAmount,
+        totalPrice,
+        coverNote: coverNote || `Submission from email: ${email.subject || "No subject"}`,
+        submittedAt: new Date(),
+        createdById: userId!,
+      }).returning();
+
+      submissionId = newSubmission.id;
+    }
+
     const [updated] = await db.update(tenderInboundEmails)
       .set({
         tenderId: body.tenderId,
         supplierId: body.supplierId,
-        tenderSubmissionId: body.tenderSubmissionId || null,
+        tenderSubmissionId: submissionId,
         status: "MATCHED",
         matchedAt: new Date(),
       })
@@ -458,7 +501,7 @@ router.post("/api/tender-inbox/emails/:id/match", requireAuth, async (req: Reque
     await logTenderEmailActivity(id, "matched", `Matched to tender and supplier`, userId || undefined, {
       tenderId: body.tenderId,
       supplierId: body.supplierId,
-      tenderSubmissionId: body.tenderSubmissionId,
+      tenderSubmissionId: submissionId,
     });
 
     res.json(updated);
