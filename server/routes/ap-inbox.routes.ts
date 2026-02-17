@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAuth } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { eq, and, desc, sql, ilike } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, count } from "drizzle-orm";
 import crypto from "crypto";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import {
@@ -91,6 +91,45 @@ router.put("/api/ap-inbox/settings", requireAuth, async (req: Request, res: Resp
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating inbox settings");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update inbox settings" });
+  }
+});
+
+router.get("/api/ap-inbox/counts", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const statusCounts = await db
+      .select({
+        status: apInboundEmails.status,
+        count: count(),
+      })
+      .from(apInboundEmails)
+      .where(eq(apInboundEmails.companyId, companyId))
+      .groupBy(apInboundEmails.status);
+
+    const counts: Record<string, number> = {
+      received: 0,
+      processing: 0,
+      processed: 0,
+      matched: 0,
+      archived: 0,
+      failed: 0,
+      all: 0,
+    };
+
+    for (const row of statusCounts) {
+      const key = row.status.toLowerCase();
+      if (key in counts) {
+        counts[key] = row.count;
+      }
+      counts.all += row.count;
+    }
+
+    res.json(counts);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching AP inbox counts");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch counts" });
   }
 });
 

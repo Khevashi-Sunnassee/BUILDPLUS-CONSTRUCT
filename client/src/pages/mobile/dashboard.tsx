@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { CHAT_ROUTES, TASKS_ROUTES, ADMIN_ROUTES, JOBS_ROUTES, PANELS_ROUTES, LOGISTICS_ROUTES, PROCUREMENT_ROUTES, HIRE_ROUTES } from "@shared/api-routes";
+import { CHAT_ROUTES, TASKS_ROUTES, ADMIN_ROUTES, JOBS_ROUTES, PANELS_ROUTES, LOGISTICS_ROUTES, PROCUREMENT_ROUTES, HIRE_ROUTES, AP_INBOX_ROUTES, TENDER_INBOX_ROUTES, DRAFTING_INBOX_ROUTES } from "@shared/api-routes";
 import type { GlobalSettings } from "@shared/schema";
 import {
   ListTodo,
@@ -17,6 +17,7 @@ import {
   ClipboardCheck,
   ImageIcon,
   Package,
+  Inbox,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -53,6 +54,16 @@ interface PurchaseOrder {
   id: string;
 }
 
+interface InboxCounts {
+  received: number;
+  processing: number;
+  processed: number;
+  matched: number;
+  archived: number;
+  failed: number;
+  all: number;
+}
+
 function BadgeCount({ value }: { value: number }) {
   if (!value) return null;
   return (
@@ -81,7 +92,7 @@ function StatCard({
   } as const;
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4" data-testid={`stat-${title.toLowerCase()}`}>
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-4" data-testid={`stat-${title.toLowerCase().replace(/\s+/g, '-')}`}>
       <div className={`text-3xl font-bold ${accentMap[accent]}`}>{value}</div>
       <div className="mt-1 text-sm font-semibold text-white">{title}</div>
       {subtitle ? <div className="mt-0.5 text-xs text-white/60">{subtitle}</div> : null}
@@ -131,6 +142,11 @@ function NavRow({
       </button>
     </Link>
   );
+}
+
+function getUnprocessedCount(counts: InboxCounts | undefined): number {
+  if (!counts) return 0;
+  return (counts.received || 0) + (counts.processing || 0) + (counts.processed || 0) + (counts.failed || 0);
 }
 
 export default function MobileDashboard() {
@@ -186,6 +202,18 @@ export default function MobileDashboard() {
     queryKey: [ADMIN_ROUTES.SETTINGS],
   });
 
+  const { data: apCounts } = useQuery<InboxCounts>({
+    queryKey: [AP_INBOX_ROUTES.COUNTS],
+  });
+
+  const { data: tenderCounts } = useQuery<InboxCounts>({
+    queryKey: [TENDER_INBOX_ROUTES.COUNTS],
+  });
+
+  const { data: draftingCounts } = useQuery<InboxCounts>({
+    queryKey: [DRAFTING_INBOX_ROUTES.COUNTS],
+  });
+
   const isLoading = (showChat && loadingConversations) || (showTasks && loadingTasks) || (showJobs && loadingJobs) || (showPanels && loadingPanels);
 
   const unreadMessages = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
@@ -193,13 +221,14 @@ export default function MobileDashboard() {
   const totalTasks = allTasks.length;
   const openTasks = allTasks.filter(t => t.status !== "DONE").length;
   const activeJobs = jobs.filter(j => j.status === "ACTIVE").length;
-  const inProgressPanels = panels.filter(p => p.productionApprovalStatus === "APPROVED").length;
   const criticalIssues = panels.filter(p => p.productionApprovalStatus === "REJECTED").length;
+
+  const emailsToProcess = getUnprocessedCount(apCounts) + getUnprocessedCount(tenderCounts) + getUnprocessedCount(draftingCounts);
 
   const statCards = [];
   if (showTasks) statCards.push(<StatCard key="tasks" value={totalTasks} title="Tasks" subtitle={`${openTasks} open`} accent="blue" />);
-  if (showJobs) statCards.push(<StatCard key="jobs" value={activeJobs} title="Jobs" subtitle="In Progress" accent="green" />);
-  if (showPanels) statCards.push(<StatCard key="panels" value={inProgressPanels} title="Panels" subtitle="In Progress" accent="yellow" />);
+  if (showJobs) statCards.push(<StatCard key="jobs" value={activeJobs} title="Jobs" subtitle="Active" accent="green" />);
+  statCards.push(<StatCard key="emails" value={emailsToProcess} title="Emails" subtitle="To Process" accent="yellow" />);
   if (showPanels) statCards.push(<StatCard key="critical" value={criticalIssues} title="Critical" subtitle="Issues" accent="red" />);
 
   return (
@@ -262,6 +291,13 @@ export default function MobileDashboard() {
         ) : null}
 
         <nav className="mt-6 space-y-3" aria-label="Quick access">
+          <NavRow
+            icon={<Inbox className="h-5 w-5 text-indigo-400" />}
+            iconBg="bg-indigo-500/20"
+            label="Email Processing"
+            badge={emailsToProcess}
+            href="/mobile/email-processing"
+          />
           {showTasks && (
             <NavRow
               icon={<ListTodo className="h-5 w-5 text-blue-400" />}

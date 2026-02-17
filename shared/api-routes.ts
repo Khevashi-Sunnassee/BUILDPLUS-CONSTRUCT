@@ -1001,6 +1001,7 @@ export const AP_INBOX_ROUTES = {
   CHECK_EMAILS: '/api/ap-inbox/check-emails',
   BACKGROUND_STATUS: '/api/ap-inbox/background-status',
   WEBHOOK: '/api/webhooks/resend-inbound',
+  COUNTS: '/api/ap-inbox/counts',
 } as const;
 export type ApInboxRoutes = typeof AP_INBOX_ROUTES;
 
