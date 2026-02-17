@@ -641,11 +641,21 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState("MEDIUM");
+  const [assigneeId, setAssigneeId] = useState("");
   const [aiReason, setAiReason] = useState("");
   const { toast } = useToast();
 
+  const { data: companyUsers = [] } = useQuery<Array<{ id: string; fullName: string; role: string }>>({
+    queryKey: ["/api/users"],
+    enabled: isOpen,
+    select: (data: any) => {
+      const list = Array.isArray(data) ? data : data?.users || [];
+      return list.filter((u: any) => u.fullName).sort((a: any, b: any) => a.fullName.localeCompare(b.fullName));
+    },
+  });
+
   const createTaskMutation = useMutation({
-    mutationFn: async (data: { title: string; actionType: string; description?: string; jobId?: string | null; dueDate?: string | null; priority?: string | null }) => {
+    mutationFn: async (data: { title: string; actionType: string; description?: string; jobId?: string | null; dueDate?: string | null; priority?: string | null; assigneeIds?: string[] }) => {
       const res = await apiRequest("POST", DRAFTING_INBOX_ROUTES.CREATE_TASK(emailId), data);
       return res.json();
     },
@@ -659,6 +669,7 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
       setDescription("");
       setDueDate("");
       setPriority("MEDIUM");
+      setAssigneeId("");
       setAiReason("");
     },
     onError: (err: Error) => {
@@ -689,6 +700,10 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
       toast({ title: "Enter a task title", variant: "destructive" });
       return;
     }
+    if (!assigneeId) {
+      toast({ title: "Select a user to assign this task to", variant: "destructive" });
+      return;
+    }
     createTaskMutation.mutate({
       title: title.trim(),
       actionType,
@@ -696,6 +711,7 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
       jobId: email.jobId || null,
       dueDate: dueDate || null,
       priority,
+      assigneeIds: [assigneeId],
     });
   };
 
@@ -789,6 +805,25 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
               </Select>
             </div>
 
+            <div data-testid="field-task-assignee">
+              <label className="text-xs text-muted-foreground mb-1 block">Assign To <span className="text-destructive">*</span></label>
+              <Select value={assigneeId} onValueChange={setAssigneeId}>
+                <SelectTrigger data-testid="select-task-assignee" className={!assigneeId ? "border-destructive/50" : ""}>
+                  <SelectValue placeholder="Select a user..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {companyUsers.map(user => (
+                    <SelectItem key={user.id} value={user.id} data-testid={`option-assignee-${user.id}`}>
+                      {user.fullName}
+                    </SelectItem>
+                  ))}
+                  {companyUsers.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">No users found</div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div data-testid="field-task-due-date">
               <label className="text-xs text-muted-foreground mb-1 block">Due Date</label>
               <Input
@@ -834,7 +869,7 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
               <Button
                 size="sm"
                 onClick={handleSubmit}
-                disabled={createTaskMutation.isPending || !actionType || !title.trim()}
+                disabled={createTaskMutation.isPending || !actionType || !title.trim() || !assigneeId}
                 data-testid="button-submit-task"
               >
                 {createTaskMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}

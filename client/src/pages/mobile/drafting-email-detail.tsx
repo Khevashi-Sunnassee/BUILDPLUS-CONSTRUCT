@@ -363,11 +363,20 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState("MEDIUM");
+  const [assigneeId, setAssigneeId] = useState("");
   const [aiReason, setAiReason] = useState("");
   const { toast } = useToast();
 
+  const { data: companyUsers = [] } = useQuery<Array<{ id: string; fullName: string; role: string }>>({
+    queryKey: ["/api/users"],
+    select: (data: any) => {
+      const list = Array.isArray(data) ? data : data?.users || [];
+      return list.filter((u: any) => u.fullName).sort((a: any, b: any) => a.fullName.localeCompare(b.fullName));
+    },
+  });
+
   const createTaskMutation = useMutation({
-    mutationFn: async (data: { title: string; actionType: string; description?: string; jobId?: string | null; dueDate?: string | null; priority?: string | null }) => {
+    mutationFn: async (data: { title: string; actionType: string; description?: string; jobId?: string | null; dueDate?: string | null; priority?: string | null; assigneeIds?: string[] }) => {
       const res = await apiRequest("POST", DRAFTING_INBOX_ROUTES.CREATE_TASK(emailId), data);
       return res.json();
     },
@@ -380,6 +389,7 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
       setDescription("");
       setDueDate("");
       setPriority("MEDIUM");
+      setAssigneeId("");
       setAiReason("");
     },
     onError: (err: Error) => {
@@ -410,6 +420,10 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
       toast({ title: "Enter a task title", variant: "destructive" });
       return;
     }
+    if (!assigneeId) {
+      toast({ title: "Select a user to assign this task to", variant: "destructive" });
+      return;
+    }
     createTaskMutation.mutate({
       title: title.trim(),
       actionType,
@@ -417,6 +431,7 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
       jobId: email.jobId || null,
       dueDate: dueDate || null,
       priority,
+      assigneeIds: [assigneeId],
     });
   };
 
@@ -488,6 +503,25 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
       </Select>
 
       <div>
+        <label className="text-xs text-white/50 mb-1 block">Assign To <span className="text-red-400">*</span></label>
+        <Select value={assigneeId} onValueChange={setAssigneeId}>
+          <SelectTrigger className={`bg-white/10 border-white/20 text-white ${!assigneeId ? "border-red-500/50" : ""}`} data-testid="select-task-assignee-mobile">
+            <SelectValue placeholder="Select a user..." />
+          </SelectTrigger>
+          <SelectContent>
+            {companyUsers.map(user => (
+              <SelectItem key={user.id} value={user.id} data-testid={`option-assignee-mobile-${user.id}`}>
+                {user.fullName}
+              </SelectItem>
+            ))}
+            {companyUsers.length === 0 && (
+              <div className="px-3 py-2 text-sm text-muted-foreground">No users found</div>
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
         <Input
           type="date"
           value={dueDate}
@@ -531,7 +565,7 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
 
       <Button
         onClick={handleSubmit}
-        disabled={createTaskMutation.isPending || !actionType || !title.trim()}
+        disabled={createTaskMutation.isPending || !actionType || !title.trim() || !assigneeId}
         className="w-full"
         data-testid="button-submit-task-mobile"
       >
