@@ -6,7 +6,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { twilioService } from "../services/twilio.service";
-import { insertPurchaseOrderSchema, purchaseOrderItems, purchaseOrders } from "@shared/schema";
+import { insertPurchaseOrderSchema, purchaseOrderItems, purchaseOrders, InsertPurchaseOrder, InsertPurchaseOrderItem } from "@shared/schema";
 import { db } from "../db";
 import { eq, and, inArray } from "drizzle-orm";
 
@@ -128,6 +128,7 @@ router.post("/api/purchase-orders", requireAuth, async (req, res) => {
     const companyId = req.companyId;
     const userId = req.session.userId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!userId) return res.status(401).json({ error: "Authentication required" });
     const result = createPurchaseOrderSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
@@ -141,17 +142,17 @@ router.post("/api/purchase-orders", requireAuth, async (req, res) => {
       (poData as Record<string, unknown>).requiredByDate = new Date(poData.requiredByDate);
     }
     const order = await storage.createPurchaseOrder(
-      { ...poData, poNumber, companyId, requestedById: userId },
-      lineItems || []
+      { ...poData, poNumber, companyId, requestedById: userId } as InsertPurchaseOrder,
+      (lineItems || []) as Omit<InsertPurchaseOrderItem, "purchaseOrderId">[]
     );
     if (poData.capexRequestId) {
       try {
-        const capex = await storage.getCapexRequest(poData.capexRequestId);
+        const capex = await storage.getCapexRequest(poData.capexRequestId as string);
         if (capex && capex.companyId === companyId) {
-          await storage.updateCapexRequest(poData.capexRequestId, { purchaseOrderId: order.id });
-          const actor = await storage.getUser(userId!);
+          await storage.updateCapexRequest(poData.capexRequestId as string, { purchaseOrderId: order.id });
+          const actor = await storage.getUser(userId);
           await storage.createCapexAuditEvent({
-            capexRequestId: poData.capexRequestId,
+            capexRequestId: poData.capexRequestId as string,
             eventType: "po_linked",
             actorId: userId!,
             actorName: actor?.name || actor?.email || "",
@@ -196,7 +197,7 @@ router.patch("/api/purchase-orders/:id", requireAuth, requirePermission("purchas
     if (mutablePoData.supplierId === "") {
       mutablePoData.supplierId = null;
     }
-    const updated = await storage.updatePurchaseOrder(String(req.params.id), mutablePoData, lineItems);
+    const updated = await storage.updatePurchaseOrder(String(req.params.id), mutablePoData as Partial<InsertPurchaseOrder>, lineItems as Omit<InsertPurchaseOrderItem, "purchaseOrderId">[] | undefined);
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating purchase order");

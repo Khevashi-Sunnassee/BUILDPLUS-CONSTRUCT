@@ -10,6 +10,7 @@ import {
   jobActivities, jobActivityAssignees, jobActivityUpdates, jobActivityFiles,
   jobActivityChecklists,
   taskGroups, tasks,
+  InsertTask,
 } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
@@ -1055,13 +1056,13 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
     }
 
     if (updateData.startDate !== undefined) {
-      updateData.startDate = updateData.startDate ? new Date(updateData.startDate) : null;
+      updateData.startDate = updateData.startDate ? new Date(updateData.startDate as string) : null;
     }
     if (updateData.endDate !== undefined) {
-      updateData.endDate = updateData.endDate ? new Date(updateData.endDate) : null;
+      updateData.endDate = updateData.endDate ? new Date(updateData.endDate as string) : null;
     }
     if (updateData.reminderDate !== undefined) {
-      updateData.reminderDate = updateData.reminderDate ? new Date(updateData.reminderDate) : null;
+      updateData.reminderDate = updateData.reminderDate ? new Date(updateData.reminderDate as string) : null;
     }
 
     const changedFields: Record<string, { from: unknown; to: unknown }> = {};
@@ -1603,7 +1604,7 @@ router.post("/api/activity-seed", requireAuth, requireRole("ADMIN"), async (req,
             deliverable: a.deliverable,
             jobPhase: a.phase,
             sortOrder: i,
-          });
+          } as typeof activityTemplates.$inferInsert);
         }
       }
     });
@@ -1754,10 +1755,10 @@ router.post("/api/job-types/:jobTypeId/templates/import", requireAuth, requireRo
         return ((val as {richText: {text: string}[]}).richText || []).map((r) => r.text || "").join("").trim();
       }
       if (typeof val === "object" && val !== null && "text" in val) {
-        return String((val as Record<string, unknown>).text || "").trim();
+        return String((val as unknown as Record<string, unknown>).text || "").trim();
       }
       if (typeof val === "object" && val !== null && "result" in val) {
-        return String((val as Record<string, unknown>).result || "").trim();
+        return String((val as unknown as Record<string, unknown>).result || "").trim();
       }
       return String(val).trim();
     }
@@ -1829,7 +1830,7 @@ router.post("/api/job-types/:jobTypeId/templates/import", requireAuth, requireRo
 
     await db.transaction(async (tx) => {
       for (const row of rows) {
-        await tx.insert(activityTemplates).values(row);
+        await tx.insert(activityTemplates).values(row as typeof activityTemplates.$inferInsert);
       }
     });
 
@@ -1944,7 +1945,7 @@ router.post("/api/job-activities/:activityId/tasks", requireAuth, requirePermiss
       taskData.reminderDate = new Date(validatedData.reminderDate);
     }
 
-    const task = await storage.createTask(taskData);
+    const task = await storage.createTask(taskData as InsertTask);
 
     if (userId) {
       await storage.setTaskAssignees(task.id, [userId]);
