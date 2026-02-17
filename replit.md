@@ -44,7 +44,7 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Multi-Tenancy:** Designed for multi-company deployment with strict data isolation.
 - **Scalability:** Supports 300+ simultaneous users.
 - **Robustness:** Extensive input validation, comprehensive error handling, and consistent API response structures.
-- **Security:** Role-Based Access Control (RBAC), authentication, and UUID validation.
+- **Security:** Multi-layered security with RBAC, CSRF protection, CSP headers, input sanitization, and comprehensive validation (see Security Coding Standards below).
 - **Data Integrity:** Enforced through CHECK constraints, unique constraints, and foreign keys, with performance indexes.
 - **Query Safety:** All list endpoints and multi-row queries have `.limit()` safeguards to prevent unbounded result sets.
 - **Accessibility:** All interactive elements and pages adhere to accessibility standards.
@@ -64,6 +64,46 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Graceful Shutdown:** Handlers for SIGTERM/SIGINT to ensure clean application termination.
 - **Broadcast System:** Template-based mass notifications via email/SMS/WhatsApp with delivery tracking.
 - **Drafting Email Inbox:** Polls drafting@metdul.resend.app for inbound emails, AI-powered extraction identifying change requests, job matching, production impact, drawing references. Background poll on 5-min interval. Rich text email viewer with HTML/text toggle.
+
+## Security Coding Standards
+
+All new code MUST follow these security requirements to maintain the application's security posture.
+
+### CSRF Protection (server/middleware/csrf.ts)
+- **Double-submit cookie pattern** is enforced globally on all `/api` POST/PUT/PATCH/DELETE routes.
+- CSRF tokens are **rotated on login** (via `rotateCsrfToken(res)` in auth routes) and **cleared on logout**.
+- **Origin/Referer validation** rejects requests from mismatched origins using `timingSafeEqual` for token comparison.
+- Client-side: All mutating requests MUST include the `x-csrf-token` header (handled automatically by `apiRequest()` and `apiUpload()` in `client/src/lib/queryClient.ts`).
+- Exempt paths (webhooks, invitations, agent) are explicitly listed; do NOT add exemptions without security review.
+
+### Content Security Policy (server/index.ts via helmet)
+- CSP is configured via helmet with restrictive directives: `default-src 'self'`, `object-src 'none'`, `frame-src 'none'`, `base-uri 'self'`, `form-action 'self'`.
+- Production `connectSrc` is restricted to known external APIs (OpenAI, Resend, Twilio, Mailgun, Replit domains).
+- `upgradeInsecureRequests` is enforced in production; HSTS is set to 1 year.
+- Additional headers: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` restricts camera/microphone/geolocation/payment.
+- When adding new external API integrations, update the `connectSrc` whitelist in `server/index.ts`.
+
+### Input Validation & Sanitization (server/middleware/sanitize.ts)
+All these middleware are applied globally via `server/index.ts`:
+- **`sanitizeRequestBody`**: Strips `<script>` tags, inline event handlers (`onmouseover=`), and `javascript:` protocol from all request body strings. Applied to all routes.
+- **`validateContentType`**: Rejects POST/PUT/PATCH requests with unsupported content types (only JSON, multipart, and urlencoded are allowed).
+- **`enforceBodyLimits`**: Enforces string field length limits (10,000 chars for normal fields, 100,000 for long-text fields like `content`, `description`, `body`, `htmlBody`, `notes`, `scope`, `specifications`). Rejects arrays with >1,000 elements and objects with >200 fields.
+- **`validateAllParams`**: Validates all route params against `^[a-zA-Z0-9_\-:.@]+$` regex (rejects HTML/SQL injection characters) and enforces 256-char max length.
+- **`sanitizeQueryStrings`**: Strips script tags and `javascript:` protocol from all query string values.
+
+### Coding Requirements for New Routes
+1. **Never use raw SQL** with user input — always use Drizzle ORM's parameterized queries or `inArray()` instead of raw `ANY()` with template literals.
+2. **Validate request bodies** with Zod schemas from `drizzle-zod` before passing to storage/database.
+3. **UUID params are validated globally** via `validateAllParams` middleware. For extra strictness on specific routes, use `validateUUIDParams('id', 'jobId')` middleware from `server/middleware/sanitize.ts`.
+4. **Never expose stack traces or internal errors** to clients — use generic error messages with structured error codes.
+5. **All API responses** must include the company isolation check (`eq(table.companyId, companyId)`) to enforce multi-tenant data isolation.
+6. **Session cookies** are configured with `httpOnly: true`, `secure: true` (production), `sameSite: 'lax'`, and PostgreSQL-backed storage.
+7. **Rate limiting** is applied to all API routes (300/min), auth routes (20/15min), and upload routes (30/min).
+
+### Security Testing
+- Unit tests: `server/__tests__/csrf.test.ts` (16 tests) and `server/__tests__/sanitize.test.ts` (34 tests) cover middleware behavior.
+- Integration tests: `tests/security.test.ts` (14 tests) verifies headers, CSRF enforcement, input validation, and rate limiting end-to-end.
+- Smoke tests: `tests/api-smoke.test.ts` verifies all endpoints enforce authentication.
 
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.

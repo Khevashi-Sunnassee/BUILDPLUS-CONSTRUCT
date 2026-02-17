@@ -211,5 +211,109 @@ describe('CSRF Middleware', () => {
 
       expect(next).toHaveBeenCalled();
     });
+
+    it('should reject POST with mismatched Origin header', () => {
+      const token = crypto.randomBytes(32).toString('hex');
+      const req = createMockReq({
+        method: 'POST',
+        path: '/api/data',
+        session: { userId: 'user-1' },
+        cookies: { csrf_token: token },
+        headers: {
+          'x-csrf-token': token,
+          'origin': 'https://evil-site.com',
+          'host': 'myapp.replit.app',
+        },
+      });
+      const res = createMockRes();
+      const next = vi.fn();
+
+      csrfProtection(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Origin not allowed' });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should allow POST with matching Origin header', () => {
+      const token = crypto.randomBytes(32).toString('hex');
+      const req = createMockReq({
+        method: 'POST',
+        path: '/api/data',
+        session: { userId: 'user-1' },
+        cookies: { csrf_token: token },
+        headers: {
+          'x-csrf-token': token,
+          'origin': 'https://myapp.replit.app',
+          'host': 'myapp.replit.app',
+        },
+      });
+      const res = createMockRes();
+      const next = vi.fn();
+
+      csrfProtection(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+    });
+
+    it('should allow POST with Referer from same host', () => {
+      const token = crypto.randomBytes(32).toString('hex');
+      const req = createMockReq({
+        method: 'POST',
+        path: '/api/data',
+        session: { userId: 'user-1' },
+        cookies: { csrf_token: token },
+        headers: {
+          'x-csrf-token': token,
+          'referer': 'https://myapp.replit.dev/some-page',
+          'host': 'myapp.replit.dev',
+        },
+      });
+      const res = createMockRes();
+      const next = vi.fn();
+
+      csrfProtection(req, res, next);
+
+      expect(next).toHaveBeenCalled();
+    });
+
+    it('should reject PUT with malicious Origin', () => {
+      const token = crypto.randomBytes(32).toString('hex');
+      const req = createMockReq({
+        method: 'PUT',
+        path: '/api/update',
+        session: { userId: 'user-1' },
+        cookies: { csrf_token: token },
+        headers: {
+          'x-csrf-token': token,
+          'origin': 'https://attacker.com',
+          'host': 'myapp.replit.dev',
+        },
+      });
+      const res = createMockRes();
+      const next = vi.fn();
+
+      csrfProtection(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should handle malformed CSRF tokens gracefully', () => {
+      const req = createMockReq({
+        method: 'POST',
+        path: '/api/data',
+        session: { userId: 'user-1' },
+        cookies: { csrf_token: 'short' },
+        headers: { 'x-csrf-token': 'different-length-token-value' },
+      });
+      const res = createMockRes();
+      const next = vi.fn();
+
+      csrfProtection(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(next).not.toHaveBeenCalled();
+    });
   });
 });

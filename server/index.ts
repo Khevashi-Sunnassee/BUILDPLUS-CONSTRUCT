@@ -18,7 +18,7 @@ import { getAllCacheStats } from "./lib/cache";
 import { getAllCircuitStats } from "./lib/circuit-breaker";
 import { getAllQueueStats } from "./lib/job-queue";
 import { requestMetrics, getEventLoopLag } from "./lib/metrics";
-import { sanitizeRequestBody, validateContentType } from "./middleware/sanitize";
+import { sanitizeRequestBody, validateContentType, enforceBodyLimits, validateAllParams, sanitizeQueryStrings } from "./middleware/sanitize";
 import { requestTimingMiddleware } from "./middleware/request-timing";
 import { healthRouter } from "./middleware/health";
 
@@ -35,16 +35,29 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
-      connectSrc: ["'self'", "ws:", "wss:", "https:"],
+      connectSrc: isDev
+        ? ["'self'", "ws:", "wss:", "https:"]
+        : ["'self'", "wss:", "https://api.openai.com", "https://api.resend.com", "https://api.twilio.com", "https://api.mailgun.net", "https://*.replit.dev", "https://*.replit.app"],
       mediaSrc: ["'self'", "blob:"],
       objectSrc: ["'none'"],
-      frameSrc: ["'self'"],
+      frameSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],
+      upgradeInsecureRequests: isDev ? null : [],
+      workerSrc: ["'self'", "blob:"],
     },
   },
   crossOriginEmbedderPolicy: false,
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  hsts: isDev ? false : { maxAge: 31536000, includeSubDomains: true },
 }));
+
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  next();
+});
 
 app.set("trust proxy", 1);
 
@@ -149,6 +162,9 @@ app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
 app.use(sanitizeRequestBody);
 app.use(validateContentType);
+app.use("/api", enforceBodyLimits);
+app.use("/api", validateAllParams);
+app.use("/api", sanitizeQueryStrings);
 app.use(requestTimingMiddleware);
 app.use(healthRouter);
 

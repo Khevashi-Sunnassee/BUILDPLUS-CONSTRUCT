@@ -3,6 +3,7 @@ import { z } from "zod";
 import { storage } from "../storage";
 import { loginSchema } from "@shared/schema";
 import { requireAuth } from "./middleware/auth.middleware";
+import { rotateCsrfToken } from "../middleware/csrf";
 
 const router = Router();
 
@@ -23,6 +24,7 @@ router.post("/login", async (req, res) => {
     req.session.userId = user.id;
     req.session.companyId = user.companyId;
     req.session.name = user.name ?? undefined;
+    rotateCsrfToken(res);
     res.json({ user: { ...user, passwordHash: undefined } });
   } catch (error: unknown) {
     res.status(500).json({ error: "Internal server error" });
@@ -31,6 +33,7 @@ router.post("/login", async (req, res) => {
 
 router.post("/logout", (req, res) => {
   req.session.destroy(() => {});
+  res.clearCookie("csrf_token", { path: "/" });
   res.json({ ok: true });
 });
 
