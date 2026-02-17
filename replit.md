@@ -48,7 +48,13 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Data Integrity:** Enforced through CHECK constraints, unique constraints, and foreign keys, with performance indexes.
 - **Query Safety:** All list endpoints and multi-row queries have `.limit()` safeguards to prevent unbounded result sets.
 - **Accessibility:** All interactive elements and pages adhere to accessibility standards.
-- **Testing:** Frontend tested with React Testing Library + Vitest; backend tested with API integration tests covering company isolation, data integrity, pagination, rate limiting, and input sanitization.
+- **Testing:** Comprehensive five-tier testing system:
+  - *Frontend Component Tests*: 100% page coverage (66/66 pages) using React Testing Library + Vitest with mocked queries.
+  - *Backend API Tests*: Integration tests covering company isolation, CRUD flows, security, RBAC, validation, and input sanitization.
+  - *API Smoke Tests*: Automated endpoint discovery testing all ~500 GET endpoints for auth enforcement and 500-error absence.
+  - *CRUD Flow E2E Tests*: End-to-end lifecycle tests for AP invoices, tenders, scopes, email inboxes, MYOB, and paginated endpoints.
+  - *Load Testing*: Custom Node.js-based load test simulating 50→150→300→350 concurrent users with latency percentiles (p95/p99) and error rate thresholds.
+  - *Test Runner*: Single command `bash tests/run-all-tests.sh` runs all tiers with selective skip flags (--skip-frontend, --skip-load, --backend-only, etc.).
 - **Background Job System:** Interval-based scheduler for tasks like AP email polling and invoice extraction.
 - **Job Queue System:** In-memory priority queue with concurrency control and retry mechanisms.
 - **Circuit Breakers:** Implemented for external services like OpenAI, Twilio, Mailgun, and Resend.

@@ -1,0 +1,5113 @@
+{
+  "generatedAt": "2026-02-17T06:21:41.782Z",
+  "totalRoutes": 850,
+  "byMethod": {
+    "GET": 361,
+    "POST": 271,
+    "PATCH": 67,
+    "PUT": 45,
+    "DELETE": 106
+  },
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/address-lookup",
+      "file": "address-lookup.routes.ts",
+      "hasAuth": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/devices",
+      "file": "admin.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/devices",
+      "file": "admin.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/devices/:id",
+      "file": "admin.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/devices/:id",
+      "file": "admin.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/work-types",
+      "file": "admin.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/work-types",
+      "file": "admin.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/work-types",
+      "file": "admin.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/work-types/:id",
+      "file": "admin.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/work-types/:id",
+      "file": "admin.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/data-deletion/counts",
+      "file": "admin.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/data-deletion/validate",
+      "file": "admin.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/data-deletion/delete",
+      "file": "admin.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/ingest",
+      "file": "agent.routes.ts",
+      "hasAuth": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/ap-inbox/settings",
+      "file": "ap-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/ap-inbox/settings",
+      "file": "ap-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/ap-inbox/emails",
+      "file": "ap-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/ap-inbox/check-emails",
+      "file": "ap-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/ap-inbox/background-status",
+      "file": "ap-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/webhooks/resend-inbound",
+      "file": "ap-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/asset-repair-requests/next-number",
+      "file": "asset-repair.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/asset-repair-requests",
+      "file": "asset-repair.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/assets/:assetId/repair-requests",
+      "file": "asset-repair.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/asset-repair-requests/:id",
+      "file": "asset-repair.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/asset-repair-requests",
+      "file": "asset-repair.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/asset-repair-requests/:id",
+      "file": "asset-repair.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/asset-repair-requests/:id",
+      "file": "asset-repair.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/assets/template",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/assets/import",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/assets/simple",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/assets",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/assets/:id",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/assets",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/assets/:id",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/assets/:id",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/assets/:id/ai-summary",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/assets/:id/maintenance",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/assets/:id/maintenance",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/assets/:assetId/maintenance/:id",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/assets/:id/transfers",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/assets/:id/transfers",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/assets/:assetId/transfers/:id",
+      "file": "assets.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/login",
+      "file": "auth.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/logout",
+      "file": "auth.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/me",
+      "file": "auth.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/switch-company",
+      "file": "auth.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/boq/groups",
+      "file": "boq.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/boq/groups",
+      "file": "boq.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/:jobId/boq/groups/:id",
+      "file": "boq.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/jobs/:jobId/boq/groups/:id",
+      "file": "boq.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/boq/items",
+      "file": "boq.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/boq/items",
+      "file": "boq.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/:jobId/boq/items/:id",
+      "file": "boq.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/jobs/:jobId/boq/items/:id",
+      "file": "boq.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/boq/summary",
+      "file": "boq.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/broadcast-templates",
+      "file": "broadcast.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/broadcast-templates/:id",
+      "file": "broadcast.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/broadcast-templates",
+      "file": "broadcast.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/broadcast-templates/:id",
+      "file": "broadcast.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/broadcast-templates/:id",
+      "file": "broadcast.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/broadcasts",
+      "file": "broadcast.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/broadcasts/channels-status",
+      "file": "broadcast.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/broadcasts/:id",
+      "file": "broadcast.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/broadcasts/:id/deliveries",
+      "file": "broadcast.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/broadcasts/deliveries/:deliveryId/resend",
+      "file": "broadcast.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/broadcasts/recipients",
+      "file": "broadcast.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/broadcasts/send",
+      "file": "broadcast.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/budget",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/budget",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/:jobId/budget",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/budget/lines",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/budget/lines",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/:jobId/budget/lines/:id",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/jobs/:jobId/budget/lines/:id",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/budget/summary",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/budget/lines/create-from-cost-codes",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/budget-lines/:lineId/updates",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/budget-lines/:lineId/updates",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/budget-line-updates/:id",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/budget-lines/:lineId/email-drop",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/budget-lines/:lineId/files",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/budget-lines/:lineId/files",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/budget-line-files/:id",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/budget-lines/:budgetLineId/detail-items",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/budget-lines/:budgetLineId/detail-items",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/budget-line-detail-items/:id",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/budget-line-detail-items/:id",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/budget-lines/:budgetLineId/toggle-lock",
+      "file": "budget.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/capex-requests",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/capex-requests/pending-my-approval",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/capex-requests/by-po/:poId",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/approvers",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/capex-requests/:id",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/capex-requests/:id/audit-history",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/capex-requests",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/capex-requests/:id",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/capex-requests/:id/submit",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/capex-requests/:id/approve",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/capex-requests/:id/reject",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/capex-requests/:id/withdraw",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/capex-requests/:id/draft",
+      "file": "capex.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/entity-types",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/checklist/entity-types",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/checklist/entity-types/:id",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/checklist/entity-types/:id",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/entity-subtypes",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/entity-types/:entityTypeId/subtypes",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/checklist/entity-subtypes",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/checklist/entity-subtypes/:id",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/checklist/entity-subtypes/:id",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/templates",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/templates/by-type/:entityTypeId/:entitySubtypeId",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/templates/by-type/:entityTypeId",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/templates/:id",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/checklist/templates",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/checklist/templates/:id",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/checklist/templates/:id/duplicate",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/checklist/templates/:id",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/instances",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/instances/:id",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/templates/:templateId/instances",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/jobs/:jobId/instances",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/panels/:panelId/instances",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/checklist/instances/from-asset",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/checklist/instances",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/checklist/instances/:id",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/checklist/instances/:id/complete",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/checklist/instances/:id/sign-off",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/checklist/instances/:id",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/reports/summary",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/instances/:instanceId/work-orders",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/checklist/work-orders",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/checklist/work-orders/:id",
+      "file": "checklist.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/companies",
+      "file": "companies.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/companies/:id",
+      "file": "companies.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/companies",
+      "file": "companies.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/companies/:id",
+      "file": "companies.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/companies/:id",
+      "file": "companies.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/contracts/hub",
+      "file": "contracts.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/contracts/job/:jobId",
+      "file": "contracts.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/contracts/:id",
+      "file": "contracts.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/contracts",
+      "file": "contracts.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/contracts/:id",
+      "file": "contracts.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/contracts/ai-analyze",
+      "file": "contracts.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/cost-analysis",
+      "file": "cost-analytics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/cost-analysis-daily",
+      "file": "cost-analytics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/labour-cost-analysis",
+      "file": "cost-analytics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/cost-codes",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/child-cost-codes",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/cost-codes-with-children",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/cost-codes/template/download",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/cost-codes/import",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/cost-codes/:id",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/cost-codes",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/cost-codes/:id",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/cost-codes/:id",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/child-cost-codes/:id",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/child-cost-codes",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/child-cost-codes/:id",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/child-cost-codes/:id",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/cost-code-defaults/:jobTypeId",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/cost-code-defaults",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/cost-codes",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/cost-codes/inherit",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/cost-codes",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/:jobId/cost-codes/:id",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/jobs/:jobId/cost-codes/:id",
+      "file": "cost-codes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/customers",
+      "file": "customer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/customers/active",
+      "file": "customer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/customers/template",
+      "file": "customer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/customers/export",
+      "file": "customer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/customers/import",
+      "file": "customer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/customers/:id",
+      "file": "customer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/customers",
+      "file": "customer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/customers/:id",
+      "file": "customer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/customers/:id",
+      "file": "customer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/daily-logs",
+      "file": "daily-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/daily-logs",
+      "file": "daily-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/daily-logs/submitted",
+      "file": "daily-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/daily-logs/:id",
+      "file": "daily-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/daily-logs/:id/submit",
+      "file": "daily-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/daily-logs/:id/approve",
+      "file": "daily-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/daily-logs/:id/merge",
+      "file": "daily-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/log-rows/:id",
+      "file": "daily-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/log-rows/:id",
+      "file": "daily-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/daily-logs/:id",
+      "file": "daily-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/manual-entry",
+      "file": "daily-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-types",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-types/active",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-types/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/document-types",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/document-types/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/document-types/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-types/:typeId/statuses",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/document-types/:typeId/statuses",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/document-types/:typeId/statuses/:statusId",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/document-types/:typeId/statuses/:statusId",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-disciplines",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-disciplines/active",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-disciplines/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/document-disciplines",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/document-disciplines/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/document-disciplines/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-categories",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-categories/active",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-categories/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/document-categories",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/document-categories/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/document-categories/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents/next-number",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents/:id/versions",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/check-duplicates",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/upload",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/:id/new-version",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents/:id/view",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents/:id/thumbnail",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/documents/:id/download",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/visual-diff",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/send-email",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/documents/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/documents/:id/status",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/documents/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-bundles",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-bundles/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-bundles/qr/:qrCodeId",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/document-bundles",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/document-bundles/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/document-bundles/:id/documents",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/document-bundles/:bundleId/documents/:documentId",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/document-bundles/:id",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/document-bundles/:bundleId/items/:itemId/request-latest",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/document-bundles/:bundleId/notify-updates",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/public/documents/:token/download",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/public/documents/bulk/:token/download",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/public/bundles/:qrCodeId",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/public/bundles/:qrCodeId/documents/:documentId/view",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/public/bundles/:qrCodeId/documents/:documentId/download",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/document-bundles/:id/access-logs",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/analyze-version",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/:id/analyze-changes",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/extract-metadata",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/bulk-upload",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panels/:panelId/documents",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/panels/:panelId/documents/upload",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/panels/:panelId/documents/:documentId/status",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/drawing-package/analyze",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/documents/drawing-package/register",
+      "file": "documents.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-inbox/settings",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/drafting-inbox/settings",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-inbox/emails",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-inbox/counts",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-inbox/emails/:id",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/drafting-inbox/upload",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-inbox/emails/:id/document-view",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-inbox/emails/:id/extracted-fields",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/drafting-inbox/emails/:id/extract",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/drafting-inbox/emails/:id/match",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/drafting-inbox/emails/:id",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/drafting-inbox/emails/:id",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-inbox/emails/:id/activity",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-inbox/emails/:id/page-thumbnails",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/drafting-inbox/check-emails",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-inbox/background-status",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-inbox/emails/:id/body",
+      "file": "drafting-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/drafting-daily",
+      "file": "drafting-logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/logistics",
+      "file": "drafting-logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-program",
+      "file": "drafting.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-program/my-allocated",
+      "file": "drafting.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/drafting-program/:id",
+      "file": "drafting.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/drafting-program/generate",
+      "file": "drafting.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/drafting-program/:id/assign",
+      "file": "drafting.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/drafting-program/:id",
+      "file": "drafting.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/drafting-program/:id",
+      "file": "drafting.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/drafting-program/job/:jobId",
+      "file": "drafting.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/employees",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/employees/active",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/employees/template",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/employees/export",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/employees/import",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/employees/licences/all",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/employees/:id",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/employees",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/employees/:id",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/employees/:id",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/employees/:employeeId/employments",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/employees/:employeeId/employments",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/employees/:employeeId/employments/:id",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/employees/:employeeId/employments/:id",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/employees/:employeeId/documents",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/employees/:employeeId/documents",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/employees/:employeeId/documents/:id",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/employees/:employeeId/documents/:id",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/employees/:employeeId/licences",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/employees/:employeeId/licences",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/employees/:employeeId/licences/:id",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/employees/:employeeId/licences/:id",
+      "file": "employee.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/eot-claims",
+      "file": "eot-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/eot-claims/by-job/:jobId",
+      "file": "eot-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/eot-claims/:id",
+      "file": "eot-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/eot-claims",
+      "file": "eot-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/eot-claims/:id",
+      "file": "eot-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/eot-claims/:id/submit",
+      "file": "eot-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/eot-claims/:id/approve",
+      "file": "eot-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/eot-claims/:id/reject",
+      "file": "eot-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/eot-claims/:id",
+      "file": "eot-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/eot-claims/next-number/:jobId",
+      "file": "eot-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/factories",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/factories",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/factories/:id",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/factories",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/factories/:id",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/factories/:id",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/factories/:factoryId/beds",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/factories/:factoryId/beds",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/factories/:factoryId/beds/:bedId",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/factories/:factoryId/beds/:bedId",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/cfmeu-holidays",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/cfmeu-calendars",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cfmeu-calendars/sync",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/cfmeu-calendars/sync-all",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/cfmeu-calendars/:calendarType",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/geocode",
+      "file": "factories.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/help",
+      "file": "help.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/help/search",
+      "file": "help.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/help/categories",
+      "file": "help.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/help/recent",
+      "file": "help.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/help/feedback",
+      "file": "help.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/help/admin/list",
+      "file": "help.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/help/admin",
+      "file": "help.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/help/admin/:id",
+      "file": "help.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/help/admin/:id",
+      "file": "help.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/help/admin/:id/versions",
+      "file": "help.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/hire-bookings",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/hire-bookings/next-number",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/hire-bookings/:id",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/hire-bookings",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/hire-bookings/:id",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/hire-bookings/:id/submit",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/hire-bookings/:id/approve",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/hire-bookings/:id/reject",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/hire-bookings/:id/book",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/hire-bookings/:id/pickup",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/hire-bookings/:id/on-hire",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/hire-bookings/:id/return",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/hire-bookings/:id/cancel",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/hire-bookings/:id/close",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/hire-bookings/:id",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/hire-bookings/:id/send-email",
+      "file": "hire.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/invitations",
+      "file": "invitation.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/invitations",
+      "file": "invitation.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/invitations/:id/cancel",
+      "file": "invitation.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/invitations/:token",
+      "file": "invitation.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/invitations/:token/register",
+      "file": "invitation.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/opportunities",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/opportunities",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/jobs/opportunities/:id",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/opportunities/:id/history",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/customers/quick",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/projects",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/my-memberships",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/audit-log",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/totals",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/panel-rates",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/jobs/:jobId/panel-rates/:panelTypeId",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/jobs/:jobId/panel-rates/:rateId",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/jobs",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/jobs/:id",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/jobs",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/jobs/:id",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/jobs/:id",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/jobs/:id/generate-levels",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/jobs/:id/build-levels",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/jobs/:id/level-cycle-times",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/jobs/:id/level-cycle-times",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/jobs/:id/programme",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/jobs/:id/programme/:entryId",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/jobs/:id/programme",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/jobs/:id/programme/split",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/jobs/:id/programme/reorder",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/jobs/:id/programme/recalculate",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/jobs/:id/programme/:entryId",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/jobs/:id/production-slot-status",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/jobs/:id/rules",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/mapping-rules/:id",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/jobs/:id/phase-status",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/jobs/:id/audit-log",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/jobs/:id/members",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/jobs/:id/members",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/jobs/:id/members/:userId",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/opportunities/:id/updates",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/opportunities/:id/updates",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/opportunities/:id/email-drop",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/opportunity-updates/:id",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/opportunities/:id/files",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/opportunities/:id/files",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/opportunity-files/:id",
+      "file": "jobs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/trailer-types",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/trailer-types",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/trailer-types",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/trailer-types/:id",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/trailer-types/:id",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/zones",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/zones/:id",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/zones",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/zones/:id",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/zones/:id",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/load-lists",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/load-lists/:id",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/load-lists",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/load-lists/:id",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/load-lists/:id",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/load-lists/:id/panels",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/load-lists/:id/panels/:panelId",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/load-lists/:id/delivery",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/load-lists/:id/delivery",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/delivery-records/:id",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/load-lists/:id/return",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/load-lists/:id/return",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/test-gmail",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/test-all-emails",
+      "file": "logistics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/myob/auth",
+      "file": "myob.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/myob/callback",
+      "file": "myob.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/myob/status",
+      "file": "myob.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/myob/disconnect",
+      "file": "myob.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/myob/company",
+      "file": "myob.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/myob/customers",
+      "file": "myob.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/myob/suppliers",
+      "file": "myob.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/myob/accounts",
+      "file": "myob.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/myob/invoices",
+      "file": "myob.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/myob/items",
+      "file": "myob.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/myob/export-logs",
+      "file": "myob.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/onboarding/instruments",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/onboarding/instruments",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/onboarding/instruments/:id",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/onboarding/instruments/:id",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/onboarding/templates",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/onboarding/templates",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/onboarding/templates/:id",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/onboarding/templates/:id",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/onboarding/templates/:id",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/onboarding/templates/:templateId/tasks",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/onboarding/templates/:templateId/tasks",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/onboarding/templates/:templateId/tasks/:taskId",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/onboarding/templates/:templateId/tasks/:taskId",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/employees/:employeeId/onboardings",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/employees/:employeeId/onboardings",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/employees/:employeeId/onboardings/:id",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/employees/:employeeId/onboardings/:id",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/employees/:employeeId/onboardings/:onboardingId/tasks/:taskId",
+      "file": "onboarding.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/panels/admin/:id/upload-pdf",
+      "file": "panel-approval.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panels/admin/:id/download-pdf",
+      "file": "panel-approval.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/panels/admin/:id/analyze-pdf",
+      "file": "panel-approval.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/panels/admin/:id/approve-production",
+      "file": "panel-approval.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/panels/admin/:id/revoke-production",
+      "file": "panel-approval.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/panels/admin/import",
+      "file": "panel-import.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/import-estimate",
+      "file": "panel-import.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panel-types/admin",
+      "file": "panel-types.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panel-types/admin/cost-summaries",
+      "file": "panel-types.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panel-types/admin/:id",
+      "file": "panel-types.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/panel-types/admin",
+      "file": "panel-types.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/panel-types/admin/:id",
+      "file": "panel-types.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/panel-types/admin/:id",
+      "file": "panel-types.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panel-types/:id/cost-components",
+      "file": "panel-types.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/panel-types/:id/cost-components",
+      "file": "panel-types.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panel-types",
+      "file": "panel-types.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panels",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panels/by-job/:jobId",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panels/ready-for-loading",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panels/approved-for-production",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/panels/:id/document-status",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panels/admin",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panels/:id/details",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panels/admin/source-counts",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panels/admin/:id",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/panels/admin",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/panels/admin/:id",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/panels/admin/:id/validate",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/panels/admin/:id",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/panels/admin/by-source/:source",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/panels/:id/audit-logs",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/panels/consolidation-check",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/panels/consolidate",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/panels/:id/lifecycle",
+      "file": "panels.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/pm-call-logs/:id",
+      "file": "pm-call-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/pm-call-logs/job/:jobId/upcoming-levels",
+      "file": "pm-call-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/pm-call-logs/:id",
+      "file": "pm-call-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "[REF:PM_CALL_LOGS_ROUTES.LIST]",
+      "file": "pm-call-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "[REF:PM_CALL_LOGS_ROUTES.LIST]",
+      "file": "pm-call-logs.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/purchase-orders",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/purchase-orders/my",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/purchase-orders/by-capex/:capexId",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/purchase-orders/next-number",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/purchase-orders/:id",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/purchase-orders",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/purchase-orders/:id",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/purchase-orders/:id/submit",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/purchase-orders/:id/approve",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/purchase-orders/:id/reject",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/purchase-orders/:id/receive",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/purchase-orders/:id",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/purchase-orders/:id/attachments",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/purchase-orders/:id/attachments",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/po-attachments/:id/download",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/po-attachments/:id",
+      "file": "procurement-orders.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/suppliers",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/suppliers/active",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/suppliers/equipment-hire",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/suppliers/template",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/suppliers/export",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/procurement/suppliers/import",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/suppliers/:id",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/procurement/suppliers",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/procurement/suppliers/:id",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/procurement/suppliers/:id",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/item-categories",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/item-categories/active",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/item-categories/:id",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/procurement/item-categories",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/procurement/item-categories/:id",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/procurement/item-categories/:id",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/construction-stages",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/items",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/items/active",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/items/template",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/procurement/items/:id",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/procurement/items",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/procurement/items/:id",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/procurement/items/:id",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/procurement/items/import",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/purchase-orders/:id/pdf",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/purchase-orders/:id/send-with-pdf",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/purchase-orders/:id/send-email",
+      "file": "procurement.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/production-daily",
+      "file": "production-analytics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/production-with-costs",
+      "file": "production-analytics.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-entries",
+      "file": "production-entries.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-entries/:id",
+      "file": "production-entries.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/production-entries",
+      "file": "production-entries.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/production-entries/batch-status",
+      "file": "production-entries.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/production-entries/:id",
+      "file": "production-entries.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/production-entries/:id",
+      "file": "production-entries.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-slots/:slotId/panel-entries",
+      "file": "production-entries.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/production-slots/:slotId/assign-panels",
+      "file": "production-entries.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-schedule/stats",
+      "file": "production-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-schedule/ready-panels",
+      "file": "production-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-schedule/days",
+      "file": "production-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/production-schedule/add-panels",
+      "file": "production-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-slots",
+      "file": "production-slots.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-slots/jobs-without-slots",
+      "file": "production-slots.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-slots/:id",
+      "file": "production-slots.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-slots/check-levels/:jobId",
+      "file": "production-slots.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/production-slots/generate/:jobId",
+      "file": "production-slots.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/production-slots/:id/adjust",
+      "file": "production-slots.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/production-slots/:id/book",
+      "file": "production-slots.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/production-slots/:id/complete",
+      "file": "production-slots.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-slots/:id/adjustments",
+      "file": "production-slots.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/production-slots/:id",
+      "file": "production-slots.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-summary",
+      "file": "production.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-summary-with-costs",
+      "file": "production.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-reports",
+      "file": "production.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/production-days",
+      "file": "production.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/production-days",
+      "file": "production.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/production-days/:date",
+      "file": "production.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/progress-claims",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/progress-claims/next-number",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/progress-claims/retention-report",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/progress-claims/:id",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/progress-claims/:id/items",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/progress-claims/job/:jobId/claimable-panels",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/progress-claims/job/:jobId/summary",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/progress-claims",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/progress-claims/:id",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/progress-claims/:id/submit",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/progress-claims/:id/approve",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/progress-claims/:id/reject",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/progress-claims/job/:jobId/retention-summary",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/progress-claims/:id",
+      "file": "progress-claims.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/job-types",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/job-types/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/job-types",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/job-types/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/job-types/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/activity-stages",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/activity-stages",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/activity-stages/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/activity-stages/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/activity-consultants",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/activity-consultants",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/activity-consultants/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/activity-consultants/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/job-types/:jobTypeId/templates",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/job-types/:jobTypeId/templates",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/activity-templates/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/activity-templates/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/job-types/:jobTypeId/templates/reorder",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/activity-templates/:templateId/subtasks",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/activity-templates/:templateId/subtasks",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/activity-template-subtasks/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/activity-template-subtasks/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/activity-templates/:templateId/checklists",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/activity-templates/:templateId/checklists",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/activity-template-checklists/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/activities",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/activities/instantiate",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/activities/sync-predecessors",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/job-activities/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/job-activities/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/activities/reorder",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/activities/recalculate",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/job-activities/:id/assignees",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/job-activities/:id/assignees",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/job-activities/:id/updates",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/job-activities/:id/updates",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/job-activity-updates/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/job-activities/:id/files",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/job-activities/:id/files",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/job-activity-files/:id",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/job-activities/:activityId/checklists",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/job-activity-checklists/:id/toggle",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/activity-seed",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/job-types/:jobTypeId/templates/download-template",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/job-types/:jobTypeId/templates/import",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/job-activities/:activityId/tasks",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/job-activities/:activityId/tasks",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/job-activities/:activityId/tasks/reorder",
+      "file": "project-activities.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reo-schedules/ifc-panels",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reo-schedules",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reo-schedules/:id",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reo-schedules/panel/:panelId",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/reo-schedules",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/reo-schedules/:id",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reo-schedules/:scheduleId/items",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/reo-schedules/:scheduleId/items",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/reo-schedules/:scheduleId/items/:itemId",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/reo-schedules/:scheduleId/items/:itemId",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/reo-schedules/:scheduleId/items/bulk-status",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/reo-schedules/:scheduleId/process",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/reo-schedules/:scheduleId/create-po",
+      "file": "reo-schedule.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports",
+      "file": "reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/scope-trades/cost-codes",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/scope-trades",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/scope-trades/seed",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/scope-trades",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/scope-trades/:id",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/scope-trades/:id",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/scopes",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/scopes/stats",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/scopes/:id",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/scopes",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/scopes/:id",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/scopes/:id",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/scopes/:id/duplicate",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/scopes/:id/status",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/scopes/:id/items",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/scopes/:id/items/:itemId",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/scopes/:id/items/:itemId",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/scopes/:id/items/bulk-status",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/scopes/:id/items/reorder",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/scopes/ai-generate",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/scopes/ai-create",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/scopes/import-parse",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/scopes/import-create",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/scopes/:id/import",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/scopes/:id/export",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenders/:tenderId/scopes",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:tenderId/scopes",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/tenders/:tenderId/scopes/:scopeId",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/scopes/email",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/scopes/:id/print",
+      "file": "scopes.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/settings",
+      "file": "settings.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/settings",
+      "file": "settings.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/settings/logo",
+      "file": "settings.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/settings/company-name",
+      "file": "settings.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/logo",
+      "file": "settings.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/po-terms",
+      "file": "settings.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/settings/po-terms",
+      "file": "settings.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/settings/email-template",
+      "file": "settings.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/settings/email-template",
+      "file": "settings.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/settings/email-template/preview",
+      "file": "settings.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/task-groups",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/task-groups/:id",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/task-groups",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/task-groups/:id",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/task-groups/:id",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/task-groups/:id/members",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/task-groups/:id/members",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/task-groups/reorder",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks/:id",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/tasks/:id",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/tasks/:id",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/reorder",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/:id/move",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks/:id/assignees",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/tasks/:id/assignees",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks/:id/updates",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/:id/updates",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/:id/email-drop",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/task-updates/:id",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tasks/:id/files",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/:id/files",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/task-files/:id",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/task-notifications",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/task-notifications/unread-count",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/task-notifications/:id/read",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/task-notifications/read-all",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tasks/send-email",
+      "file": "tasks.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tender-inbox/settings",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/tender-inbox/settings",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tender-inbox/emails",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tender-inbox/counts",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tender-inbox/emails/:id",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tender-inbox/upload",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tender-inbox/emails/:id/document-view",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tender-inbox/emails/:id/extracted-fields",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tender-inbox/emails/:id/extract",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tender-inbox/emails/:id/match",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/tender-inbox/emails/:id",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/tender-inbox/emails/:id",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tender-inbox/emails/:id/activity",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tender-inbox/emails/:id/page-thumbnails",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tender-inbox/check-emails",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tender-inbox/background-status",
+      "file": "tender-inbox.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenders",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenders/:id",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/tenders/:id",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/tenders/:id",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenders/:tenderId/submissions",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:tenderId/submissions",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/tenders/:tenderId/submissions/:id",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:tenderId/submissions/:id/approve",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenders/:tenderId/submissions/:submissionId/line-items",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:tenderId/submissions/:submissionId/line-items",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/tenders/:tenderId/submissions/:submissionId/line-items/:id",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/tenders/:tenderId/submissions/:submissionId/line-items/:id",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/tenders",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/jobs/:jobId/tenders/:tenderId/sheet",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/tenders/:tenderId/submissions/:submissionId/upsert-lines",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/jobs/:jobId/tenders/:tenderId/documents",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/jobs/:jobId/tenders/:tenderId/documents/:packageId",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenders/:id/members",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenders/:id/packages",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:id/send-invitations",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:id/notify-doc-updates",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:id/duplicate-package",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenders/:id/search-radius",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:id/find-suppliers",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:id/add-found-suppliers",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenders/:id/notes",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:id/notes",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/tenders/:id/notes/:noteId",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/tenders/:id/notes/:noteId",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenders/:id/files",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:id/files",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tenders/:id/files/:fileId/download",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/tenders/:id/files/:fileId",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:id/files/send-email",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tenders/:id/members/:memberId/send-invite",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tender-members/:id/updates",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tender-members/:id/updates",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/tender-member-updates/:id",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tender-members/:id/email-drop",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/tender-members/:id/files",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/tender-members/:id/files",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/tender-member-files/:id",
+      "file": "tender.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/timer-sessions",
+      "file": "timer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/timer-sessions/active",
+      "file": "timer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/timer-sessions/start",
+      "file": "timer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/timer-sessions/:id/pause",
+      "file": "timer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/timer-sessions/:id/resume",
+      "file": "timer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/timer-sessions/:id/stop",
+      "file": "timer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/timer-sessions/cancel-stale",
+      "file": "timer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/timer-sessions/:id/cancel",
+      "file": "timer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/timer-sessions/:id",
+      "file": "timer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/timer-sessions/panel/:panelId",
+      "file": "timer.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/users",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/user/settings",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/user/settings",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/dashboard/stats",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/dashboard/my-due-tasks",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/my-permissions",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/users",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/users",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/users/:id",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/users/:id/work-hours",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/users/:id",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/user-permissions",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/user-permissions/:userId",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/user-permissions/:userId/initialize",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/user-permissions/:userId/:functionKey",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/permission-types",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/permission-types",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/admin/permission-types/:id",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/permission-types/:id",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/user-permissions/:userId/apply-type",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/departments",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/departments",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/admin/departments",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/admin/departments/:id",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/admin/departments/:id",
+      "file": "users.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/weekly-wage-reports",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/weekly-wage-reports/:id",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/weekly-wage-reports",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/weekly-wage-reports/:id",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/weekly-wage-reports/:id",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/weekly-wage-reports/:id/analysis",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/weekly-job-reports",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/weekly-job-reports/my-reports",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/weekly-job-reports/pending-approval",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/weekly-job-reports/approved",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/weekly-job-reports/:id",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/weekly-job-reports",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/weekly-job-reports/:id",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/weekly-job-reports/:id/submit",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/weekly-job-reports/:id/approve",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/weekly-job-reports/:id/reject",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/weekly-job-reports/:id",
+      "file": "weekly-reports.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/health",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/conversations",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/messages",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/conversations/:conversationId/messages",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/conversations/:conversationId/messages",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/upload",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/mentions",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/settings",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/settings/popup",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/conversations",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/panels/:panelId/conversation",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/panels/counts",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/chat/conversations/:conversationId",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/chat/conversations/:conversationId/messages/:messageId",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/chat/conversations/:conversationId/messages/:messageId",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/messages",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/users",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/jobs",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/panels",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/mark-read",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/unread-counts",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/total-unread",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/conversations/:conversationId/members",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/chat/topics",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/topics",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/chat/topics/:topicId",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/chat/topics/:topicId",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/topics/reorder",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/chat/conversations/:conversationId/topic",
+      "file": "chat.routes.ts",
+      "hasAuth": true
+    }
+  ]
+}
