@@ -428,6 +428,7 @@ export interface IStorage {
 
   getTask(id: string): Promise<TaskWithDetails | undefined>;
   getTasksByActivity(activityId: string, companyId?: string): Promise<TaskWithDetails[]>;
+  getTasksByDraftingEmailId(draftingEmailId: string, companyId?: string): Promise<TaskWithDetails[]>;
   createTask(data: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: string): Promise<void>;

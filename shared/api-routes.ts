@@ -1036,5 +1036,7 @@ export const DRAFTING_INBOX_ROUTES = {
   PAGE_THUMBNAILS: (id: string | number) => `/api/drafting-inbox/emails/${id}/page-thumbnails`,
   EMAIL_BODY: (id: string | number) => `/api/drafting-inbox/emails/${id}/body`,
   COUNTS: '/api/drafting-inbox/counts',
+  EMAIL_TASKS: (id: string | number) => `/api/drafting-inbox/emails/${id}/tasks`,
+  CREATE_TASK: (id: string | number) => `/api/drafting-inbox/emails/${id}/tasks`,
 } as const;
 export type DraftingInboxRoutes = typeof DRAFTING_INBOX_ROUTES;

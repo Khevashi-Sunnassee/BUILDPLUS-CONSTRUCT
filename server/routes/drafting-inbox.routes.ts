@@ -9,9 +9,10 @@ import multer from "multer";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import {
   draftingInboundEmails, draftingInboxSettings, draftingEmailDocuments,
-  draftingEmailExtractedFields, draftingEmailActivity, jobs
+  draftingEmailExtractedFields, draftingEmailActivity, jobs, taskGroups, users
 } from "@shared/schema";
 import { requireUUID, safeJsonParse } from "../lib/api-utils";
+import { storage } from "../storage";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -775,6 +776,122 @@ router.get("/api/drafting-inbox/emails/:id/body", requireAuth, async (req: Reque
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting email body");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch email body" });
+  }
+});
+
+const draftingTaskCreateSchema = z.object({
+  title: z.string().min(1, "Title is required").max(500),
+  actionType: z.string().min(1, "Action type is required").max(100),
+  description: z.string().max(2000).optional(),
+  jobId: z.string().nullable().optional(),
+  dueDate: z.string().nullable().optional(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).nullable().optional(),
+  assigneeIds: z.array(z.string()).optional(),
+});
+
+router.get("/api/drafting-inbox/emails/:id/tasks", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
+
+    const [email] = await db.select().from(draftingInboundEmails)
+      .where(and(eq(draftingInboundEmails.id, id), eq(draftingInboundEmails.companyId, companyId))).limit(1);
+    if (!email) return res.status(404).json({ error: "Drafting email not found" });
+
+    const linkedTasks = await storage.getTasksByDraftingEmailId(id, companyId);
+    res.json(linkedTasks);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching drafting email tasks");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch tasks" });
+  }
+});
+
+router.post("/api/drafting-inbox/emails/:id/tasks", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
+    const userId = req.session?.userId;
+    if (!userId) return res.status(401).json({ error: "Authentication required" });
+
+    const [email] = await db.select().from(draftingInboundEmails)
+      .where(and(eq(draftingInboundEmails.id, id), eq(draftingInboundEmails.companyId, companyId))).limit(1);
+    if (!email) return res.status(404).json({ error: "Drafting email not found" });
+
+    const parsed = draftingTaskCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    const { title, actionType, description, jobId, dueDate, priority, assigneeIds } = parsed.data;
+
+    if (jobId) {
+      const [job] = await db.select({ id: jobs.id }).from(jobs)
+        .where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId))).limit(1);
+      if (!job) {
+        return res.status(400).json({ error: "Invalid job for this company" });
+      }
+    }
+
+    let draftingGroupId: string | null = null;
+    const [draftingGroup] = await db.select().from(taskGroups)
+      .where(and(eq(taskGroups.companyId, companyId), eq(taskGroups.name, "DRAFTING")))
+      .limit(1);
+    if (draftingGroup) {
+      draftingGroupId = draftingGroup.id;
+    } else {
+      const newGroup = await storage.createTaskGroup({
+        name: "DRAFTING",
+        companyId,
+        createdById: userId,
+      });
+      draftingGroupId = newGroup.id;
+    }
+
+    const fullTitle = `[${actionType}] ${title}`;
+    const task = await storage.createTask({
+      groupId: draftingGroupId,
+      title: fullTitle,
+      status: "NOT_STARTED",
+      jobId: jobId || null,
+      draftingEmailId: id,
+      dueDate: dueDate ? new Date(dueDate) : null,
+      priority: priority || "MEDIUM",
+      consultant: description || null,
+      createdById: userId,
+    });
+
+    const assignees = new Set<string>();
+    if (assigneeIds && assigneeIds.length > 0) {
+      assigneeIds.forEach(uid => assignees.add(uid));
+    } else {
+      const managers = await db.select().from(users)
+        .where(and(eq(users.companyId, companyId), eq(users.role, "MANAGER")))
+        .limit(20);
+      managers.forEach(m => assignees.add(m.id));
+    }
+    assignees.add(userId);
+
+    if (assignees.size > 0) {
+      await storage.setTaskAssignees(task.id, Array.from(assignees));
+    }
+
+    await logDraftingEmailActivity(
+      id,
+      "task_created",
+      `Task created: ${fullTitle}`,
+      userId,
+      { taskId: task.id, actionType, priority }
+    );
+
+    const taskWithDetails = await storage.getTask(task.id);
+    res.status(201).json(taskWithDetails || task);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error creating drafting email task");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create task" });
   }
 });
 

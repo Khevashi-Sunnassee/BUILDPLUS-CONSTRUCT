@@ -548,4 +548,19 @@ export const taskMethods = {
       await db.insert(taskNotifications).values(notificationsToInsert);
     }
   },
+
+  async getTasksByDraftingEmailId(draftingEmailId: string, companyId?: string): Promise<TaskWithDetails[]> {
+    const conditions = [eq(tasks.draftingEmailId, draftingEmailId)];
+    if (companyId) {
+      const companyGroupIds = await db.select({ id: taskGroups.id }).from(taskGroups)
+        .where(eq(taskGroups.companyId, companyId));
+      if (companyGroupIds.length === 0) return [];
+      conditions.push(inArray(tasks.groupId, companyGroupIds.map(g => g.id)));
+    }
+    const rawTasks = await db.select().from(tasks)
+      .where(and(...conditions))
+      .orderBy(desc(tasks.createdAt))
+      .limit(50);
+    return batchEnrichTasks(rawTasks);
+  },
 };

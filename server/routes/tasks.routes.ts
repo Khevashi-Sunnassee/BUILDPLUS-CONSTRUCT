@@ -63,6 +63,7 @@ const taskCreateSchema = z.object({
   jobId: z.string().nullable().optional(),
   parentId: z.string().nullable().optional(),
   jobActivityId: z.string().nullable().optional(),
+  draftingEmailId: z.string().nullable().optional(),
 });
 
 const taskUpdateSchema_partial = z.object({

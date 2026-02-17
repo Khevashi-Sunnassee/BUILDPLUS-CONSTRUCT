@@ -1896,6 +1896,7 @@ export const tasks = pgTable("tasks", {
   parentId: varchar("parent_id", { length: 36 }),
   jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "set null" }),
   jobActivityId: varchar("job_activity_id", { length: 36 }),
+  draftingEmailId: varchar("drafting_email_id", { length: 36 }),
   title: text("title").notNull(),
   status: taskStatusEnum("status").default("NOT_STARTED").notNull(),
   dueDate: timestamp("due_date"),
@@ -1915,6 +1916,7 @@ export const tasks = pgTable("tasks", {
   statusIdx: index("tasks_status_idx").on(table.status),
   sortOrderIdx: index("tasks_sort_order_idx").on(table.sortOrder),
   reminderIdx: index("tasks_reminder_idx").on(table.reminderDate),
+  draftingEmailIdx: index("tasks_drafting_email_idx").on(table.draftingEmailId),
 }));
 
 export const taskAssignees = pgTable("task_assignees", {

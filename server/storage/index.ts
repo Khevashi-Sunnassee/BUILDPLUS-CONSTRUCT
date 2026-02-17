@@ -322,6 +322,7 @@ export class DatabaseStorage implements IStorage {
   reorderTaskGroups = taskMethods.reorderTaskGroups;
   getTask = taskMethods.getTask;
   getTasksByActivity = taskMethods.getTasksByActivity;
+  getTasksByDraftingEmailId = taskMethods.getTasksByDraftingEmailId;
   createTask = taskMethods.createTask;
   updateTask = taskMethods.updateTask;
   deleteTask = taskMethods.deleteTask;

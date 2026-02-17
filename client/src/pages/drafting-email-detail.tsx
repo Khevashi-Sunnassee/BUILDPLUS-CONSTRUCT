@@ -595,6 +595,306 @@ function JobMatchPanel({ email, emailId }: { email: DraftingEmailDetail; emailId
   );
 }
 
+const DRAFTING_ACTION_TYPES = [
+  "Update Drawing",
+  "Contact Customer",
+  "Confirm Detail",
+  "Review Specification",
+  "Respond to RFI",
+  "Issue Revised Drawing",
+  "Schedule Meeting",
+  "Update Production Schedule",
+  "Notify Stakeholder",
+  "Request Information",
+  "Other",
+] as const;
+
+interface LinkedTask {
+  id: string;
+  title: string;
+  status: string;
+  dueDate: string | null;
+  priority: string | null;
+  createdAt: string;
+  assignees?: Array<{ userId: string; user?: { id: string; fullName: string } }>;
+  job?: { id: string; name: string; jobNumber?: string } | null;
+}
+
+function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; emailId: string }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [actionType, setActionType] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [priority, setPriority] = useState("MEDIUM");
+  const [jobId, setJobId] = useState(email.jobId || "");
+  const { toast } = useToast();
+
+  const { data: jobs } = useQuery<Array<{ id: string; name: string; jobNumber?: string }>>({
+    queryKey: ["/api/jobs"],
+    select: (data: any) => {
+      if (Array.isArray(data)) return data;
+      if (data?.jobs) return data.jobs;
+      return [];
+    },
+  });
+
+  const createTaskMutation = useMutation({
+    mutationFn: async (data: { title: string; actionType: string; description?: string; jobId?: string | null; dueDate?: string | null; priority?: string | null }) => {
+      const res = await apiRequest("POST", DRAFTING_INBOX_ROUTES.CREATE_TASK(emailId), data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.EMAIL_TASKS(emailId)] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.ACTIVITY(emailId)] });
+      toast({ title: "Task created successfully" });
+      setIsOpen(false);
+      setActionType("");
+      setTitle("");
+      setDescription("");
+      setDueDate("");
+      setPriority("MEDIUM");
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to create task", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!actionType) {
+      toast({ title: "Select an action type", variant: "destructive" });
+      return;
+    }
+    if (!title.trim()) {
+      toast({ title: "Enter a task title", variant: "destructive" });
+      return;
+    }
+    createTaskMutation.mutate({
+      title: title.trim(),
+      actionType,
+      description: description.trim() || undefined,
+      jobId: jobId || null,
+      dueDate: dueDate || null,
+      priority,
+    });
+  };
+
+  useEffect(() => {
+    if (email.jobId && !jobId) {
+      setJobId(email.jobId);
+    }
+  }, [email.jobId]);
+
+  const extractedAction = email.extractedFields?.find(f => f.fieldKey === "action_required");
+  useEffect(() => {
+    if (extractedAction?.fieldValue && !title) {
+      setTitle(extractedAction.fieldValue);
+    }
+  }, [extractedAction?.fieldValue]);
+
+  return (
+    <Card data-testid="card-create-task">
+      <CardContent className="p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="text-sm font-semibold">Action Required</h3>
+          {!isOpen && (
+            <Button size="sm" onClick={() => setIsOpen(true)} data-testid="button-open-create-task">
+              <Pencil className="h-3 w-3 mr-1" />
+              Create Task
+            </Button>
+          )}
+        </div>
+
+        {isOpen && (
+          <div className="space-y-3 pt-1">
+            <div data-testid="field-action-type">
+              <label className="text-xs text-muted-foreground mb-1 block">Action Type</label>
+              <Select value={actionType} onValueChange={setActionType}>
+                <SelectTrigger data-testid="select-action-type">
+                  <SelectValue placeholder="Select action..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {DRAFTING_ACTION_TYPES.map(type => (
+                    <SelectItem key={type} value={type} data-testid={`option-action-${type}`}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div data-testid="field-task-title">
+              <label className="text-xs text-muted-foreground mb-1 block">Task Title</label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g., Update north elevation drawings"
+                data-testid="input-task-title"
+              />
+            </div>
+
+            <div data-testid="field-task-description">
+              <label className="text-xs text-muted-foreground mb-1 block">Description</label>
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Additional details..."
+                data-testid="input-task-description"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div data-testid="field-task-job">
+                <label className="text-xs text-muted-foreground mb-1 block">Job</label>
+                <Select value={jobId} onValueChange={setJobId}>
+                  <SelectTrigger data-testid="select-task-job">
+                    <SelectValue placeholder="Select job..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(jobs || []).slice(0, 50).map(job => (
+                      <SelectItem key={job.id} value={job.id} data-testid={`option-task-job-${job.id}`}>
+                        {job.jobNumber ? `${job.jobNumber} - ${job.name}` : job.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div data-testid="field-task-priority">
+                <label className="text-xs text-muted-foreground mb-1 block">Priority</label>
+                <Select value={priority} onValueChange={setPriority}>
+                  <SelectTrigger data-testid="select-task-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="LOW">Low</SelectItem>
+                    <SelectItem value="MEDIUM">Medium</SelectItem>
+                    <SelectItem value="HIGH">High</SelectItem>
+                    <SelectItem value="CRITICAL">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div data-testid="field-task-due-date">
+              <label className="text-xs text-muted-foreground mb-1 block">Due Date</label>
+              <Input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                data-testid="input-task-due-date"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
+              <Button
+                size="sm"
+                onClick={handleSubmit}
+                disabled={createTaskMutation.isPending || !actionType || !title.trim()}
+                data-testid="button-submit-task"
+              >
+                {createTaskMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                Create Task
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsOpen(false)}
+                data-testid="button-cancel-task"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function LinkedTasksPanel({ emailId }: { emailId: string }) {
+  const { data: linkedTasks, isLoading } = useQuery<LinkedTask[]>({
+    queryKey: [DRAFTING_INBOX_ROUTES.EMAIL_TASKS(emailId)],
+    enabled: !!emailId,
+  });
+
+  if (isLoading) {
+    return (
+      <Card data-testid="card-linked-tasks">
+        <CardContent className="p-4">
+          <h3 className="text-sm font-semibold mb-3">Linked Tasks</h3>
+          <Skeleton className="h-16 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!linkedTasks || linkedTasks.length === 0) return null;
+
+  const taskStatusColors: Record<string, string> = {
+    NOT_STARTED: "bg-gray-500 text-white",
+    IN_PROGRESS: "bg-blue-500 text-white",
+    STUCK: "bg-red-500 text-white",
+    DONE: "bg-green-500 text-white",
+    ON_HOLD: "bg-amber-500 text-white",
+  };
+
+  const priorityColors: Record<string, string> = {
+    LOW: "bg-gray-400 text-white",
+    MEDIUM: "bg-amber-500 text-white",
+    HIGH: "bg-orange-500 text-white",
+    CRITICAL: "bg-red-600 text-white",
+  };
+
+  return (
+    <Card data-testid="card-linked-tasks">
+      <CardContent className="p-4">
+        <h3 className="text-sm font-semibold mb-3">Linked Tasks ({linkedTasks.length})</h3>
+        <div className="space-y-2">
+          {linkedTasks.map((task) => (
+            <div
+              key={task.id}
+              className="flex items-start gap-2 p-2.5 rounded-md border text-sm"
+              data-testid={`linked-task-${task.id}`}
+            >
+              <div className="flex-1 min-w-0 space-y-1">
+                <p className="font-medium truncate" data-testid={`text-task-title-${task.id}`}>
+                  {task.title}
+                </p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Badge className={taskStatusColors[task.status] || "bg-gray-500 text-white"} data-testid={`badge-task-status-${task.id}`}>
+                    {task.status.replace(/_/g, " ")}
+                  </Badge>
+                  {task.priority && (
+                    <Badge className={priorityColors[task.priority] || ""} data-testid={`badge-task-priority-${task.id}`}>
+                      {task.priority}
+                    </Badge>
+                  )}
+                  {task.dueDate && (
+                    <span className="text-xs text-muted-foreground" data-testid={`text-task-due-${task.id}`}>
+                      Due: {formatDate(task.dueDate)}
+                    </span>
+                  )}
+                </div>
+                {task.assignees && task.assignees.length > 0 && (
+                  <p className="text-xs text-muted-foreground" data-testid={`text-task-assignees-${task.id}`}>
+                    Assigned: {task.assignees.map(a => a.user?.fullName || "Unknown").join(", ")}
+                  </p>
+                )}
+              </div>
+              <Button variant="ghost" size="icon" asChild data-testid={`button-view-task-${task.id}`}>
+                <a href="/tasks">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </Button>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ActivityFeed({ emailId }: { emailId: string }) {
   const { data: activity } = useQuery<Array<{ id: string; activityType: string; message: string; createdAt: string }>>({
     queryKey: [DRAFTING_INBOX_ROUTES.ACTIVITY(emailId)],
@@ -793,6 +1093,10 @@ export default function DraftingEmailDetailPage() {
         </Card>
 
         <JobMatchPanel email={email} emailId={emailId!} />
+
+        <CreateTaskPanel email={email} emailId={emailId!} />
+
+        <LinkedTasksPanel emailId={emailId!} />
 
         <ExtractedFieldsCard
           email={email}
