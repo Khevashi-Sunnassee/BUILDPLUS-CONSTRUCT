@@ -253,4 +253,53 @@ router.get("/api/myob/export-logs", requireAuth, async (req: Request, res: Respo
   }
 });
 
+router.get("/api/myob/profit-and-loss", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+    const reportingBasis = (req.query.reportingBasis as string) || "Accrual";
+    const yearEndAdjust = req.query.yearEndAdjust === "true";
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate query parameters are required" });
+    }
+
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+      return res.status(400).json({ error: "startDate and endDate must be in YYYY-MM-DD format" });
+    }
+
+    if (isNaN(Date.parse(startDate)) || isNaN(Date.parse(endDate))) {
+      return res.status(400).json({ error: "Invalid date values provided" });
+    }
+
+    if (new Date(startDate) > new Date(endDate)) {
+      return res.status(400).json({ error: "startDate must be before endDate" });
+    }
+
+    const allowedBasis = ["Accrual", "Cash"];
+    if (!allowedBasis.includes(reportingBasis)) {
+      return res.status(400).json({ error: "reportingBasis must be 'Accrual' or 'Cash'" });
+    }
+
+    const params = new URLSearchParams({
+      StartDate: startDate,
+      EndDate: endDate,
+      ReportingBasis: reportingBasis,
+      YearEndAdjust: String(yearEndAdjust),
+    });
+
+    const myob = createMyobClient(companyId);
+    const data = await myob.getProfitAndLoss(params.toString());
+    res.json(data);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    logger.error({ err: message }, "Error fetching MYOB Profit & Loss");
+    res.status(500).json({ error: "MYOB request failed", details: message });
+  }
+});
+
 export { router as myobRouter };

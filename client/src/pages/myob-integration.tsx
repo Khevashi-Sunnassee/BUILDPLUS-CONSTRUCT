@@ -8,7 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Search, Link2, Unlink, Building2, Users, Truck, FileText, Package, DollarSign, RefreshCw, Loader2, ExternalLink, CheckCircle2, XCircle, AlertTriangle, ClipboardList } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Search, Link2, Unlink, Building2, Users, Truck, FileText, Package, DollarSign, RefreshCw, Loader2, ExternalLink, CheckCircle2, XCircle, AlertTriangle, ClipboardList, TrendingUp, TrendingDown, BarChart3, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MYOB_ROUTES } from "@shared/api-routes";
@@ -163,6 +165,7 @@ export default function MyobIntegrationPage() {
               <TabsTrigger value="accounts" data-testid="tab-accounts">Accounts</TabsTrigger>
               <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
               <TabsTrigger value="items" data-testid="tab-items">Items</TabsTrigger>
+              <TabsTrigger value="profit-loss" data-testid="tab-profit-loss">Profit & Loss</TabsTrigger>
               <TabsTrigger value="export-log" data-testid="tab-export-log">Export Log</TabsTrigger>
             </TabsList>
 
@@ -286,6 +289,10 @@ export default function MyobIntegrationPage() {
                 searchTerm={searchTerms.items || ""}
                 onSearchChange={(v) => setSearchTerms(prev => ({ ...prev, items: v }))}
               />
+            </TabsContent>
+
+            <TabsContent value="profit-loss">
+              <ProfitAndLossTab />
             </TabsContent>
 
             <TabsContent value="export-log">
@@ -521,6 +528,382 @@ function MyobDataTable({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+interface PnlAccount {
+  AccountTotal: number;
+  Account: {
+    UID: string;
+    Name: string;
+    DisplayID: string;
+    URI?: string;
+  };
+}
+
+interface PnlData {
+  StartDate: string;
+  EndDate: string;
+  ReportingBasis: string;
+  YearEndAdjust: boolean;
+  AccountsBreakdown: PnlAccount[];
+}
+
+function getFinancialYearDates() {
+  const now = new Date();
+  const year = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  return {
+    start: `${year}-07-01`,
+    end: `${year + 1}-06-30`,
+  };
+}
+
+function getPresetDates(preset: string) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  switch (preset) {
+    case "this-month": {
+      const start = new Date(y, m, 1);
+      const end = new Date(y, m + 1, 0);
+      return { start: start.toISOString().split("T")[0], end: end.toISOString().split("T")[0] };
+    }
+    case "last-month": {
+      const start = new Date(y, m - 1, 1);
+      const end = new Date(y, m, 0);
+      return { start: start.toISOString().split("T")[0], end: end.toISOString().split("T")[0] };
+    }
+    case "this-quarter": {
+      const qStart = Math.floor(m / 3) * 3;
+      const start = new Date(y, qStart, 1);
+      const end = new Date(y, qStart + 3, 0);
+      return { start: start.toISOString().split("T")[0], end: end.toISOString().split("T")[0] };
+    }
+    case "this-fy": {
+      const fy = getFinancialYearDates();
+      return { start: fy.start, end: fy.end };
+    }
+    case "last-fy": {
+      const fyYear = (m >= 6 ? y : y - 1) - 1;
+      return { start: `${fyYear}-07-01`, end: `${fyYear + 1}-06-30` };
+    }
+    default:
+      return getPresetDates("this-fy");
+  }
+}
+
+function ProfitAndLossTab() {
+  const fyDates = getFinancialYearDates();
+  const [startDate, setStartDate] = useState(fyDates.start);
+  const [endDate, setEndDate] = useState(fyDates.end);
+  const [reportingBasis, setReportingBasis] = useState("Accrual");
+  const [yearEndAdjust, setYearEndAdjust] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const pnlUrl = `${MYOB_ROUTES.PROFIT_AND_LOSS}?startDate=${startDate}&endDate=${endDate}&reportingBasis=${reportingBasis}&yearEndAdjust=${yearEndAdjust}`;
+
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery<PnlData>({
+    queryKey: [MYOB_ROUTES.PROFIT_AND_LOSS, startDate, endDate, reportingBasis, yearEndAdjust],
+    queryFn: async () => {
+      const res = await apiRequest("GET", pnlUrl);
+      return res.json();
+    },
+  });
+
+  const accounts = data?.AccountsBreakdown || [];
+
+  const incomeAccounts = accounts.filter((a) => a.Account.DisplayID.startsWith("4-"));
+  const cosAccounts = accounts.filter((a) => a.Account.DisplayID.startsWith("5-"));
+  const expenseAccounts = accounts.filter((a) =>
+    a.Account.DisplayID.startsWith("6-") || a.Account.DisplayID.startsWith("7-") || a.Account.DisplayID.startsWith("8-") || a.Account.DisplayID.startsWith("9-")
+  );
+  const otherAccounts = accounts.filter((a) => {
+    const d = a.Account.DisplayID;
+    return !d.startsWith("4-") && !d.startsWith("5-") && !d.startsWith("6-") && !d.startsWith("7-") && !d.startsWith("8-") && !d.startsWith("9-");
+  });
+
+  const filterAccounts = (list: PnlAccount[]) => {
+    if (!searchTerm) return list;
+    const term = searchTerm.toLowerCase();
+    return list.filter(
+      (a) =>
+        a.Account.Name.toLowerCase().includes(term) ||
+        a.Account.DisplayID.toLowerCase().includes(term)
+    );
+  };
+
+  const totalIncome = incomeAccounts.reduce((sum, a) => sum + a.AccountTotal, 0);
+  const totalCos = cosAccounts.reduce((sum, a) => sum + a.AccountTotal, 0);
+  const grossProfit = totalIncome - Math.abs(totalCos);
+  const totalExpenses = expenseAccounts.reduce((sum, a) => sum + Math.abs(a.AccountTotal), 0);
+  const netProfit = grossProfit - totalExpenses;
+
+  const handlePreset = (preset: string) => {
+    const dates = getPresetDates(preset);
+    setStartDate(dates.start);
+    setEndDate(dates.end);
+  };
+
+  const formatCurrency = (val: number) => {
+    const abs = Math.abs(val);
+    const formatted = abs.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return val < 0 ? `($${formatted})` : `$${formatted}`;
+  };
+
+  const renderAccountSection = (title: string, sectionAccounts: PnlAccount[], total: number, icon: React.ReactNode, variant: "income" | "expense" | "neutral") => {
+    const filtered = filterAccounts(sectionAccounts);
+    if (sectionAccounts.length === 0 && !searchTerm) return null;
+
+    return (
+      <div className="space-y-2" data-testid={`section-${title.toLowerCase().replace(/\s+/g, "-")}`}>
+        <div className="flex items-center justify-between gap-2 py-2 border-b flex-wrap">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            {icon}
+            {title}
+          </h3>
+          <span className={`font-mono font-semibold text-sm ${variant === "income" ? "text-green-600 dark:text-green-400" : variant === "expense" ? "text-red-600 dark:text-red-400" : ""}`}>
+            {formatCurrency(total)}
+          </span>
+        </div>
+        {filtered.length > 0 ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-24">Account #</TableHead>
+                <TableHead>Account Name</TableHead>
+                <TableHead className="text-right w-36">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((a) => (
+                <TableRow key={a.Account.UID} data-testid={`row-pnl-${a.Account.DisplayID}`}>
+                  <TableCell className="font-mono text-sm text-muted-foreground">{a.Account.DisplayID}</TableCell>
+                  <TableCell className="text-sm">{a.Account.Name}</TableCell>
+                  <TableCell className={`text-right font-mono text-sm ${a.AccountTotal < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                    {formatCurrency(a.AccountTotal)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : searchTerm ? (
+          <p className="text-sm text-muted-foreground py-2">No matching accounts</p>
+        ) : null}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Profit & Loss Report
+            </CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search accounts..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-48"
+                  data-testid="input-search-pnl"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                data-testid="button-refresh-pnl"
+              >
+                <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Quick Period</Label>
+              <div className="flex gap-1 flex-wrap">
+                {[
+                  { label: "This Month", value: "this-month" },
+                  { label: "Last Month", value: "last-month" },
+                  { label: "This Quarter", value: "this-quarter" },
+                  { label: "This FY", value: "this-fy" },
+                  { label: "Last FY", value: "last-fy" },
+                ].map((p) => (
+                  <Button key={p.value} variant="outline" size="sm" onClick={() => handlePreset(p.value)} data-testid={`button-preset-${p.value}`}>
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="pnl-start" className="text-xs text-muted-foreground">Start Date</Label>
+              <Input
+                id="pnl-start"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-40"
+                data-testid="input-pnl-start-date"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="pnl-end" className="text-xs text-muted-foreground">End Date</Label>
+              <Input
+                id="pnl-end"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-40"
+                data-testid="input-pnl-end-date"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Basis</Label>
+              <Select value={reportingBasis} onValueChange={setReportingBasis}>
+                <SelectTrigger className="w-32" data-testid="select-reporting-basis">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Accrual">Accrual</SelectItem>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 pb-0.5">
+              <input
+                type="checkbox"
+                id="year-end-adjust"
+                checked={yearEndAdjust}
+                onChange={(e) => setYearEndAdjust(e.target.checked)}
+                className="rounded border-input"
+                data-testid="checkbox-year-end-adjust"
+              />
+              <Label htmlFor="year-end-adjust" className="text-sm cursor-pointer">Year-end adjustments</Label>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <Card>
+          <CardContent className="py-6 space-y-3">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-full" />
+            ))}
+          </CardContent>
+        </Card>
+      ) : isError ? (
+        <Card>
+          <CardContent className="py-8 text-center space-y-2">
+            <XCircle className="h-8 w-8 mx-auto text-destructive" />
+            <p className="text-sm text-muted-foreground">
+              {(error as Error)?.message || "Failed to load Profit & Loss from MYOB"}
+            </p>
+            <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-retry-pnl">
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card data-testid="card-total-income">
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-xs text-muted-foreground font-medium">Total Income</p>
+                  <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                </div>
+                <p className="text-xl font-bold font-mono mt-1 text-green-600 dark:text-green-400">{formatCurrency(totalIncome)}</p>
+              </CardContent>
+            </Card>
+            <Card data-testid="card-cost-of-sales">
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-xs text-muted-foreground font-medium">Cost of Sales</p>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-xl font-bold font-mono mt-1">{formatCurrency(Math.abs(totalCos))}</p>
+              </CardContent>
+            </Card>
+            <Card data-testid="card-gross-profit">
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-xs text-muted-foreground font-medium">Gross Profit</p>
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className={`text-xl font-bold font-mono mt-1 ${grossProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  {formatCurrency(grossProfit)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card data-testid="card-net-profit">
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-xs text-muted-foreground font-medium">Net Profit</p>
+                  {netProfit >= 0 ? (
+                    <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  )}
+                </div>
+                <p className={`text-xl font-bold font-mono mt-1 ${netProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  {formatCurrency(netProfit)}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardContent className="pt-4 space-y-6">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                <Calendar className="h-3.5 w-3.5" />
+                <span>
+                  {new Date(startDate).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+                  {" - "}
+                  {new Date(endDate).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+                <Badge variant="secondary" className="text-xs">{reportingBasis}</Badge>
+                {yearEndAdjust && <Badge variant="secondary" className="text-xs">Incl. Year-End Adj.</Badge>}
+                <Badge variant="secondary" className="text-xs">{accounts.length} accounts</Badge>
+              </div>
+
+              {renderAccountSection("Income", incomeAccounts, totalIncome, <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />, "income")}
+
+              {renderAccountSection("Cost of Sales", cosAccounts, Math.abs(totalCos), <DollarSign className="h-4 w-4 text-muted-foreground" />, "neutral")}
+
+              <div className="flex items-center justify-between gap-2 py-2 border-y bg-muted/30 px-2 rounded-md flex-wrap">
+                <span className="font-semibold text-sm">Gross Profit</span>
+                <span className={`font-mono font-bold text-sm ${grossProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  {formatCurrency(grossProfit)}
+                </span>
+              </div>
+
+              {renderAccountSection("Operating Expenses", expenseAccounts, totalExpenses, <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />, "expense")}
+
+              {otherAccounts.length > 0 && renderAccountSection("Other", otherAccounts, otherAccounts.reduce((s, a) => s + a.AccountTotal, 0), <FileText className="h-4 w-4 text-muted-foreground" />, "neutral")}
+
+              <div className="flex items-center justify-between gap-2 py-3 border-t-2 border-foreground/20 flex-wrap">
+                <span className="font-bold text-base">Net Profit / (Loss)</span>
+                <span className={`font-mono font-bold text-base ${netProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  {formatCurrency(netProfit)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </div>
   );
 }
 

@@ -35,7 +35,7 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **CAPEX Module:** Capital expenditure request management with approval workflows, audit trails, and bidirectional PO integration.
 - **Scope of Works Builder:** AI-powered scope generation for tender management across trades.
 - **Budget System:** Four-phase cost management including two-tier cost codes, a tender center, job tender sheets, and per-job budget management with Bill of Quantities (BOQ).
-- **MYOB Integration:** OAuth 2.0 connection to MYOB Business API with database-backed token storage (per-company), auto-refresh, and multi-tenant isolation.
+- **MYOB Integration:** OAuth 2.0 connection to MYOB Business API with database-backed token storage (per-company), auto-refresh, multi-tenant isolation, and Profit & Loss reporting via Report/ProfitAndLossSummary endpoint with date range presets, reporting basis selection, and account breakdown.
 - **Centralized Email Inbox Addresses:** Per-company inbox email configuration (AP, Tender, Drafting) stored in companies table with unique constraints; polling jobs resolve addresses from company settings with backward-compatible fallback; individual inbox settings pages show read-only email sourced from company settings.
 - **AP Email Inbox Monitoring:** Automatic invoice processing via Resend inbound email webhooks.
 - **AP Invoice Status Workflow:** Multi-stage approval workflow for invoices: IMPORTED → PROCESSED → CONFIRMED → PARTIALLY_APPROVED → APPROVED.

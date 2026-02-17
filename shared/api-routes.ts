@@ -955,6 +955,7 @@ export const MYOB_ROUTES = {
   INVOICES: '/api/myob/invoices',
   ITEMS: '/api/myob/items',
   EXPORT_LOGS: '/api/myob/export-logs',
+  PROFIT_AND_LOSS: '/api/myob/profit-and-loss',
 } as const;
 export type MyobRoutes = typeof MYOB_ROUTES;
 

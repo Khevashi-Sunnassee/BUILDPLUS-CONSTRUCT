@@ -167,6 +167,7 @@ export function createMyobClient(companyId: string) {
       method: "POST",
       body: JSON.stringify(bill),
     }),
+    getProfitAndLoss: (params: string) => myobFetch(companyId, `Report/ProfitAndLossSummary?${params}`),
   };
 }
 
