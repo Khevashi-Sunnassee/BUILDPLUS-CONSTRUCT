@@ -13,7 +13,7 @@ import {
   tenders, tenderSubmissions, suppliers, companies
 } from "@shared/schema";
 import { getResendApiKey } from "../services/email.service";
-import { requireUUID } from "../lib/api-utils";
+import { requireUUID, safeJsonParse } from "../lib/api-utils";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -707,8 +707,8 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
           proc.on("error", (err: Error) => reject(err));
         });
 
-        let parsed;
-        try { parsed = JSON.parse(result); } catch { parsed = { error: "Failed to parse extraction result", raw: result.slice(0, 500) }; }
+        const parseResult = safeJsonParse(result);
+        const parsed = parseResult.success ? parseResult.data : { error: "Failed to parse extraction result", raw: result.slice(0, 500) };
         res.json(parsed);
       } finally {
         try {

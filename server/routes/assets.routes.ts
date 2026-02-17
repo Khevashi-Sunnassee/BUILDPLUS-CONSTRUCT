@@ -688,7 +688,7 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
         const loanTerm = parseNumber(rowData.loanTerm);
         if (loanTerm !== null) insertData.loanTerm = Math.round(loanTerm);
 
-        const [created] = await db.insert(assets).values(insertData).returning();
+        const [created] = await db.insert(assets).values(insertData as typeof assets.$inferInsert).returning();
         imported.push({ id: created.id, name: created.name, assetTag: created.assetTag });
       } catch (rowError: unknown) {
         errors.push(`Row ${parsedRow.rowNum} (${name}): ${rowError instanceof Error ? rowError.message : String(rowError)}`);

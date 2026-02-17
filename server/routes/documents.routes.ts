@@ -14,6 +14,7 @@ import { ObjectStorageService, ObjectNotFoundError } from "../replit_integration
 import { emailService } from "../services/email.service";
 import { buildBrandedEmail } from "../lib/email-template";
 import logger from "../lib/logger";
+import { safeJsonParse } from "../lib/api-utils";
 import { 
   insertDocumentSchema, 
   insertDocumentBundleSchema,
@@ -2873,8 +2874,9 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
       });
     });
 
-    let analysisResult: any;
-    try { analysisResult = JSON.parse(result); } catch { throw new Error("Failed to parse PDF extraction result"); }
+    const analysisParseResult = safeJsonParse(result);
+    if (!analysisParseResult.success) throw new Error("Failed to parse PDF extraction result");
+    const analysisResult: any = analysisParseResult.data;
     sendProgress("pdf_extract", 1, 1, `Extracted ${analysisResult.pages?.length || 0} pages`);
 
     const aiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
@@ -3126,8 +3128,8 @@ router.post("/api/documents/drawing-package/register", requireAuth, drawingPacka
       return;
     }
 
-    let drawingsData: any[];
-    try { drawingsData = JSON.parse(req.body.drawings || "[]"); } catch { drawingsData = []; }
+    const drawingsParseResult = safeJsonParse<any[]>(req.body.drawings || "[]", []);
+    const drawingsData: any[] = drawingsParseResult.success ? drawingsParseResult.data : [];
     const globalJobId = req.body.jobId || null;
 
     if (!drawingsData.length) {
@@ -3187,8 +3189,9 @@ print(json.dumps(extracted))
       proc.on("error", (err: Error) => reject(err));
     });
 
-    let extractedFiles: Array<{ filename: string; filepath: string; pageNumber: number }>;
-    try { extractedFiles = JSON.parse(splitResult); } catch { throw new Error("Failed to parse PDF split result"); }
+    const splitParseResult = safeJsonParse<Array<{ filename: string; filepath: string; pageNumber: number }>>(splitResult);
+    if (!splitParseResult.success) throw new Error("Failed to parse PDF split result");
+    const extractedFiles = splitParseResult.data;
 
     sendProgress("splitting", drawingsData.length, drawingsData.length, "PDF split complete");
 

@@ -76,7 +76,7 @@ router.get("/api/jobs/:jobId/boq/groups", requireAuth, requirePermission("budget
 
     res.json(mapped);
   } catch (error: unknown) {
-    logger.error("Error fetching BOQ groups:", error);
+    logger.error({ err: error }, "Error fetching BOQ groups");
     res.status(500).json({ message: "Failed to fetch BOQ groups" });
   }
 });
@@ -107,7 +107,7 @@ router.post("/api/jobs/:jobId/boq/groups", requireAuth, requirePermission("budge
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
-    logger.error("Error creating BOQ group:", error);
+    logger.error({ err: error }, "Error creating BOQ group");
     res.status(500).json({ message: "Failed to create BOQ group" });
   }
 });
@@ -137,7 +137,7 @@ router.patch("/api/jobs/:jobId/boq/groups/:id", requireAuth, requirePermission("
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
-    logger.error("Error updating BOQ group:", error);
+    logger.error({ err: error }, "Error updating BOQ group");
     res.status(500).json({ message: "Failed to update BOQ group" });
   }
 });
@@ -157,7 +157,7 @@ router.delete("/api/jobs/:jobId/boq/groups/:id", requireAuth, requirePermission(
     }
     res.json({ message: "BOQ group deleted", id: deleted.id });
   } catch (error: unknown) {
-    logger.error("Error deleting BOQ group:", error);
+    logger.error({ err: error }, "Error deleting BOQ group");
     res.status(500).json({ message: "Failed to delete BOQ group" });
   }
 });
@@ -207,7 +207,7 @@ router.get("/api/jobs/:jobId/boq/items", requireAuth, requirePermission("budgets
 
     res.json(mapped);
   } catch (error: unknown) {
-    logger.error("Error fetching BOQ items:", error);
+    logger.error({ err: error }, "Error fetching BOQ items");
     res.status(500).json({ message: "Failed to fetch BOQ items" });
   }
 });
@@ -244,7 +244,7 @@ router.post("/api/jobs/:jobId/boq/items", requireAuth, requirePermission("budget
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
-    logger.error("Error creating BOQ item:", error);
+    logger.error({ err: error }, "Error creating BOQ item");
     res.status(500).json({ message: "Failed to create BOQ item" });
   }
 });
@@ -285,7 +285,7 @@ router.patch("/api/jobs/:jobId/boq/items/:id", requireAuth, requirePermission("b
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
-    logger.error("Error updating BOQ item:", error);
+    logger.error({ err: error }, "Error updating BOQ item");
     res.status(500).json({ message: "Failed to update BOQ item" });
   }
 });
@@ -305,7 +305,7 @@ router.delete("/api/jobs/:jobId/boq/items/:id", requireAuth, requirePermission("
     }
     res.json({ message: "BOQ item deleted", id: deleted.id });
   } catch (error: unknown) {
-    logger.error("Error deleting BOQ item:", error);
+    logger.error({ err: error }, "Error deleting BOQ item");
     res.status(500).json({ message: "Failed to delete BOQ item" });
   }
 });
@@ -345,7 +345,7 @@ router.get("/api/jobs/:jobId/boq/summary", requireAuth, requirePermission("budge
       breakdown,
     });
   } catch (error: unknown) {
-    logger.error("Error fetching BOQ summary:", error);
+    logger.error({ err: error }, "Error fetching BOQ summary");
     res.status(500).json({ message: "Failed to fetch BOQ summary" });
   }
 });

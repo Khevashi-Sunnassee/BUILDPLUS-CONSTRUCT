@@ -363,7 +363,7 @@ export function JobFormDialog({
                             onChange={field.onChange}
                             onSelect={(result) => {
                               field.onChange(result.suburb);
-                              jobForm.setValue("state", result.state);
+                              jobForm.setValue("state", result.state as "VIC" | "NSW" | "QLD" | "SA" | "WA" | "TAS" | "NT" | "ACT");
                             }}
                             placeholder="Start typing suburb..."
                             data-testid="input-job-city"
