@@ -4,8 +4,8 @@ import { eq, and, lte, notInArray } from "drizzle-orm";
 import { storage, db } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
-import { tasks, taskAssignees, taskGroups, jobs } from "@shared/schema";
-import type { FunctionKey } from "@shared/schema";
+import { tasks, taskAssignees, taskGroups, jobs, permissionTypes, FUNCTION_KEYS } from "@shared/schema";
+import type { FunctionKey, PermissionLevel } from "@shared/schema";
 import logger from "../lib/logger";
 
 const router = Router();
@@ -304,7 +304,7 @@ router.post("/api/admin/user-permissions/:userId/initialize", requireRole("ADMIN
 });
 
 const updatePermissionSchema = z.object({
-  permissionLevel: z.enum(["HIDDEN", "VIEW", "VIEW_AND_UPDATE"]),
+  permissionLevel: z.enum(["HIDDEN", "VIEW", "VIEW_AND_UPDATE", "VIEW_OWN", "VIEW_AND_UPDATE_OWN"]),
 });
 
 // Admin: Update user permission
@@ -326,6 +326,157 @@ router.put("/api/admin/user-permissions/:userId/:functionKey", requireRole("ADMI
     permissionLevel
   );
   res.json(permission);
+});
+
+// ============================================================================
+// PERMISSION TYPES
+// ============================================================================
+
+const permissionTypeSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().nullable().optional(),
+  permissions: z.record(z.enum(["HIDDEN", "VIEW", "VIEW_AND_UPDATE", "VIEW_OWN", "VIEW_AND_UPDATE_OWN"])),
+  isDefault: z.boolean().optional(),
+});
+
+router.get("/api/admin/permission-types", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId!;
+    const types = await db.select().from(permissionTypes)
+      .where(eq(permissionTypes.companyId, companyId))
+      .orderBy(permissionTypes.name)
+      .limit(100);
+    res.json(types);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching permission types");
+    res.status(500).json({ error: "Failed to fetch permission types" });
+  }
+});
+
+router.post("/api/admin/permission-types", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId!;
+    const data = permissionTypeSchema.parse(req.body);
+
+    const [existing] = await db.select({ id: permissionTypes.id })
+      .from(permissionTypes)
+      .where(and(eq(permissionTypes.companyId, companyId), eq(permissionTypes.name, data.name)))
+      .limit(1);
+    if (existing) {
+      return res.status(400).json({ error: "A permission type with this name already exists" });
+    }
+
+    const [created] = await db.insert(permissionTypes).values({
+      companyId,
+      name: data.name,
+      description: data.description || null,
+      permissions: data.permissions,
+      isDefault: data.isDefault || false,
+    }).returning();
+
+    res.status(201).json(created);
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    logger.error({ err: error }, "Error creating permission type");
+    res.status(500).json({ error: "Failed to create permission type" });
+  }
+});
+
+router.patch("/api/admin/permission-types/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId!;
+    const id = req.params.id;
+    const data = permissionTypeSchema.partial().parse(req.body);
+
+    const [existing] = await db.select().from(permissionTypes)
+      .where(and(eq(permissionTypes.id, id), eq(permissionTypes.companyId, companyId)))
+      .limit(1);
+    if (!existing) return res.status(404).json({ error: "Permission type not found" });
+
+    if (data.name && data.name !== existing.name) {
+      const [dup] = await db.select({ id: permissionTypes.id })
+        .from(permissionTypes)
+        .where(and(eq(permissionTypes.companyId, companyId), eq(permissionTypes.name, data.name)))
+        .limit(1);
+      if (dup) return res.status(400).json({ error: "A permission type with this name already exists" });
+    }
+
+    const updates: any = { updatedAt: new Date() };
+    if (data.name !== undefined) updates.name = data.name;
+    if (data.description !== undefined) updates.description = data.description;
+    if (data.permissions !== undefined) updates.permissions = data.permissions;
+    if (data.isDefault !== undefined) updates.isDefault = data.isDefault;
+
+    const [updated] = await db.update(permissionTypes)
+      .set(updates)
+      .where(and(eq(permissionTypes.id, id), eq(permissionTypes.companyId, companyId)))
+      .returning();
+
+    res.json(updated);
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    logger.error({ err: error }, "Error updating permission type");
+    res.status(500).json({ error: "Failed to update permission type" });
+  }
+});
+
+router.delete("/api/admin/permission-types/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId!;
+    const id = req.params.id;
+
+    const [existing] = await db.select().from(permissionTypes)
+      .where(and(eq(permissionTypes.id, id), eq(permissionTypes.companyId, companyId)))
+      .limit(1);
+    if (!existing) return res.status(404).json({ error: "Permission type not found" });
+
+    await db.delete(permissionTypes)
+      .where(and(eq(permissionTypes.id, id), eq(permissionTypes.companyId, companyId)));
+
+    res.json({ success: true });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error deleting permission type");
+    res.status(500).json({ error: "Failed to delete permission type" });
+  }
+});
+
+router.post("/api/admin/user-permissions/:userId/apply-type", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId!;
+    const userId = req.params.userId;
+
+    const body = z.object({ permissionTypeId: z.string() }).parse(req.body);
+
+    const user = await storage.getUser(userId);
+    if (!user || user.companyId !== companyId) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const [permType] = await db.select().from(permissionTypes)
+      .where(and(eq(permissionTypes.id, body.permissionTypeId), eq(permissionTypes.companyId, companyId)))
+      .limit(1);
+    if (!permType) return res.status(404).json({ error: "Permission type not found" });
+
+    const permsToApply = permType.permissions as Record<string, PermissionLevel>;
+
+    for (const functionKey of FUNCTION_KEYS) {
+      const level = permsToApply[functionKey] || "VIEW_AND_UPDATE";
+      await storage.setUserPermission(userId, functionKey as FunctionKey, level as PermissionLevel);
+    }
+
+    const updatedPerms = await storage.getUserPermissions(userId);
+    res.json({ permissions: updatedPerms, appliedType: permType.name });
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    logger.error({ err: error }, "Error applying permission type");
+    res.status(500).json({ error: "Failed to apply permission type" });
+  }
 });
 
 // ============================================================================

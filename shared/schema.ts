@@ -1581,6 +1581,28 @@ export type InsertUserPermission = z.infer<typeof insertUserPermissionSchema>;
 export type UserPermission = typeof userPermissions.$inferSelect;
 export type PermissionLevel = "HIDDEN" | "VIEW" | "VIEW_AND_UPDATE" | "VIEW_OWN" | "VIEW_AND_UPDATE_OWN";
 
+export const permissionTypes = pgTable("permission_types", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  permissions: json("permissions").$type<Record<string, PermissionLevel>>().notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("permission_types_company_idx").on(table.companyId),
+  companyNameUnique: uniqueIndex("permission_types_company_name_unique").on(table.companyId, table.name),
+}));
+
+export const insertPermissionTypeSchema = createInsertSchema(permissionTypes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertPermissionType = z.infer<typeof insertPermissionTypeSchema>;
+export type PermissionType = typeof permissionTypes.$inferSelect;
+
 export type Role = "USER" | "MANAGER" | "ADMIN";
 export type LogStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
 export type JobStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Shield,
@@ -11,6 +11,10 @@ import {
   ChevronUp,
   Save,
   RefreshCw,
+  Plus,
+  Trash2,
+  Copy,
+  Settings2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,7 +42,29 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import type { User, UserPermission, PermissionLevel } from "@shared/schema";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import type { User, UserPermission, PermissionLevel, PermissionType } from "@shared/schema";
 import { FUNCTION_KEYS } from "@shared/schema";
 import { ADMIN_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
@@ -150,9 +176,570 @@ const PERMISSION_ICONS: Record<PermissionLevel, React.ReactNode> = {
 
 const SUPPORTS_OWN_LEVELS = ["purchase_orders", "tasks", "weekly_job_logs", "pm_call_logs"];
 
+const ALL_PERMISSION_LEVELS: PermissionLevel[] = ["HIDDEN", "VIEW_OWN", "VIEW", "VIEW_AND_UPDATE_OWN", "VIEW_AND_UPDATE"];
+
+function buildDefaultPermissions(): Record<string, PermissionLevel> {
+  const perms: Record<string, PermissionLevel> = {};
+  for (const key of FUNCTION_KEYS) {
+    perms[key] = "VIEW_AND_UPDATE";
+  }
+  return perms;
+}
+
+function PermissionTypeEditor({
+  open,
+  onOpenChange,
+  editingType,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingType: PermissionType | null;
+}) {
+  const { toast } = useToast();
+  const isEditing = !!editingType;
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [permissions, setPermissions] = useState<Record<string, PermissionLevel>>(buildDefaultPermissions());
+  const [isDefault, setIsDefault] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      if (editingType) {
+        setName(editingType.name);
+        setDescription(editingType.description || "");
+        setPermissions(editingType.permissions as Record<string, PermissionLevel>);
+        setIsDefault(editingType.isDefault);
+      } else {
+        setName("");
+        setDescription("");
+        setPermissions(buildDefaultPermissions());
+        setIsDefault(false);
+      }
+    }
+  }, [open, editingType]);
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { name: string; description: string; permissions: Record<string, PermissionLevel>; isDefault: boolean }) => {
+      return apiRequest("POST", ADMIN_ROUTES.PERMISSION_TYPES, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PERMISSION_TYPES] });
+      toast({ title: "Permission type created", description: "The permission type has been created successfully." });
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create permission type", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { name: string; description: string; permissions: Record<string, PermissionLevel>; isDefault: boolean }) => {
+      return apiRequest("PATCH", ADMIN_ROUTES.PERMISSION_TYPE_BY_ID(editingType!.id), data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PERMISSION_TYPES] });
+      toast({ title: "Permission type updated", description: "The permission type has been updated successfully." });
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update permission type", variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!name.trim()) {
+      toast({ title: "Validation error", description: "Name is required", variant: "destructive" });
+      return;
+    }
+    const data = { name: name.trim(), description: description.trim(), permissions, isDefault };
+    if (isEditing) {
+      updateMutation.mutate(data);
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
+  const setPermission = (key: string, level: PermissionLevel) => {
+    setPermissions(prev => ({ ...prev, [key]: level }));
+  };
+
+  const setSectionAll = (sectionKeys: string[], level: PermissionLevel) => {
+    setPermissions(prev => {
+      const next = { ...prev };
+      for (const key of sectionKeys) {
+        next[key] = level;
+      }
+      return next;
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle data-testid="text-permission-type-dialog-title">
+            {isEditing ? "Edit Permission Type" : "Create Permission Type"}
+          </DialogTitle>
+          <DialogDescription>
+            {isEditing
+              ? "Update the permission type name, description, and access levels."
+              : "Define a reusable set of permissions that can be applied to users."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="pt-name">Name</Label>
+              <Input
+                id="pt-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Project Manager"
+                data-testid="input-permission-type-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pt-description">Description</Label>
+              <Input
+                id="pt-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Optional description"
+                data-testid="input-permission-type-description"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {PERMISSION_SECTIONS.map(section => (
+              <div key={section.label}>
+                <div className="flex items-center gap-2 py-2 mb-1 flex-wrap">
+                  <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{section.label}</h4>
+                  <div className="flex-1 h-px bg-border" />
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground">Set All:</span>
+                    <Select
+                      onValueChange={(value) => setSectionAll(section.keys, value as PermissionLevel)}
+                      data-testid={`select-set-all-${section.label.replace(/\s+/g, '-').toLowerCase()}`}
+                    >
+                      <SelectTrigger className="w-48" data-testid={`select-trigger-set-all-${section.label.replace(/\s+/g, '-').toLowerCase()}`}>
+                        <SelectValue placeholder="Set all..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="HIDDEN">
+                          <div className="flex items-center gap-2">
+                            <EyeOff className="h-4 w-4 text-red-500" />
+                            Hidden
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="VIEW_OWN">
+                          <div className="flex items-center gap-2">
+                            <Eye className="h-4 w-4 text-blue-500" />
+                            View Own Only
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="VIEW">
+                          <div className="flex items-center gap-2">
+                            <Eye className="h-4 w-4 text-yellow-500" />
+                            View All
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="VIEW_AND_UPDATE_OWN">
+                          <div className="flex items-center gap-2">
+                            <Pencil className="h-4 w-4 text-cyan-500" />
+                            View & Edit Own
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="VIEW_AND_UPDATE">
+                          <div className="flex items-center gap-2">
+                            <Pencil className="h-4 w-4 text-green-500" />
+                            View & Edit All
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-1/2">Feature</TableHead>
+                      <TableHead>Access Level</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {section.keys.map(functionKey => (
+                      <TableRow key={functionKey}>
+                        <TableCell className="font-medium">{FUNCTION_LABELS[functionKey] || functionKey}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={permissions[functionKey] || "VIEW_AND_UPDATE"}
+                            onValueChange={(value) => setPermission(functionKey, value as PermissionLevel)}
+                          >
+                            <SelectTrigger className="w-48" data-testid={`select-pt-permission-${functionKey}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="HIDDEN">
+                                <div className="flex items-center gap-2">
+                                  <EyeOff className="h-4 w-4 text-red-500" />
+                                  Hidden
+                                </div>
+                              </SelectItem>
+                              {SUPPORTS_OWN_LEVELS.includes(functionKey) && (
+                                <SelectItem value="VIEW_OWN">
+                                  <div className="flex items-center gap-2">
+                                    <Eye className="h-4 w-4 text-blue-500" />
+                                    View Own Only
+                                  </div>
+                                </SelectItem>
+                              )}
+                              <SelectItem value="VIEW">
+                                <div className="flex items-center gap-2">
+                                  <Eye className="h-4 w-4 text-yellow-500" />
+                                  View All
+                                </div>
+                              </SelectItem>
+                              {SUPPORTS_OWN_LEVELS.includes(functionKey) && (
+                                <SelectItem value="VIEW_AND_UPDATE_OWN">
+                                  <div className="flex items-center gap-2">
+                                    <Pencil className="h-4 w-4 text-cyan-500" />
+                                    View & Edit Own Only
+                                  </div>
+                                </SelectItem>
+                              )}
+                              <SelectItem value="VIEW_AND_UPDATE">
+                                <div className="flex items-center gap-2">
+                                  <Pencil className="h-4 w-4 text-green-500" />
+                                  View & Edit All
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending} data-testid="button-cancel-permission-type">
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isPending} data-testid="button-save-permission-type">
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+            {isEditing ? "Update" : "Create"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ApplyPermissionTypeDialog({
+  open,
+  onOpenChange,
+  userId,
+  userName,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  userId: string;
+  userName: string;
+}) {
+  const { toast } = useToast();
+  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const { data: permissionTypes } = useQuery<PermissionType[]>({
+    queryKey: [ADMIN_ROUTES.PERMISSION_TYPES],
+  });
+
+  const applyMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", ADMIN_ROUTES.USER_PERMISSION_APPLY_TYPE(userId), { permissionTypeId: selectedTypeId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USER_PERMISSIONS] });
+      toast({ title: "Permission type applied", description: `Permissions have been updated for ${userName}.` });
+      setSelectedTypeId("");
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to apply permission type", variant: "destructive" });
+    },
+  });
+
+  const selectedType = permissionTypes?.find(t => t.id === selectedTypeId);
+
+  const handleApplyClick = () => {
+    if (!selectedTypeId) {
+      toast({ title: "Select a type", description: "Please select a permission type to apply.", variant: "destructive" });
+      return;
+    }
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmApply = () => {
+    setConfirmOpen(false);
+    applyMutation.mutate();
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle data-testid="text-apply-type-dialog-title">Apply Permission Type</DialogTitle>
+            <DialogDescription>
+              Select a permission type to apply to <strong>{userName}</strong>. This will overwrite all existing permissions for this user.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Permission Type</Label>
+              <Select value={selectedTypeId} onValueChange={setSelectedTypeId}>
+                <SelectTrigger data-testid="select-apply-permission-type">
+                  <SelectValue placeholder="Select a permission type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {permissionTypes?.map(pt => (
+                    <SelectItem key={pt.id} value={pt.id} data-testid={`select-item-type-${pt.id}`}>
+                      {pt.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedType && (
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <p className="text-sm font-medium">{selectedType.name}</p>
+                {selectedType.description && (
+                  <p className="text-sm text-muted-foreground mt-1">{selectedType.description}</p>
+                )}
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {(() => {
+                    const perms = selectedType.permissions as Record<string, PermissionLevel>;
+                    const counts: Record<string, number> = {};
+                    for (const level of Object.values(perms)) {
+                      counts[level] = (counts[level] || 0) + 1;
+                    }
+                    return Object.entries(counts).map(([level, count]) => (
+                      <Badge key={level} className={PERMISSION_COLORS[level as PermissionLevel]} variant="secondary">
+                        {PERMISSION_ICONS[level as PermissionLevel]} {count} {level.replace(/_/g, " ").toLowerCase()}
+                      </Badge>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={applyMutation.isPending} data-testid="button-cancel-apply-type">
+              Cancel
+            </Button>
+            <Button onClick={handleApplyClick} disabled={applyMutation.isPending || !selectedTypeId} data-testid="button-apply-permission-type">
+              {applyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+              Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Apply Permission Type</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to apply "{selectedType?.name}" to {userName}? This will overwrite all existing permissions for this user.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-confirm-apply">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmApply} data-testid="button-confirm-apply-type">
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+function PermissionTypesTab() {
+  const { toast } = useToast();
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingType, setEditingType] = useState<PermissionType | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const { data: permissionTypes, isLoading } = useQuery<PermissionType[]>({
+    queryKey: [ADMIN_ROUTES.PERMISSION_TYPES],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", ADMIN_ROUTES.PERMISSION_TYPE_BY_ID(id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PERMISSION_TYPES] });
+      toast({ title: "Permission type deleted", description: "The permission type has been deleted." });
+      setDeleteConfirmId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete permission type", variant: "destructive" });
+    },
+  });
+
+  const handleCreate = () => {
+    setEditingType(null);
+    setEditorOpen(true);
+  };
+
+  const handleEdit = (pt: PermissionType) => {
+    setEditingType(pt);
+    setEditorOpen(true);
+  };
+
+  const handleEditorClose = (open: boolean) => {
+    if (!open) {
+      setEditingType(null);
+    }
+    setEditorOpen(open);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => (
+          <Skeleton key={i} className="h-24 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-muted-foreground">
+          Create reusable permission templates that can be quickly applied to users.
+        </p>
+        <Button onClick={handleCreate} data-testid="button-create-permission-type">
+          <Plus className="h-4 w-4 mr-2" />
+          Create Permission Type
+        </Button>
+      </div>
+
+      {permissionTypes && permissionTypes.length > 0 ? (
+        <div className="grid gap-4">
+          {permissionTypes.map(pt => {
+            const perms = pt.permissions as Record<string, PermissionLevel>;
+            const counts: Record<string, number> = {};
+            for (const level of Object.values(perms)) {
+              counts[level] = (counts[level] || 0) + 1;
+            }
+
+            return (
+              <Card key={pt.id} data-testid={`card-permission-type-${pt.id}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full bg-primary/10">
+                        <Settings2 className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg" data-testid={`text-permission-type-name-${pt.id}`}>{pt.name}</CardTitle>
+                        {pt.description && (
+                          <CardDescription data-testid={`text-permission-type-desc-${pt.id}`}>{pt.description}</CardDescription>
+                        )}
+                      </div>
+                      {pt.isDefault && (
+                        <Badge variant="secondary">Default</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(pt)} data-testid={`button-edit-permission-type-${pt.id}`}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setDeleteConfirmId(pt.id)} data-testid={`button-delete-permission-type-${pt.id}`}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="flex gap-2 flex-wrap">
+                    {Object.entries(counts).map(([level, count]) => (
+                      <Badge key={level} className={PERMISSION_COLORS[level as PermissionLevel]} variant="secondary">
+                        {PERMISSION_ICONS[level as PermissionLevel]} {count} {level.replace(/_/g, " ").toLowerCase()}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Settings2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-lg font-medium">No permission types defined</p>
+            <p className="text-muted-foreground mb-4">Create permission types to quickly apply standardized access levels to users.</p>
+            <Button onClick={handleCreate} data-testid="button-create-permission-type-empty">
+              <Plus className="h-4 w-4 mr-2" />
+              Create First Permission Type
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <PermissionTypeEditor
+        key={editingType?.id || "new"}
+        open={editorOpen}
+        onOpenChange={handleEditorClose}
+        editingType={editingType}
+      />
+
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Permission Type</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this permission type? This action cannot be undone. Existing user permissions will not be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-type">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteConfirmId && deleteMutation.mutate(deleteConfirmId)}
+              data-testid="button-confirm-delete-type"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 export default function UserPermissionsPage() {
   const { toast } = useToast();
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+  const [applyTypeUserId, setApplyTypeUserId] = useState<string | null>(null);
+  const [applyTypeUserName, setApplyTypeUserName] = useState<string>("");
 
   const { data: usersWithPermissions, isLoading, refetch } = useQuery<UserWithPermissions[]>({
     queryKey: [ADMIN_ROUTES.USER_PERMISSIONS],
@@ -231,7 +818,7 @@ export default function UserPermissionsPage() {
 
   return (
     <div className="space-y-6" role="main" aria-label="User Permissions">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <Shield className="h-8 w-8 text-primary" />
           <div>
@@ -304,179 +891,221 @@ export default function UserPermissionsPage() {
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
-        {usersWithPermissions?.map(({ user, permissions }) => {
-          const isExpanded = expandedUsers.has(user.id);
-          const counts = countPermissions(permissions);
-          const hasUnsetPermissions = counts.unset > 0;
+      <Tabs defaultValue="users" data-testid="tabs-permissions">
+        <TabsList data-testid="tabs-list-permissions">
+          <TabsTrigger value="users" data-testid="tab-trigger-users">
+            <Users className="h-4 w-4 mr-2" />
+            Users
+          </TabsTrigger>
+          <TabsTrigger value="permission-types" data-testid="tab-trigger-permission-types">
+            <Settings2 className="h-4 w-4 mr-2" />
+            Permission Types
+          </TabsTrigger>
+        </TabsList>
 
-          return (
-            <Collapsible key={user.id} open={isExpanded} onOpenChange={() => toggleUser(user.id)}>
-              <Card className="overflow-hidden" data-testid={`card-user-${user.id}`}>
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 rounded-full bg-primary/10">
-                          <Users className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-lg">{user.name || user.email}</CardTitle>
-                          <CardDescription>{user.email}</CardDescription>
-                        </div>
-                        <Badge variant="outline" className="ml-2">{user.role}</Badge>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="flex gap-2">
-                          {counts.HIDDEN > 0 && (
-                            <Badge className={PERMISSION_COLORS.HIDDEN}>
-                              {PERMISSION_ICONS.HIDDEN} {counts.HIDDEN} Hidden
-                            </Badge>
-                          )}
-                          {counts.VIEW_OWN > 0 && (
-                            <Badge className={PERMISSION_COLORS.VIEW_OWN}>
-                              {PERMISSION_ICONS.VIEW_OWN} {counts.VIEW_OWN} Own
-                            </Badge>
-                          )}
-                          {counts.VIEW > 0 && (
-                            <Badge className={PERMISSION_COLORS.VIEW}>
-                              {PERMISSION_ICONS.VIEW} {counts.VIEW} View
-                            </Badge>
-                          )}
-                          {counts.VIEW_AND_UPDATE_OWN > 0 && (
-                            <Badge className={PERMISSION_COLORS.VIEW_AND_UPDATE_OWN}>
-                              {PERMISSION_ICONS.VIEW_AND_UPDATE_OWN} {counts.VIEW_AND_UPDATE_OWN} Edit Own
-                            </Badge>
-                          )}
-                          {counts.VIEW_AND_UPDATE > 0 && (
-                            <Badge className={PERMISSION_COLORS.VIEW_AND_UPDATE}>
-                              {PERMISSION_ICONS.VIEW_AND_UPDATE} {counts.VIEW_AND_UPDATE} Full
-                            </Badge>
-                          )}
-                          {hasUnsetPermissions && (
-                            <Badge variant="secondary">{counts.unset} Not Set</Badge>
-                          )}
-                        </div>
-                        {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                      </div>
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <CardContent className="pt-0">
-                    {hasUnsetPermissions && (
-                      <div className="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-amber-800 dark:text-amber-200">Some permissions are not set</p>
-                          <p className="text-sm text-amber-700 dark:text-amber-300">Initialize to set all functions to "View & Update" by default</p>
-                        </div>
-                        <Button
-                          onClick={() => initializeMutation.mutate(user.id)}
-                          disabled={initializeMutation.isPending}
-                          data-testid={`button-initialize-${user.id}`}
-                        >
-                          {initializeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                          Initialize All
-                        </Button>
-                      </div>
-                    )}
-                    <div className="space-y-4">
-                      {PERMISSION_SECTIONS.map(section => (
-                        <div key={section.label}>
-                          <div className="flex items-center gap-2 py-2 mb-1">
-                            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{section.label}</h4>
-                            <div className="flex-1 h-px bg-border" />
+        <TabsContent value="users">
+          <div className="space-y-4">
+            {usersWithPermissions?.map(({ user, permissions }) => {
+              const isExpanded = expandedUsers.has(user.id);
+              const counts = countPermissions(permissions);
+              const hasUnsetPermissions = counts.unset > 0;
+
+              return (
+                <Collapsible key={user.id} open={isExpanded} onOpenChange={() => toggleUser(user.id)}>
+                  <Card className="overflow-visible" data-testid={`card-user-${user.id}`}>
+                    <CollapsibleTrigger asChild>
+                      <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-4 flex-wrap">
+                            <div className="p-2 rounded-full bg-primary/10">
+                              <Users className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <CardTitle className="text-lg">{user.name || user.email}</CardTitle>
+                              <CardDescription>{user.email}</CardDescription>
+                            </div>
+                            <Badge variant="outline" className="ml-2">{user.role}</Badge>
                           </div>
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="w-1/2">Feature</TableHead>
-                                <TableHead>Access Level</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {section.keys.map(functionKey => {
-                                const currentLevel = getPermissionForFunction(permissions, functionKey);
-                                return (
-                                  <TableRow key={functionKey} data-testid={`row-permission-${user.id}-${functionKey}`}>
-                                    <TableCell className="font-medium">{FUNCTION_LABELS[functionKey] || functionKey}</TableCell>
-                                    <TableCell>
-                                      <Select
-                                        value={currentLevel}
-                                        onValueChange={(value) => {
-                                          updatePermissionMutation.mutate({
-                                            userId: user.id,
-                                            functionKey,
-                                            permissionLevel: value as PermissionLevel,
-                                          });
-                                        }}
-                                        disabled={updatePermissionMutation.isPending}
-                                      >
-                                        <SelectTrigger className="w-48" data-testid={`select-permission-${user.id}-${functionKey}`}>
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="HIDDEN">
-                                            <div className="flex items-center gap-2">
-                                              <EyeOff className="h-4 w-4 text-red-500" />
-                                              Hidden
-                                            </div>
-                                          </SelectItem>
-                                          {SUPPORTS_OWN_LEVELS.includes(functionKey) && (
-                                            <SelectItem value="VIEW_OWN">
-                                              <div className="flex items-center gap-2">
-                                                <Eye className="h-4 w-4 text-blue-500" />
-                                                View Own Only
-                                              </div>
-                                            </SelectItem>
-                                          )}
-                                          <SelectItem value="VIEW">
-                                            <div className="flex items-center gap-2">
-                                              <Eye className="h-4 w-4 text-yellow-500" />
-                                              View All
-                                            </div>
-                                          </SelectItem>
-                                          {SUPPORTS_OWN_LEVELS.includes(functionKey) && (
-                                            <SelectItem value="VIEW_AND_UPDATE_OWN">
-                                              <div className="flex items-center gap-2">
-                                                <Pencil className="h-4 w-4 text-cyan-500" />
-                                                View & Edit Own Only
-                                              </div>
-                                            </SelectItem>
-                                          )}
-                                          <SelectItem value="VIEW_AND_UPDATE">
-                                            <div className="flex items-center gap-2">
-                                              <Pencil className="h-4 w-4 text-green-500" />
-                                              View & Edit All
-                                            </div>
-                                          </SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
+                          <div className="flex items-center gap-4 flex-wrap">
+                            <div className="flex gap-2 flex-wrap">
+                              {counts.HIDDEN > 0 && (
+                                <Badge className={PERMISSION_COLORS.HIDDEN}>
+                                  {PERMISSION_ICONS.HIDDEN} {counts.HIDDEN} Hidden
+                                </Badge>
+                              )}
+                              {counts.VIEW_OWN > 0 && (
+                                <Badge className={PERMISSION_COLORS.VIEW_OWN}>
+                                  {PERMISSION_ICONS.VIEW_OWN} {counts.VIEW_OWN} Own
+                                </Badge>
+                              )}
+                              {counts.VIEW > 0 && (
+                                <Badge className={PERMISSION_COLORS.VIEW}>
+                                  {PERMISSION_ICONS.VIEW} {counts.VIEW} View
+                                </Badge>
+                              )}
+                              {counts.VIEW_AND_UPDATE_OWN > 0 && (
+                                <Badge className={PERMISSION_COLORS.VIEW_AND_UPDATE_OWN}>
+                                  {PERMISSION_ICONS.VIEW_AND_UPDATE_OWN} {counts.VIEW_AND_UPDATE_OWN} Edit Own
+                                </Badge>
+                              )}
+                              {counts.VIEW_AND_UPDATE > 0 && (
+                                <Badge className={PERMISSION_COLORS.VIEW_AND_UPDATE}>
+                                  {PERMISSION_ICONS.VIEW_AND_UPDATE} {counts.VIEW_AND_UPDATE} Full
+                                </Badge>
+                              )}
+                              {hasUnsetPermissions && (
+                                <Badge variant="secondary">{counts.unset} Not Set</Badge>
+                              )}
+                            </div>
+                            {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
-          );
-        })}
-      </div>
+                      </CardHeader>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <CardContent className="pt-0">
+                        <div className="flex items-center gap-2 mb-4 flex-wrap">
+                          {hasUnsetPermissions && (
+                            <Button
+                              onClick={(e) => { e.stopPropagation(); initializeMutation.mutate(user.id); }}
+                              disabled={initializeMutation.isPending}
+                              data-testid={`button-initialize-${user.id}`}
+                            >
+                              {initializeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                              Initialize All
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setApplyTypeUserId(user.id);
+                              setApplyTypeUserName(user.name || user.email);
+                            }}
+                            data-testid={`button-apply-type-${user.id}`}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Apply Permission Type
+                          </Button>
+                        </div>
+                        {hasUnsetPermissions && (
+                          <div className="mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                            <p className="font-medium text-amber-800 dark:text-amber-200">Some permissions are not set</p>
+                            <p className="text-sm text-amber-700 dark:text-amber-300">Initialize to set all functions to "View & Update" by default, or apply a permission type.</p>
+                          </div>
+                        )}
+                        <div className="space-y-4">
+                          {PERMISSION_SECTIONS.map(section => (
+                            <div key={section.label}>
+                              <div className="flex items-center gap-2 py-2 mb-1">
+                                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{section.label}</h4>
+                                <div className="flex-1 h-px bg-border" />
+                              </div>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-1/2">Feature</TableHead>
+                                    <TableHead>Access Level</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {section.keys.map(functionKey => {
+                                    const currentLevel = getPermissionForFunction(permissions, functionKey);
+                                    return (
+                                      <TableRow key={functionKey} data-testid={`row-permission-${user.id}-${functionKey}`}>
+                                        <TableCell className="font-medium">{FUNCTION_LABELS[functionKey] || functionKey}</TableCell>
+                                        <TableCell>
+                                          <Select
+                                            value={currentLevel}
+                                            onValueChange={(value) => {
+                                              updatePermissionMutation.mutate({
+                                                userId: user.id,
+                                                functionKey,
+                                                permissionLevel: value as PermissionLevel,
+                                              });
+                                            }}
+                                            disabled={updatePermissionMutation.isPending}
+                                          >
+                                            <SelectTrigger className="w-48" data-testid={`select-permission-${user.id}-${functionKey}`}>
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="HIDDEN">
+                                                <div className="flex items-center gap-2">
+                                                  <EyeOff className="h-4 w-4 text-red-500" />
+                                                  Hidden
+                                                </div>
+                                              </SelectItem>
+                                              {SUPPORTS_OWN_LEVELS.includes(functionKey) && (
+                                                <SelectItem value="VIEW_OWN">
+                                                  <div className="flex items-center gap-2">
+                                                    <Eye className="h-4 w-4 text-blue-500" />
+                                                    View Own Only
+                                                  </div>
+                                                </SelectItem>
+                                              )}
+                                              <SelectItem value="VIEW">
+                                                <div className="flex items-center gap-2">
+                                                  <Eye className="h-4 w-4 text-yellow-500" />
+                                                  View All
+                                                </div>
+                                              </SelectItem>
+                                              {SUPPORTS_OWN_LEVELS.includes(functionKey) && (
+                                                <SelectItem value="VIEW_AND_UPDATE_OWN">
+                                                  <div className="flex items-center gap-2">
+                                                    <Pencil className="h-4 w-4 text-cyan-500" />
+                                                    View & Edit Own Only
+                                                  </div>
+                                                </SelectItem>
+                                              )}
+                                              <SelectItem value="VIEW_AND_UPDATE">
+                                                <div className="flex items-center gap-2">
+                                                  <Pencil className="h-4 w-4 text-green-500" />
+                                                  View & Edit All
+                                                </div>
+                                              </SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              );
+            })}
+          </div>
 
-      {(!usersWithPermissions || usersWithPermissions.length === 0) && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">No users found</p>
-            <p className="text-muted-foreground">Add users in the Users section to manage their permissions</p>
-          </CardContent>
-        </Card>
+          {(!usersWithPermissions || usersWithPermissions.length === 0) && (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-lg font-medium">No users found</p>
+                <p className="text-muted-foreground">Add users in the Users section to manage their permissions</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="permission-types">
+          <PermissionTypesTab />
+        </TabsContent>
+      </Tabs>
+
+      {applyTypeUserId && (
+        <ApplyPermissionTypeDialog
+          open={!!applyTypeUserId}
+          onOpenChange={(open) => { if (!open) { setApplyTypeUserId(null); setApplyTypeUserName(""); } }}
+          userId={applyTypeUserId}
+          userName={applyTypeUserName}
+        />
       )}
     </div>
   );

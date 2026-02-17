@@ -379,7 +379,11 @@ export const ADMIN_ROUTES = {
   USER_PERMISSION_BY_ID: (id: string | number) => `/api/admin/user-permissions/${id}`,
   USER_PERMISSION_INITIALIZE: (id: string | number) => `/api/admin/user-permissions/${id}/initialize`,
   USER_PERMISSION_UPDATE: (userId: string | number, functionKey: string) => `/api/admin/user-permissions/${userId}/${functionKey}`,
-  
+  USER_PERMISSION_APPLY_TYPE: (userId: string | number) => `/api/admin/user-permissions/${userId}/apply-type`,
+
+  PERMISSION_TYPES: '/api/admin/permission-types',
+  PERMISSION_TYPE_BY_ID: (id: string | number) => `/api/admin/permission-types/${id}`,
+
   // Jobs
   JOBS: '/api/admin/jobs',
   JOB_BY_ID: (id: string | number) => `/api/admin/jobs/${id}`,
