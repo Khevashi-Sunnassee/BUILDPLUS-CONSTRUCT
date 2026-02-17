@@ -127,13 +127,27 @@ async function pollEmailsForCompany(
   let skipped = 0;
   const errors: string[] = [];
 
+  const matchingIds = matchingEmails.map((e: any) => e.id).filter(Boolean) as string[];
+  const existingMap = new Map<string, { id: string; status: string; invoiceId: string | null }>();
+  if (matchingIds.length > 0) {
+    const existingRecords = await db.select({
+      id: apInboundEmails.id,
+      resendEmailId: apInboundEmails.resendEmailId,
+      status: apInboundEmails.status,
+      invoiceId: apInboundEmails.invoiceId,
+    }).from(apInboundEmails)
+      .where(inArray(apInboundEmails.resendEmailId, matchingIds))
+      .limit(1000);
+    for (const rec of existingRecords) {
+      existingMap.set(rec.resendEmailId, { id: rec.id, status: rec.status, invoiceId: rec.invoiceId });
+    }
+  }
+
   for (const email of matchingEmails) {
     const emailId = email.id;
     if (!emailId) { skipped++; continue; }
 
-    const [existing] = await db.select().from(apInboundEmails)
-      .where(eq(apInboundEmails.resendEmailId, emailId)).limit(1);
-
+    const existing = existingMap.get(emailId);
     if (existing) {
       if (existing.status === "PROCESSED" && !existing.invoiceId) {
         try {

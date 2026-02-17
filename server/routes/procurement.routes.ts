@@ -133,8 +133,9 @@ router.get("/api/procurement/suppliers", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 1000, 1000);
     const suppliersData = await storage.getAllSuppliers(companyId);
-    res.json(suppliersData);
+    res.json(suppliersData.slice(0, safeLimit));
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching suppliers");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
@@ -530,8 +531,9 @@ router.get("/api/procurement/items", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 1000, 1000);
     const itemsData = await storage.getAllItems(companyId);
-    res.json(itemsData);
+    res.json(itemsData.slice(0, safeLimit));
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching items");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch items" });

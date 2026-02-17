@@ -39,13 +39,6 @@ async function logActivity(invoiceId: string, type: string, message: string, act
   });
 }
 
-const assigneeUser = db.$with("assignee_user").as(
-  db.select({ id: users.id, name: users.name, email: users.email }).from(users)
-);
-const creatorUser = db.$with("creator_user").as(
-  db.select({ id: users.id, name: users.name, email: users.email }).from(users)
-);
-
 router.get("/api/ap-invoices", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;

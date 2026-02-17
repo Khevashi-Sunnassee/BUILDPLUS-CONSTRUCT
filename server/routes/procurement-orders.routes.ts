@@ -63,7 +63,8 @@ router.get("/api/purchase-orders", requireAuth, requirePermission("purchase_orde
       const userId = req.session.userId;
       orders = orders.filter((o) => o.requestedById === userId);
     }
-    res.json(orders);
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 500);
+    res.json(orders.slice(0, safeLimit));
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching purchase orders");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch purchase orders" });
