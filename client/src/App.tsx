@@ -120,6 +120,7 @@ const WorkflowBuilderPage = lazyWithRetry(() => import("@/pages/admin/workflow-b
 const JobActivitiesPage = lazyWithRetry(() => import("@/pages/job-activities"));
 const MyobIntegrationPage = lazyWithRetry(() => import("@/pages/myob-integration"));
 const TenderEmailsPage = lazyWithRetry(() => import("@/pages/tender-emails"));
+const TenderEmailDetailPage = lazyWithRetry(() => import("@/pages/tender-email-detail"));
 
 const RegisterPage = lazyWithRetry(() => import("@/pages/register"));
 const MobileLoginPage = lazyWithRetry(() => import("@/pages/mobile/login"));
@@ -483,6 +484,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <TenderEmailsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/tender-emails/:id">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <TenderEmailDetailPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

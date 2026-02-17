@@ -1011,6 +1011,7 @@ export const TENDER_INBOX_ROUTES = {
   EXTRACT: (id: string | number) => `/api/tender-inbox/emails/${id}/extract`,
   MATCH_TENDER: (id: string | number) => `/api/tender-inbox/emails/${id}/match`,
   ACTIVITY: (id: string | number) => `/api/tender-inbox/emails/${id}/activity`,
+  PAGE_THUMBNAILS: (id: string | number) => `/api/tender-inbox/emails/${id}/page-thumbnails`,
   COUNTS: '/api/tender-inbox/counts',
 } as const;
 export type TenderInboxRoutes = typeof TENDER_INBOX_ROUTES;

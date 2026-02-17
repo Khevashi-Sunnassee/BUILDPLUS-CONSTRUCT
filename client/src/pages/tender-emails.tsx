@@ -303,214 +303,6 @@ function TenderInboxSettingsDialog({ open, onOpenChange }: { open: boolean; onOp
   );
 }
 
-function TenderEmailDetailDialog({ emailId, open, onOpenChange }: { emailId: string | null; open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { toast } = useToast();
-
-  const { data: detail, isLoading } = useQuery<any>({
-    queryKey: [TENDER_INBOX_ROUTES.LIST, emailId],
-    queryFn: async () => {
-      if (!emailId) return null;
-      const res = await fetch(TENDER_INBOX_ROUTES.BY_ID(emailId), { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to load email details");
-      return res.json();
-    },
-    enabled: open && !!emailId,
-  });
-
-  const extractMutation = useMutation({
-    mutationFn: async () => {
-      if (!emailId) return;
-      await apiRequest("POST", TENDER_INBOX_ROUTES.EXTRACT(emailId));
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [TENDER_INBOX_ROUTES.LIST, emailId] });
-      queryClient.invalidateQueries({ queryKey: [TENDER_INBOX_ROUTES.LIST] });
-      queryClient.invalidateQueries({ queryKey: [TENDER_INBOX_ROUTES.COUNTS] });
-      toast({ title: "Extraction started" });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Extraction failed", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const extractedFields = detail?.extractedFields || [];
-  const documents = detail?.documents || [];
-  const activity = detail?.activity || [];
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto" data-testid="dialog-tender-email-detail">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            {detail?.subject || "Tender Email"}
-          </DialogTitle>
-        </DialogHeader>
-
-        {isLoading ? (
-          <div className="space-y-4 py-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-40 w-full" />
-          </div>
-        ) : detail ? (
-          <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">From:</span>
-                <span className="ml-2 font-medium" data-testid="text-detail-from">{detail.fromAddress}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Status:</span>
-                <span className="ml-2"><StatusBadge status={detail.status} /></span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Received:</span>
-                <span className="ml-2" data-testid="text-detail-received">{formatDateTime(detail.createdAt)}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Attachments:</span>
-                <span className="ml-2" data-testid="text-detail-attachments">{detail.attachmentCount || 0}</span>
-              </div>
-              {detail.supplier && (
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Matched Supplier:</span>
-                  <span className="ml-2 font-medium text-green-600 dark:text-green-400" data-testid="text-detail-supplier">
-                    {detail.supplier.name}
-                  </span>
-                </div>
-              )}
-              {detail.tender && (
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Linked Tender:</span>
-                  <Link href={`/tenders/${detail.tender.id}`} className="ml-2 text-foreground hover:underline" data-testid="link-detail-tender">
-                    {detail.tender.name || detail.tender.title || `Tender #${detail.tender.id}`}
-                  </Link>
-                </div>
-              )}
-              {detail.processingError && (
-                <div className="col-span-2">
-                  <span className="text-destructive text-xs" data-testid="text-detail-error">{detail.processingError}</span>
-                </div>
-              )}
-            </div>
-
-            {documents.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium mb-2">Documents</h4>
-                <div className="space-y-1">
-                  {documents.map((doc: any) => (
-                    <div key={doc.id} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2" data-testid={`doc-${doc.id}`}>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{doc.fileName}</span>
-                        {doc.fileSize && <span className="text-xs text-muted-foreground">({(doc.fileSize / 1024).toFixed(1)} KB)</span>}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={async () => {
-                          try {
-                            const res = await fetch(TENDER_INBOX_ROUTES.DOCUMENT_VIEW(emailId!), { credentials: "include" });
-                            if (res.ok) {
-                              const blob = await res.blob();
-                              const url = URL.createObjectURL(blob);
-                              window.open(url, "_blank");
-                            }
-                          } catch {}
-                        }}
-                        data-testid={`button-view-doc-${doc.id}`}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {extractedFields.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium mb-2">Extracted Information</h4>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Field</TableHead>
-                        <TableHead>Value</TableHead>
-                        <TableHead className="w-20">Confidence</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {extractedFields.map((field: any) => (
-                        <TableRow key={field.id} data-testid={`field-${field.fieldKey}`}>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {field.fieldKey.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}
-                          </TableCell>
-                          <TableCell className="text-sm font-medium">{field.fieldValue || "\u2014"}</TableCell>
-                          <TableCell>
-                            {field.confidence && (
-                              <Badge variant="outline" className="text-xs">
-                                {(parseFloat(field.confidence) * 100).toFixed(0)}%
-                              </Badge>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-2 justify-end">
-              {detail.status === "PROCESSED" && (
-                <Button
-                  variant="outline"
-                  onClick={() => extractMutation.mutate()}
-                  disabled={extractMutation.isPending}
-                  data-testid="button-re-extract"
-                >
-                  {extractMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Re-extract
-                </Button>
-              )}
-              {(detail.status === "RECEIVED" || detail.status === "FAILED") && (
-                <Button
-                  onClick={() => extractMutation.mutate()}
-                  disabled={extractMutation.isPending}
-                  data-testid="button-extract"
-                >
-                  {extractMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Extract Data
-                </Button>
-              )}
-            </div>
-
-            {activity.length > 0 && (
-              <div>
-                <h4 className="text-sm font-medium mb-2">Activity</h4>
-                <div className="space-y-2">
-                  {activity.map((act: any) => (
-                    <div key={act.id} className="flex items-start gap-2 text-xs" data-testid={`activity-${act.id}`}>
-                      <Clock className="h-3 w-3 mt-0.5 text-muted-foreground shrink-0" />
-                      <div>
-                        <span className="text-muted-foreground">{formatDateTime(act.createdAt)}</span>
-                        <span className="ml-2">{act.message}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : null}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function LoadingSkeleton() {
   return (
     <div className="space-y-4 p-6">
@@ -536,14 +328,13 @@ function LoadingSkeleton() {
 export default function TenderEmailsPage({ embedded = false }: { embedded?: boolean } = {}) {
   if (!embedded) useDocumentTitle("Tender Emails");
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [inboxSettingsOpen, setInboxSettingsOpen] = useState(false);
-  const [detailEmailId, setDetailEmailId] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
@@ -752,13 +543,13 @@ export default function TenderEmailsPage({ embedded = false }: { embedded?: bool
                       key={email.id}
                       className="cursor-pointer"
                       data-testid={`row-tender-email-${email.id}`}
-                      onClick={() => { setDetailEmailId(email.id); setDetailOpen(true); }}
+                      onClick={() => navigate(`/tender-emails/${email.id}`)}
                     >
                       <TableCell>
                         <button
                           type="button"
                           className="text-left text-foreground font-medium hover:underline line-clamp-1 max-w-[250px]"
-                          onClick={(e) => { e.stopPropagation(); setDetailEmailId(email.id); setDetailOpen(true); }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/tender-emails/${email.id}`); }}
                           data-testid={`link-tender-email-${email.id}`}
                         >
                           {email.subject || "No Subject"}
@@ -795,7 +586,7 @@ export default function TenderEmailsPage({ embedded = false }: { embedded?: bool
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onClick={() => { setDetailEmailId(email.id); setDetailOpen(true); }}
+                              onClick={() => navigate(`/tender-emails/${email.id}`)}
                               data-testid={`action-tender-view-${email.id}`}
                             >
                               <Eye className="h-4 w-4 mr-2" />
@@ -839,7 +630,6 @@ export default function TenderEmailsPage({ embedded = false }: { embedded?: bool
 
       <UploadDialog open={uploadOpen} onOpenChange={setUploadOpen} />
       <TenderInboxSettingsDialog open={inboxSettingsOpen} onOpenChange={setInboxSettingsOpen} />
-      <TenderEmailDetailDialog emailId={detailEmailId} open={detailOpen} onOpenChange={setDetailOpen} />
     </div>
   );
 }
