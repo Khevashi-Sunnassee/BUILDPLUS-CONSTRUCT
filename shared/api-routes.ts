@@ -1038,5 +1038,6 @@ export const DRAFTING_INBOX_ROUTES = {
   COUNTS: '/api/drafting-inbox/counts',
   EMAIL_TASKS: (id: string | number) => `/api/drafting-inbox/emails/${id}/tasks`,
   CREATE_TASK: (id: string | number) => `/api/drafting-inbox/emails/${id}/tasks`,
+  SUGGEST_DUE_DATE: (id: string | number) => `/api/drafting-inbox/emails/${id}/suggest-due-date`,
 } as const;
 export type DraftingInboxRoutes = typeof DRAFTING_INBOX_ROUTES;

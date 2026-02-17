@@ -899,5 +899,63 @@ router.post("/api/drafting-inbox/emails/:id/tasks", requireAuth, async (req: Req
   }
 });
 
+router.post("/api/drafting-inbox/emails/:id/suggest-due-date", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
+
+    const [email] = await db.select().from(draftingInboundEmails)
+      .where(and(eq(draftingInboundEmails.id, id), eq(draftingInboundEmails.companyId, companyId))).limit(1);
+    if (!email) return res.status(404).json({ error: "Drafting email not found" });
+
+    const { actionType } = z.object({ actionType: z.string().optional() }).parse(req.body);
+
+    const { default: OpenAI } = await import("openai");
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+
+    const prompt = `You are a construction project management assistant. Based on the following drafting email details, suggest how many days from today the task should be due. Consider urgency, complexity, and typical construction timelines.
+
+Email Subject: ${email.subject || "No subject"}
+Request Type: ${email.requestType || "Unknown"}
+Impact Area: ${email.impactArea || "Unknown"}
+Action Type: ${actionType || "General"}
+Today's Date: ${todayStr}
+
+Respond with ONLY a JSON object: {"days": <number>, "reason": "<brief reason>"}
+The days should be one of: 0 (today/urgent), 1 (tomorrow), 7, 14, or 21. Pick the most appropriate.`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 100,
+    });
+
+    const content = completion.choices[0]?.message?.content?.trim() || "";
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const days = [0, 1, 7, 14, 21].includes(parsed.days) ? parsed.days : 7;
+      const suggestedDate = new Date(today);
+      suggestedDate.setDate(suggestedDate.getDate() + days);
+      res.json({
+        days,
+        date: suggestedDate.toISOString().split("T")[0],
+        reason: parsed.reason || "AI suggestion",
+      });
+    } else {
+      res.json({ days: 7, date: new Date(today.getTime() + 7 * 86400000).toISOString().split("T")[0], reason: "Default suggestion" });
+    }
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error suggesting due date");
+    res.json({ days: 7, date: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0], reason: "Default (AI unavailable)" });
+  }
+});
+
 export { router as draftingInboxRouter };
 export default router;

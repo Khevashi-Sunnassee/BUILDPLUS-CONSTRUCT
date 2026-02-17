@@ -18,7 +18,7 @@ import {
   ArrowLeft, FileText, CheckCircle2, Clock, Pencil,
   ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, LinkIcon, RefreshCw, Mail, Eye, Trash2, Archive,
-  Code, Type, ExternalLink, Download
+  Code, Type, ExternalLink, Download, Sparkles
 } from "lucide-react";
 
 interface DraftingEmailDetail {
@@ -620,6 +620,20 @@ interface LinkedTask {
   job?: { id: string; name: string; jobNumber?: string } | null;
 }
 
+function addDays(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+const DUE_DATE_PRESETS = [
+  { label: "Today", days: 0 },
+  { label: "Tomorrow", days: 1 },
+  { label: "7 Days", days: 7 },
+  { label: "14 Days", days: 14 },
+  { label: "21 Days", days: 21 },
+] as const;
+
 function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; emailId: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [actionType, setActionType] = useState("");
@@ -627,17 +641,8 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState("MEDIUM");
-  const [jobId, setJobId] = useState(email.jobId || "");
+  const [aiReason, setAiReason] = useState("");
   const { toast } = useToast();
-
-  const { data: jobs } = useQuery<Array<{ id: string; name: string; jobNumber?: string }>>({
-    queryKey: ["/api/jobs"],
-    select: (data: any) => {
-      if (Array.isArray(data)) return data;
-      if (data?.jobs) return data.jobs;
-      return [];
-    },
-  });
 
   const createTaskMutation = useMutation({
     mutationFn: async (data: { title: string; actionType: string; description?: string; jobId?: string | null; dueDate?: string | null; priority?: string | null }) => {
@@ -654,9 +659,24 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
       setDescription("");
       setDueDate("");
       setPriority("MEDIUM");
+      setAiReason("");
     },
     onError: (err: Error) => {
       toast({ title: "Failed to create task", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const suggestDueDateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", DRAFTING_INBOX_ROUTES.SUGGEST_DUE_DATE(emailId), { actionType: actionType || undefined });
+      return res.json();
+    },
+    onSuccess: (data: { days: number; date: string; reason: string }) => {
+      setDueDate(data.date);
+      setAiReason(data.reason);
+    },
+    onError: () => {
+      toast({ title: "Could not get AI suggestion", variant: "destructive" });
     },
   });
 
@@ -673,17 +693,11 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
       title: title.trim(),
       actionType,
       description: description.trim() || undefined,
-      jobId: jobId || null,
+      jobId: email.jobId || null,
       dueDate: dueDate || null,
       priority,
     });
   };
-
-  useEffect(() => {
-    if (email.jobId && !jobId) {
-      setJobId(email.jobId);
-    }
-  }, [email.jobId]);
 
   const extractedAction = email.extractedFields?.find(f => f.fieldKey === "action_required");
   useEffect(() => {
@@ -691,6 +705,10 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
       setTitle(extractedAction.fieldValue);
     }
   }, [extractedAction?.fieldValue]);
+
+  const matchedJobLabel = email.job
+    ? `${email.job.jobNumber ? `${email.job.jobNumber} - ` : ""}${email.job.name}`
+    : null;
 
   return (
     <Card data-testid="card-create-task">
@@ -707,6 +725,19 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
 
         {isOpen && (
           <div className="space-y-3 pt-1">
+            {matchedJobLabel && (
+              <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-sm" data-testid="field-task-job-display">
+                <LinkIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground">Job:</span>
+                <span className="font-medium truncate">{matchedJobLabel}</span>
+              </div>
+            )}
+            {!matchedJobLabel && (
+              <div className="flex items-center gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-sm" data-testid="field-task-no-job">
+                <span className="text-amber-700 dark:text-amber-400">Match a job above first to link this task</span>
+              </div>
+            )}
+
             <div data-testid="field-action-type">
               <label className="text-xs text-muted-foreground mb-1 block">Action Type</label>
               <Select value={actionType} onValueChange={setActionType}>
@@ -743,37 +774,19 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div data-testid="field-task-job">
-                <label className="text-xs text-muted-foreground mb-1 block">Job</label>
-                <Select value={jobId} onValueChange={setJobId}>
-                  <SelectTrigger data-testid="select-task-job">
-                    <SelectValue placeholder="Select job..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(jobs || []).slice(0, 50).map(job => (
-                      <SelectItem key={job.id} value={job.id} data-testid={`option-task-job-${job.id}`}>
-                        {job.jobNumber ? `${job.jobNumber} - ${job.name}` : job.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div data-testid="field-task-priority">
-                <label className="text-xs text-muted-foreground mb-1 block">Priority</label>
-                <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger data-testid="select-task-priority">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="LOW">Low</SelectItem>
-                    <SelectItem value="MEDIUM">Medium</SelectItem>
-                    <SelectItem value="HIGH">High</SelectItem>
-                    <SelectItem value="CRITICAL">Critical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div data-testid="field-task-priority">
+              <label className="text-xs text-muted-foreground mb-1 block">Priority</label>
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger data-testid="select-task-priority">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LOW">Low</SelectItem>
+                  <SelectItem value="MEDIUM">Medium</SelectItem>
+                  <SelectItem value="HIGH">High</SelectItem>
+                  <SelectItem value="CRITICAL">Critical</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div data-testid="field-task-due-date">
@@ -781,9 +794,40 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
               <Input
                 type="date"
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                onChange={(e) => { setDueDate(e.target.value); setAiReason(""); }}
                 data-testid="input-task-due-date"
               />
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                {DUE_DATE_PRESETS.map(preset => (
+                  <Button
+                    key={preset.days}
+                    type="button"
+                    variant={dueDate === addDays(preset.days) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => { setDueDate(addDays(preset.days)); setAiReason(""); }}
+                    data-testid={`button-due-${preset.days}d`}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => suggestDueDateMutation.mutate()}
+                  disabled={suggestDueDateMutation.isPending}
+                  className="ml-auto"
+                  data-testid="button-ai-suggest-due"
+                >
+                  {suggestDueDateMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                  AI Suggest
+                </Button>
+              </div>
+              {aiReason && (
+                <p className="text-xs text-muted-foreground mt-1.5 italic" data-testid="text-ai-reason">
+                  {aiReason}
+                </p>
+              )}
             </div>
 
             <div className="flex items-center gap-2 pt-1 flex-wrap">
