@@ -444,14 +444,17 @@ async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean>
 
   const { scheduler } = await import("./lib/background-scheduler");
   const { pollEmailsJob, processImportedInvoicesJob } = await import("./lib/ap-inbox-jobs");
+  const { pollTenderEmailsJob } = await import("./lib/tender-inbox-jobs");
 
   const EMAIL_POLL_INTERVAL = 5 * 60 * 1000;
   const EXTRACT_INTERVAL = 2 * 60 * 1000;
+  const TENDER_POLL_INTERVAL = 5 * 60 * 1000;
 
   scheduler.register("ap-email-poll", pollEmailsJob, EMAIL_POLL_INTERVAL);
   scheduler.register("ap-invoice-extract", processImportedInvoicesJob, EXTRACT_INTERVAL);
+  scheduler.register("tender-email-poll", pollTenderEmailsJob, TENDER_POLL_INTERVAL);
   scheduler.start();
-  logger.info("[Background] AP email poll (5min) and invoice extraction (2min) jobs started");
+  logger.info("[Background] AP email poll (5min), invoice extraction (2min), and tender email poll (5min) jobs started");
 
   try {
     const { eq, count } = await import("drizzle-orm");
