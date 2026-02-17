@@ -739,6 +739,8 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastTouchDistance = useRef<number | null>(null);
+  const lastTouchCenter = useRef<{ x: number; y: number } | null>(null);
 
   const doc = invoice.documents?.[0];
   const focusedFieldData = focusedField ? invoice.extractedFields?.find(f => f.fieldKey === focusedField) : null;
@@ -788,12 +790,71 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
     setIsPanning(false);
   }, []);
 
+  const getTouchDistance = useCallback((touches: React.TouchList) => {
+    if (touches.length < 2) return null;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }, []);
+
+  const getTouchCenter = useCallback((touches: React.TouchList) => {
+    if (touches.length < 2) return { x: touches[0].clientX, y: touches[0].clientY };
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2,
+    };
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      lastTouchDistance.current = getTouchDistance(e.touches);
+      lastTouchCenter.current = getTouchCenter(e.touches);
+    } else if (e.touches.length === 1 && zoom > 1) {
+      setIsPanning(true);
+      setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    }
+  }, [zoom, getTouchDistance, getTouchCenter]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && lastTouchDistance.current !== null) {
+      e.preventDefault();
+      const newDist = getTouchDistance(e.touches);
+      if (newDist !== null) {
+        const scale = newDist / lastTouchDistance.current;
+        setZoom(z => Math.min(5, Math.max(0.5, z * scale)));
+        lastTouchDistance.current = newDist;
+      }
+      const newCenter = getTouchCenter(e.touches);
+      if (lastTouchCenter.current && containerRef.current) {
+        const dx = lastTouchCenter.current.x - newCenter.x;
+        const dy = lastTouchCenter.current.y - newCenter.y;
+        containerRef.current.scrollLeft += dx;
+        containerRef.current.scrollTop += dy;
+      }
+      lastTouchCenter.current = newCenter;
+    } else if (e.touches.length === 1 && isPanning && containerRef.current) {
+      const container = containerRef.current;
+      const dx = panStart.x - e.touches[0].clientX;
+      const dy = panStart.y - e.touches[0].clientY;
+      container.scrollLeft += dx;
+      container.scrollTop += dy;
+      setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    }
+  }, [isPanning, panStart, getTouchDistance, getTouchCenter]);
+
+  const handleTouchEnd = useCallback(() => {
+    lastTouchDistance.current = null;
+    lastTouchCenter.current = null;
+    setIsPanning(false);
+  }, []);
+
   return (
     <div className="flex flex-col h-full bg-muted/30" data-testid="panel-pdf-viewer">
       <div className="p-2 border-b bg-muted/30 flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium truncate max-w-[200px]">{doc?.fileName || "Document"}</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm font-medium truncate">{doc?.fileName || "Document"}</span>
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon"
@@ -805,7 +866,7 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
             {Math.round(zoom * 100)}%
           </span>
           <Button variant="ghost" size="icon"
-            onClick={() => setZoom(z => Math.min(3, z + 0.25))}
+            onClick={() => setZoom(z => Math.min(5, z + 0.25))}
             data-testid="button-zoom-in">
             <ZoomIn className="h-3.5 w-3.5" />
           </Button>
@@ -819,26 +880,29 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
 
       <div
         ref={containerRef}
-        className="flex-1 overflow-auto bg-muted/10 p-4"
-        style={{ cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default" }}
+        className="flex-1 overflow-auto bg-muted/10 p-2 md:p-4"
+        style={{ cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default", touchAction: zoom > 1 ? "none" : "pan-y" }}
         onMouseDown={handlePanStart}
         onMouseMove={handlePanMove}
         onMouseUp={handlePanEnd}
         onMouseLeave={handlePanEnd}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {!doc ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
+          <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center">
             <FileText className="h-16 w-16 text-muted-foreground mb-4" />
             <p className="text-sm font-medium mb-1">No document uploaded</p>
             <p className="text-xs text-muted-foreground">Upload a PDF or image to view it here</p>
           </div>
         ) : isLoading ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+          <div className="flex flex-col items-center justify-center h-full min-h-[300px]">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-2" />
             <p className="text-sm text-muted-foreground">Rendering document...</p>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center">
+          <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-center">
             <AlertTriangle className="h-8 w-8 text-destructive mb-2" />
             <p className="text-sm text-destructive">Failed to load document</p>
           </div>
@@ -875,15 +939,15 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-2 px-4 py-2 border-t bg-background flex-wrap">
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-t bg-background flex-wrap">
         <div className="flex items-center gap-1">
           <Button variant="outline" size="sm" disabled={!doc} onClick={handleDownload} data-testid="button-download-invoice">
             <Download className="h-3 w-3 mr-1" />
-            Download
+            <span className="hidden sm:inline">Download</span>
           </Button>
           <Button variant="outline" size="sm" data-testid="button-document-management">
             <FolderOpen className="h-3 w-3 mr-1" />
-            Documents
+            <span className="hidden sm:inline">Documents</span>
           </Button>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -1365,17 +1429,18 @@ export default function ApInvoiceDetailPage() {
   }
 
   const invoiceTotal = parseFloat(String(invoice.totalInc || "0"));
+  const [mobileTab, setMobileTab] = useState<"document" | "details">("document");
 
   return (
     <div className="flex flex-col h-[calc(100vh-73px)]" data-testid="page-invoice-detail">
-      <div className="flex items-center gap-3 px-4 py-2 border-b bg-background flex-wrap">
+      <div className="flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 border-b bg-background flex-wrap">
         <Button variant="ghost" size="sm" onClick={() => navigate("/ap-invoices")} data-testid="button-back">
           <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
+          <span className="hidden sm:inline">Back</span>
         </Button>
         <Separator orientation="vertical" className="h-5" />
-        <h1 className="text-sm font-semibold" data-testid="text-invoice-number">
-          Invoice {invoice.invoiceNumber || invoice.id}
+        <h1 className="text-sm font-semibold truncate" data-testid="text-invoice-number">
+          <span className="hidden sm:inline">Invoice </span>{invoice.invoiceNumber || invoice.id.substring(0, 8)}
         </h1>
         <Badge
           variant={
@@ -1397,7 +1462,7 @@ export default function ApInvoiceDetailPage() {
           {(invoice.status || "imported").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
         </Badge>
         {invoice.isUrgent && <Badge variant="destructive">Urgent</Badge>}
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
+        <div className="ml-auto hidden md:flex items-center gap-2 flex-wrap">
           {invoice.documents && invoice.documents.length > 0 && (
             <Button
               variant="outline"
@@ -1454,7 +1519,28 @@ export default function ApInvoiceDetailPage() {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="md:hidden flex border-b bg-background">
+        <button
+          type="button"
+          className={`flex-1 py-2.5 text-sm font-medium text-center border-b-2 transition-colors ${mobileTab === "document" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}
+          onClick={() => setMobileTab("document")}
+          data-testid="tab-mobile-document"
+        >
+          <FileText className="h-4 w-4 inline-block mr-1.5" />
+          Document
+        </button>
+        <button
+          type="button"
+          className={`flex-1 py-2.5 text-sm font-medium text-center border-b-2 transition-colors ${mobileTab === "details" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}
+          onClick={() => setMobileTab("details")}
+          data-testid="tab-mobile-details"
+        >
+          <Pencil className="h-4 w-4 inline-block mr-1.5" />
+          Details
+        </button>
+      </div>
+
+      <div className="hidden md:flex flex-1 overflow-hidden">
         <div className="w-[55%] border-r overflow-hidden">
           <PdfViewer invoice={invoice} focusedField={focusedField} />
         </div>
@@ -1562,6 +1648,124 @@ export default function ApInvoiceDetailPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="flex md:hidden flex-1 overflow-hidden flex-col">
+        {mobileTab === "document" ? (
+          <div className="flex-1 overflow-hidden">
+            <PdfViewer invoice={invoice} focusedField={focusedField} />
+          </div>
+        ) : (
+          <>
+            <ScrollArea className="flex-1">
+              <div className="p-3 space-y-3">
+                <RiskCard invoice={invoice} />
+                <InvoiceSummaryCard invoice={invoice} onFieldSave={handleFieldSave} onFieldFocus={handleFieldFocus} />
+
+                <div className="flex items-center justify-between">
+                  <Button variant="ghost" size="sm" className="text-primary underline-offset-4 hover:underline" onClick={() => setApprovalSheetOpen(true)} data-testid="button-view-approval-path-mobile">
+                    View Approval Path
+                  </Button>
+                </div>
+
+                <SplitsTable
+                  invoiceId={invoiceId}
+                  invoiceTotal={invoiceTotal}
+                  splits={splits}
+                  onSplitsChange={setSplits}
+                  supplierId={invoice.supplierId}
+                  supplierDefaultCostCodeId={invoice.supplier?.defaultCostCodeId}
+                />
+
+                <ActivitiesFeed invoiceId={invoiceId} />
+                <CommentsSection invoiceId={invoiceId} />
+              </div>
+            </ScrollArea>
+
+            <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-t bg-background flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onHoldMutation.mutate()}
+                  disabled={onHoldMutation.isPending}
+                  className={`toggle-elevate ${invoice.isOnHold ? "toggle-elevated" : ""}`}
+                  data-testid="button-on-hold-mobile"
+                >
+                  <Pause className="h-3 w-3 mr-1" />
+                  Hold
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => urgentMutation.mutate()}
+                  disabled={urgentMutation.isPending}
+                  className={`toggle-elevate ${invoice.isUrgent ? "toggle-elevated" : ""}`}
+                  data-testid="button-urgent-mobile"
+                >
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  Urgent
+                </Button>
+                {invoice.documents && invoice.documents.length > 0 && (
+                  <Button variant="outline" size="sm" onClick={() => extractMutation.mutate()} disabled={extractMutation.isPending} data-testid="button-extract-ai-mobile">
+                    {extractMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <BarChart3 className="h-3 w-3 mr-1" />}
+                    AI
+                  </Button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {(invoice.status === "IMPORTED" || invoice.status === "PROCESSED") && (
+                  <Button size="sm" onClick={handleConfirm} disabled={confirmMutation.isPending} data-testid="button-confirm-mobile">
+                    {confirmMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+                    Confirm
+                  </Button>
+                )}
+                {invoice.status === "CONFIRMED" && (
+                  <Button size="sm" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending} data-testid="button-submit-mobile">
+                    {submitMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Send className="h-3 w-3 mr-1" />}
+                    Submit
+                  </Button>
+                )}
+                {invoice.status === "PARTIALLY_APPROVED" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive border-destructive/50"
+                    onClick={handleReject}
+                    disabled={rejectMutation.isPending || (approvalData && !isCurrentApprover)}
+                    data-testid="button-reject-mobile"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Reject
+                  </Button>
+                )}
+                {invoice.status === "PARTIALLY_APPROVED" && (
+                  <Button
+                    size="sm"
+                    className="bg-green-600 text-white"
+                    onClick={() => approveMutation.mutate()}
+                    disabled={approveMutation.isPending || (approvalData && !isCurrentApprover)}
+                    data-testid="button-approve-mobile"
+                  >
+                    <Check className="h-3 w-3 mr-1" />
+                    Approve
+                  </Button>
+                )}
+                {invoice.status === "APPROVED" && (
+                  <Button
+                    size="sm"
+                    onClick={() => exportMyobMutation.mutate()}
+                    disabled={exportMyobMutation.isPending}
+                    data-testid="button-export-myob-mobile"
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    MYOB
+                  </Button>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <ApprovalPathSheet invoiceId={invoiceId} open={approvalSheetOpen} onOpenChange={setApprovalSheetOpen} />
