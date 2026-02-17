@@ -152,7 +152,7 @@ function EmailBodyViewer({ emailId }: { emailId: string }) {
           <html>
           <head>
             <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.6; color: #333; margin: 12px; word-wrap: break-word; }
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.6; color: #333; background-color: #ffffff; margin: 12px; word-wrap: break-word; }
               img { max-width: 100%; height: auto; }
               a { color: #2563eb; }
               table { border-collapse: collapse; max-width: 100%; }
@@ -221,17 +221,17 @@ function EmailBodyViewer({ emailId }: { emailId: string }) {
           )}
         </div>
       </div>
-      <div className="flex-1 overflow-auto p-0" data-testid="container-email-body">
+      <div className="flex-1 overflow-auto p-0 bg-white" data-testid="container-email-body">
         {effectiveMode === "html" && hasHtml ? (
           <iframe
             ref={iframeRef}
             sandbox="allow-same-origin"
-            className="w-full h-full border-0 min-h-[300px]"
+            className="w-full h-full border-0 min-h-[300px] bg-white"
             title="Email body"
             data-testid="iframe-email-body"
           />
         ) : (
-          <pre className="p-4 text-sm whitespace-pre-wrap font-sans leading-relaxed text-foreground" data-testid="text-email-body">
+          <pre className="p-4 text-sm whitespace-pre-wrap font-sans leading-relaxed text-gray-800 bg-white" data-testid="text-email-body">
             {emailBody?.text || ""}
           </pre>
         )}
