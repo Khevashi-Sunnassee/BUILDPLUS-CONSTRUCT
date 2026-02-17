@@ -424,8 +424,12 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
         .returning();
     }
 
-    // Calculate start time from completed time minus duration
-    const sessionStartTime = new Date(now.getTime() - totalElapsed);
+    // Use the original session creation time as start (createdAt never changes, unlike startedAt which resets on resume)
+    const sessionStartTime = session.createdAt;
+
+    // End time: if stopped from PAUSED, use the last pause time (when work actually ended);
+    // if stopped from RUNNING, use now (work ends at this moment)
+    const sessionEndTime = session.status === "PAUSED" && session.pausedAt ? session.pausedAt : now;
 
     // Get panel mark and drawing code from panel register if panelRegisterId is provided
     const finalPanelRegisterId = panelRegisterId || session.panelRegisterId || null;
@@ -457,9 +461,9 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
         panelRegisterId: finalPanelRegisterId,
         workTypeId: workTypeId ? parseInt(workTypeId, 10) : (session.workTypeId || null),
         startAt: sessionStartTime,
-        endAt: now,
+        endAt: sessionEndTime,
         durationMin: Math.round(durationMinutes) as number,
-        idleMin: 0 as number,
+        idleMin: Math.max(0, Math.round((sessionEndTime.getTime() - sessionStartTime.getTime() - totalElapsed) / 60000)) as number,
         source: "timer",
         sourceEventId: `timer-${sessionId}`,
         app: app || session.app || "manual",

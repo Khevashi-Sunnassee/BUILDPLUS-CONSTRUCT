@@ -405,15 +405,17 @@ export function TimerWidget() {
               <div className="space-y-2">
                 <Label>Start Time</Label>
                 <div className="p-2 bg-muted rounded-md font-mono text-sm" data-testid="text-timer-start-time">
-                  {activeSession?.startedAt 
-                    ? format(new Date(activeSession.startedAt), "hh:mm a")
+                  {activeSession?.createdAt 
+                    ? format(new Date(activeSession.createdAt), "hh:mm a")
                     : "--:-- --"}
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>End Time</Label>
                 <div className="p-2 bg-muted rounded-md font-mono text-sm" data-testid="text-timer-end-time">
-                  {format(currentTime, "hh:mm a")}
+                  {activeSession?.status === "PAUSED" && activeSession?.pausedAt
+                    ? format(new Date(activeSession.pausedAt), "hh:mm a")
+                    : format(currentTime, "hh:mm a")}
                 </div>
               </div>
             </div>
