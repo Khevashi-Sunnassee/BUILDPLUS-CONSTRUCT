@@ -214,6 +214,10 @@ function SubmissionRow({ submission, tenderId }: { submission: SubmissionWithDet
     enabled: expanded,
   });
 
+  const extractedSupplierName = submission.extractedFields?.supplier_name || submission.extractedFields?.company_name || null;
+  const displaySupplierName = submission.supplier?.name || extractedSupplierName || "Unknown";
+  const isFromExtracted = !submission.supplier?.name && !!extractedSupplierName;
+
   return (
     <>
       <TableRow
@@ -225,7 +229,8 @@ function SubmissionRow({ submission, tenderId }: { submission: SubmissionWithDet
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </TableCell>
         <TableCell data-testid={`text-submission-supplier-${submission.id}`}>
-          {submission.supplier?.name || "Unknown"}
+          <span>{displaySupplierName}</span>
+          {isFromExtracted && <span className="text-xs text-muted-foreground ml-1.5">(extracted)</span>}
         </TableCell>
         <TableCell>
           <SubmissionStatusBadge status={submission.status} />
@@ -241,34 +246,49 @@ function SubmissionRow({ submission, tenderId }: { submission: SubmissionWithDet
         <TableRow data-testid={`row-submission-detail-${submission.id}`}>
           <TableCell colSpan={5} className="bg-muted/30 p-4">
             <div className="space-y-4">
-              {(submission.supplier?.email || submission.supplier?.phone || submission.supplier?.keyContact || submission.supplierTrade) && (
-                <div className="flex gap-6 flex-wrap">
-                  {submission.supplier?.keyContact && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Contact</p>
-                      <p className="text-sm" data-testid={`text-submission-contact-${submission.id}`}>{submission.supplier.keyContact}</p>
-                    </div>
-                  )}
-                  {submission.supplier?.email && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Email</p>
-                      <p className="text-sm" data-testid={`text-submission-email-${submission.id}`}>{submission.supplier.email}</p>
-                    </div>
-                  )}
-                  {submission.supplier?.phone && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Phone</p>
-                      <p className="text-sm" data-testid={`text-submission-phone-${submission.id}`}>{submission.supplier.phone}</p>
-                    </div>
-                  )}
-                  {submission.supplierTrade && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Trade / Cost Code</p>
-                      <p className="text-sm" data-testid={`text-submission-trade-${submission.id}`}>{submission.supplierTrade}</p>
-                    </div>
-                  )}
-                </div>
-              )}
+              {(() => {
+                const ef = submission.extractedFields;
+                const contactName = submission.supplier?.keyContact || ef?.supplier_contact_name || ef?.contact_name || null;
+                const emailAddr = submission.supplier?.email || ef?.supplier_email || ef?.email || null;
+                const phone = submission.supplier?.phone || ef?.supplier_phone || ef?.phone || null;
+                const abn = ef?.supplier_abn || ef?.abn || null;
+                const hasDetails = contactName || emailAddr || phone || submission.supplierTrade || abn;
+                if (!hasDetails) return null;
+                return (
+                  <div className="flex gap-6 flex-wrap">
+                    {contactName && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Contact</p>
+                        <p className="text-sm" data-testid={`text-submission-contact-${submission.id}`}>{contactName}</p>
+                      </div>
+                    )}
+                    {emailAddr && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Email</p>
+                        <p className="text-sm" data-testid={`text-submission-email-${submission.id}`}>{emailAddr}</p>
+                      </div>
+                    )}
+                    {phone && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Phone</p>
+                        <p className="text-sm" data-testid={`text-submission-phone-${submission.id}`}>{phone}</p>
+                      </div>
+                    )}
+                    {abn && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">ABN</p>
+                        <p className="text-sm" data-testid={`text-submission-abn-${submission.id}`}>{abn}</p>
+                      </div>
+                    )}
+                    {submission.supplierTrade && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Trade / Cost Code</p>
+                        <p className="text-sm" data-testid={`text-submission-trade-${submission.id}`}>{submission.supplierTrade}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {submission.sourceEmail && (
                 <div className="flex gap-6 flex-wrap border-l-2 border-muted-foreground/20 pl-3">
                   <div>
