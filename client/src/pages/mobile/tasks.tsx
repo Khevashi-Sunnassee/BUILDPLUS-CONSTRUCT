@@ -35,6 +35,7 @@ import {
   Users,
   UserPlus,
   Check,
+  CornerDownRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -63,6 +64,7 @@ interface CompanyUser {
 interface Task {
   id: string;
   groupId: string;
+  parentId: string | null;
   title: string;
   status: TaskStatus;
   dueDate: string | null;
@@ -70,6 +72,7 @@ interface Task {
   consultant: string | null;
   projectStage: string | null;
   assignees: TaskAssignee[];
+  subtasks: Task[];
 }
 
 interface TaskGroup {
@@ -263,6 +266,28 @@ export default function MobileTasksPage() {
       createTaskMutation.mutate({ groupId, title: newTaskTitle.trim() });
     }
   };
+
+  useEffect(() => {
+    if (selectedTask && groups.length > 0) {
+      for (const group of groups) {
+        const findTask = (tasks: Task[]): Task | undefined => {
+          for (const t of tasks) {
+            if (t.id === selectedTask.id) return t;
+            if (t.subtasks?.length) {
+              const found = findTask(t.subtasks);
+              if (found) return found;
+            }
+          }
+          return undefined;
+        };
+        const found = findTask(group.tasks || []);
+        if (found) {
+          setSelectedTask(found);
+          break;
+        }
+      }
+    }
+  }, [groups]);
 
   const totalTasks = groups.reduce((sum, g) => sum + (g.tasks?.length || 0), 0);
   const activeTasks = groups.reduce((sum, g) => sum + (g.tasks?.filter(t => t.status !== "DONE").length || 0), 0);
@@ -1200,6 +1225,8 @@ function TaskDetailSheet({
   const [consultant, setConsultant] = useState(task.consultant || "");
   const [projectStage, setProjectStage] = useState(task.projectStage || "");
   const [showAssigneePicker, setShowAssigneePicker] = useState(false);
+  const [showAddSubtask, setShowAddSubtask] = useState(false);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
 
   const { data: allUsers = [] } = useQuery<CompanyUser[]>({
     queryKey: [USER_ROUTES.LIST],
@@ -1222,6 +1249,39 @@ function TaskDetailSheet({
     },
   });
 
+  const createSubtaskMutation = useMutation({
+    mutationFn: async (subtaskTitle: string) => {
+      const response = await apiRequest("POST", TASKS_ROUTES.LIST, {
+        groupId: task.groupId,
+        parentId: task.id,
+        title: subtaskTitle,
+        status: "NOT_STARTED",
+        priority: "MEDIUM",
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+      setNewSubtaskTitle("");
+      setShowAddSubtask(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to create subtask", variant: "destructive" });
+    },
+  });
+
+  const updateSubtaskStatusMutation = useMutation({
+    mutationFn: async ({ taskId, status }: { taskId: string; status: TaskStatus }) => {
+      return apiRequest("PATCH", TASKS_ROUTES.BY_ID(taskId), { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+    },
+    onError: () => {
+      toast({ title: "Failed to update subtask", variant: "destructive" });
+    },
+  });
+
   const handleToggleAssignee = (userId: string) => {
     const currentIds = assignees.map(a => a.userId);
     const newIds = currentIds.includes(userId)
@@ -1233,6 +1293,18 @@ function TaskDetailSheet({
   const handleRemoveAssignee = (userId: string) => {
     const newIds = assignees.map(a => a.userId).filter(id => id !== userId);
     setAssigneesMutation.mutate(newIds);
+  };
+
+  const cycleSubtaskStatus = (subtask: Task) => {
+    const currentIndex = statusOrder.indexOf(subtask.status);
+    const nextIndex = (currentIndex + 1) % statusOrder.length;
+    updateSubtaskStatusMutation.mutate({ taskId: subtask.id, status: statusOrder[nextIndex] });
+  };
+
+  const handleCreateSubtask = () => {
+    if (newSubtaskTitle.trim() && !createSubtaskMutation.isPending) {
+      createSubtaskMutation.mutate(newSubtaskTitle.trim());
+    }
   };
 
   const getInitials = (name: string | null | undefined) => {
@@ -1431,6 +1503,112 @@ function TaskDetailSheet({
             className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
             data-testid="input-task-project-stage"
           />
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-sm font-medium text-white/60 flex items-center gap-1.5">
+              <CornerDownRight className="h-3.5 w-3.5" />
+              Subtasks
+              {(task.subtasks?.length || 0) > 0 && (
+                <span className="text-white/40">({task.subtasks.length})</span>
+              )}
+            </label>
+          </div>
+          <div className="space-y-2">
+            {(task.subtasks || []).map((subtask) => {
+              const stInfo = statusConfig[subtask.status];
+              const StIcon = stInfo.icon;
+              return (
+                <div
+                  key={subtask.id}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/5"
+                  data-testid={`subtask-${subtask.id}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => cycleSubtaskStatus(subtask)}
+                    className="flex-shrink-0"
+                    data-testid={`subtask-status-${subtask.id}`}
+                  >
+                    <StIcon className={cn("h-5 w-5", stInfo.color)} />
+                  </button>
+                  <span className={cn(
+                    "text-sm flex-1 min-w-0 truncate",
+                    subtask.status === "DONE" ? "line-through text-white/40" : "text-white"
+                  )}>
+                    {subtask.title}
+                  </span>
+                  {subtask.dueDate && (
+                    <span className={cn(
+                      "text-xs flex-shrink-0",
+                      isBefore(new Date(subtask.dueDate), startOfDay(new Date())) && subtask.status !== "DONE"
+                        ? "text-red-400"
+                        : "text-white/40"
+                    )}>
+                      {format(new Date(subtask.dueDate), "dd MMM")}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+
+            {showAddSubtask ? (
+              <div className="flex items-center gap-2 p-3 rounded-xl border border-blue-500/30 bg-blue-500/5">
+                <Input
+                  value={newSubtaskTitle}
+                  onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                  placeholder="Subtask name..."
+                  className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateSubtask();
+                    if (e.key === "Escape") {
+                      setShowAddSubtask(false);
+                      setNewSubtaskTitle("");
+                    }
+                  }}
+                  data-testid="input-new-subtask"
+                />
+                <Button
+                  size="sm"
+                  onClick={handleCreateSubtask}
+                  disabled={!newSubtaskTitle.trim() || createSubtaskMutation.isPending}
+                  className="bg-blue-500 flex-shrink-0"
+                  data-testid="button-create-subtask"
+                >
+                  {createSubtaskMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Add"
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowAddSubtask(false);
+                    setNewSubtaskTitle("");
+                  }}
+                  className="text-white/60 flex-shrink-0"
+                  data-testid="button-cancel-subtask"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAddSubtask(true)}
+                className="w-full justify-start text-blue-400 border border-dashed border-white/10 rounded-xl"
+                data-testid="button-add-subtask"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Subtask
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
