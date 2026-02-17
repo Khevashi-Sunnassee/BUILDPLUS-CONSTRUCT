@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
-import { ChevronLeft, ChevronRight, Check, X, Pause, Loader2, FileText, AlertTriangle, DollarSign, Calendar, Building2, Hash, Filter, Shield } from "lucide-react";
+import { ChevronLeft, ChevronRight, Check, X, Pause, Loader2, FileText, AlertTriangle, DollarSign, Calendar, Building2, Hash, Filter, Shield, ZoomIn, ZoomOut, RotateCcw, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
@@ -156,31 +156,209 @@ function DetailRow({ icon, label, value }: { icon?: React.ReactNode; label: stri
   );
 }
 
+interface PageThumbnail {
+  pageNumber: number;
+  thumbnail: string;
+  width: number;
+  height: number;
+}
+
+function MobileDocViewer({ invoiceId, documents }: { invoiceId: string; documents: InvoiceDetail["documents"] }) {
+  const [zoom, setZoom] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const lastTouchDistance = useRef<number | null>(null);
+  const lastTouchCenter = useRef<{ x: number; y: number } | null>(null);
+
+  const doc = documents?.[0];
+  const isImage = doc?.mimeType?.startsWith("image/");
+
+  const { data: thumbnailData, isLoading } = useQuery<{ totalPages: number; pages: PageThumbnail[] }>({
+    queryKey: [AP_INVOICE_ROUTES.PAGE_THUMBNAILS(invoiceId)],
+    enabled: !!doc,
+  });
+
+  const numPages = thumbnailData?.totalPages || 0;
+  const currentPageData = thumbnailData?.pages?.find(p => p.pageNumber === currentPage);
+
+  const handleDownload = useCallback(() => {
+    if (!doc) return;
+    fetch(AP_INVOICE_ROUTES.DOCUMENT(invoiceId), { credentials: "include" })
+      .then(res => res.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = doc.fileName || "invoice";
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+  }, [doc, invoiceId]);
+
+  const getTouchDistance = useCallback((touches: React.TouchList) => {
+    if (touches.length < 2) return null;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const dist = getTouchDistance(e.touches);
+      lastTouchDistance.current = dist;
+      lastTouchCenter.current = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      };
+    } else if (e.touches.length === 1 && zoom > 1) {
+      setIsPanning(true);
+      setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    }
+  }, [zoom, getTouchDistance]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const dist = getTouchDistance(e.touches);
+      if (dist && lastTouchDistance.current) {
+        const scale = dist / lastTouchDistance.current;
+        setZoom(prev => Math.min(5, Math.max(0.5, prev * scale)));
+        lastTouchDistance.current = dist;
+      }
+    } else if (e.touches.length === 1 && isPanning && containerRef.current) {
+      const container = containerRef.current;
+      const dx = panStart.x - e.touches[0].clientX;
+      const dy = panStart.y - e.touches[0].clientY;
+      container.scrollLeft += dx;
+      container.scrollTop += dy;
+      setPanStart({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    }
+  }, [isPanning, panStart, zoom, getTouchDistance]);
+
+  const handleTouchEnd = useCallback(() => {
+    setIsPanning(false);
+    lastTouchDistance.current = null;
+    lastTouchCenter.current = null;
+  }, []);
+
+  if (!doc) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-white/50">
+        <div className="text-center space-y-2">
+          <FileText className="h-12 w-12 mx-auto text-white/20" />
+          <div className="text-sm">No document attached</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-white/10 flex-shrink-0">
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={() => setZoom(z => Math.max(0.5, z - 0.25))} className="h-8 w-8 text-white/70" data-testid="button-zoom-out-mobile">
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <span className="text-xs text-white/50 min-w-[3rem] text-center">{Math.round(zoom * 100)}%</span>
+          <Button variant="ghost" size="icon" onClick={() => setZoom(z => Math.min(5, z + 0.25))} className="h-8 w-8 text-white/70" data-testid="button-zoom-in-mobile">
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setZoom(1)} className="h-8 w-8 text-white/70" data-testid="button-zoom-reset-mobile">
+            <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        {numPages > 1 && (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} className="h-8 w-8 text-white/70">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs text-white/50">{currentPage}/{numPages}</span>
+            <Button variant="ghost" size="icon" onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))} disabled={currentPage >= numPages} className="h-8 w-8 text-white/70">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+        <Button variant="ghost" size="icon" onClick={handleDownload} className="h-8 w-8 text-white/70" data-testid="button-download-mobile">
+          <Download className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-auto bg-black/20"
+        style={{ touchAction: zoom > 1 ? "none" : "pan-y" }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        data-testid="mobile-doc-viewer-container"
+      >
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-8 w-8 animate-spin text-white/40" />
+          </div>
+        ) : isImage ? (
+          <div className="flex items-start justify-center p-2 min-h-full">
+            <img
+              src={AP_INVOICE_ROUTES.DOCUMENT(invoiceId)}
+              alt="Invoice"
+              className="max-w-full transition-transform duration-100"
+              style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
+              draggable={false}
+              data-testid="mobile-doc-image"
+            />
+          </div>
+        ) : currentPageData ? (
+          <div className="flex items-start justify-center p-2 min-h-full">
+            <img
+              src={`data:image/png;base64,${currentPageData.thumbnail}`}
+              alt={`Page ${currentPage}`}
+              className="max-w-full transition-transform duration-100"
+              style={{ transform: `scale(${zoom})`, transformOrigin: "top center" }}
+              draggable={false}
+              data-testid="mobile-doc-page"
+            />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-white/40">
+            <div className="text-center space-y-2">
+              <FileText className="h-10 w-10 mx-auto" />
+              <div className="text-sm">Unable to preview document</div>
+              <Button variant="outline" size="sm" onClick={handleDownload} className="border-white/20 text-white">
+                <Download className="h-3 w-3 mr-1" />
+                Download
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function InvoiceDetailSheet({ invoice, onClose }: { invoice: ApprovalInvoice; onClose: () => void }) {
   const { toast } = useToast();
   const [approveNote, setApproveNote] = useState("");
   const [rejectNote, setRejectNote] = useState("");
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<"details" | "document">("details");
 
   const { data: detail, isLoading: detailLoading } = useQuery<InvoiceDetail>({
     queryKey: ["/api/ap-invoices", invoice.id, "detail"],
     queryFn: async () => {
-      const [invRes, splitsRes, approvalRes, docsRes] = await Promise.all([
+      const [invRes, splitsRes, approvalRes] = await Promise.all([
         fetch(AP_INVOICE_ROUTES.BY_ID(invoice.id), { credentials: "include" }),
         fetch(AP_INVOICE_ROUTES.SPLITS(invoice.id), { credentials: "include" }),
         fetch(AP_INVOICE_ROUTES.APPROVAL_PATH(invoice.id), { credentials: "include" }),
-        fetch(AP_INVOICE_ROUTES.DOCUMENT(invoice.id), { credentials: "include" }),
       ]);
       const inv = invRes.ok ? await invRes.json() : {};
       const splits = splitsRes.ok ? await splitsRes.json() : [];
       const approvalsData = approvalRes.ok ? await approvalRes.json() : { steps: [] };
       const approvals = approvalsData.steps || approvalsData || [];
-      let documents: any[] = [];
-      if (docsRes.ok) {
-        const docData = await docsRes.json();
-        documents = docData.documents || [];
-      }
+      const documents = inv.documents || [];
       return { ...inv, splits, approvalPath: Array.isArray(approvals) ? approvals : [], documents };
     },
     enabled: !!invoice.id,
@@ -254,6 +432,33 @@ function InvoiceDetailSheet({ invoice, onClose }: { invoice: ApprovalInvoice; on
               <div className="text-sm text-white/60">{invoice.supplierName || "Unknown supplier"}</div>
             </SheetHeader>
 
+            <div className="flex border-b border-white/10 flex-shrink-0">
+              <button
+                type="button"
+                className={`flex-1 py-2.5 text-sm font-medium text-center border-b-2 transition-colors ${activeTab === "details" ? "border-blue-400 text-white" : "border-transparent text-white/50"}`}
+                onClick={() => setActiveTab("details")}
+                data-testid="tab-details"
+              >
+                <DollarSign className="h-4 w-4 inline-block mr-1.5" />
+                Details
+              </button>
+              <button
+                type="button"
+                className={`flex-1 py-2.5 text-sm font-medium text-center border-b-2 transition-colors ${activeTab === "document" ? "border-blue-400 text-white" : "border-transparent text-white/50"}`}
+                onClick={() => setActiveTab("document")}
+                data-testid="tab-document"
+              >
+                <FileText className="h-4 w-4 inline-block mr-1.5" />
+                Document
+                {detail?.documents && detail.documents.length > 0 && (
+                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1 py-0">{detail.documents.length}</Badge>
+                )}
+              </button>
+            </div>
+
+            {activeTab === "document" ? (
+              <MobileDocViewer invoiceId={invoice.id} documents={detail?.documents || []} />
+            ) : (
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
               {detailLoading ? (
                 <div className="space-y-4">
@@ -285,24 +490,6 @@ function InvoiceDetailSheet({ invoice, onClose }: { invoice: ApprovalInvoice; on
                       )}
                     </div>
                   </DetailSection>
-
-                  {detail?.documents && detail.documents.length > 0 && (
-                    <DetailSection title="Attached Files">
-                      <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-2">
-                        {detail.documents.map((doc) => (
-                          <div key={doc.id} className="flex items-center gap-3 py-1">
-                            <FileText className="h-4 w-4 text-blue-400 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm text-white truncate">{doc.fileName}</div>
-                              {doc.fileSize && (
-                                <div className="text-xs text-white/40">{(doc.fileSize / 1024).toFixed(0)} KB</div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </DetailSection>
-                  )}
 
                   {detail?.splits && detail.splits.length > 0 && (
                     <DetailSection title="Coding / Splits">
@@ -409,6 +596,7 @@ function InvoiceDetailSheet({ invoice, onClose }: { invoice: ApprovalInvoice; on
                 </>
               )}
             </div>
+            )}
 
             <div className="flex-shrink-0 border-t border-white/10 px-4 py-3 space-y-2" style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 12px)" }}>
               <div className="flex gap-2">
