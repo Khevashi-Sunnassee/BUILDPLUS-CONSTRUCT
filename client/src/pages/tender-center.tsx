@@ -31,9 +31,10 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Eye, Pencil, Trash2, Loader2, Search, FileText,
-  Users, Send, Mail, Package, X, Info,
+  Users, Send, Mail, Package, X, Info, Inbox,
 } from "lucide-react";
 import type { Tender, TenderSubmission, TenderMember, Job } from "@shared/schema";
+import TenderEmailsPage from "@/pages/tender-emails";
 
 type TenderStatus = "DRAFT" | "OPEN" | "UNDER_REVIEW" | "APPROVED" | "CLOSED" | "CANCELLED";
 
@@ -117,6 +118,7 @@ export default function TenderCenterPage() {
   const [jobFilter, setJobFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [mainTab, setMainTab] = useState<"tenders" | "inbox">("tenders");
 
   const [tenderFormOpen, setTenderFormOpen] = useState(false);
   const [editingTender, setEditingTender] = useState<TenderWithDetails | null>(null);
@@ -397,58 +399,67 @@ export default function TenderCenterPage() {
           <h1 className="text-2xl font-bold" data-testid="text-tender-center-title">Tender Center</h1>
           <p className="text-sm text-muted-foreground">Manage tenders, submissions and pricing</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => navigate("/tender-emails")} data-testid="button-tender-inbox">
-            <Mail className="h-4 w-4 mr-2" />
-            Email Inbox
-          </Button>
+        {mainTab === "tenders" && (
           <Button onClick={openCreateTender} data-testid="button-new-tender">
             <Plus className="h-4 w-4 mr-2" />
             New Tender
           </Button>
-        </div>
+        )}
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search tenders..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-tenders"
-          />
-        </div>
-        <Select value={jobFilter} onValueChange={setJobFilter}>
-          <SelectTrigger className="w-[220px]" data-testid="select-job-filter">
-            <SelectValue placeholder="All Jobs" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All Jobs</SelectItem>
-            {jobs.map((job) => (
-              <SelectItem key={job.id} value={job.id} data-testid={`option-job-${job.id}`}>
-                {job.jobNumber} - {job.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
-            <SelectValue placeholder="All Statuses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All Statuses</SelectItem>
-            {(Object.keys(STATUS_LABELS) as TenderStatus[]).map((s) => (
-              <SelectItem key={s} value={s} data-testid={`option-status-${s}`}>
-                {STATUS_LABELS[s]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "tenders" | "inbox")}>
+        <TabsList data-testid="tabs-tender-center">
+          <TabsTrigger value="tenders" data-testid="tab-tenders-list">
+            <FileText className="h-4 w-4 mr-2" />
+            Tenders
+          </TabsTrigger>
+          <TabsTrigger value="inbox" data-testid="tab-email-inbox">
+            <Inbox className="h-4 w-4 mr-2" />
+            Email Inbox
+          </TabsTrigger>
+        </TabsList>
 
-      <Card>
+        <TabsContent value="tenders" className="space-y-4 mt-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search tenders..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+                data-testid="input-search-tenders"
+              />
+            </div>
+            <Select value={jobFilter} onValueChange={setJobFilter}>
+              <SelectTrigger className="w-[220px]" data-testid="select-job-filter">
+                <SelectValue placeholder="All Jobs" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Jobs</SelectItem>
+                {jobs.map((job) => (
+                  <SelectItem key={job.id} value={job.id} data-testid={`option-job-${job.id}`}>
+                    {job.jobNumber} - {job.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Statuses</SelectItem>
+                {(Object.keys(STATUS_LABELS) as TenderStatus[]).map((s) => (
+                  <SelectItem key={s} value={s} data-testid={`option-status-${s}`}>
+                    {STATUS_LABELS[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4 space-y-0">
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -539,8 +550,14 @@ export default function TenderCenterPage() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+          </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="inbox" className="mt-4">
+          <TenderEmailsPage embedded />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={tenderFormOpen} onOpenChange={(open) => { if (!open) closeTenderForm(); }}>
         <DialogContent className="max-w-2xl" data-testid="dialog-tender-form">

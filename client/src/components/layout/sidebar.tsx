@@ -130,7 +130,6 @@ const adminFinanceNavItems = [
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Asset Register", url: "/admin/asset-register", icon: Boxes },
   { title: "AP Invoices", url: "/ap-invoices", icon: Receipt },
-  { title: "Tender Emails", url: "/tender-emails", icon: Inbox },
   { title: "MYOB Integration", url: "/myob-integration", icon: Link2 },
 ];
 
@@ -193,7 +192,6 @@ const urlToFunctionKey: Record<string, string> = {
   "/scopes": "scopes",
   "/weekly-wages": "weekly_wages",
   "/admin/asset-register": "admin_assets",
-  "/tender-emails": "tenders",
   "/kpi-dashboard": "kpi_dashboard",
   "/manager/review": "manager_review",
   "/checklist-reports": "checklist_reports",

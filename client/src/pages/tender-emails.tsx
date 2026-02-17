@@ -533,8 +533,8 @@ function LoadingSkeleton() {
   );
 }
 
-export default function TenderEmailsPage() {
-  useDocumentTitle("Tender Emails");
+export default function TenderEmailsPage({ embedded = false }: { embedded?: boolean } = {}) {
+  if (!embedded) useDocumentTitle("Tender Emails");
   const { toast } = useToast();
 
   const [search, setSearch] = useState("");
@@ -645,10 +645,10 @@ export default function TenderEmailsPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-6 space-y-4 flex-1 overflow-auto">
+      <div className={embedded ? "space-y-4 flex-1 overflow-auto" : "p-6 space-y-4 flex-1 overflow-auto"}>
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <h1 className="text-2xl font-semibold" data-testid="text-tender-emails-title">Tender Emails</h1>
-          <div className="flex items-center gap-2">
+          {!embedded && <h1 className="text-2xl font-semibold" data-testid="text-tender-emails-title">Tender Emails</h1>}
+          <div className={`flex items-center gap-2 ${embedded ? "ml-auto" : ""}`}>
             <Button
               variant="outline"
               onClick={() => checkEmailsMutation.mutate()}
