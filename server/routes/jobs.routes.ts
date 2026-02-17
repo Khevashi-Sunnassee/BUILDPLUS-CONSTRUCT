@@ -74,6 +74,7 @@ router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Res
       primaryContact: jobs.primaryContact,
       probability: jobs.probability,
       estimatedStartDate: jobs.estimatedStartDate,
+      submissionDate: jobs.submissionDate,
       comments: jobs.comments,
       jobPhase: jobs.jobPhase,
       jobTypeId: jobs.jobTypeId,
@@ -135,6 +136,7 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
       primaryContact: z.string().max(255).optional().nullable(),
       probability: z.number().int().min(0).max(100).optional().nullable(),
       estimatedStartDate: z.string().optional().nullable(),
+      submissionDate: z.string().optional().nullable(),
       comments: z.string().optional().nullable(),
       jobTypeId: z.string().max(36).optional().nullable(),
     });
@@ -196,6 +198,7 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
       primaryContact: parsed.data.primaryContact || null,
       probability: parsed.data.probability ?? null,
       estimatedStartDate: parsed.data.estimatedStartDate ? new Date(parsed.data.estimatedStartDate) : null,
+      submissionDate: parsed.data.submissionDate ? new Date(parsed.data.submissionDate) : null,
       comments: parsed.data.comments || null,
       jobTypeId: parsed.data.jobTypeId || null,
     };
@@ -250,6 +253,7 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
       primaryContact: z.string().max(255).optional().nullable(),
       probability: z.number().int().min(0).max(100).optional().nullable(),
       estimatedStartDate: z.string().optional().nullable(),
+      submissionDate: z.string().optional().nullable(),
       comments: z.string().optional().nullable(),
       jobTypeId: z.string().max(36).optional().nullable(),
       statusNote: z.string().max(500).optional(),
@@ -271,6 +275,9 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
     const updateData: Record<string, unknown> = { ...rest };
     if (updateData.estimatedStartDate) {
       updateData.estimatedStartDate = new Date(updateData.estimatedStartDate);
+    }
+    if (updateData.submissionDate) {
+      updateData.submissionDate = new Date(updateData.submissionDate);
     }
 
     if (updateData.salesStage && !updateData.salesStatus) {

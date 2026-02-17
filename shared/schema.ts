@@ -387,6 +387,7 @@ export const jobs = pgTable("jobs", {
   primaryContact: text("primary_contact"),
   probability: integer("probability"),
   estimatedStartDate: timestamp("estimated_start_date"),
+  submissionDate: timestamp("submission_date"),
   comments: text("comments"),
   jobTypeId: varchar("job_type_id", { length: 36 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -3573,6 +3574,23 @@ export const licenceExpiryNotifications = pgTable("licence_expiry_notifications"
   employeeIdx: index("licence_expiry_notif_employee_idx").on(table.employeeId),
   companyIdx: index("licence_expiry_notif_company_idx").on(table.companyId),
   typeIdx: index("licence_expiry_notif_type_idx").on(table.notificationType),
+}));
+
+// ============== Opportunity Submission Reminders ==============
+
+export const opportunitySubmissionReminders = pgTable("opportunity_submission_reminders", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  notificationType: text("notification_type").notNull(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  emailTo: text("email_to"),
+  status: text("status").default("sent").notNull(),
+  errorMessage: text("error_message"),
+}, (table) => ({
+  jobIdx: index("opp_sub_reminder_job_idx").on(table.jobId),
+  companyIdx: index("opp_sub_reminder_company_idx").on(table.companyId),
+  typeIdx: index("opp_sub_reminder_type_idx").on(table.notificationType),
 }));
 
 // ============== Industrial Instruments (Award / EBA / Policy Pack) ==============

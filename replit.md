@@ -38,6 +38,7 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **MYOB Integration:** OAuth 2.0 connection to MYOB Business API with database-backed token storage (per-company), auto-refresh, and multi-tenant isolation.
 - **AP Email Inbox Monitoring:** Automatic invoice processing via Resend inbound email webhooks.
 - **AP Invoice Status Workflow:** Multi-stage approval workflow for invoices: IMPORTED → PROCESSED → CONFIRMED → PARTIALLY_APPROVED → APPROVED.
+- **Opportunity Submission Date & Reminders:** Opportunities have a submission date (datetime) field for tender deadlines; automated 7-day reminder emails are sent to customer contacts when submission dates approach, with deduplication tracking via `opportunity_submission_reminders` table.
 
 **System Design Choices:**
 - **Multi-Tenancy:** Designed for multi-company deployment with strict data isolation.

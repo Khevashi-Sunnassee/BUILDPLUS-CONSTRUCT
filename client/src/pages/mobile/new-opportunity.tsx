@@ -124,6 +124,7 @@ export default function MobileNewOpportunity() {
     opportunityType: "",
     probability: "",
     estimatedStartDate: "",
+    submissionDate: "",
     comments: "",
     jobTypeId: "",
   });
@@ -191,11 +192,30 @@ export default function MobileNewOpportunity() {
     const errs: Record<string, string> = {};
     if (!form.name.trim()) errs.name = "Project name is required";
     if (!form.address.trim()) errs.address = "Address is required";
-    if (!form.city.trim()) errs.city = "City is required";
+    if (!form.city.trim()) errs.city = "City / Suburb is required";
+    if (!form.state) errs.state = "State is required";
     if (form.probability && (parseInt(form.probability) < 0 || parseInt(form.probability) > 100)) {
       errs.probability = "Must be 0-100";
     }
+    if (form.submissionDate) {
+      const subDate = new Date(form.submissionDate);
+      if (isNaN(subDate.getTime())) {
+        errs.submissionDate = "Invalid date/time";
+      }
+    }
     setErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      const firstErrorKey = Object.keys(errs)[0];
+      const el = document.querySelector(`[data-testid="input-${firstErrorKey === "name" ? "project-name" : firstErrorKey}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      toast({
+        title: "Please fix the errors",
+        description: Object.values(errs).join(". "),
+        variant: "destructive",
+      });
+    }
     return Object.keys(errs).length === 0;
   };
 
@@ -222,6 +242,7 @@ export default function MobileNewOpportunity() {
     if (form.opportunityType) data.opportunityType = form.opportunityType;
     if (form.probability) data.probability = parseInt(form.probability);
     if (form.estimatedStartDate) data.estimatedStartDate = form.estimatedStartDate;
+    if (form.submissionDate) data.submissionDate = form.submissionDate;
     if (form.comments) data.comments = form.comments;
     if (form.jobTypeId) data.jobTypeId = form.jobTypeId;
 
@@ -251,7 +272,7 @@ export default function MobileNewOpportunity() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-52 pt-4">
         {/* Project Name */}
         <FormField label="Project Name" required error={errors.name}>
           <input
@@ -332,13 +353,13 @@ export default function MobileNewOpportunity() {
                 data-testid="input-city"
               />
             </FormField>
-            <FormField label="State">
+            <FormField label="State" required error={errors.state}>
               <div className="relative">
                 <select
                   className={selectClass}
                   value={form.state}
                   onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
-                  data-testid="select-state"
+                  data-testid="input-state"
                 >
                   <option value="" className="bg-[#0D1117]">Select state...</option>
                   {STATES.map((s) => (
@@ -545,6 +566,16 @@ export default function MobileNewOpportunity() {
             title="Timeline"
           />
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <FormField label="Submission Date" error={errors.submissionDate}>
+              <input
+                type="datetime-local"
+                className={`${inputClass} [color-scheme:dark]`}
+                value={form.submissionDate}
+                onChange={(e) => setForm((f) => ({ ...f, submissionDate: e.target.value }))}
+                data-testid="input-submissionDate"
+              />
+              <p className="text-xs text-white/40 mt-1">When is the tender due for submission?</p>
+            </FormField>
             <FormField label="Estimated Start Date">
               <input
                 type="date"
@@ -577,8 +608,8 @@ export default function MobileNewOpportunity() {
         </div>
       </div>
 
-      {/* Fixed bottom submit button */}
-      <div className="fixed bottom-16 left-0 right-0 z-20 border-t border-white/10 bg-[#0D1117]/95 backdrop-blur px-4 py-3">
+      {/* Fixed bottom submit button - positioned above nav with extra spacing */}
+      <div className="fixed bottom-[4.5rem] left-0 right-0 z-20 border-t border-white/10 bg-[#0D1117]/95 backdrop-blur px-4 py-4">
         <button
           className="w-full flex items-center justify-center gap-2 rounded-xl bg-blue-500 py-3.5 text-base font-semibold text-white active:scale-[0.99] disabled:opacity-50 disabled:active:scale-100"
           onClick={handleSubmit}

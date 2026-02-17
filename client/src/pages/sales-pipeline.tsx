@@ -91,6 +91,7 @@ interface Opportunity {
   primaryContact: string | null;
   probability: number | null;
   estimatedStartDate: string | null;
+  submissionDate: string | null;
   comments: string | null;
   jobTypeId: string | null;
   createdAt: string;
@@ -167,6 +168,7 @@ export default function SalesPipelinePage() {
     estimatedValue: "",
     opportunityType: "",
     probability: "",
+    submissionDate: "",
     comments: "",
     jobTypeId: "",
   });
@@ -195,7 +197,7 @@ export default function SalesPipelinePage() {
   });
 
   const resetNewOppForm = () => {
-    setNewOpp({ name: "", customerId: "", address: "", city: "", state: "", estimatedValue: "", opportunityType: "", probability: "", comments: "", jobTypeId: "" });
+    setNewOpp({ name: "", customerId: "", address: "", city: "", state: "", estimatedValue: "", opportunityType: "", probability: "", submissionDate: "", comments: "", jobTypeId: "" });
   };
 
   const createOpportunity = useMutation({
@@ -213,6 +215,7 @@ export default function SalesPipelinePage() {
       if (newOpp.estimatedValue) body.estimatedValue = newOpp.estimatedValue;
       if (newOpp.opportunityType) body.opportunityType = newOpp.opportunityType;
       if (newOpp.probability) body.probability = parseInt(newOpp.probability);
+      if (newOpp.submissionDate) body.submissionDate = newOpp.submissionDate;
       if (newOpp.comments) body.comments = newOpp.comments;
       if (newOpp.jobTypeId) body.jobTypeId = newOpp.jobTypeId;
       const res = await apiRequest("POST", JOBS_ROUTES.OPPORTUNITIES, body);
@@ -657,6 +660,12 @@ export default function SalesPipelinePage() {
                       <div className="text-sm font-medium">{selectedOpp.probability != null ? `${selectedOpp.probability}%` : "-"}</div>
                     </div>
                     <div>
+                      <div className="text-xs text-muted-foreground mb-1">Submission Date</div>
+                      <div className="text-sm" data-testid="text-opp-submission-date">
+                        {selectedOpp.submissionDate ? formatDateTime(selectedOpp.submissionDate) : "-"}
+                      </div>
+                    </div>
+                    <div>
                       <div className="text-xs text-muted-foreground mb-1">Est. Start Date</div>
                       <div className="text-sm">{formatDate(selectedOpp.estimatedStartDate)}</div>
                     </div>
@@ -940,6 +949,17 @@ export default function SalesPipelinePage() {
                   data-testid="input-new-opp-probability"
                 />
               </div>
+            </div>
+            <div>
+              <Label htmlFor="new-opp-submission-date">Submission Date</Label>
+              <Input
+                id="new-opp-submission-date"
+                type="datetime-local"
+                value={newOpp.submissionDate}
+                onChange={(e) => setNewOpp((p) => ({ ...p, submissionDate: e.target.value }))}
+                data-testid="input-new-opp-submission-date"
+              />
+              <p className="text-xs text-muted-foreground mt-1">When is the tender due for submission?</p>
             </div>
             <div>
               <Label htmlFor="new-opp-comments">Comments</Label>

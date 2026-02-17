@@ -446,18 +446,21 @@ async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean>
   const { pollEmailsJob, processImportedInvoicesJob } = await import("./lib/ap-inbox-jobs");
   const { pollTenderEmailsJob } = await import("./lib/tender-inbox-jobs");
   const { checkLicenceExpiriesJob } = await import("./lib/licence-expiry-jobs");
+  const { checkOpportunitySubmissionRemindersJob } = await import("./lib/opportunity-reminder-jobs");
 
   const EMAIL_POLL_INTERVAL = 5 * 60 * 1000;
   const EXTRACT_INTERVAL = 2 * 60 * 1000;
   const TENDER_POLL_INTERVAL = 5 * 60 * 1000;
   const LICENCE_EXPIRY_CHECK_INTERVAL = 6 * 60 * 60 * 1000;
+  const OPPORTUNITY_REMINDER_INTERVAL = 6 * 60 * 60 * 1000;
 
   scheduler.register("ap-email-poll", pollEmailsJob, EMAIL_POLL_INTERVAL);
   scheduler.register("ap-invoice-extract", processImportedInvoicesJob, EXTRACT_INTERVAL);
   scheduler.register("tender-email-poll", pollTenderEmailsJob, TENDER_POLL_INTERVAL);
   scheduler.register("licence-expiry-check", checkLicenceExpiriesJob, LICENCE_EXPIRY_CHECK_INTERVAL);
+  scheduler.register("opportunity-submission-reminder", checkOpportunitySubmissionRemindersJob, OPPORTUNITY_REMINDER_INTERVAL);
   scheduler.start();
-  logger.info("[Background] AP email poll (5min), invoice extraction (2min), tender email poll (5min), and licence expiry check (6hr) jobs started");
+  logger.info("[Background] AP email poll (5min), invoice extraction (2min), tender email poll (5min), licence expiry check (6hr), and opportunity submission reminder (6hr) jobs started");
 
   try {
     const { eq, count } = await import("drizzle-orm");
