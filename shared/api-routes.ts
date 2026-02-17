@@ -844,6 +844,7 @@ export const EMPLOYEE_ROUTES = {
   EMPLOYMENT_BY_ID: (employeeId: string | number, id: string | number) => `/api/employees/${employeeId}/employments/${id}`,
   DOCUMENTS: (employeeId: string | number) => `/api/employees/${employeeId}/documents`,
   DOCUMENT_BY_ID: (employeeId: string | number, id: string | number) => `/api/employees/${employeeId}/documents/${id}`,
+  ALL_LICENCES: '/api/employees/licences/all',
   LICENCES: (employeeId: string | number) => `/api/employees/${employeeId}/licences`,
   LICENCE_BY_ID: (employeeId: string | number, id: string | number) => `/api/employees/${employeeId}/licences/${id}`,
   ONBOARDINGS: (employeeId: string | number) => `/api/employees/${employeeId}/onboardings`,

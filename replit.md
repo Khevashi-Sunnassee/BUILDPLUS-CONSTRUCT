@@ -1,7 +1,7 @@
 # BuildPlus Ai Management System
 
 ## Overview
-The BuildPlus AI Management System optimizes panel production and delivery for construction and manufacturing. It manages the entire panel lifecycle, from CAD/Revit time management to delivery tracking, aiming to enhance operational control, efficiency, and decision-making. Key features include daily log management, approval workflows, reporting, analytics, KPI dashboards, and logistics for load lists and delivery. The system is designed for enterprise-grade scale, supporting 300+ simultaneous users with multi-company deployment and data isolation, providing a comprehensive solution for managing complex construction and manufacturing workflows.
+The BuildPlus AI Management System optimizes panel production and delivery for construction and manufacturing. It manages the entire panel lifecycle from CAD/Revit time management to delivery tracking, aiming to enhance operational control, efficiency, and decision-making. Key features include daily log management, approval workflows, reporting, analytics, KPI dashboards, and logistics for load lists and delivery. The system is designed for enterprise-grade scale, supporting 300+ simultaneous users with multi-company deployment and data isolation, providing a comprehensive solution for managing complex construction and manufacturing workflows with a business vision to transform construction and manufacturing operations.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -26,96 +26,36 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Communication:** Teams-style chat with DMs, groups, channels, @mentions, notifications, and file attachments.
 - **Sales & Document Management:** Mobile-first pre-sales opportunity management; document management with version control, bundles, entity linking, bulk upload, and AI metadata extraction.
 - **Mobile Functionality:** QR scanner for panels and document bundles, mobile panel checklists with conditional fields, and mobile PM Call Logs.
-- **Address Autocomplete:** Australian suburb/postcode/state lookup across all address forms (customers, suppliers, employees, jobs, factories, mobile opportunities) using a built-in dataset via `SuburbLookup` component and `/api/address-lookup` endpoint.
+- **Address Autocomplete:** Australian suburb/postcode/state lookup across all address forms.
 - **Advanced Features:** Panel consolidation, contract retention tracking, visual document comparison, and a comprehensive Asset Register with lifecycle management.
+- **Employee Licences & Tickets:** Comprehensive licence/ticket management per employee with pre-populated construction ticket types and automated expiry email notifications.
 - **Hire Booking Engine:** Equipment hire management with approval workflows for internal and external assets.
 - **Project Activities / Workflow System:** Template-driven activity workflow system for job types, with nested tasks, statuses, comments, and MS Project-style dependencies.
 - **User Invitation System:** Admin-initiated email invitations with secure tokens and public registration.
 - **CAPEX Module:** Capital expenditure request management with approval workflows, audit trails, and bidirectional PO integration.
 - **Scope of Works Builder:** AI-powered scope generation for tender management across trades.
 - **Budget System:** Four-phase cost management including two-tier cost codes, a tender center, job tender sheets, and per-job budget management with Bill of Quantities (BOQ).
-- **MYOB Integration:** OAuth 2.0 connection to MYOB Business API with database-backed token storage (per-company), auto-refresh, and multi-tenant isolation. Endpoints: company info, customers, suppliers, accounts, invoices, inventory items. Frontend page at `/myob-integration` with tabbed data browsing. Key files: `server/myob.ts` (API client), `server/routes/myob.routes.ts` (routes), `client/src/pages/myob-integration.tsx` (UI).
-- **AP Email Inbox Monitoring:** Automatic invoice processing via Resend inbound email webhooks. Suppliers send invoices to a dedicated email address; the system creates AP invoices from PDF/image attachments and auto-triggers OCR extraction. Per-company inbox settings (enable/disable, inbound email, auto-extract, auto-submit, default status). Schema tables: `apInboundEmails` (email tracking), `apInboxSettings` (per-company config). Key files: `server/routes/ap-inbox.routes.ts` (webhook + settings API), `client/src/pages/ap-invoices.tsx` (inbox settings dialog).
-- **AP Invoice Status Workflow:** IMPORTED → PROCESSED (after AI extraction) → CONFIRMED (data entry approval) → PARTIALLY_APPROVED (approval in progress) → APPROVED (fully approved). Alternate states: ON_HOLD, REJECTED. Supplier filtering and column sorting (supplier, date, amount) on invoice list. Deletion handles FK constraints for `apInboundEmails` and `myobExportLogs`.
+- **MYOB Integration:** OAuth 2.0 connection to MYOB Business API with database-backed token storage (per-company), auto-refresh, and multi-tenant isolation.
+- **AP Email Inbox Monitoring:** Automatic invoice processing via Resend inbound email webhooks.
+- **AP Invoice Status Workflow:** Multi-stage approval workflow for invoices: IMPORTED → PROCESSED → CONFIRMED → PARTIALLY_APPROVED → APPROVED.
 
 **System Design Choices:**
-- **Multi-Tenancy:** Designed for multi-company deployment with strict data isolation, ensuring every query on company-owned tables includes a `companyId` filter.
+- **Multi-Tenancy:** Designed for multi-company deployment with strict data isolation.
 - **Scalability:** Supports 300+ simultaneous users.
-- **Robustness:** Extensive input validation using Zod, comprehensive error handling, and consistent API response structures.
-- **Security:** Role-Based Access Control (RBAC), authentication via `bcrypt` and `express-session`, and UUID validation.
-- **Data Integrity:** Enforced through 142 CHECK constraints, 61 unique constraints, and 390 foreign keys. Performance indexes on all user_id and created_at columns.
-- **Query Safety:** All list endpoints and multi-row queries across 25+ route files have `.limit()` safeguards (1000 standard, 5000 for exports/reports) to prevent unbounded result sets at scale.
-- **Accessibility:** All interactive elements and pages adhere to accessibility standards (`aria-label`, `aria-required`, `role="alert"`).
-- **Testing:** Frontend tested with React Testing Library + Vitest (135 files, 562+ tests); backend tested with 43+ API integration tests covering company isolation, data integrity, pagination, rate limiting, and input sanitization.
-
-## Sidebar Pattern (EntitySidebar)
-
-When building sidebar components with Updates/Files/Activity tabs, **always** use the shared `EntitySidebar` component (`client/src/components/EntitySidebar.tsx`) instead of duplicating sidebar logic. Shared utilities live in `client/src/lib/sidebar-utils.tsx`.
-
-**How to add a new sidebar:**
-1. Define route constants in `shared/api-routes.ts` (UPDATES, UPDATE_BY_ID, FILES, FILE_BY_ID, EMAIL_DROP)
-2. Create a thin wrapper component that passes entity-specific props to `EntitySidebar`
-3. Use `testIdPrefix` for consistent data-testid naming (e.g., `"task"`, `"opp"`, `"budget"`, `"invitation"`)
-4. Use `extraTabs` + `renderExtraTab` for entity-specific tabs (e.g., BudgetLineSidebar's "items" tab)
-5. Use `hideActivityTab` if the entity doesn't need an activity log
-6. Use `invalidationKeys` to specify parent query keys to invalidate on mutations
-
-**Existing sidebars using this pattern:**
-- `TaskSidebar` → `client/src/pages/tasks/TaskSidebar.tsx` (uses TASKS_ROUTES)
-- `OpportunitySidebar` → `client/src/pages/OpportunitySidebar.tsx` (uses OPPORTUNITY_ROUTES)
-- `BudgetLineSidebar` → `client/src/components/budget/BudgetLineSidebar.tsx` (uses BUDGET_LINE_ROUTES, has extra "items" tab)
-- `InvitationSidebar` → inline in `client/src/pages/tender-detail.tsx` (uses TENDER_MEMBER_ROUTES)
-
-## Lifecycle Testing
-
-The lifecycle testing skill (`.agents/skills/lifecycle-testing/SKILL.md`) documents the complete 15-stage panel lifecycle test workflow. Key points:
-
-- **Test Company:** Salvo Property Group (admin@salvo.com.au / admin123)
-- **15 Stages:** Job setup → Panel registration → Production slots → Drafting program → Drafting Register (daily logs) → Job activities → Panel lifecycle advancement → Production entries → Reo schedules → Activity completion → Load lists → Delivery confirmation → Progress claims
-- **Date-Sensitive Data:** Daily log dates must be within the current week for the Drafting Register page; production entry dates must be within 30 days for the Production Schedule page.
-- **Schema Gotchas:** `production_entries` uses `production_date` (not `pour_date`); `daily_logs` has no `company_id` column (filter by `user_id`); `job_activities` status enum uses `DONE` not `COMPLETED`; `document_status` is an enum requiring `::text` cast in SQL aggregations.
-
-## Comprehensive System Audit (Feb 2026)
-
-### Audit Scope
-Full-system audit covering all subsystems for enterprise readiness at 300+ simultaneous users and 10,000+ documents.
-
-### Subsystems Audited
-1. **Database Layer** — Connection pooling (max 100), indexes, query safety, statement timeouts, transient retry logic
-2. **Background Job System** — BackgroundScheduler (setInterval-based), AP email poll (5min), AP invoice extraction (2min), overlap prevention, error tracking, startup recovery check
-3. **Job Queue System** — In-memory priority queue with concurrency control (email: 2, AI: 1, PDF: 2), retry with backoff, queue size limits (10,000), auto-cleanup, graceful drain on shutdown
-4. **Email System** — Resend integration via Replit connector with circuit breaker protection, credential caching (5min TTL), email sending with attachments, AP inbox polling for inbound invoices
-5. **Communication System** — Teams-style chat with conversations, DMs, groups, channels, @mentions, notifications, file attachments, query limits on all fetches
-6. **Circuit Breakers** — OpenAI (threshold: 3, reset: 60s), Twilio (threshold: 5, reset: 30s), Mailgun (threshold: 5, reset: 30s), Resend (threshold: 4, reset: 45s)
-7. **Caching** — LRU cache with TTL (settings: 5min/100, users: 2min/500, jobs: 3min/200, queries: 30s/2000), auto-prune every 60s, credential caching for email service
-8. **Rate Limiting** — API (300/min per session), Auth (20/15min per IP), Uploads (30/min per IP)
-9. **Request Monitoring** — Metrics collection, event loop lag measurement, request timing, error monitoring
-10. **Security** — Helmet CSP, input sanitization, content type validation, request ID tracing, RBAC, CSRF double-submit cookie protection
-11. **Graceful Shutdown** — SIGTERM/SIGINT handlers, 15s force exit timeout, scheduler stop, job queue drain, pool draining, HTTP server close
-12. **AP Invoice Processing** — Upload → OCR extraction (GPT-4o) → supplier matching → auto-split → approval path assignment → multi-step approval → MYOB export, startup recovery for orphaned invoices, duplicate invoice detection on confirm (supplier+invoiceNumber)
-13. **Broadcast System** — Template-based mass notifications via email/SMS/WhatsApp with delivery tracking
-14. **MYOB Integration** — OAuth 2.0 with auto-refresh, multi-tenant token isolation, data sync endpoints
-15. **Query Safety** — All list endpoints across 25+ route files have `.limit()` safeguards (1000 standard, 5000 for exports/reports) to prevent unbounded result sets
-
-### Key Infrastructure Files
-- `server/db.ts` — PostgreSQL pool config (max: 100, min: 5, statement_timeout: 60s)
-- `server/lib/background-scheduler.ts` — Interval-based job scheduler with overlap prevention
-- `server/lib/job-queue.ts` — In-memory priority job queue (email, AI, PDF queues)
-- `server/lib/circuit-breaker.ts` — Circuit breakers for OpenAI, Twilio, Mailgun, Resend
-- `server/lib/cache.ts` — LRU cache with TTL and pruning
-- `server/lib/metrics.ts` — Request metrics and event loop lag monitoring
-- `server/lib/ap-inbox-jobs.ts` — Email polling and invoice extraction background jobs with memory leak prevention
-- `server/services/email.service.ts` — Resend email integration with circuit breaker and credential caching
-- `server/chat/chat.routes.ts` — Chat system routes (1265 lines) with query limits
-- `server/routes/broadcast.routes.ts` — Mass notification system
-- `server/middleware/csrf.ts` — CSRF double-submit cookie protection with webhook/auth exemptions
-
-### Scalability Targets
-- 300+ simultaneous users
-- 10,000+ documents and files
-- Minimal API response latency (<500ms for list endpoints)
-- Background jobs must not block request handling
-- Multi-company data isolation on all queries
+- **Robustness:** Extensive input validation, comprehensive error handling, and consistent API response structures.
+- **Security:** Role-Based Access Control (RBAC), authentication, and UUID validation.
+- **Data Integrity:** Enforced through CHECK constraints, unique constraints, and foreign keys, with performance indexes.
+- **Query Safety:** All list endpoints and multi-row queries have `.limit()` safeguards to prevent unbounded result sets.
+- **Accessibility:** All interactive elements and pages adhere to accessibility standards.
+- **Testing:** Frontend tested with React Testing Library + Vitest; backend tested with API integration tests covering company isolation, data integrity, pagination, rate limiting, and input sanitization.
+- **Background Job System:** Interval-based scheduler for tasks like AP email polling and invoice extraction.
+- **Job Queue System:** In-memory priority queue with concurrency control and retry mechanisms.
+- **Circuit Breakers:** Implemented for external services like OpenAI, Twilio, Mailgun, and Resend.
+- **Caching:** LRU cache with TTL for various data types.
+- **Rate Limiting:** Applied to API, Auth, and Upload endpoints.
+- **Request Monitoring:** Metrics collection, event loop lag measurement, request timing, and error monitoring.
+- **Graceful Shutdown:** Handlers for SIGTERM/SIGINT to ensure clean application termination.
+- **Broadcast System:** Template-based mass notifications via email/SMS/WhatsApp with delivery tracking.
 
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.
@@ -133,3 +73,7 @@ Full-system audit covering all subsystems for enterprise readiness at 300+ simul
 - **connect-pg-simple**: PostgreSQL-backed session store.
 - **Vitest**: Testing framework.
 - **ExcelJS**: Excel file generation library.
+- **Resend**: Email service for outbound and inbound email processing.
+- **MYOB Business API**: Accounting software integration.
+- **Twilio**: SMS and voice communication services.
+- **Mailgun**: Email automation service.

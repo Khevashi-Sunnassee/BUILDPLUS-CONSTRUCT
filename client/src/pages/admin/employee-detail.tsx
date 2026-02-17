@@ -80,6 +80,62 @@ import { Progress } from "@/components/ui/progress";
 import type { Employee, EmployeeEmployment, EmployeeDocument, EmployeeLicence, EmployeeOnboarding, EmployeeOnboardingTask, OnboardingTemplate, Department } from "@shared/schema";
 import { EMPLOYEE_ROUTES, ONBOARDING_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 
+const CONSTRUCTION_TICKET_TYPES = [
+  { value: "Forklift Licence", category: "Plant & Equipment" },
+  { value: "Elevated Work Platform (EWP)", category: "Plant & Equipment" },
+  { value: "Boom-Type EWP (Over 11m)", category: "Plant & Equipment" },
+  { value: "Crane Operator (up to 20t)", category: "Plant & Equipment" },
+  { value: "Crane Operator (up to 60t)", category: "Plant & Equipment" },
+  { value: "Crane Operator (up to 100t)", category: "Plant & Equipment" },
+  { value: "Crane Operator (over 100t)", category: "Plant & Equipment" },
+  { value: "Dogging", category: "Rigging & Lifting" },
+  { value: "Basic Rigging", category: "Rigging & Lifting" },
+  { value: "Intermediate Rigging", category: "Rigging & Lifting" },
+  { value: "Advanced Rigging", category: "Rigging & Lifting" },
+  { value: "Basic Scaffolding", category: "Rigging & Lifting" },
+  { value: "Intermediate Scaffolding", category: "Rigging & Lifting" },
+  { value: "Advanced Scaffolding", category: "Rigging & Lifting" },
+  { value: "Concrete Placing Boom", category: "Plant & Equipment" },
+  { value: "Reach Stacker", category: "Plant & Equipment" },
+  { value: "Bridge & Gantry Crane", category: "Plant & Equipment" },
+  { value: "Vehicle Loading Crane", category: "Plant & Equipment" },
+  { value: "Hoist (Personnel & Materials)", category: "Plant & Equipment" },
+  { value: "Hoist (Materials Only)", category: "Plant & Equipment" },
+  { value: "Pressure Equipment", category: "Plant & Equipment" },
+  { value: "White Card (General Construction Induction)", category: "Safety & Induction" },
+  { value: "Working at Heights", category: "Safety & Induction" },
+  { value: "Confined Spaces Entry", category: "Safety & Induction" },
+  { value: "Electrical Spotter", category: "Electrical" },
+  { value: "Electrical Licence - Grade A", category: "Electrical" },
+  { value: "Electrical Licence - Grade B", category: "Electrical" },
+  { value: "Electrical Licence - Restricted", category: "Electrical" },
+  { value: "Heavy Rigid (HR) Licence", category: "Vehicle" },
+  { value: "Heavy Combination (HC) Licence", category: "Vehicle" },
+  { value: "Multi Combination (MC) Licence", category: "Vehicle" },
+  { value: "Medium Rigid (MR) Licence", category: "Vehicle" },
+  { value: "Heavy Vehicle (HV) Licence", category: "Vehicle" },
+  { value: "Dangerous Goods Driver", category: "Vehicle" },
+  { value: "Traffic Control (Stop/Slow)", category: "Traffic" },
+  { value: "Traffic Management Implementation", category: "Traffic" },
+  { value: "Traffic Management Design", category: "Traffic" },
+  { value: "First Aid Certificate", category: "Safety & Induction" },
+  { value: "CPR Certificate", category: "Safety & Induction" },
+  { value: "Fire Warden", category: "Safety & Induction" },
+  { value: "Asbestos Awareness", category: "Safety & Induction" },
+  { value: "Asbestos Removal (Class A)", category: "Safety & Induction" },
+  { value: "Asbestos Removal (Class B)", category: "Safety & Induction" },
+  { value: "Demolition Licence", category: "Safety & Induction" },
+  { value: "Blasting Licence", category: "Safety & Induction" },
+  { value: "Gas Fitter Licence", category: "Trades" },
+  { value: "Plumbing Licence", category: "Trades" },
+  { value: "Welding Certificate", category: "Trades" },
+  { value: "Concrete Finisher Cert III", category: "Trades" },
+  { value: "Carpentry Licence", category: "Trades" },
+  { value: "Builder Licence", category: "Trades" },
+];
+
+const TICKET_CATEGORIES = [...new Set(CONSTRUCTION_TICKET_TYPES.map(t => t.category))];
+
 const AUSTRALIAN_STATES = [
   { value: "VIC", label: "Victoria" },
   { value: "NSW", label: "New South Wales" },
@@ -287,6 +343,7 @@ export default function EmployeeDetailPage() {
   const [editingLicence, setEditingLicence] = useState<EmployeeLicence | null>(null);
   const [deleteLicenceOpen, setDeleteLicenceOpen] = useState(false);
   const [deletingLicenceId, setDeletingLicenceId] = useState<string | null>(null);
+  const [useCustomLicenceType, setUseCustomLicenceType] = useState(false);
 
   const [createOnboardingOpen, setCreateOnboardingOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
@@ -674,12 +731,15 @@ export default function EmployeeDetailPage() {
 
   const openCreateLicence = () => {
     setEditingLicence(null);
+    setUseCustomLicenceType(false);
     licenceForm.reset(defaultLicenceValues);
     setLicenceDialogOpen(true);
   };
 
   const openEditLicence = (lic: EmployeeLicence) => {
     setEditingLicence(lic);
+    const isPreset = CONSTRUCTION_TICKET_TYPES.some(t => t.value === lic.licenceType);
+    setUseCustomLicenceType(!isPreset);
     licenceForm.reset({
       licenceType: lic.licenceType,
       licenceNumber: lic.licenceNumber || "",
@@ -1864,8 +1924,38 @@ export default function EmployeeDetailPage() {
             <form onSubmit={licenceForm.handleSubmit(onSubmitLicence)} className="space-y-4">
               <FormField control={licenceForm.control} name="licenceType" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Licence Type *</FormLabel>
-                  <FormControl><Input {...field} data-testid="input-licence-type" /></FormControl>
+                  <FormLabel>Licence / Ticket Type *</FormLabel>
+                  {useCustomLicenceType ? (
+                    <div className="flex items-center gap-2">
+                      <FormControl><Input {...field} placeholder="Enter custom licence type" data-testid="input-licence-type" /></FormControl>
+                      <Button type="button" variant="outline" size="sm" onClick={() => { setUseCustomLicenceType(false); field.onChange(""); }} data-testid="button-licence-preset">
+                        Preset
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-licence-type">
+                            <SelectValue placeholder="Select ticket type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-[300px]">
+                          {TICKET_CATEGORIES.map((cat) => (
+                            <div key={cat}>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{cat}</div>
+                              {CONSTRUCTION_TICKET_TYPES.filter(t => t.category === cat).map((t) => (
+                                <SelectItem key={t.value} value={t.value}>{t.value}</SelectItem>
+                              ))}
+                            </div>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button type="button" variant="outline" size="sm" onClick={() => { setUseCustomLicenceType(true); field.onChange(""); }} data-testid="button-licence-custom">
+                        Custom
+                      </Button>
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )} />

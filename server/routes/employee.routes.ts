@@ -6,7 +6,7 @@ import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { departments } from "@shared/schema";
+import { departments, employeeLicences } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
 const router = Router();
@@ -467,6 +467,23 @@ router.post("/api/employees/import", requireRole("ADMIN", "MANAGER"), upload.sin
   } catch (error: unknown) {
     logger.error({ err: error }, "Error importing employees");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import employees" });
+  }
+});
+
+// ============== All Licences for Company (Employee Register) ==============
+
+router.get("/api/employees/licences/all", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const allLicences = await db.select().from(employeeLicences)
+      .where(eq(employeeLicences.companyId, companyId))
+      .limit(5000);
+    res.json(allLicences);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Failed to fetch all licences";
+    logger.error({ err: error }, "Error fetching all company licences");
+    res.status(500).json({ error: msg });
   }
 });
 

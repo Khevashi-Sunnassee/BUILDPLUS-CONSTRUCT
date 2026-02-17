@@ -3536,6 +3536,23 @@ export const insertEmployeeLicenceSchema = createInsertSchema(employeeLicences).
 export type InsertEmployeeLicence = z.infer<typeof insertEmployeeLicenceSchema>;
 export type EmployeeLicence = typeof employeeLicences.$inferSelect;
 
+export const licenceExpiryNotifications = pgTable("licence_expiry_notifications", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  licenceId: varchar("licence_id", { length: 36 }).notNull().references(() => employeeLicences.id, { onDelete: "cascade" }),
+  employeeId: varchar("employee_id", { length: 36 }).notNull().references(() => employees.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  notificationType: text("notification_type").notNull(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  emailTo: text("email_to"),
+  status: text("status").default("sent").notNull(),
+  errorMessage: text("error_message"),
+}, (table) => ({
+  licenceIdx: index("licence_expiry_notif_licence_idx").on(table.licenceId),
+  employeeIdx: index("licence_expiry_notif_employee_idx").on(table.employeeId),
+  companyIdx: index("licence_expiry_notif_company_idx").on(table.companyId),
+  typeIdx: index("licence_expiry_notif_type_idx").on(table.notificationType),
+}));
+
 // ============== Industrial Instruments (Award / EBA / Policy Pack) ==============
 
 export const industrialInstruments = pgTable("industrial_instruments", {

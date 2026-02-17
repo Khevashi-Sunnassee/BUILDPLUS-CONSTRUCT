@@ -75,9 +75,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Employee } from "@shared/schema";
+import type { Employee, EmployeeLicence } from "@shared/schema";
 import { EMPLOYEE_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const employeeSchema = z.object({
   employeeNumber: z.string().min(1, "Employee number is required"),
@@ -191,6 +192,22 @@ export default function AdminEmployeesPage() {
   const { data: employeesList, isLoading } = useQuery<Employee[]>({
     queryKey: [EMPLOYEE_ROUTES.LIST],
   });
+
+  const { data: allLicences } = useQuery<EmployeeLicence[]>({
+    queryKey: [EMPLOYEE_ROUTES.ALL_LICENCES],
+  });
+
+  const licencesByEmployee = useMemo(() => {
+    const map = new Map<string, EmployeeLicence[]>();
+    if (allLicences) {
+      for (const lic of allLicences) {
+        const existing = map.get(lic.employeeId) || [];
+        existing.push(lic);
+        map.set(lic.employeeId, existing);
+      }
+    }
+    return map;
+  }, [allLicences]);
 
   const importMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -440,6 +457,7 @@ export default function AdminEmployeesPage() {
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("phone")} data-testid="sort-employee-phone">
                     <span className="flex items-center">Phone<SortIcon column="phone" /></span>
                   </TableHead>
+                  <TableHead>Licences / Tickets</TableHead>
                   <TableHead>Role Tags</TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")} data-testid="sort-employee-status">
                     <span className="flex items-center">Status<SortIcon column="status" /></span>
@@ -461,6 +479,49 @@ export default function AdminEmployeesPage() {
                     </TableCell>
                     <TableCell data-testid={`text-employee-phone-${employee.id}`}>
                       {employee.phone || "-"}
+                    </TableCell>
+                    <TableCell data-testid={`text-employee-licences-${employee.id}`}>
+                      {(() => {
+                        const empLicences = licencesByEmployee.get(employee.id) || [];
+                        if (empLicences.length === 0) return <span className="text-muted-foreground">-</span>;
+                        const now = new Date();
+                        return (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {empLicences.slice(0, 3).map((lic) => {
+                              const isExpired = lic.expiryDate ? new Date(lic.expiryDate) < now : false;
+                              const isExpiringSoon = lic.expiryDate ? !isExpired && (new Date(lic.expiryDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24) <= 30 : false;
+                              const shortName = lic.licenceType.length > 20 ? lic.licenceType.slice(0, 18) + "..." : lic.licenceType;
+                              return (
+                                <Tooltip key={lic.id}>
+                                  <TooltipTrigger asChild>
+                                    <Badge
+                                      variant={isExpired ? "destructive" : isExpiringSoon ? "outline" : "secondary"}
+                                      className={isExpiringSoon ? "border-orange-500 text-orange-600 dark:text-orange-400" : ""}
+                                      data-testid={`badge-licence-${lic.id}`}
+                                    >
+                                      {shortName}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{lic.licenceType}</p>
+                                    {lic.expiryDate && (
+                                      <p className={isExpired ? "text-red-400" : isExpiringSoon ? "text-orange-400" : ""}>
+                                        {isExpired ? "Expired: " : "Expires: "}{lic.expiryDate}
+                                      </p>
+                                    )}
+                                    {lic.licenceNumber && <p>#{lic.licenceNumber}</p>}
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })}
+                            {empLicences.length > 3 && (
+                              <Badge variant="secondary" data-testid={`badge-licence-more-${employee.id}`}>
+                                +{empLicences.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell data-testid={`text-employee-roles-${employee.id}`}>
                       <div className="flex items-center gap-1 flex-wrap">
