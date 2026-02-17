@@ -504,7 +504,7 @@ export default function MobileTasksPage() {
       </div>
 
       <Sheet open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTask(null)}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl bg-[#0D1117] border-white/10">
+        <SheetContent side="bottom" className="h-[100dvh] rounded-none bg-[#0D1117] border-white/10">
           {selectedTask && (
             <TaskDetailSheet 
               task={selectedTask} 
