@@ -892,7 +892,7 @@ router.post("/api/admin/assets/:id/ai-summary", requireRole("ADMIN"), async (req
     const maintenanceHistory = await db.select().from(assetMaintenanceRecords)
       .where(and(eq(assetMaintenanceRecords.assetId, asset.id), eq(assetMaintenanceRecords.companyId, companyId)))
       .orderBy(desc(assetMaintenanceRecords.maintenanceDate))
-      .limit(10);
+      .limit(20);
 
     const prompt = `Analyze this construction/manufacturing asset and provide a comprehensive summary:
 

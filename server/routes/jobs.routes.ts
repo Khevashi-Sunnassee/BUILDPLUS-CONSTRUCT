@@ -329,7 +329,7 @@ router.get("/api/jobs/opportunities/:id/history", requireAuth, async (req: Reque
       .from(salesStatusHistory)
       .where(eq(salesStatusHistory.jobId, String(req.params.id)))
       .orderBy(desc(salesStatusHistory.createdAt))
-      .limit(1000);
+      .limit(500);
 
     res.json(history);
   } catch (error: unknown) {
@@ -442,7 +442,7 @@ router.get("/api/jobs/:jobId/audit-log", requireAuth, async (req: Request, res: 
       .from(jobAuditLogs)
       .where(eq(jobAuditLogs.jobId, job.id))
       .orderBy(desc(jobAuditLogs.createdAt))
-      .limit(100);
+      .limit(500);
     res.json(logs);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching job audit log");
@@ -1518,7 +1518,7 @@ router.get("/api/admin/jobs/:id/audit-log", requireAuth, async (req: Request, re
       .from(jobAuditLogs)
       .where(eq(jobAuditLogs.jobId, job.id))
       .orderBy(desc(jobAuditLogs.createdAt))
-      .limit(100);
+      .limit(500);
 
     res.json(logs);
   } catch (error: unknown) {
@@ -1582,7 +1582,7 @@ router.post("/api/admin/jobs/:id/members", requireRole("ADMIN", "MANAGER"), asyn
     const existing = await db.select()
       .from(jobMembers)
       .where(and(eq(jobMembers.jobId, jobId), eq(jobMembers.userId, userId)))
-      .limit(1000);
+      .limit(500);
     if (existing.length > 0) {
       return res.status(409).json({ error: "User is already a member of this job" });
     }

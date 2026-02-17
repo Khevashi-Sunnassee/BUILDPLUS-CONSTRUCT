@@ -16,6 +16,7 @@ import {
 } from "@shared/schema";
 import type { ApApprovalCondition } from "@shared/schema";
 import { assignApprovalPathToInvoice, reassignApprovalPathsForCompany } from "../lib/ap-approval-assign";
+import { requireUUID } from "../lib/api-utils";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -267,7 +268,8 @@ router.get("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Respon
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [invoice] = await db
       .select()
@@ -464,7 +466,8 @@ router.patch("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Resp
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select()
@@ -564,7 +567,8 @@ router.post("/api/ap-invoices/:id/confirm", requireAuth, async (req: Request, re
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select()
@@ -647,7 +651,8 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select()
@@ -664,7 +669,7 @@ router.post("/api/ap-invoices/:id/submit", requireAuth, async (req: Request, res
 
     const existingApprovals = await db.select().from(apInvoiceApprovals)
       .where(eq(apInvoiceApprovals.invoiceId, id))
-      .limit(1000);
+      .limit(100);
 
     let newStatus: string;
     if (approvalResult.matched && approvalResult.approverCount === 0) {
@@ -697,7 +702,8 @@ router.post("/api/ap-invoices/:id/assign", requireAuth, async (req: Request, res
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const { assigneeUserId } = z.object({ assigneeUserId: z.string() }).parse(req.body);
 
@@ -729,7 +735,8 @@ router.post("/api/ap-invoices/:id/approve", requireAuth, async (req: Request, re
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const body = z.object({ note: z.string().optional() }).parse(req.body || {});
 
@@ -802,7 +809,8 @@ router.post("/api/ap-invoices/:id/reject", requireAuth, async (req: Request, res
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const body = z.object({ note: z.string().min(1, "Rejection note is required") }).parse(req.body);
 
@@ -853,7 +861,8 @@ router.post("/api/ap-invoices/:id/on-hold", requireAuth, async (req: Request, re
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select()
@@ -895,7 +904,8 @@ router.post("/api/ap-invoices/:id/urgent", requireAuth, async (req: Request, res
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select()
@@ -935,7 +945,8 @@ router.get("/api/ap-invoices/:id/splits", requireAuth, async (req: Request, res:
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [invoice] = await db
       .select({ id: apInvoices.id, supplierId: apInvoices.supplierId })
@@ -1011,7 +1022,8 @@ router.put("/api/ap-invoices/:id/splits", requireAuth, async (req: Request, res:
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select()
@@ -1086,7 +1098,8 @@ router.get("/api/ap-invoices/:id/extracted-fields", requireAuth, async (req: Req
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select({ id: apInvoices.id })
@@ -1114,7 +1127,8 @@ router.post("/api/ap-invoices/:id/field-map", requireAuth, async (req: Request, 
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const body = z.object({
       fieldKey: z.string(),
@@ -1171,7 +1185,8 @@ router.get("/api/ap-invoices/:id/document", requireAuth, async (req: Request, re
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select({ id: apInvoices.id })
@@ -1206,7 +1221,8 @@ router.get("/api/ap-invoices/:id/comments", requireAuth, async (req: Request, re
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select({ id: apInvoices.id })
@@ -1244,7 +1260,8 @@ router.post("/api/ap-invoices/:id/comments", requireAuth, async (req: Request, r
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const body = z.object({ body: z.string().min(1, "Comment body is required") }).parse(req.body);
 
@@ -1278,7 +1295,8 @@ router.get("/api/ap-invoices/:id/activity", requireAuth, async (req: Request, re
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select({ id: apInvoices.id })
@@ -1317,7 +1335,8 @@ router.get("/api/ap-invoices/:id/approval-path", requireAuth, async (req: Reques
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select({ id: apInvoices.id })
@@ -1507,7 +1526,8 @@ router.delete("/api/ap-invoices/:id", requireAuth, async (req: Request, res: Res
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select()
@@ -1598,7 +1618,8 @@ router.patch("/api/ap-approval-rules/:id", requireAuth, async (req: Request, res
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select()
@@ -1644,7 +1665,8 @@ router.delete("/api/ap-approval-rules/:id", requireAuth, async (req: Request, re
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db
       .select()
@@ -1675,7 +1697,8 @@ router.post("/api/ap-invoices/:id/export/myob", requireAuth, async (req: Request
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [invoice] = await db.select().from(apInvoices)
       .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId))).limit(1);
@@ -1686,7 +1709,7 @@ router.post("/api/ap-invoices/:id/export/myob", requireAuth, async (req: Request
     const splits = await db.select().from(apInvoiceSplits)
       .where(eq(apInvoiceSplits.invoiceId, id))
       .orderBy(asc(apInvoiceSplits.sortOrder))
-      .limit(5000);
+      .limit(200);
 
     let supplierInfo: any = null;
     if (invoice.supplierId) {
@@ -1782,14 +1805,15 @@ router.get("/api/ap-invoices/:id/document-view", requireAuth, async (req: Reques
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [invoice] = await db.select().from(apInvoices)
       .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId))).limit(1);
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
 
     const docs = await db.select().from(apInvoiceDocuments)
-      .where(eq(apInvoiceDocuments.invoiceId, id)).limit(1);
+      .where(eq(apInvoiceDocuments.invoiceId, id)).limit(200);
     if (!docs.length) return res.status(404).json({ error: "No document found" });
 
     const doc = docs[0];
@@ -1824,14 +1848,15 @@ router.get("/api/ap-invoices/:id/page-thumbnails", requireAuth, async (req: Requ
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [invoice] = await db.select().from(apInvoices)
       .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId))).limit(1);
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
 
     const docs = await db.select().from(apInvoiceDocuments)
-      .where(eq(apInvoiceDocuments.invoiceId, id)).limit(1);
+      .where(eq(apInvoiceDocuments.invoiceId, id)).limit(200);
     if (!docs.length) return res.status(404).json({ error: "No document found" });
 
     const doc = docs[0];
@@ -1897,7 +1922,8 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
           proc.on("error", (err: Error) => reject(err));
         });
 
-        const parsed = JSON.parse(result);
+        let parsed;
+        try { parsed = JSON.parse(result); } catch { parsed = { error: "Failed to parse extraction result", raw: result.slice(0, 500) }; }
         res.json(parsed);
       } finally {
         try {
@@ -1933,14 +1959,15 @@ router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, re
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId!;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [invoice] = await db.select().from(apInvoices)
       .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId))).limit(1);
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });
 
     const docs = await db.select().from(apInvoiceDocuments)
-      .where(eq(apInvoiceDocuments.invoiceId, id)).limit(1);
+      .where(eq(apInvoiceDocuments.invoiceId, id)).limit(200);
     if (!docs.length) return res.status(400).json({ error: "No document to extract from" });
 
     const doc = docs[0];
@@ -2034,7 +2061,7 @@ router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, re
     if (data.supplier_name) {
       const matchingSuppliers = await db.select().from(suppliers)
         .where(and(eq(suppliers.companyId, companyId), ilike(suppliers.name, `%${data.supplier_name}%`)))
-        .limit(1);
+        .limit(100);
       if (matchingSuppliers.length > 0) {
         updateData.supplierId = matchingSuppliers[0].id;
       }

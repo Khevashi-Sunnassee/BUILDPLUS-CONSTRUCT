@@ -70,7 +70,7 @@ router.get("/api/asset-repair-requests", requireAuth, async (req, res) => {
       .leftJoin(suppliers, eq(assetRepairRequests.vendorId, suppliers.id))
       .where(eq(assetRepairRequests.companyId, companyId))
       .orderBy(desc(assetRepairRequests.createdAt))
-      .limit(500);
+      .limit(1000);
 
     const result = rows.map((r) => ({
       ...r.asset_repair_requests,
@@ -101,7 +101,7 @@ router.get("/api/admin/assets/:assetId/repair-requests", requireAuth, async (req
         eq(assetRepairRequests.assetId, assetId)
       ))
       .orderBy(desc(assetRepairRequests.createdAt))
-      .limit(500);
+      .limit(1000);
 
     const result = rows.map((r) => ({
       ...r.asset_repair_requests,

@@ -473,7 +473,7 @@ async function processInboundEmail(
 async function triggerAutoExtract(invoiceId: string, companyId: string) {
   try {
     const docs = await db.select().from(apInvoiceDocuments)
-      .where(eq(apInvoiceDocuments.invoiceId, invoiceId)).limit(1);
+      .where(eq(apInvoiceDocuments.invoiceId, invoiceId)).limit(200);
 
     if (!docs.length) return;
 
@@ -617,7 +617,7 @@ Return your response as valid JSON with this exact structure:
     if (fieldMap.supplier_name) {
       const matchingSuppliers = await db.select().from(suppliers)
         .where(and(eq(suppliers.companyId, companyId), ilike(suppliers.name, `%${fieldMap.supplier_name}%`)))
-        .limit(1);
+        .limit(100);
       if (matchingSuppliers.length > 0) {
         updateData.supplierId = matchingSuppliers[0].id;
       }

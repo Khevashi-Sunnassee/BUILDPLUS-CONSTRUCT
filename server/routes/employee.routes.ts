@@ -478,7 +478,7 @@ router.get("/api/employees/licences/all", requireAuth, async (req, res) => {
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const allLicences = await db.select().from(employeeLicences)
       .where(eq(employeeLicences.companyId, companyId))
-      .limit(5000);
+      .limit(500);
     res.json(allLicences);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to fetch all licences";

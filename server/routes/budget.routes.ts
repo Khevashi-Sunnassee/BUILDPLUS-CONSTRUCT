@@ -5,6 +5,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { parseEmailFile, summarizeEmailBody } from "../utils/email-parser";
+import { requireUUID } from "../lib/api-utils";
 import { db } from "../db";
 import { jobBudgets, budgetLines, budgetLineFiles, budgetLineUpdates, budgetLineDetailItems, costCodes, childCostCodes, tenderSubmissions, tenders, tenderLineItems, suppliers, jobs, jobCostCodes, costCodeDefaults, users } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
@@ -38,7 +39,8 @@ const budgetLineSchema = z.object({
 router.get("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
 
     const [budget] = await db
       .select()
@@ -159,7 +161,8 @@ router.post("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets",
   try {
     const companyId = req.session.companyId!;
     const userId = req.session.userId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
     const data = budgetSchema.parse(req.body);
 
     const [existingBudget] = await db
@@ -206,7 +209,8 @@ router.post("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets",
 router.patch("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
     const data = budgetSchema.partial().parse(req.body);
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -238,7 +242,8 @@ router.patch("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets"
 router.get("/api/jobs/:jobId/budget/lines", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
 
     const [budget] = await db
       .select({ id: jobBudgets.id })
@@ -356,7 +361,8 @@ router.get("/api/jobs/:jobId/budget/lines", requireAuth, requirePermission("budg
 router.post("/api/jobs/:jobId/budget/lines", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
     const data = budgetLineSchema.parse(req.body);
 
     const [budget] = await db
@@ -399,6 +405,8 @@ router.post("/api/jobs/:jobId/budget/lines", requireAuth, requirePermission("bud
 router.patch("/api/jobs/:jobId/budget/lines/:id", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const data = budgetLineSchema.partial().parse(req.body);
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -416,7 +424,7 @@ router.patch("/api/jobs/:jobId/budget/lines/:id", requireAuth, requirePermission
     const [result] = await db
       .update(budgetLines)
       .set(updateData)
-      .where(and(eq(budgetLines.id, req.params.id), eq(budgetLines.companyId, companyId)))
+      .where(and(eq(budgetLines.id, id), eq(budgetLines.companyId, companyId)))
       .returning();
 
     if (!result) {
@@ -435,10 +443,12 @@ router.patch("/api/jobs/:jobId/budget/lines/:id", requireAuth, requirePermission
 router.delete("/api/jobs/:jobId/budget/lines/:id", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [deleted] = await db
       .delete(budgetLines)
-      .where(and(eq(budgetLines.id, req.params.id), eq(budgetLines.companyId, companyId)))
+      .where(and(eq(budgetLines.id, id), eq(budgetLines.companyId, companyId)))
       .returning();
 
     if (!deleted) {
@@ -454,7 +464,8 @@ router.delete("/api/jobs/:jobId/budget/lines/:id", requireAuth, requirePermissio
 router.get("/api/jobs/:jobId/budget/summary", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
 
     const [budget] = await db
       .select()
@@ -519,7 +530,8 @@ router.get("/api/jobs/:jobId/budget/summary", requireAuth, requirePermission("bu
 router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
 
     const [budget] = await db
       .select({ id: jobBudgets.id })
@@ -695,7 +707,8 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
 
 router.get("/api/budget-lines/:lineId/updates", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
-    const lineId = req.params.lineId;
+    const lineId = requireUUID(req, res, "lineId");
+    if (!lineId) return;
     const updates = await db
       .select({
         id: budgetLineUpdates.id,
@@ -744,7 +757,8 @@ router.get("/api/budget-lines/:lineId/updates", requireAuth, requirePermission("
 
 router.post("/api/budget-lines/:lineId/updates", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
-    const lineId = req.params.lineId;
+    const lineId = requireUUID(req, res, "lineId");
+    if (!lineId) return;
     const userId = req.session.userId!;
     const { content } = z.object({ content: z.string().min(1) }).parse(req.body);
 
@@ -763,12 +777,14 @@ router.post("/api/budget-lines/:lineId/updates", requireAuth, requirePermission(
 router.delete("/api/budget-line-updates/:id", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const [update] = await db.select({ id: budgetLineUpdates.id, budgetLineId: budgetLineUpdates.budgetLineId })
       .from(budgetLineUpdates)
       .innerJoin(budgetLines, eq(budgetLineUpdates.budgetLineId, budgetLines.id))
-      .where(and(eq(budgetLineUpdates.id, req.params.id), eq(budgetLines.companyId, companyId)));
+      .where(and(eq(budgetLineUpdates.id, id), eq(budgetLines.companyId, companyId)));
     if (!update) return res.status(404).json({ message: "Update not found" });
-    await db.delete(budgetLineUpdates).where(eq(budgetLineUpdates.id, req.params.id));
+    await db.delete(budgetLineUpdates).where(eq(budgetLineUpdates.id, id));
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error("Error deleting budget line update:", error);
@@ -781,7 +797,8 @@ const budgetEmailUpload = multer({ storage: multer.memoryStorage(), limits: { fi
 router.post("/api/budget-lines/:lineId/email-drop", requireAuth, requirePermission("budgets", "VIEW"), budgetEmailUpload.single("file"), async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const lineId = req.params.lineId;
+    const lineId = requireUUID(req, res, "lineId");
+    if (!lineId) return;
 
     const file = (req as any).file;
     if (!file) return res.status(400).json({ error: "No file uploaded" });
@@ -814,7 +831,8 @@ router.post("/api/budget-lines/:lineId/email-drop", requireAuth, requirePermissi
 
 router.get("/api/budget-lines/:lineId/files", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
-    const lineId = req.params.lineId;
+    const lineId = requireUUID(req, res, "lineId");
+    if (!lineId) return;
     const files = await db
       .select({
         id: budgetLineFiles.id,
@@ -847,7 +865,8 @@ router.get("/api/budget-lines/:lineId/files", requireAuth, requirePermission("bu
 
 router.post("/api/budget-lines/:lineId/files", requireAuth, requirePermission("budgets", "VIEW"), upload.single("file"), async (req: Request, res: Response) => {
   try {
-    const lineId = req.params.lineId;
+    const lineId = requireUUID(req, res, "lineId");
+    if (!lineId) return;
     const userId = req.session.userId!;
     const file = req.file;
     if (!file) return res.status(400).json({ message: "No file uploaded" });
@@ -879,12 +898,14 @@ router.post("/api/budget-lines/:lineId/files", requireAuth, requirePermission("b
 router.delete("/api/budget-line-files/:id", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const [file] = await db.select({ id: budgetLineFiles.id })
       .from(budgetLineFiles)
       .innerJoin(budgetLines, eq(budgetLineFiles.budgetLineId, budgetLines.id))
-      .where(and(eq(budgetLineFiles.id, req.params.id), eq(budgetLines.companyId, companyId)));
+      .where(and(eq(budgetLineFiles.id, id), eq(budgetLines.companyId, companyId)));
     if (!file) return res.status(404).json({ message: "File not found" });
-    await db.delete(budgetLineFiles).where(eq(budgetLineFiles.id, req.params.id));
+    await db.delete(budgetLineFiles).where(eq(budgetLineFiles.id, id));
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error("Error deleting budget line file:", error);
@@ -906,7 +927,8 @@ const detailItemSchema = z.object({
 router.get("/api/budget-lines/:budgetLineId/detail-items", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const { budgetLineId } = req.params;
+    const budgetLineId = requireUUID(req, res, "budgetLineId");
+    if (!budgetLineId) return;
 
     const items = await db
       .select()
@@ -928,7 +950,8 @@ router.get("/api/budget-lines/:budgetLineId/detail-items", requireAuth, requireP
 router.post("/api/budget-lines/:budgetLineId/detail-items", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const { budgetLineId } = req.params;
+    const budgetLineId = requireUUID(req, res, "budgetLineId");
+    if (!budgetLineId) return;
     const data = detailItemSchema.parse(req.body);
 
     const qty = parseFloat(data.quantity || "0");
@@ -964,7 +987,8 @@ router.post("/api/budget-lines/:budgetLineId/detail-items", requireAuth, require
 router.patch("/api/budget-line-detail-items/:id", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const { id } = req.params;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const data = detailItemSchema.partial().parse(req.body);
 
     const [existing] = await db.select().from(budgetLineDetailItems).where(and(
@@ -1003,7 +1027,8 @@ router.patch("/api/budget-line-detail-items/:id", requireAuth, requirePermission
 router.delete("/api/budget-line-detail-items/:id", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const { id } = req.params;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db.select().from(budgetLineDetailItems).where(and(
       eq(budgetLineDetailItems.id, id),
@@ -1025,7 +1050,8 @@ router.delete("/api/budget-line-detail-items/:id", requireAuth, requirePermissio
 router.patch("/api/budget-lines/:budgetLineId/toggle-lock", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const { budgetLineId } = req.params;
+    const budgetLineId = requireUUID(req, res, "budgetLineId");
+    if (!budgetLineId) return;
     const { locked } = req.body;
 
     const [line] = await db.select().from(budgetLines).where(and(

@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
+import { requireUUID } from "../lib/api-utils";
 import { db } from "../db";
 import { hireBookings, employees, suppliers, jobs, assets, users, companies, factories, ASSET_CATEGORIES } from "@shared/schema";
 import { eq, and, desc, sql, ilike, or } from "drizzle-orm";
@@ -150,7 +151,8 @@ router.get("/api/hire-bookings/:id", requireAuth, async (req: Request, res: Resp
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = String(req.params.id);
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const result = await db
       .select({
@@ -282,7 +284,8 @@ router.patch("/api/hire-bookings/:id", requireAuth, async (req: Request, res: Re
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = String(req.params.id);
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const existing = await db
       .select()
@@ -385,7 +388,8 @@ async function transitionStatus(
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = String(req.params.id);
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const existing = await db
       .select()
@@ -518,7 +522,8 @@ router.delete("/api/hire-bookings/:id", requireAuth, requireRole("ADMIN"), async
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = String(req.params.id);
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const existing = await db
       .select()
@@ -627,7 +632,8 @@ router.post("/api/hire-bookings/:id/send-email", requireAuth, async (req: Reques
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = String(req.params.id);
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const emailTo = req.body.to as string;
     const emailCc = req.body.cc as string | undefined;

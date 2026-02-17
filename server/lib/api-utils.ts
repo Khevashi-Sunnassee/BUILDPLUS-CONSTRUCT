@@ -125,3 +125,30 @@ export function createdResponse<T>(res: Response, data: T): Response {
 export function noContentResponse(res: Response): Response {
   return res.status(204).end();
 }
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function isValidUUID(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
+
+export function requireUUID(req: Request, res: Response, paramName: string): string | null {
+  const value = req.params[paramName];
+  if (!value || typeof value !== "string" || !UUID_REGEX.test(value.trim())) {
+    res.status(400).json({ error: `Invalid ${paramName} format` });
+    return null;
+  }
+  return value.trim();
+}
+
+export function safeJsonParse<T = unknown>(text: string, fallback?: T): { success: true; data: T } | { success: false; error: string } {
+  try {
+    const data = JSON.parse(text) as T;
+    return { success: true, data };
+  } catch (err) {
+    if (fallback !== undefined) {
+      return { success: true, data: fallback };
+    }
+    return { success: false, error: err instanceof Error ? err.message : "Invalid JSON" };
+  }
+}

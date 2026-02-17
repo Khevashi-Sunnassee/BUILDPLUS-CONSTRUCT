@@ -13,6 +13,7 @@ import {
   tenders, tenderSubmissions, suppliers, companies
 } from "@shared/schema";
 import { getResendApiKey } from "../services/email.service";
+import { requireUUID } from "../lib/api-utils";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -211,7 +212,8 @@ router.get("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, res
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId)))
@@ -323,14 +325,15 @@ router.get("/api/tender-inbox/emails/:id/document-view", requireAuth, async (req
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
     if (!email) return res.status(404).json({ error: "Tender email not found" });
 
     const docs = await db.select().from(tenderEmailDocuments)
-      .where(eq(tenderEmailDocuments.inboundEmailId, id)).limit(1);
+      .where(eq(tenderEmailDocuments.inboundEmailId, id)).limit(200);
     if (!docs.length) return res.status(404).json({ error: "No document found" });
 
     const doc = docs[0];
@@ -362,14 +365,15 @@ router.get("/api/tender-inbox/emails/:id/extracted-fields", requireAuth, async (
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
     if (!email) return res.status(404).json({ error: "Tender email not found" });
 
     const fields = await db.select().from(tenderEmailExtractedFields)
-      .where(eq(tenderEmailExtractedFields.inboundEmailId, id)).limit(1000);
+      .where(eq(tenderEmailExtractedFields.inboundEmailId, id)).limit(200);
 
     res.json(fields);
   } catch (error: unknown) {
@@ -383,14 +387,15 @@ router.post("/api/tender-inbox/emails/:id/extract", requireAuth, async (req: Req
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
     if (!email) return res.status(404).json({ error: "Tender email not found" });
 
     const docs = await db.select().from(tenderEmailDocuments)
-      .where(eq(tenderEmailDocuments.inboundEmailId, id)).limit(1);
+      .where(eq(tenderEmailDocuments.inboundEmailId, id)).limit(200);
     if (!docs.length) return res.status(404).json({ error: "No document found for extraction" });
 
     const doc = docs[0];
@@ -432,7 +437,8 @@ router.post("/api/tender-inbox/emails/:id/match", requireAuth, async (req: Reque
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const body = z.object({
       tenderId: z.string(),
@@ -452,7 +458,7 @@ router.post("/api/tender-inbox/emails/:id/match", requireAuth, async (req: Reque
 
     if (!submissionId) {
       const extractedFields = await db.select().from(tenderEmailExtractedFields)
-        .where(eq(tenderEmailExtractedFields.inboundEmailId, id)).limit(100);
+        .where(eq(tenderEmailExtractedFields.inboundEmailId, id)).limit(200);
 
       let subtotal = "0";
       let taxAmount = "0";
@@ -516,7 +522,8 @@ router.patch("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, r
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const userId = req.session.userId;
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [existing] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
@@ -573,14 +580,15 @@ router.delete("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, 
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
     if (!email) return res.status(404).json({ error: "Tender email not found" });
 
     const docs = await db.select().from(tenderEmailDocuments)
-      .where(eq(tenderEmailDocuments.inboundEmailId, id)).limit(1000);
+      .where(eq(tenderEmailDocuments.inboundEmailId, id)).limit(200);
 
     for (const doc of docs) {
       try {
@@ -604,7 +612,8 @@ router.get("/api/tender-inbox/emails/:id/activity", requireAuth, async (req: Req
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
@@ -613,7 +622,7 @@ router.get("/api/tender-inbox/emails/:id/activity", requireAuth, async (req: Req
     const activity = await db.select().from(tenderEmailActivity)
       .where(eq(tenderEmailActivity.inboundEmailId, id))
       .orderBy(desc(tenderEmailActivity.createdAt))
-      .limit(1000);
+      .limit(500);
 
     res.json(activity);
   } catch (error: unknown) {
@@ -626,14 +635,15 @@ router.get("/api/tender-inbox/emails/:id/page-thumbnails", requireAuth, async (r
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
     if (!email) return res.status(404).json({ error: "Tender email not found" });
 
     const docs = await db.select().from(tenderEmailDocuments)
-      .where(eq(tenderEmailDocuments.inboundEmailId, id)).limit(1);
+      .where(eq(tenderEmailDocuments.inboundEmailId, id)).limit(200);
     if (!docs.length) return res.status(404).json({ error: "No document found" });
 
     const doc = docs[0];
@@ -697,7 +707,8 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
           proc.on("error", (err: Error) => reject(err));
         });
 
-        const parsed = JSON.parse(result);
+        let parsed;
+        try { parsed = JSON.parse(result); } catch { parsed = { error: "Failed to parse extraction result", raw: result.slice(0, 500) }; }
         res.json(parsed);
       } finally {
         try {

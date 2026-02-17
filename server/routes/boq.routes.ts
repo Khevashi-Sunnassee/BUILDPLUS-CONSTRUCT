@@ -6,6 +6,7 @@ import logger from "../lib/logger";
 import { db } from "../db";
 import { boqGroups, boqItems, costCodes, childCostCodes, budgetLines, tenderLineItems } from "@shared/schema";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { requireUUID } from "../lib/api-utils";
 
 const router = Router();
 
@@ -36,7 +37,8 @@ const boqItemSchema = z.object({
 router.get("/api/jobs/:jobId/boq/groups", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
     const { costCodeId } = req.query;
 
     let conditions = [eq(boqGroups.jobId, jobId), eq(boqGroups.companyId, companyId)];
@@ -82,7 +84,8 @@ router.get("/api/jobs/:jobId/boq/groups", requireAuth, requirePermission("budget
 router.post("/api/jobs/:jobId/boq/groups", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
     const data = boqGroupSchema.parse(req.body);
 
     const [result] = await db
@@ -162,7 +165,8 @@ router.delete("/api/jobs/:jobId/boq/groups/:id", requireAuth, requirePermission(
 router.get("/api/jobs/:jobId/boq/items", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
     const { groupId, costCodeId } = req.query;
 
     let conditions = [eq(boqItems.jobId, jobId), eq(boqItems.companyId, companyId)];
@@ -211,7 +215,8 @@ router.get("/api/jobs/:jobId/boq/items", requireAuth, requirePermission("budgets
 router.post("/api/jobs/:jobId/boq/items", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
     const data = boqItemSchema.parse(req.body);
 
     const [result] = await db
@@ -308,7 +313,8 @@ router.delete("/api/jobs/:jobId/boq/items/:id", requireAuth, requirePermission("
 router.get("/api/jobs/:jobId/boq/summary", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
 
     const [totals] = await db
       .select({

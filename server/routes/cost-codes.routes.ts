@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
+import { requireUUID } from "../lib/api-utils";
 import { db } from "../db";
 import { costCodes, childCostCodes, costCodeDefaults, jobCostCodes, jobTypes, jobs } from "@shared/schema";
 import { eq, and, desc, asc, sql, ilike, or, inArray } from "drizzle-orm";
@@ -527,10 +528,12 @@ router.post("/api/cost-codes/import", requireAuth, requirePermission("admin_cost
 router.get("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_codes", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const [result] = await db
       .select()
       .from(costCodes)
-      .where(and(eq(costCodes.id, req.params.id), eq(costCodes.companyId, companyId)));
+      .where(and(eq(costCodes.id, id), eq(costCodes.companyId, companyId)));
 
     if (!result) {
       return res.status(404).json({ message: "Cost code not found" });
@@ -583,6 +586,8 @@ router.post("/api/cost-codes", requireAuth, requirePermission("admin_cost_codes"
 router.patch("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_codes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const data = costCodeSchema.partial().parse(req.body);
 
     if (data.code) {
@@ -592,7 +597,7 @@ router.patch("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_c
         .where(and(eq(costCodes.code, data.code), eq(costCodes.companyId, companyId)))
         .limit(1);
 
-      if (existing.length > 0 && existing[0].id !== req.params.id) {
+      if (existing.length > 0 && existing[0].id !== id) {
         return res.status(409).json({ message: `Cost code "${data.code}" already exists` });
       }
     }
@@ -603,7 +608,7 @@ router.patch("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_c
         ...data,
         updatedAt: new Date(),
       })
-      .where(and(eq(costCodes.id, req.params.id), eq(costCodes.companyId, companyId)))
+      .where(and(eq(costCodes.id, id), eq(costCodes.companyId, companyId)))
       .returning();
 
     if (!result) {
@@ -622,24 +627,26 @@ router.patch("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_c
 router.delete("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_codes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const usedInDefaults = await db
       .select({ id: costCodeDefaults.id })
       .from(costCodeDefaults)
-      .where(eq(costCodeDefaults.costCodeId, req.params.id))
+      .where(eq(costCodeDefaults.costCodeId, id))
       .limit(1);
 
     const usedInJobs = await db
       .select({ id: jobCostCodes.id })
       .from(jobCostCodes)
-      .where(eq(jobCostCodes.costCodeId, req.params.id))
+      .where(eq(jobCostCodes.costCodeId, id))
       .limit(1);
 
     if (usedInDefaults.length > 0 || usedInJobs.length > 0) {
       const [result] = await db
         .update(costCodes)
         .set({ isActive: false, updatedAt: new Date() })
-        .where(and(eq(costCodes.id, req.params.id), eq(costCodes.companyId, companyId)))
+        .where(and(eq(costCodes.id, id), eq(costCodes.companyId, companyId)))
         .returning();
 
       return res.json({ ...result, deactivated: true, message: "Cost code is in use and has been deactivated instead of deleted" });
@@ -647,7 +654,7 @@ router.delete("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_
 
     const [deleted] = await db
       .delete(costCodes)
-      .where(and(eq(costCodes.id, req.params.id), eq(costCodes.companyId, companyId)))
+      .where(and(eq(costCodes.id, id), eq(costCodes.companyId, companyId)))
       .returning();
 
     if (!deleted) {
@@ -663,6 +670,8 @@ router.delete("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_
 router.get("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_cost_codes", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const [result] = await db
       .select({
         id: childCostCodes.id,
@@ -680,7 +689,7 @@ router.get("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_co
       })
       .from(childCostCodes)
       .innerJoin(costCodes, eq(childCostCodes.parentCostCodeId, costCodes.id))
-      .where(and(eq(childCostCodes.id, req.params.id), eq(childCostCodes.companyId, companyId)));
+      .where(and(eq(childCostCodes.id, id), eq(childCostCodes.companyId, companyId)));
 
     if (!result) {
       return res.status(404).json({ message: "Child cost code not found" });
@@ -733,6 +742,8 @@ router.post("/api/child-cost-codes", requireAuth, requirePermission("admin_cost_
 router.patch("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_cost_codes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const data = childCostCodeSchema.partial().parse(req.body);
 
     if (data.code) {
@@ -742,7 +753,7 @@ router.patch("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_
         .where(and(eq(childCostCodes.code, data.code), eq(childCostCodes.companyId, companyId)))
         .limit(1);
 
-      if (existing.length > 0 && existing[0].id !== req.params.id) {
+      if (existing.length > 0 && existing[0].id !== id) {
         return res.status(409).json({ message: `Child cost code "${data.code}" already exists` });
       }
     }
@@ -753,7 +764,7 @@ router.patch("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_
         ...data,
         updatedAt: new Date(),
       })
-      .where(and(eq(childCostCodes.id, req.params.id), eq(childCostCodes.companyId, companyId)))
+      .where(and(eq(childCostCodes.id, id), eq(childCostCodes.companyId, companyId)))
       .returning();
 
     if (!result) {
@@ -772,10 +783,12 @@ router.patch("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_
 router.delete("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_cost_codes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [deleted] = await db
       .delete(childCostCodes)
-      .where(and(eq(childCostCodes.id, req.params.id), eq(childCostCodes.companyId, companyId)))
+      .where(and(eq(childCostCodes.id, id), eq(childCostCodes.companyId, companyId)))
       .returning();
 
     if (!deleted) {
@@ -791,6 +804,8 @@ router.delete("/api/child-cost-codes/:id", requireAuth, requirePermission("admin
 router.get("/api/cost-code-defaults/:jobTypeId", requireAuth, requirePermission("admin_cost_codes", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const jobTypeId = requireUUID(req, res, "jobTypeId");
+    if (!jobTypeId) return;
 
     const results = await db
       .select({
@@ -803,7 +818,7 @@ router.get("/api/cost-code-defaults/:jobTypeId", requireAuth, requirePermission(
       })
       .from(costCodeDefaults)
       .innerJoin(costCodes, eq(costCodeDefaults.costCodeId, costCodes.id))
-      .where(and(eq(costCodeDefaults.jobTypeId, req.params.jobTypeId), eq(costCodeDefaults.companyId, companyId)))
+      .where(and(eq(costCodeDefaults.jobTypeId, jobTypeId), eq(costCodeDefaults.companyId, companyId)))
       .orderBy(asc(costCodes.sortOrder), asc(costCodes.code))
       .limit(1000);
 
@@ -863,6 +878,8 @@ router.post("/api/cost-code-defaults", requireAuth, requirePermission("admin_cos
 router.get("/api/jobs/:jobId/cost-codes", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
 
     const results = await db
       .select({
@@ -879,7 +896,7 @@ router.get("/api/jobs/:jobId/cost-codes", requireAuth, async (req: Request, res:
       })
       .from(jobCostCodes)
       .innerJoin(costCodes, eq(jobCostCodes.costCodeId, costCodes.id))
-      .where(and(eq(jobCostCodes.jobId, req.params.jobId), eq(jobCostCodes.companyId, companyId)))
+      .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.companyId, companyId)))
       .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code))
       .limit(1000);
 
@@ -893,7 +910,8 @@ router.get("/api/jobs/:jobId/cost-codes", requireAuth, async (req: Request, res:
 router.post("/api/jobs/:jobId/cost-codes/inherit", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
 
     const [job] = await db
       .select({ id: jobs.id, jobTypeId: jobs.jobTypeId })
@@ -967,7 +985,8 @@ router.post("/api/jobs/:jobId/cost-codes/inherit", requireAuth, async (req: Requ
 router.post("/api/jobs/:jobId/cost-codes", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = requireUUID(req, res, "jobId");
+    if (!jobId) return;
     const { costCodeId, customName, sortOrder } = z.object({
       costCodeId: z.string().min(1),
       customName: z.string().nullable().optional(),
@@ -1008,6 +1027,8 @@ router.post("/api/jobs/:jobId/cost-codes", requireAuth, async (req: Request, res
 router.patch("/api/jobs/:jobId/cost-codes/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const data = z.object({
       isDisabled: z.boolean().optional(),
       customName: z.string().nullable().optional(),
@@ -1017,7 +1038,7 @@ router.patch("/api/jobs/:jobId/cost-codes/:id", requireAuth, async (req: Request
     const [result] = await db
       .update(jobCostCodes)
       .set(data)
-      .where(and(eq(jobCostCodes.id, req.params.id), eq(jobCostCodes.companyId, companyId)))
+      .where(and(eq(jobCostCodes.id, id), eq(jobCostCodes.companyId, companyId)))
       .returning();
 
     if (!result) {
@@ -1036,10 +1057,12 @@ router.patch("/api/jobs/:jobId/cost-codes/:id", requireAuth, async (req: Request
 router.delete("/api/jobs/:jobId/cost-codes/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
 
     const [deleted] = await db
       .delete(jobCostCodes)
-      .where(and(eq(jobCostCodes.id, req.params.id), eq(jobCostCodes.companyId, companyId)))
+      .where(and(eq(jobCostCodes.id, id), eq(jobCostCodes.companyId, companyId)))
       .returning();
 
     if (!deleted) {

@@ -36,7 +36,7 @@ router.get("/api/checklist/entity-types", requireAuth, async (req: Request, res:
         eq(entityTypes.isActive, true)
       ))
       .orderBy(entityTypes.sortOrder)
-      .limit(1000);
+      .limit(200);
 
     res.json(types);
   } catch (error: unknown) {
@@ -145,7 +145,7 @@ router.get("/api/checklist/entity-subtypes", requireAuth, async (req: Request, r
         eq(entitySubtypes.isActive, true)
       ))
       .orderBy(entitySubtypes.sortOrder)
-      .limit(1000);
+      .limit(200);
 
     res.json(subtypes);
   } catch (error: unknown) {
@@ -171,7 +171,7 @@ router.get("/api/checklist/entity-types/:entityTypeId/subtypes", requireAuth, as
         eq(entitySubtypes.isActive, true)
       ))
       .orderBy(entitySubtypes.sortOrder)
-      .limit(1000);
+      .limit(200);
 
     res.json(subtypes);
   } catch (error: unknown) {
@@ -273,7 +273,7 @@ router.get("/api/checklist/templates", requireAuth, async (req: Request, res: Re
         eq(checklistTemplates.isActive, true)
       ))
       .orderBy(desc(checklistTemplates.createdAt))
-      .limit(1000);
+      .limit(500);
 
     res.json(templates);
   } catch (error: unknown) {
@@ -301,7 +301,7 @@ router.get("/api/checklist/templates/by-type/:entityTypeId/:entitySubtypeId", re
         eq(checklistTemplates.isActive, true)
       ))
       .orderBy(checklistTemplates.name)
-      .limit(1000);
+      .limit(500);
 
     res.json(templates);
   } catch (error: unknown) {
@@ -327,7 +327,7 @@ router.get("/api/checklist/templates/by-type/:entityTypeId", requireAuth, async 
         eq(checklistTemplates.isActive, true)
       ))
       .orderBy(checklistTemplates.name)
-      .limit(1000);
+      .limit(500);
 
     res.json(templates);
   } catch (error: unknown) {
@@ -866,7 +866,7 @@ router.get("/api/checklist/reports/summary", requireAuth, async (req: Request, r
     const instances = await db.select()
       .from(checklistInstances)
       .where(eq(checklistInstances.companyId, companyId))
-      .limit(5000);
+      .limit(1000);
 
     const summary = {
       total: instances.length,
@@ -928,7 +928,8 @@ async function processWorkOrderTriggers(
             eq(checklistWorkOrders.checklistInstanceId, instanceId),
             eq(checklistWorkOrders.fieldId, field.id),
             eq(checklistWorkOrders.companyId, companyId)
-          ));
+          ))
+          .limit(100);
 
         if (triggerMatches) {
           if (existing.length > 0) {
@@ -976,7 +977,7 @@ router.get("/api/checklist/instances/:instanceId/work-orders", requireAuth, asyn
       return res.status(400).json({ error: "Company ID required" });
     }
 
-    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 500);
     const orders = await db.select().from(checklistWorkOrders)
       .where(and(
         eq(checklistWorkOrders.checklistInstanceId, instanceId),
@@ -1000,7 +1001,7 @@ router.get("/api/checklist/work-orders", requireAuth, async (req: Request, res: 
       return res.status(400).json({ error: "Company ID required" });
     }
 
-    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 500);
     const orders = await db.select().from(checklistWorkOrders)
       .where(eq(checklistWorkOrders.companyId, companyId!))
       .orderBy(desc(checklistWorkOrders.createdAt))

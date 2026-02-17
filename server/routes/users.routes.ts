@@ -345,7 +345,7 @@ router.get("/api/admin/permission-types", requireRole("ADMIN"), async (req, res)
     const types = await db.select().from(permissionTypes)
       .where(eq(permissionTypes.companyId, companyId))
       .orderBy(permissionTypes.name)
-      .limit(100);
+      .limit(200);
     res.json(types);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching permission types");

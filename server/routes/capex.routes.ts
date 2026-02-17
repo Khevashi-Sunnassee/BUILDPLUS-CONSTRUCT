@@ -4,6 +4,7 @@ import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
+import { requireUUID } from "../lib/api-utils";
 import { purchaseOrders } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
@@ -89,7 +90,9 @@ router.get("/api/capex-requests/by-po/:poId", requireAuth, requirePermission("ca
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const capex = await storage.getCapexRequestByPurchaseOrder(req.params.poId);
+    const poId = requireUUID(req, res, "poId");
+    if (!poId) return;
+    const capex = await storage.getCapexRequestByPurchaseOrder(poId);
     if (capex && capex.companyId !== companyId) return res.status(403).json({ error: "Forbidden" });
     res.json(capex || null);
   } catch (error: unknown) {
@@ -119,7 +122,8 @@ router.get("/api/capex-requests/:id", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const id = req.params.id as string;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const capex = await storage.getCapexRequest(id);
     if (!capex) return res.status(404).json({ error: "CAPEX request not found" });
     if (capex.companyId !== companyId) return res.status(403).json({ error: "Forbidden" });
@@ -132,7 +136,8 @@ router.get("/api/capex-requests/:id", requireAuth, async (req, res) => {
 
 router.get("/api/capex-requests/:id/audit-history", requireAuth, async (req, res) => {
   try {
-    const id = req.params.id as string;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const events = await storage.getCapexAuditHistory(id);
     res.json(events);
   } catch (error: unknown) {
@@ -181,7 +186,8 @@ router.post("/api/capex-requests", requireAuth, requirePermission("capex_request
 
 router.put("/api/capex-requests/:id", requireAuth, requirePermission("capex_requests"), async (req, res) => {
   try {
-    const id = req.params.id as string;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const existing = await storage.getCapexRequest(id);
     if (!existing) return res.status(404).json({ error: "CAPEX request not found" });
 
@@ -222,7 +228,8 @@ router.put("/api/capex-requests/:id/submit", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
 
-    const id = req.params.id as string;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const existing = await storage.getCapexRequest(id);
     if (!existing) return res.status(404).json({ error: "CAPEX request not found" });
     if (existing.status !== "DRAFT") return res.status(400).json({ error: "Only draft requests can be submitted" });
@@ -266,7 +273,8 @@ router.post("/api/capex-requests/:id/approve", requireAuth, async (req, res) => 
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
 
-    const id = req.params.id as string;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const existing = await storage.getCapexRequest(id);
     if (!existing) return res.status(404).json({ error: "CAPEX request not found" });
     if (existing.status !== "SUBMITTED") return res.status(400).json({ error: "Only submitted requests can be approved" });
@@ -331,7 +339,8 @@ router.post("/api/capex-requests/:id/approve", requireAuth, async (req, res) => 
 
 router.post("/api/capex-requests/:id/reject", requireAuth, async (req, res) => {
   try {
-    const id = req.params.id as string;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const existing = await storage.getCapexRequest(id);
     if (!existing) return res.status(404).json({ error: "CAPEX request not found" });
     if (existing.status !== "SUBMITTED") return res.status(400).json({ error: "Only submitted requests can be rejected" });
@@ -381,7 +390,8 @@ router.post("/api/capex-requests/:id/withdraw", requireAuth, async (req, res) =>
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
 
-    const id = req.params.id as string;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const existing = await storage.getCapexRequest(id);
     if (!existing) return res.status(404).json({ error: "CAPEX request not found" });
     if (existing.status !== "SUBMITTED") return res.status(400).json({ error: "Only submitted requests can be withdrawn" });
@@ -420,7 +430,8 @@ router.post("/api/capex-requests/:id/withdraw", requireAuth, async (req, res) =>
 
 router.delete("/api/capex-requests/:id/draft", requireAuth, async (req, res) => {
   try {
-    const id = req.params.id as string;
+    const id = requireUUID(req, res, "id");
+    if (!id) return;
     const existing = await storage.getCapexRequest(id);
     if (!existing) return res.status(404).json({ error: "CAPEX request not found" });
     if (existing.status !== "DRAFT") return res.status(400).json({ error: "Only draft requests can be discarded" });

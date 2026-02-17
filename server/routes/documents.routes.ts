@@ -1646,7 +1646,7 @@ router.post("/api/document-bundles/:bundleId/items/:itemId/request-latest", requ
           eq(documents.isLatestVersion, true),
           eq(documents.parentDocumentId, currentDoc.parentDocumentId || currentDoc.id)
         ))
-        .limit(1);
+        .limit(200);
       if (allVersions.length > 0) {
         latestDoc = allVersions[0];
       }
@@ -2873,7 +2873,8 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
       });
     });
 
-    const analysisResult = JSON.parse(result);
+    let analysisResult: any;
+    try { analysisResult = JSON.parse(result); } catch { throw new Error("Failed to parse PDF extraction result"); }
     sendProgress("pdf_extract", 1, 1, `Extracted ${analysisResult.pages?.length || 0} pages`);
 
     const aiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
@@ -3125,7 +3126,8 @@ router.post("/api/documents/drawing-package/register", requireAuth, drawingPacka
       return;
     }
 
-    const drawingsData = JSON.parse(req.body.drawings || "[]");
+    let drawingsData: any[];
+    try { drawingsData = JSON.parse(req.body.drawings || "[]"); } catch { drawingsData = []; }
     const globalJobId = req.body.jobId || null;
 
     if (!drawingsData.length) {
@@ -3185,7 +3187,8 @@ print(json.dumps(extracted))
       proc.on("error", (err: Error) => reject(err));
     });
 
-    const extractedFiles: Array<{ filename: string; filepath: string; pageNumber: number }> = JSON.parse(splitResult);
+    let extractedFiles: Array<{ filename: string; filepath: string; pageNumber: number }>;
+    try { extractedFiles = JSON.parse(splitResult); } catch { throw new Error("Failed to parse PDF split result"); }
 
     sendProgress("splitting", drawingsData.length, drawingsData.length, "PDF split complete");
 

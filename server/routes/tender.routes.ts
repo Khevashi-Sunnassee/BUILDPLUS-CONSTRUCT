@@ -2920,7 +2920,7 @@ router.get("/api/tender-members/:id/updates", requireAuth, requirePermission("te
     const updatesWithFiles = await Promise.all(updates.map(async (update) => {
       const files = await db.select().from(tenderMemberFiles)
         .where(eq(tenderMemberFiles.updateId, update.id))
-        .limit(100);
+        .limit(500);
       return { ...update, files };
     }));
 
@@ -3028,7 +3028,7 @@ router.get("/api/tender-members/:id/files", requireAuth, requirePermission("tend
     const files = await db.select().from(tenderMemberFiles)
       .where(eq(tenderMemberFiles.tenderMemberId, memberId))
       .orderBy(desc(tenderMemberFiles.createdAt))
-      .limit(1000);
+      .limit(500);
 
     res.json(files);
   } catch (error: unknown) {
