@@ -397,10 +397,16 @@ export default function TenderCenterPage() {
           <h1 className="text-2xl font-bold" data-testid="text-tender-center-title">Tender Center</h1>
           <p className="text-sm text-muted-foreground">Manage tenders, submissions and pricing</p>
         </div>
-        <Button onClick={openCreateTender} data-testid="button-new-tender">
-          <Plus className="h-4 w-4 mr-2" />
-          New Tender
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => navigate("/tender-emails")} data-testid="button-tender-inbox">
+            <Mail className="h-4 w-4 mr-2" />
+            Email Inbox
+          </Button>
+          <Button onClick={openCreateTender} data-testid="button-new-tender">
+            <Plus className="h-4 w-4 mr-2" />
+            New Tender
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-3 flex-wrap">
