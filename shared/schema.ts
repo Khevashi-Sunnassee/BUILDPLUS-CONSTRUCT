@@ -5148,6 +5148,102 @@ export type InsertTenderEmailActivity = z.infer<typeof insertTenderEmailActivity
 export type TenderEmailActivity = typeof tenderEmailActivity.$inferSelect;
 
 // ============================================================================
+// DRAFTING EMAIL INBOX
+// ============================================================================
+
+export const draftingInboxSettings = pgTable("drafting_inbox_settings", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  companyId: varchar("company_id", { length: 36 }).notNull().unique().references(() => companies.id),
+  isEnabled: boolean("is_enabled").default(false).notNull(),
+  inboundEmailAddress: varchar("inbound_email_address", { length: 255 }),
+  autoExtract: boolean("auto_extract").default(true).notNull(),
+  notifyUserIds: jsonb("notify_user_ids").$type<string[]>().default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDraftingInboxSettingsSchema = createInsertSchema(draftingInboxSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDraftingInboxSettings = z.infer<typeof insertDraftingInboxSettingsSchema>;
+export type DraftingInboxSettings = typeof draftingInboxSettings.$inferSelect;
+
+export const draftingInboundEmails = pgTable("drafting_inbound_emails", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  resendEmailId: varchar("resend_email_id", { length: 255 }).notNull(),
+  fromAddress: varchar("from_address", { length: 255 }).notNull(),
+  toAddress: varchar("to_address", { length: 255 }),
+  subject: varchar("subject", { length: 500 }),
+  htmlBody: text("html_body"),
+  textBody: text("text_body"),
+  status: varchar("status", { length: 50 }).notNull().default("RECEIVED"),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
+  requestType: varchar("request_type", { length: 50 }),
+  impactArea: varchar("impact_area", { length: 50 }),
+  attachmentCount: integer("attachment_count").default(0),
+  processingError: text("processing_error"),
+  processedAt: timestamp("processed_at"),
+  matchedAt: timestamp("matched_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("drafting_inbound_emails_company_idx").on(table.companyId),
+  resendIdx: index("drafting_inbound_emails_resend_idx").on(table.resendEmailId),
+  statusIdx: index("drafting_inbound_emails_status_idx").on(table.status),
+  jobIdx: index("drafting_inbound_emails_job_idx").on(table.jobId),
+}));
+
+export const insertDraftingInboundEmailSchema = createInsertSchema(draftingInboundEmails).omit({ id: true, createdAt: true });
+export type InsertDraftingInboundEmail = z.infer<typeof insertDraftingInboundEmailSchema>;
+export type DraftingInboundEmail = typeof draftingInboundEmails.$inferSelect;
+
+export const draftingEmailDocuments = pgTable("drafting_email_documents", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  inboundEmailId: varchar("inbound_email_id", { length: 36 }).notNull().references(() => draftingInboundEmails.id, { onDelete: "cascade" }),
+  storageKey: text("storage_key").notNull(),
+  fileName: varchar("file_name", { length: 500 }).notNull(),
+  mimeType: varchar("mime_type", { length: 100 }),
+  fileSize: integer("file_size"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  emailIdx: index("drafting_email_docs_email_idx").on(table.inboundEmailId),
+}));
+
+export const insertDraftingEmailDocumentSchema = createInsertSchema(draftingEmailDocuments).omit({ id: true, createdAt: true });
+export type InsertDraftingEmailDocument = z.infer<typeof insertDraftingEmailDocumentSchema>;
+export type DraftingEmailDocument = typeof draftingEmailDocuments.$inferSelect;
+
+export const draftingEmailExtractedFields = pgTable("drafting_email_extracted_fields", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  inboundEmailId: varchar("inbound_email_id", { length: 36 }).notNull().references(() => draftingInboundEmails.id, { onDelete: "cascade" }),
+  fieldKey: varchar("field_key", { length: 100 }).notNull(),
+  fieldValue: text("field_value"),
+  confidence: numeric("confidence", { precision: 5, scale: 4 }),
+  source: varchar("source", { length: 50 }).default("extraction"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  emailIdx: index("drafting_email_fields_email_idx").on(table.inboundEmailId),
+}));
+
+export const insertDraftingEmailExtractedFieldSchema = createInsertSchema(draftingEmailExtractedFields).omit({ id: true, createdAt: true });
+export type InsertDraftingEmailExtractedField = z.infer<typeof insertDraftingEmailExtractedFieldSchema>;
+export type DraftingEmailExtractedField = typeof draftingEmailExtractedFields.$inferSelect;
+
+export const draftingEmailActivity = pgTable("drafting_email_activity", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  inboundEmailId: varchar("inbound_email_id", { length: 36 }).notNull().references(() => draftingInboundEmails.id, { onDelete: "cascade" }),
+  activityType: varchar("activity_type", { length: 50 }).notNull(),
+  message: text("message").notNull(),
+  actorUserId: varchar("actor_user_id", { length: 36 }).references(() => users.id),
+  metaJson: jsonb("meta_json"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  emailIdx: index("drafting_email_activity_email_idx").on(table.inboundEmailId),
+}));
+
+export const insertDraftingEmailActivitySchema = createInsertSchema(draftingEmailActivity).omit({ id: true, createdAt: true });
+export type InsertDraftingEmailActivity = z.infer<typeof insertDraftingEmailActivitySchema>;
+export type DraftingEmailActivity = typeof draftingEmailActivity.$inferSelect;
+
+// ============================================================================
 // MYOB EXPORT LOGS
 // ============================================================================
 export const myobExportLogs = pgTable("myob_export_logs", {

@@ -57,6 +57,7 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Request Monitoring:** Metrics collection, event loop lag measurement, request timing, and error monitoring.
 - **Graceful Shutdown:** Handlers for SIGTERM/SIGINT to ensure clean application termination.
 - **Broadcast System:** Template-based mass notifications via email/SMS/WhatsApp with delivery tracking.
+- **Drafting Email Inbox:** Polls drafting@metdul.resend.app for inbound emails, AI-powered extraction identifying change requests, job matching, production impact, drawing references. Background poll on 5-min interval. Rich text email viewer with HTML/text toggle.
 
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.

@@ -63,6 +63,7 @@ import { myobRouter } from "./myob.routes";
 import { apInvoicesRouter } from "./ap-invoices.routes";
 import { apInboxRouter } from "./ap-inbox.routes";
 import { tenderInboxRouter } from "./tender-inbox.routes";
+import { draftingInboxRouter } from "./drafting-inbox.routes";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
@@ -188,6 +189,7 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(apInvoicesRouter);
   app.use(apInboxRouter);
   app.use(tenderInboxRouter);
+  app.use(draftingInboxRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);

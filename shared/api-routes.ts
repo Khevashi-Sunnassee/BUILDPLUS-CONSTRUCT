@@ -1020,3 +1020,21 @@ export const TENDER_INBOX_ROUTES = {
   COUNTS: '/api/tender-inbox/counts',
 } as const;
 export type TenderInboxRoutes = typeof TENDER_INBOX_ROUTES;
+
+export const DRAFTING_INBOX_ROUTES = {
+  SETTINGS: '/api/drafting-inbox/settings',
+  LIST: '/api/drafting-inbox/emails',
+  BY_ID: (id: string | number) => `/api/drafting-inbox/emails/${id}`,
+  CHECK_EMAILS: '/api/drafting-inbox/check-emails',
+  BACKGROUND_STATUS: '/api/drafting-inbox/background-status',
+  UPLOAD: '/api/drafting-inbox/upload',
+  DOCUMENT_VIEW: (id: string | number) => `/api/drafting-inbox/emails/${id}/document-view`,
+  EXTRACTED_FIELDS: (id: string | number) => `/api/drafting-inbox/emails/${id}/extracted-fields`,
+  EXTRACT: (id: string | number) => `/api/drafting-inbox/emails/${id}/extract`,
+  MATCH_JOB: (id: string | number) => `/api/drafting-inbox/emails/${id}/match`,
+  ACTIVITY: (id: string | number) => `/api/drafting-inbox/emails/${id}/activity`,
+  PAGE_THUMBNAILS: (id: string | number) => `/api/drafting-inbox/emails/${id}/page-thumbnails`,
+  EMAIL_BODY: (id: string | number) => `/api/drafting-inbox/emails/${id}/body`,
+  COUNTS: '/api/drafting-inbox/counts',
+} as const;
+export type DraftingInboxRoutes = typeof DRAFTING_INBOX_ROUTES;
