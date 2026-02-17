@@ -387,11 +387,12 @@ router.patch("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW
     if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
     const data = tenderSchema.partial().parse(req.body);
 
+    const [currentTender] = await db.select({ id: tenders.id, status: tenders.status, openDate: tenders.openDate, closedDate: tenders.closedDate }).from(tenders).where(and(eq(tenders.id, req.params.id), eq(tenders.companyId, companyId)));
+    if (!currentTender) {
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
+    }
+
     if (data.status !== undefined) {
-      const [currentTender] = await db.select({ id: tenders.id, status: tenders.status }).from(tenders).where(and(eq(tenders.id, req.params.id), eq(tenders.companyId, companyId)));
-      if (!currentTender) {
-        return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
-      }
       const allowed = VALID_TRANSITIONS[currentTender.status] || [];
       if (!allowed.includes(data.status)) {
         return res.status(400).json({ message: `Cannot transition from ${currentTender.status} to ${data.status}`, code: "STATUS_LOCKED" });

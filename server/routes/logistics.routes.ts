@@ -162,12 +162,12 @@ router.get("/api/load-lists", requireAuth, requirePermission("logistics"), async
       db.select()
         .from(loadListPanels)
         .innerJoin(panelRegister, eq(loadListPanels.panelId, panelRegister.id))
-        .where(sql`${loadListPanels.loadListId} = ANY(${loadListIds})`)
+        .where(inArray(loadListPanels.loadListId, loadListIds))
         .orderBy(asc(loadListPanels.sequence)),
       db.select().from(deliveryRecords)
-        .where(sql`${deliveryRecords.loadListId} = ANY(${loadListIds})`),
+        .where(inArray(deliveryRecords.loadListId, loadListIds)),
       db.select().from(loadReturns)
-        .where(sql`${loadReturns.loadListId} = ANY(${loadListIds})`),
+        .where(inArray(loadReturns.loadListId, loadListIds)),
     ]);
 
     const panelsByLoadList = new Map<string, typeof allPanelRows>();

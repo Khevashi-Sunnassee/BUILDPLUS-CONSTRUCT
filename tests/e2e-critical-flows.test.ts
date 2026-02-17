@@ -113,11 +113,11 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Tender Center - CRUD Flow", () => {
     const res = await adminPatch(`/api/tenders/${tenderId}`, {
       description: "E2E updated tender description",
     });
-    if (res.status === 500) {
+    expect([200, 204]).toContain(res.status);
+    if (res.status === 200) {
       const data = await res.json();
-      console.warn(`[KNOWN BUG] Tender PATCH returns 500: ${data.message || JSON.stringify(data)}`);
+      expect(data).toBeDefined();
     }
-    expect(res.status).not.toBe(401);
   });
 
   it("should delete the tender", async () => {
