@@ -518,7 +518,7 @@ router.delete("/api/procurement/item-categories/:id", requireRole("ADMIN"), asyn
 
 router.get("/api/procurement/construction-stages", requireAuth, async (req, res) => {
   try {
-    const stages = await db.select().from(constructionStages).orderBy(constructionStages.sortOrder);
+    const stages = await db.select().from(constructionStages).orderBy(constructionStages.sortOrder).limit(100);
     res.json(stages);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching construction stages");
@@ -719,7 +719,7 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
     const categories = await storage.getAllItemCategories(companyId);
     const categoryMap = new Map(categories.map(c => [c.name.toLowerCase(), c.id]));
 
-    const stages = await db.select().from(constructionStages).orderBy(constructionStages.sortOrder);
+    const stages = await db.select().from(constructionStages).orderBy(constructionStages.sortOrder).limit(100);
     const stageMap = new Map(stages.map(s => [s.name.toLowerCase(), s.id]));
 
     const itemsToImport: InsertItem[] = [];

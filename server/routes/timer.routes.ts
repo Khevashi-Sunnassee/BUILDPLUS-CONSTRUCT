@@ -524,7 +524,8 @@ router.post("/api/timer-sessions/cancel-stale", requireAuth, async (req, res) =>
           eq(timerSessions.status, "RUNNING"),
           eq(timerSessions.status, "PAUSED")
         )
-      ));
+      ))
+      .limit(500);
 
     const now = new Date();
     const melbourneOffset = 11 * 60 * 60 * 1000;

@@ -109,7 +109,8 @@ router.get("/api/contracts/job/:jobId", requireAuth, async (req: Request, res: R
     const [contract] = await db
       .select()
       .from(contracts)
-      .where(and(eq(contracts.jobId, jobId), eq(contracts.companyId, companyId))!);
+      .where(and(eq(contracts.jobId, jobId), eq(contracts.companyId, companyId))!)
+      .limit(1);
 
     if (!contract) {
       return res.json(null);
@@ -130,7 +131,8 @@ router.get("/api/contracts/:id", requireAuth, async (req: Request, res: Response
     const [contract] = await db
       .select()
       .from(contracts)
-      .where(and(eq(contracts.id, id), eq(contracts.companyId, companyId))!);
+      .where(and(eq(contracts.id, id), eq(contracts.companyId, companyId))!)
+      .limit(1);
 
     if (!contract) {
       return res.status(404).json({ error: "Contract not found" });
@@ -157,7 +159,8 @@ router.post("/api/contracts", requireAuth, async (req: Request, res: Response) =
     const [existing] = await db
       .select()
       .from(contracts)
-      .where(and(eq(contracts.jobId, data.jobId), eq(contracts.companyId, companyId))!);
+      .where(and(eq(contracts.jobId, data.jobId), eq(contracts.companyId, companyId))!)
+      .limit(1);
 
     if (existing) {
       return res.status(409).json({ error: "Contract already exists for this job" });
@@ -179,7 +182,8 @@ router.patch("/api/contracts/:id", requireAuth, async (req: Request, res: Respon
     const [existing] = await db
       .select()
       .from(contracts)
-      .where(and(eq(contracts.id, id), eq(contracts.companyId, companyId))!);
+      .where(and(eq(contracts.id, id), eq(contracts.companyId, companyId))!)
+      .limit(1);
 
     if (!existing) {
       return res.status(404).json({ error: "Contract not found" });

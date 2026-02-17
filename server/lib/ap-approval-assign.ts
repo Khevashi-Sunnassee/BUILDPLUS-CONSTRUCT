@@ -35,7 +35,8 @@ export async function assignApprovalPathToInvoice(
 
   const rules = await db.select().from(apApprovalRules)
     .where(and(eq(apApprovalRules.companyId, companyId), eq(apApprovalRules.isActive, true)))
-    .orderBy(asc(apApprovalRules.priority));
+    .orderBy(asc(apApprovalRules.priority))
+    .limit(200);
 
   if (rules.length === 0) {
     logger.info({ invoiceId, companyId }, "[ApprovalAssign] No active approval rules found");
@@ -45,7 +46,8 @@ export async function assignApprovalPathToInvoice(
   const invoiceTotal = parseFloat(invoice.totalInc || invoice.totalEx || "0");
 
   const splits = await db.select().from(apInvoiceSplits)
-    .where(eq(apInvoiceSplits.invoiceId, invoiceId));
+    .where(eq(apInvoiceSplits.invoiceId, invoiceId))
+    .limit(200);
 
   const splitJobIds = splits.map(s => s.jobId).filter(Boolean) as string[];
   const splitCostCodeIds = splits.map(s => s.costCodeId).filter(Boolean) as string[];

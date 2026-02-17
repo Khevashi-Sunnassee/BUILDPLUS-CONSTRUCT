@@ -70,12 +70,12 @@ const DEFAULT_TRADES = [
 ];
 
 async function verifyScopeOwnership(companyId: string, scopeId: string) {
-  const [s] = await db.select({ id: scopes.id }).from(scopes).where(and(eq(scopes.id, scopeId), eq(scopes.companyId, companyId)));
+  const [s] = await db.select({ id: scopes.id }).from(scopes).where(and(eq(scopes.id, scopeId), eq(scopes.companyId, companyId))).limit(1);
   return !!s;
 }
 
 async function verifyTradeOwnership(companyId: string, tradeId: string) {
-  const [t] = await db.select({ id: scopeTrades.id }).from(scopeTrades).where(and(eq(scopeTrades.id, tradeId), eq(scopeTrades.companyId, companyId)));
+  const [t] = await db.select({ id: scopeTrades.id }).from(scopeTrades).where(and(eq(scopeTrades.id, tradeId), eq(scopeTrades.companyId, companyId))).limit(1);
   return !!t;
 }
 
@@ -328,7 +328,8 @@ router.get("/api/scopes/stats", requireAuth, requirePermission("scopes", "VIEW")
     const [totalResult] = await db
       .select({ total: sql<number>`count(*)::int` })
       .from(scopes)
-      .where(eq(scopes.companyId, companyId));
+      .where(eq(scopes.companyId, companyId))
+      .limit(1);
 
     const byStatus = await db
       .select({
@@ -401,7 +402,8 @@ router.get("/api/scopes/:id", requireAuth, requirePermission("scopes", "VIEW"), 
       .leftJoin(scopeTrades, eq(scopes.tradeId, scopeTrades.id))
       .leftJoin(jobTypes, eq(scopes.jobTypeId, jobTypes.id))
       .leftJoin(users, eq(scopes.createdById, users.id))
-      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)));
+      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)))
+      .limit(1);
 
     if (!result) return res.status(404).json({ message: "Scope not found" });
 
@@ -524,7 +526,8 @@ router.post("/api/scopes/:id/duplicate", requireAuth, requirePermission("scopes"
     const [original] = await db
       .select()
       .from(scopes)
-      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)));
+      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)))
+      .limit(1);
 
     if (!original) return res.status(404).json({ message: "Scope not found" });
 
@@ -897,10 +900,10 @@ router.post("/api/scopes/ai-create", requireAuth, requirePermission("scopes", "V
       return res.status(400).json({ message: "Invalid trade" });
     }
 
-    const [trade] = await db.select({ name: scopeTrades.name }).from(scopeTrades).where(eq(scopeTrades.id, data.tradeId));
+    const [trade] = await db.select({ name: scopeTrades.name }).from(scopeTrades).where(eq(scopeTrades.id, data.tradeId)).limit(1);
     let jobTypeName: string | undefined;
     if (data.jobTypeId) {
-      const [jt] = await db.select({ id: jobTypes.id, name: jobTypes.name }).from(jobTypes).where(and(eq(jobTypes.id, data.jobTypeId), eq(jobTypes.companyId, companyId)));
+      const [jt] = await db.select({ id: jobTypes.id, name: jobTypes.name }).from(jobTypes).where(and(eq(jobTypes.id, data.jobTypeId), eq(jobTypes.companyId, companyId))).limit(1);
       if (!jt) return res.status(400).json({ message: "Invalid job type" });
       jobTypeName = jt.name;
     }
@@ -1097,14 +1100,14 @@ router.post("/api/scopes/import-create", requireAuth, requirePermission("scopes"
       return res.status(400).json({ message: "Invalid trade" });
     }
     if (data.jobTypeId) {
-      const [jt] = await db.select({ id: jobTypes.id }).from(jobTypes).where(and(eq(jobTypes.id, data.jobTypeId), eq(jobTypes.companyId, companyId)));
+      const [jt] = await db.select({ id: jobTypes.id }).from(jobTypes).where(and(eq(jobTypes.id, data.jobTypeId), eq(jobTypes.companyId, companyId))).limit(1);
       if (!jt) return res.status(400).json({ message: "Invalid job type" });
     }
 
     let finalItems = data.items;
 
     if (data.aiFormat) {
-      const [trade] = await db.select({ name: scopeTrades.name }).from(scopeTrades).where(eq(scopeTrades.id, data.tradeId));
+      const [trade] = await db.select({ name: scopeTrades.name }).from(scopeTrades).where(eq(scopeTrades.id, data.tradeId)).limit(1);
 
       const rawItemsList = data.items.map((item, idx) =>
         `${idx + 1}. [${item.category}] ${item.description}${item.details ? ` - ${item.details}` : ""}`
@@ -1273,7 +1276,8 @@ router.get("/api/scopes/:id/export", requireAuth, requirePermission("scopes", "V
       .from(scopes)
       .leftJoin(scopeTrades, eq(scopes.tradeId, scopeTrades.id))
       .leftJoin(jobTypes, eq(scopes.jobTypeId, jobTypes.id))
-      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)));
+      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)))
+      .limit(1);
 
     if (!scope) return res.status(404).json({ message: "Scope not found" });
 
@@ -1358,7 +1362,8 @@ router.post("/api/tenders/:tenderId/scopes", requireAuth, requirePermission("ten
     const [tender] = await db
       .select({ id: tenders.id })
       .from(tenders)
-      .where(and(eq(tenders.id, tenderId), eq(tenders.companyId, companyId)));
+      .where(and(eq(tenders.id, tenderId), eq(tenders.companyId, companyId)))
+      .limit(1);
     if (!tender) return res.status(404).json({ message: "Tender not found" });
 
     if (!(await verifyScopeOwnership(companyId, data.scopeId))) {
@@ -1519,7 +1524,8 @@ router.get("/api/scopes/:id/print", requireAuth, requirePermission("scopes", "VI
       .leftJoin(scopeTrades, eq(scopes.tradeId, scopeTrades.id))
       .leftJoin(jobTypes, eq(scopes.jobTypeId, jobTypes.id))
       .leftJoin(users, eq(scopes.createdById, users.id))
-      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)));
+      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)))
+      .limit(1);
 
     if (!scope) return res.status(404).json({ message: "Scope not found" });
 

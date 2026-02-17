@@ -69,7 +69,8 @@ router.get("/api/asset-repair-requests", requireAuth, async (req, res) => {
       .leftJoin(users, eq(assetRepairRequests.requestedById, users.id))
       .leftJoin(suppliers, eq(assetRepairRequests.vendorId, suppliers.id))
       .where(eq(assetRepairRequests.companyId, companyId))
-      .orderBy(desc(assetRepairRequests.createdAt));
+      .orderBy(desc(assetRepairRequests.createdAt))
+      .limit(500);
 
     const result = rows.map((r) => ({
       ...r.asset_repair_requests,
@@ -99,7 +100,8 @@ router.get("/api/admin/assets/:assetId/repair-requests", requireAuth, async (req
         eq(assetRepairRequests.companyId, companyId),
         eq(assetRepairRequests.assetId, assetId)
       ))
-      .orderBy(desc(assetRepairRequests.createdAt));
+      .orderBy(desc(assetRepairRequests.createdAt))
+      .limit(500);
 
     const result = rows.map((r) => ({
       ...r.asset_repair_requests,
@@ -127,7 +129,8 @@ router.get("/api/asset-repair-requests/:id", requireAuth, async (req, res) => {
       .where(and(
         eq(assetRepairRequests.id, id),
         eq(assetRepairRequests.companyId, companyId)
-      ));
+      ))
+      .limit(1);
 
     if (!row) return res.status(404).json({ error: "Repair request not found" });
 
