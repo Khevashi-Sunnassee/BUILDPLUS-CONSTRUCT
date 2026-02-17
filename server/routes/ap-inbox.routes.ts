@@ -9,7 +9,8 @@ import { ObjectStorageService } from "../replit_integrations/object_storage";
 import {
   apInboundEmails, apInboxSettings, apInvoices, apInvoiceDocuments,
   apInvoiceActivity, apInvoiceSplits, companies, suppliers,
-  tenderInboundEmails, tenderInboxSettings, tenderEmailDocuments, tenderEmailActivity
+  tenderInboundEmails, tenderInboxSettings, tenderEmailDocuments, tenderEmailActivity,
+  draftingInboundEmails, draftingInboxSettings, draftingEmailActivity
 } from "@shared/schema";
 import { getResendApiKey } from "../services/email.service";
 
@@ -234,7 +235,7 @@ router.post("/api/webhooks/resend-inbound", async (req: Request, res: Response) 
 
     const toAddresses: string[] = Array.isArray(to) ? to : (to ? [to] : []);
 
-    const [allApSettings, allTenderSettings] = await Promise.all([
+    const [allApSettings, allTenderSettings, allDraftingSettings] = await Promise.all([
       db.select({ settings: apInboxSettings, companyName: companies.name })
         .from(apInboxSettings)
         .leftJoin(companies, eq(apInboxSettings.companyId, companies.id))
@@ -245,10 +246,16 @@ router.post("/api/webhooks/resend-inbound", async (req: Request, res: Response) 
         .leftJoin(companies, eq(tenderInboxSettings.companyId, companies.id))
         .where(eq(tenderInboxSettings.isEnabled, true))
         .limit(1000),
+      db.select({ settings: draftingInboxSettings, companyName: companies.name })
+        .from(draftingInboxSettings)
+        .leftJoin(companies, eq(draftingInboxSettings.companyId, companies.id))
+        .where(eq(draftingInboxSettings.isEnabled, true))
+        .limit(1000),
     ]);
 
     let matchedApSettings = null;
     let matchedTenderSettings = null;
+    let matchedDraftingSettings = null;
 
     for (const { settings } of allApSettings) {
       if (settings.inboundEmailAddress) {
@@ -272,12 +279,28 @@ router.post("/api/webhooks/resend-inbound", async (req: Request, res: Response) 
       }
     }
 
+    if (!matchedApSettings && !matchedTenderSettings) {
+      for (const { settings } of allDraftingSettings) {
+        if (settings.inboundEmailAddress) {
+          const normalizedInbound = settings.inboundEmailAddress.toLowerCase().trim();
+          if (toAddresses.some(addr => addr.toLowerCase().trim() === normalizedInbound)) {
+            matchedDraftingSettings = settings;
+            break;
+          }
+        }
+      }
+    }
+
     if (matchedTenderSettings) {
       return await handleTenderInboundEmail(res, email_id, from, toAddresses, subject, effectiveHasAttachments, matchedTenderSettings);
     }
 
+    if (matchedDraftingSettings) {
+      return await handleDraftingInboundEmail(res, email_id, from, toAddresses, subject, effectiveHasAttachments, matchedDraftingSettings);
+    }
+
     if (!matchedApSettings) {
-      logger.warn({ to: toAddresses, apCount: allApSettings.length, tenderCount: allTenderSettings.length }, "[Inbox] No matching inbox settings for inbound email");
+      logger.warn({ to: toAddresses, apCount: allApSettings.length, tenderCount: allTenderSettings.length, draftingCount: allDraftingSettings.length }, "[Inbox] No matching inbox settings for inbound email");
       return res.status(200).json({ status: "ignored", reason: "No matching company inbox" });
     }
 
@@ -893,6 +916,72 @@ async function processTenderInboundEmail(
         processedAt: new Date(),
       })
       .where(eq(tenderInboundEmails.id, inboundId));
+  }
+}
+
+async function handleDraftingInboundEmail(
+  res: Response,
+  email_id: string,
+  from: any,
+  toAddresses: string[],
+  subject: string | null,
+  has_attachments: boolean,
+  settings: typeof draftingInboxSettings.$inferSelect
+) {
+  logger.info({ emailId: email_id, to: toAddresses }, "[Drafting Inbox] Routing inbound email to drafting inbox");
+
+  const [existingEmail] = await db.select().from(draftingInboundEmails)
+    .where(eq(draftingInboundEmails.resendEmailId, email_id)).limit(1);
+
+  if (existingEmail) {
+    logger.info({ emailId: email_id }, "[Drafting Inbox] Duplicate email webhook, skipping");
+    return res.status(200).json({ status: "duplicate", inbox: "drafting" });
+  }
+
+  const fromAddress = typeof from === "string" ? from : (from?.email || from?.address || JSON.stringify(from));
+
+  const [inboundRecord] = await db.insert(draftingInboundEmails).values({
+    companyId: settings.companyId,
+    resendEmailId: email_id,
+    fromAddress,
+    toAddress: toAddresses[0] || null,
+    subject: subject || null,
+    status: "RECEIVED",
+    attachmentCount: 0,
+  }).returning();
+
+  await db.insert(draftingEmailActivity).values({
+    inboundEmailId: inboundRecord.id,
+    activityType: "received",
+    message: `Drafting email received from ${fromAddress}`,
+    metaJson: { subject, from: fromAddress },
+  });
+
+  processDraftingInboundEmailWebhook(inboundRecord.id, email_id, settings).catch(err => {
+    logger.error({ err, inboundId: inboundRecord.id }, "[Drafting Inbox] Background processing failed");
+  });
+
+  return res.status(200).json({ status: "accepted", inbox: "drafting", inboundId: inboundRecord.id });
+}
+
+async function processDraftingInboundEmailWebhook(
+  inboundId: string,
+  resendEmailId: string,
+  settings: typeof draftingInboxSettings.$inferSelect
+) {
+  try {
+    const { processDraftingEmailFromPoll: processFromPoll } = await import("../lib/drafting-inbox-jobs");
+    const apiKey = await getResendApiKey();
+    await processFromPoll(inboundId, resendEmailId, settings, apiKey);
+  } catch (error: any) {
+    logger.error({ err: error, inboundId }, "[Drafting Inbox] Webhook processing error");
+    await db.update(draftingInboundEmails)
+      .set({
+        status: "FAILED",
+        processingError: error.message || "Unknown error",
+        processedAt: new Date(),
+      })
+      .where(eq(draftingInboundEmails.id, inboundId));
   }
 }
 

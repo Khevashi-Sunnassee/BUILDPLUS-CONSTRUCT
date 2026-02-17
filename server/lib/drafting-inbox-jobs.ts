@@ -67,7 +67,7 @@ export async function pollDraftingEmailsJob(): Promise<void> {
   }
 }
 
-async function pollDraftingEmailsForCompany(
+export async function pollDraftingEmailsForCompany(
   settings: typeof draftingInboxSettings.$inferSelect,
   apiKey: string
 ): Promise<{ found: number; processed: number; skipped: number; errors: string[] }> {
@@ -182,7 +182,7 @@ async function pollDraftingEmailsForCompany(
   return { found: matchingEmails.length, processed, skipped, errors };
 }
 
-async function processDraftingEmailFromPoll(
+export async function processDraftingEmailFromPoll(
   inboundId: string,
   resendEmailId: string,
   settings: typeof draftingInboxSettings.$inferSelect,
