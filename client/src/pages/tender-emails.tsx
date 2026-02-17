@@ -383,7 +383,7 @@ function TenderEmailDetailDialog({ emailId, open, onOpenChange }: { emailId: str
               {detail.tender && (
                 <div className="col-span-2">
                   <span className="text-muted-foreground">Linked Tender:</span>
-                  <Link href={`/tenders/${detail.tender.id}`} className="ml-2 text-primary hover:underline" data-testid="link-detail-tender">
+                  <Link href={`/tenders/${detail.tender.id}`} className="ml-2 text-foreground hover:underline" data-testid="link-detail-tender">
                     {detail.tender.name || detail.tender.title || `Tender #${detail.tender.id}`}
                   </Link>
                 </div>
@@ -757,7 +757,7 @@ export default function TenderEmailsPage({ embedded = false }: { embedded?: bool
                       <TableCell>
                         <button
                           type="button"
-                          className="text-left text-primary font-medium hover:underline line-clamp-1 max-w-[250px]"
+                          className="text-left text-foreground font-medium hover:underline line-clamp-1 max-w-[250px]"
                           onClick={(e) => { e.stopPropagation(); setDetailEmailId(email.id); setDetailOpen(true); }}
                           data-testid={`link-tender-email-${email.id}`}
                         >

@@ -778,7 +778,7 @@ export default function ApInvoicesPage() {
                       <TableCell>
                         <Link
                           href={`/ap-invoices/${inv.id}`}
-                          className="text-primary font-medium hover:underline"
+                          className="text-foreground font-medium hover:underline"
                           onClick={(e: any) => e.stopPropagation()}
                           data-testid={`link-invoice-${inv.id}`}
                         >
@@ -789,7 +789,7 @@ export default function ApInvoicesPage() {
                         {inv.supplierName && inv.supplierId ? (
                           <button
                             type="button"
-                            className="text-left text-primary font-medium hover:underline"
+                            className="text-left text-foreground font-medium hover:underline"
                             onClick={(e) => {
                               e.stopPropagation();
                               setSupplierFilter({ id: inv.supplierId!, name: inv.supplierName! });
@@ -814,7 +814,7 @@ export default function ApInvoicesPage() {
                           <span className="text-sm">{inv.assigneeName || "Unassigned"}</span>
                           <Link
                             href={`/ap-invoices/${inv.id}?tab=approval`}
-                            className="block text-xs text-primary hover:underline"
+                            className="block text-xs text-muted-foreground hover:underline"
                             onClick={(e: any) => e.stopPropagation()}
                             data-testid={`link-approval-path-${inv.id}`}
                           >
