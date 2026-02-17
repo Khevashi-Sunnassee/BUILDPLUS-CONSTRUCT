@@ -92,8 +92,11 @@ interface SubmissionWithDetails {
   notes: string | null;
   submittedAt: string | null;
   createdAt: string;
-  supplier: { id: string; name: string } | null;
+  supplier: { id: string; name: string; email?: string | null; phone?: string | null; keyContact?: string | null; defaultCostCodeId?: string | null } | null;
+  supplierTrade: string | null;
   createdBy: { id: string; name: string } | null;
+  sourceEmail: { fromAddress: string; subject: string | null; receivedAt: string } | null;
+  extractedFields: Record<string, string | null> | null;
 }
 
 interface TenderPackageDoc {
@@ -238,6 +241,65 @@ function SubmissionRow({ submission, tenderId }: { submission: SubmissionWithDet
         <TableRow data-testid={`row-submission-detail-${submission.id}`}>
           <TableCell colSpan={5} className="bg-muted/30 p-4">
             <div className="space-y-4">
+              {(submission.supplier?.email || submission.supplier?.phone || submission.supplier?.keyContact || submission.supplierTrade) && (
+                <div className="flex gap-6 flex-wrap">
+                  {submission.supplier?.keyContact && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Contact</p>
+                      <p className="text-sm" data-testid={`text-submission-contact-${submission.id}`}>{submission.supplier.keyContact}</p>
+                    </div>
+                  )}
+                  {submission.supplier?.email && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Email</p>
+                      <p className="text-sm" data-testid={`text-submission-email-${submission.id}`}>{submission.supplier.email}</p>
+                    </div>
+                  )}
+                  {submission.supplier?.phone && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Phone</p>
+                      <p className="text-sm" data-testid={`text-submission-phone-${submission.id}`}>{submission.supplier.phone}</p>
+                    </div>
+                  )}
+                  {submission.supplierTrade && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Trade / Cost Code</p>
+                      <p className="text-sm" data-testid={`text-submission-trade-${submission.id}`}>{submission.supplierTrade}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {submission.sourceEmail && (
+                <div className="flex gap-6 flex-wrap border-l-2 border-muted-foreground/20 pl-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Source Email</p>
+                    <p className="text-sm" data-testid={`text-submission-source-from-${submission.id}`}>{submission.sourceEmail.fromAddress}</p>
+                  </div>
+                  {submission.sourceEmail.subject && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Subject</p>
+                      <p className="text-sm" data-testid={`text-submission-source-subject-${submission.id}`}>{submission.sourceEmail.subject}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-muted-foreground">Received</p>
+                    <p className="text-sm" data-testid={`text-submission-source-date-${submission.id}`}>{format(new Date(submission.sourceEmail.receivedAt), "dd/MM/yyyy HH:mm")}</p>
+                  </div>
+                </div>
+              )}
+              {submission.extractedFields && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Extracted Fields</p>
+                  <div className="flex gap-4 flex-wrap">
+                    {Object.entries(submission.extractedFields).map(([key, value]) => (
+                      <div key={key}>
+                        <p className="text-xs text-muted-foreground">{key.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}</p>
+                        <p className="text-sm" data-testid={`text-submission-extracted-${key}-${submission.id}`}>{value || "-"}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {submission.coverNote && (
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Cover Note</p>

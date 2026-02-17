@@ -6,7 +6,7 @@ import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { parseEmailFile, summarizeEmailBody } from "../utils/email-parser";
 import { db } from "../db";
-import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, tenderNotes, tenderFiles, tenderMemberUpdates, tenderMemberFiles, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems, jobTypes, tenderScopes, scopes, scopeItems, scopeTrades } from "@shared/schema";
+import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, tenderNotes, tenderFiles, tenderMemberUpdates, tenderMemberFiles, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems, jobTypes, tenderScopes, scopes, scopeItems, scopeTrades, tenderInboundEmails, tenderEmailExtractedFields } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import crypto from "crypto";
 import QRCode from "qrcode";
@@ -553,6 +553,10 @@ router.get("/api/tenders/:tenderId/submissions", requireAuth, requirePermission(
         supplier: {
           id: suppliers.id,
           name: suppliers.name,
+          email: suppliers.email,
+          phone: suppliers.phone,
+          keyContact: suppliers.keyContact,
+          defaultCostCodeId: suppliers.defaultCostCodeId,
         },
         createdBy: {
           id: users.id,
@@ -566,11 +570,97 @@ router.get("/api/tenders/:tenderId/submissions", requireAuth, requirePermission(
       .orderBy(desc(tenderSubmissions.createdAt))
       .limit(50);
 
-    const mapped = results.map((row) => ({
-      ...row.submission,
-      supplier: row.supplier,
-      createdBy: row.createdBy,
-    }));
+    const submissionIds = results.map(r => r.submission.id);
+
+    let emailsBySubmission = new Map<string, { fromAddress: string; subject: string | null; createdAt: Date }>();
+    let extractedBySubmission = new Map<string, Array<{ fieldKey: string; fieldValue: string | null }>>();
+
+    if (submissionIds.length > 0) {
+      const linkedEmails = await db.select({
+        tenderSubmissionId: tenderInboundEmails.tenderSubmissionId,
+        fromAddress: tenderInboundEmails.fromAddress,
+        subject: tenderInboundEmails.subject,
+        createdAt: tenderInboundEmails.createdAt,
+        id: tenderInboundEmails.id,
+      })
+        .from(tenderInboundEmails)
+        .where(and(
+          inArray(tenderInboundEmails.tenderSubmissionId, submissionIds),
+          eq(tenderInboundEmails.companyId, companyId)
+        ))
+        .limit(200);
+
+      for (const le of linkedEmails) {
+        if (le.tenderSubmissionId) {
+          emailsBySubmission.set(le.tenderSubmissionId, {
+            fromAddress: le.fromAddress,
+            subject: le.subject,
+            createdAt: le.createdAt,
+          });
+        }
+      }
+
+      const emailIds = linkedEmails.map(e => e.id);
+      if (emailIds.length > 0) {
+        const extractedFields = await db.select({
+          inboundEmailId: tenderEmailExtractedFields.inboundEmailId,
+          fieldKey: tenderEmailExtractedFields.fieldKey,
+          fieldValue: tenderEmailExtractedFields.fieldValue,
+        })
+          .from(tenderEmailExtractedFields)
+          .where(inArray(tenderEmailExtractedFields.inboundEmailId, emailIds))
+          .limit(500);
+
+        const emailToSubmission = new Map<string, string>();
+        for (const le of linkedEmails) {
+          if (le.tenderSubmissionId) emailToSubmission.set(le.id, le.tenderSubmissionId);
+        }
+
+        for (const ef of extractedFields) {
+          const subId = emailToSubmission.get(ef.inboundEmailId);
+          if (subId) {
+            if (!extractedBySubmission.has(subId)) extractedBySubmission.set(subId, []);
+            extractedBySubmission.get(subId)!.push({ fieldKey: ef.fieldKey, fieldValue: ef.fieldValue });
+          }
+        }
+      }
+    }
+
+    const costCodeIds = [...new Set(results.map(r => r.supplier?.defaultCostCodeId).filter(Boolean))] as string[];
+    let costCodeMap = new Map<string, { code: string; name: string }>();
+    if (costCodeIds.length > 0) {
+      const codes = await db.select({ id: costCodes.id, code: costCodes.code, name: costCodes.name })
+        .from(costCodes)
+        .where(and(inArray(costCodes.id, costCodeIds), eq(costCodes.companyId, companyId)))
+        .limit(100);
+      for (const c of codes) {
+        costCodeMap.set(c.id, { code: c.code, name: c.name });
+      }
+    }
+
+    const mapped = results.map((row) => {
+      const supplierCostCode = row.supplier?.defaultCostCodeId ? costCodeMap.get(row.supplier.defaultCostCodeId) : null;
+      const sourceEmail = emailsBySubmission.get(row.submission.id) || null;
+      const extracted = extractedBySubmission.get(row.submission.id) || [];
+
+      const extractedMap: Record<string, string | null> = {};
+      for (const ef of extracted) {
+        extractedMap[ef.fieldKey] = ef.fieldValue;
+      }
+
+      return {
+        ...row.submission,
+        supplier: row.supplier,
+        supplierTrade: supplierCostCode ? `${supplierCostCode.code} - ${supplierCostCode.name}` : null,
+        createdBy: row.createdBy,
+        sourceEmail: sourceEmail ? {
+          fromAddress: sourceEmail.fromAddress,
+          subject: sourceEmail.subject,
+          receivedAt: sourceEmail.createdAt,
+        } : null,
+        extractedFields: Object.keys(extractedMap).length > 0 ? extractedMap : null,
+      };
+    });
 
     res.json(mapped);
   } catch (error: unknown) {

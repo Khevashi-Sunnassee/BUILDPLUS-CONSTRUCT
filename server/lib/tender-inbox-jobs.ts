@@ -440,30 +440,65 @@ Only include fields where you can find or reasonably infer the value. Return val
       }
     }
 
+    const allSuppliers = await db.select().from(suppliers)
+      .where(and(
+        eq(suppliers.companyId, companyId),
+        eq(suppliers.isActive, true),
+      ))
+      .limit(1000);
+
+    let matchedSupplier: typeof allSuppliers[0] | null = null;
+
     if (extractedData.supplier_name) {
       const supplierName = extractedData.supplier_name;
-      const matchedSuppliers = await db.select().from(suppliers)
-        .where(and(
-          eq(suppliers.companyId, companyId),
-          eq(suppliers.isActive, true),
-        ))
-        .limit(1000);
-
       const normalizedName = supplierName.toLowerCase().trim();
-      const match = matchedSuppliers.find(s => {
+      matchedSupplier = allSuppliers.find(s => {
         const sName = s.name.toLowerCase().trim();
         return sName === normalizedName ||
           sName.includes(normalizedName) ||
           normalizedName.includes(sName);
-      });
+      }) || null;
+    }
 
-      if (match) {
-        await db.update(tenderInboundEmails)
-          .set({ supplierId: match.id })
-          .where(eq(tenderInboundEmails.id, inboundEmailId));
+    if (!matchedSupplier) {
+      const [emailRecord] = await db.select().from(tenderInboundEmails)
+        .where(eq(tenderInboundEmails.id, inboundEmailId)).limit(1);
 
-        logger.info({ inboundEmailId, supplierId: match.id, supplierName: match.name }, "[Tender Extract] Auto-matched supplier");
+      if (emailRecord?.fromAddress) {
+        const fromAddr = emailRecord.fromAddress.toLowerCase().trim();
+        const emailMatch = fromAddr.match(/<([^>]+)>/) || [null, fromAddr];
+        const emailAddr = (emailMatch[1] || fromAddr).trim();
+        const domain = emailAddr.split("@")[1];
+
+        if (domain && !["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com", "live.com"].includes(domain)) {
+          matchedSupplier = allSuppliers.find(s => {
+            if (!s.email) return false;
+            const supplierEmail = s.email.toLowerCase().trim();
+            const supplierDomain = supplierEmail.split("@")[1];
+            return supplierDomain === domain;
+          }) || null;
+
+          if (matchedSupplier) {
+            logger.info({ inboundEmailId, supplierId: matchedSupplier.id, domain }, "[Tender Extract] Auto-matched supplier by email domain");
+          }
+        }
+
+        if (!matchedSupplier && extractedData.supplier_email) {
+          const extractedEmail = extractedData.supplier_email.toLowerCase().trim();
+          matchedSupplier = allSuppliers.find(s => {
+            if (!s.email) return false;
+            return s.email.toLowerCase().trim() === extractedEmail;
+          }) || null;
+        }
       }
+    }
+
+    if (matchedSupplier) {
+      await db.update(tenderInboundEmails)
+        .set({ supplierId: matchedSupplier.id })
+        .where(eq(tenderInboundEmails.id, inboundEmailId));
+
+      logger.info({ inboundEmailId, supplierId: matchedSupplier.id, supplierName: matchedSupplier.name }, "[Tender Extract] Auto-matched supplier");
     }
 
     await db.update(tenderInboundEmails)
