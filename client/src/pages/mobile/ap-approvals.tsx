@@ -416,7 +416,7 @@ function InvoiceDetailSheet({ invoice, onClose }: { invoice: ApprovalInvoice; on
   return (
     <>
       <Sheet open onOpenChange={() => onClose()}>
-        <SheetContent side="bottom" className="h-[95vh] bg-[#0D1117] border-white/10 p-0 rounded-t-2xl">
+        <SheetContent side="bottom" className="h-[100dvh] bg-[#0D1117] border-white/10 p-0 rounded-none">
           <div className="flex flex-col h-full">
             <SheetHeader className="flex-shrink-0 border-b border-white/10 px-4 py-3">
               <div className="flex items-center justify-between gap-2">
