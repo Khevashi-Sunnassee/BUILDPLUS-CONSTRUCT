@@ -82,15 +82,7 @@ export function ActivityTasksPanel({
         body.dueDate = new Date(activityEndDate).toISOString();
       }
       const res = await apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_TASKS(activityId), body);
-      const task = await res.json();
-      if (currentUserId && task?.id) {
-        try {
-          await apiRequest("POST", TASKS_ROUTES.ASSIGNEES(task.id), { userId: currentUserId });
-        } catch (err) {
-          console.warn("Failed to auto-assign user to task", err);
-        }
-      }
-      return task;
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });

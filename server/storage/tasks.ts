@@ -250,7 +250,7 @@ export const taskMethods = {
 
   async getTasksByActivity(activityId: string, companyId?: string): Promise<TaskWithDetails[]> {
     if (companyId) {
-      const activityTasks = await db.select({ t: tasks }).from(tasks)
+      const parentTasks = await db.select({ t: tasks }).from(tasks)
         .innerJoin(taskGroups, eq(tasks.groupId, taskGroups.id))
         .where(and(
           eq(tasks.jobActivityId, activityId),
@@ -259,14 +259,32 @@ export const taskMethods = {
         ))
         .orderBy(asc(tasks.sortOrder));
 
-      return batchEnrichTasks(activityTasks.map(r => r.t));
+      const parentIds = parentTasks.map(r => r.t.id);
+      if (parentIds.length === 0) return [];
+
+      const childTasks = await db.select({ t: tasks }).from(tasks)
+        .innerJoin(taskGroups, eq(tasks.groupId, taskGroups.id))
+        .where(and(
+          inArray(tasks.parentId, parentIds),
+          eq(taskGroups.companyId, companyId),
+        ))
+        .orderBy(asc(tasks.sortOrder));
+
+      return batchEnrichTasks(childTasks.map(r => r.t));
     }
 
-    const activityTasks = await db.select().from(tasks)
+    const parentTasks = await db.select().from(tasks)
       .where(and(eq(tasks.jobActivityId, activityId), isNull(tasks.parentId)))
       .orderBy(asc(tasks.sortOrder));
 
-    return batchEnrichTasks(activityTasks);
+    const parentIds = parentTasks.map(t => t.id);
+    if (parentIds.length === 0) return [];
+
+    const childTasks = await db.select().from(tasks)
+      .where(inArray(tasks.parentId, parentIds))
+      .orderBy(asc(tasks.sortOrder));
+
+    return batchEnrichTasks(childTasks);
   },
 
   async createTask(data: InsertTask): Promise<Task> {
