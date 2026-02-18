@@ -401,14 +401,14 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
   const hasAiRecommendation = !!extractedAction?.fieldValue;
   const aiTitle = extractedAction?.fieldValue || "";
   const aiActionType = mapRequestTypeToAction(extractedRequestType?.fieldValue || email.requestType);
-  const aiPriority = mapUrgencyToPriority(extractedUrgency?.fieldValue);
+  const aiPriority = mapUrgencyToPriority(extractedUrgency?.fieldValue || null);
   const aiDescription = extractedSummary?.fieldValue || "";
 
-  const { data: companyUsers = [] } = useQuery<Array<{ id: string; fullName: string; role: string }>>({
+  const { data: companyUsers = [] } = useQuery<Array<{ id: string; name: string; role: string }>>({
     queryKey: ["/api/users"],
     select: (data: any) => {
       const list = Array.isArray(data) ? data : data?.users || [];
-      return list.filter((u: any) => u.fullName).sort((a: any, b: any) => a.fullName.localeCompare(b.fullName));
+      return list.filter((u: any) => u.name).sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
     },
   });
 
@@ -581,7 +581,7 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
               <SelectContent>
                 {companyUsers.map(user => (
                   <SelectItem key={user.id} value={user.id} data-testid={`option-assignee-mobile-${user.id}`}>
-                    {user.fullName}
+                    {user.name}
                   </SelectItem>
                 ))}
                 {companyUsers.length === 0 && (
@@ -696,7 +696,7 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
               <SelectContent>
                 {companyUsers.map(user => (
                   <SelectItem key={user.id} value={user.id} data-testid={`option-assignee-mobile-${user.id}`}>
-                    {user.fullName}
+                    {user.name}
                   </SelectItem>
                 ))}
                 {companyUsers.length === 0 && (
