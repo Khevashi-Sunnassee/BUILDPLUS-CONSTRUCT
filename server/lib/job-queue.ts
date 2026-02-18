@@ -131,12 +131,20 @@ export class JobQueue {
   }
 
   private cleanup(): void {
-    const cutoff = Date.now() - 30 * 60 * 1000;
+    const cutoff = Date.now() - 5 * 60 * 1000;
+    const beforeSize = this.queue.length;
     this.queue = this.queue.filter(j => {
       if (j.status === "COMPLETED" && j.completedAt && j.completedAt.getTime() < cutoff) return false;
       if (j.status === "FAILED" && j.createdAt.getTime() < cutoff) return false;
       return true;
     });
+
+    if (this.queue.length > 5000) {
+      this.queue = this.queue.filter(j => j.status === "PENDING" || j.status === "RUNNING" || j.status === "RETRYING");
+      if (this.queue.length !== beforeSize) {
+        logger.warn({ queue: this.name, before: beforeSize, after: this.queue.length }, "Emergency queue cleanup performed");
+      }
+    }
   }
 
   getStats() {
@@ -188,3 +196,12 @@ export const pdfQueue = new JobQueue({
 export function getAllQueueStats() {
   return [emailQueue, aiQueue, pdfQueue].map(q => q.getStats());
 }
+
+setInterval(() => {
+  for (const queue of [emailQueue, aiQueue, pdfQueue]) {
+    const stats = queue.getStats();
+    if (stats.queueSize > 100) {
+      logger.info({ queue: stats.name, size: stats.queueSize }, "Running periodic queue cleanup");
+    }
+  }
+}, 120000);

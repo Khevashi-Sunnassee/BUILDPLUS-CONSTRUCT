@@ -1,6 +1,7 @@
 import logger from "./logger";
 import { db } from "../db";
 import { eq, and, inArray, ilike, isNull, sql } from "drizzle-orm";
+import { resendBreaker } from "./circuit-breaker";
 import {
   apInboundEmails, apInboxSettings, apInvoices, apInvoiceDocuments,
   apInvoiceActivity, apInvoiceSplits, apInvoiceExtractedFields, suppliers, companies
@@ -63,7 +64,10 @@ export async function pollEmailsJob(): Promise<void> {
 
     try {
       const settingsWithEmail = { ...settings, inboundEmailAddress: emailAddr };
-      const result = await pollEmailsForCompany(settingsWithEmail, apiKey);
+      const result = await resendBreaker.execute(
+        () => pollEmailsForCompany(settingsWithEmail, apiKey),
+        () => ({ found: 0, processed: 0, skipped: 0, errors: [`Resend circuit breaker open for company ${settings.companyId}`] })
+      );
       totalFound += result.found;
       totalProcessed += result.processed;
       totalSkipped += result.skipped;

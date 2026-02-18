@@ -2147,6 +2147,7 @@ export const chatMessages = pgTable("chat_messages", {
   replyToId: varchar("reply_to_id", { length: 36 }),
 }, (table) => ({
   convCreatedIdx: index("messages_conv_created_idx").on(table.conversationId, table.createdAt),
+  createdAtIdx: index("messages_created_at_idx").on(table.createdAt),
 }));
 
 export const chatMessageAttachments = pgTable("chat_message_attachments", {
@@ -2196,6 +2197,7 @@ export const chatNotifications = pgTable("chat_notifications", {
 }, (table) => ({
   userCreatedIdx: index("chat_notif_user_created_idx").on(table.userId, table.createdAt),
   userUnreadIdx: index("chat_notif_user_unread_idx").on(table.userId, table.readAt),
+  readAtIdx: index("chat_notif_read_at_idx").on(table.readAt),
 }));
 
 // Chat Insert Schemas and Types
@@ -4886,6 +4888,9 @@ export const apInvoices = pgTable("ap_invoices", {
   assigneeIdx: index("ap_invoices_assignee_idx").on(table.assigneeUserId),
   createdByIdx: index("ap_invoices_created_by_idx").on(table.createdByUserId),
   invoiceNumberCompanyIdx: index("ap_invoices_invoice_number_company_idx").on(table.invoiceNumber, table.companyId),
+  companyStatusIdx: index("ap_invoices_company_status_idx").on(table.companyId, table.status),
+  createdAtIdx: index("ap_invoices_created_at_idx").on(table.createdAt),
+  dueDateIdx: index("ap_invoices_due_date_idx").on(table.dueDate),
 }));
 
 export const insertApInvoiceSchema = createInsertSchema(apInvoices).omit({ id: true, createdAt: true, updatedAt: true });
@@ -4960,6 +4965,7 @@ export const apInvoiceActivity = pgTable("ap_invoice_activity", {
 }, (table) => ({
   invoiceIdx: index("ap_invoice_activity_invoice_idx").on(table.invoiceId),
   invoiceCreatedIdx: index("ap_invoice_activity_inv_created_idx").on(table.invoiceId, table.createdAt),
+  createdAtIdx: index("ap_invoice_activity_created_at_idx").on(table.createdAt),
 }));
 
 export const insertApInvoiceActivitySchema = createInsertSchema(apInvoiceActivity).omit({ id: true, createdAt: true });
@@ -5044,6 +5050,10 @@ export const apInboundEmails = pgTable("ap_inbound_emails", {
 }, (table) => ({
   companyIdx: index("ap_inbound_emails_company_idx").on(table.companyId),
   resendIdx: index("ap_inbound_emails_resend_idx").on(table.resendEmailId),
+  statusIdx: index("ap_inbound_emails_status_idx").on(table.status),
+  companyStatusIdx: index("ap_inbound_emails_company_status_idx").on(table.companyId, table.status),
+  createdAtIdx: index("ap_inbound_emails_created_at_idx").on(table.createdAt),
+  invoiceIdx: index("ap_inbound_emails_invoice_idx").on(table.invoiceId),
 }));
 
 export const insertApInboundEmailSchema = createInsertSchema(apInboundEmails).omit({ id: true, createdAt: true });
@@ -5112,6 +5122,8 @@ export const tenderInboundEmails = pgTable("tender_inbound_emails", {
   statusIdx: index("tender_inbound_emails_status_idx").on(table.status),
   supplierIdx: index("tender_inbound_emails_supplier_idx").on(table.supplierId),
   tenderIdx: index("tender_inbound_emails_tender_idx").on(table.tenderId),
+  companyStatusIdx: index("tender_inbound_emails_company_status_idx").on(table.companyId, table.status),
+  createdAtIdx: index("tender_inbound_emails_created_at_idx").on(table.createdAt),
 }));
 
 export const insertTenderInboundEmailSchema = createInsertSchema(tenderInboundEmails).omit({ id: true, createdAt: true });
@@ -5208,6 +5220,8 @@ export const draftingInboundEmails = pgTable("drafting_inbound_emails", {
   resendIdx: index("drafting_inbound_emails_resend_idx").on(table.resendEmailId),
   statusIdx: index("drafting_inbound_emails_status_idx").on(table.status),
   jobIdx: index("drafting_inbound_emails_job_idx").on(table.jobId),
+  companyStatusIdx: index("drafting_inbound_emails_company_status_idx").on(table.companyId, table.status),
+  createdAtIdx: index("drafting_inbound_emails_created_at_idx").on(table.createdAt),
 }));
 
 export const insertDraftingInboundEmailSchema = createInsertSchema(draftingInboundEmails).omit({ id: true, createdAt: true });

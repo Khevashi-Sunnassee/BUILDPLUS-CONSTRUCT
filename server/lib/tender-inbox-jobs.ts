@@ -1,6 +1,7 @@
 import logger from "./logger";
 import { db } from "../db";
 import { eq, and, inArray } from "drizzle-orm";
+import { resendBreaker } from "./circuit-breaker";
 import {
   tenderInboundEmails, tenderEmailDocuments, tenderEmailExtractedFields,
   tenderEmailActivity, tenderInboxSettings, suppliers, companies
@@ -50,7 +51,10 @@ export async function pollTenderEmailsJob(): Promise<void> {
 
     try {
       const settingsWithEmail = { ...settings, inboundEmailAddress: emailAddr };
-      const result = await pollTenderEmailsForCompany(settingsWithEmail, apiKey);
+      const result = await resendBreaker.execute(
+        () => pollTenderEmailsForCompany(settingsWithEmail, apiKey),
+        () => ({ found: 0, processed: 0, skipped: 0, errors: [`Resend circuit breaker open for company ${settings.companyId}`] })
+      );
       totalFound += result.found;
       totalProcessed += result.processed;
       totalSkipped += result.skipped;
@@ -121,14 +125,23 @@ async function pollTenderEmailsForCompany(
   let skipped = 0;
   const errors: string[] = [];
 
+  const allEmailIds = matchingEmails.map((e: any) => e.id).filter(Boolean) as string[];
+  const existingEmails = new Set<string>();
+  if (allEmailIds.length > 0) {
+    const existing = await db.select({ resendEmailId: tenderInboundEmails.resendEmailId })
+      .from(tenderInboundEmails)
+      .where(inArray(tenderInboundEmails.resendEmailId, allEmailIds))
+      .limit(1000);
+    for (const e of existing) {
+      existingEmails.add(e.resendEmailId);
+    }
+  }
+
   for (const email of matchingEmails) {
     const emailId = email.id;
     if (!emailId) { skipped++; continue; }
 
-    const [existing] = await db.select().from(tenderInboundEmails)
-      .where(eq(tenderInboundEmails.resendEmailId, emailId)).limit(1);
-
-    if (existing) {
+    if (existingEmails.has(emailId)) {
       skipped++;
       continue;
     }
@@ -447,12 +460,13 @@ Only include fields where you can find or reasonably infer the value. Return val
       }
     }
 
-    const allSuppliers = await db.select().from(suppliers)
+    const allSuppliers = await db.select({ id: suppliers.id, name: suppliers.name, email: suppliers.email })
+      .from(suppliers)
       .where(and(
         eq(suppliers.companyId, companyId),
         eq(suppliers.isActive, true),
       ))
-      .limit(1000);
+      .limit(500);
 
     let matchedSupplier: typeof allSuppliers[0] | null = null;
 
@@ -615,12 +629,13 @@ Only include fields where you can find or reasonably infer the value. Return val
 
     if (extractedData.supplier_name) {
       const supplierName = extractedData.supplier_name;
-      const matchedSuppliers = await db.select().from(suppliers)
+      const matchedSuppliers = await db.select({ id: suppliers.id, name: suppliers.name, email: suppliers.email })
+        .from(suppliers)
         .where(and(
           eq(suppliers.companyId, companyId),
           eq(suppliers.isActive, true),
         ))
-        .limit(1000);
+        .limit(500);
 
       const normalizedName = supplierName.toLowerCase().trim();
       const match = matchedSuppliers.find(s => {
