@@ -56,13 +56,16 @@ The system utilizes a client-server architecture. The frontend is a React applic
   - *CRUD Flow E2E Tests*: End-to-end lifecycle tests for AP invoices, tenders, scopes, email inboxes, MYOB, and paginated endpoints.
   - *Load Testing*: Custom Node.js-based load test simulating 50→150→300→350 concurrent users with latency percentiles (p95/p99) and error rate thresholds.
   - *Test Runner*: Single command `bash tests/run-all-tests.sh` runs all tiers with selective skip flags (--skip-frontend, --skip-load, --backend-only, etc.).
-- **Background Job System:** Interval-based scheduler for tasks like AP email polling and invoice extraction.
-- **Job Queue System:** In-memory priority queue with concurrency control and retry mechanisms.
-- **Circuit Breakers:** Implemented for external services like OpenAI, Twilio, Mailgun, and Resend.
-- **Caching:** LRU cache with TTL for various data types.
-- **Rate Limiting:** Applied to API, Auth, and Upload endpoints.
+- **Background Job System:** Interval-based scheduler for tasks like AP email polling and invoice extraction. All email polling jobs (AP, Tender, Drafting) are wrapped in Resend circuit breakers for resilience.
+- **Job Queue System:** In-memory priority queue with concurrency control, retry mechanisms, 5-minute completed job retention, emergency cleanup at 5000 queue depth, and periodic 2-minute pruning.
+- **Circuit Breakers:** Implemented for external services: OpenAI (3 failures/60s reset), Twilio/Mailgun/Resend (5 failures/30s reset). Resend breaker is applied to all email polling jobs.
+- **Caching:** LRU cache with TTL for various data types (settings 5min/100, users 2min/500, jobs 3min/200, queries 30s/2000) with automatic pruning every 60s.
+- **Rate Limiting:** Applied to API (300/min), Auth (20/15min), and Upload (30/min) endpoints.
+- **Database Indexes:** 14+ composite indexes on high-volume tables: inbox tables (company+status, createdAt), AP invoices (company+status, dueDate), activity/notification tables for sub-100ms query performance at 300+ user scale.
+- **Query Optimization:** Batch deduplication on email polling (AP and Tender use `inArray()` instead of per-email queries), selective column fetching for supplier matching (id, name, email only).
 - **Request Monitoring:** Metrics collection, event loop lag measurement, request timing, and error monitoring.
 - **Graceful Shutdown:** Handlers for SIGTERM/SIGINT to ensure clean application termination.
+- **Session Management:** PostgreSQL-backed session store with 15-minute expired session pruning.
 - **Broadcast System:** Template-based mass notifications via email/SMS/WhatsApp with delivery tracking.
 - **Drafting Email Inbox:** Polls drafting@metdul.resend.app for inbound emails, AI-powered extraction identifying change requests, job matching, production impact, drawing references. Background poll on 5-min interval. Rich text email viewer with HTML/text toggle.
 
