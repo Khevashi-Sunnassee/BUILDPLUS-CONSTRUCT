@@ -8,6 +8,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -194,36 +195,28 @@ function EmailBodyViewer({ emailId }: { emailId: string }) {
 
   return (
     <div className="flex flex-col h-full" data-testid="panel-email-body">
-      <div className="p-2 border-b bg-muted/30 flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0">
-          <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-sm font-medium">Email Body</span>
+      {(hasHtml && hasText) && (
+        <div className="p-2 border-b bg-muted/30 flex items-center justify-end gap-1 flex-wrap">
+          <Button
+            variant={effectiveMode === "html" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("html")}
+            data-testid="button-view-html"
+          >
+            <Code className="h-3 w-3 mr-1" />
+            HTML
+          </Button>
+          <Button
+            variant={effectiveMode === "text" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("text")}
+            data-testid="button-view-text"
+          >
+            <Type className="h-3 w-3 mr-1" />
+            Text
+          </Button>
         </div>
-        <div className="flex items-center gap-1">
-          {hasHtml && (
-            <Button
-              variant={effectiveMode === "html" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("html")}
-              data-testid="button-view-html"
-            >
-              <Code className="h-3 w-3 mr-1" />
-              HTML
-            </Button>
-          )}
-          {hasText && (
-            <Button
-              variant={effectiveMode === "text" ? "default" : "ghost"}
-              size="sm"
-              onClick={() => setViewMode("text")}
-              data-testid="button-view-text"
-            >
-              <Type className="h-3 w-3 mr-1" />
-              Text
-            </Button>
-          )}
-        </div>
-      </div>
+      )}
       <div className="flex-1 overflow-auto p-0 bg-white" data-testid="container-email-body">
         {effectiveMode === "html" && hasHtml ? (
           <iframe
@@ -269,12 +262,6 @@ function DocumentsPanel({ email }: { email: DraftingEmailDetail }) {
 
   return (
     <div className="flex flex-col" data-testid="panel-documents">
-      <div className="p-2 border-b border-t bg-muted/30 flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 min-w-0">
-          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-sm font-medium">Documents ({docs.length})</span>
-        </div>
-      </div>
       <div className="p-3 space-y-2">
         {docs.map((doc) => (
           <div
@@ -1316,13 +1303,29 @@ export default function DraftingEmailDetailPage() {
     );
   }
 
+  const docCount = email.documents?.length || 0;
+
   const leftPanel = (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto">
-        <EmailBodyViewer emailId={email.id} />
+    <Tabs defaultValue="email" className="flex flex-col h-full">
+      <div className="border-b px-2 pt-2">
+        <TabsList data-testid="tabs-email-docs">
+          <TabsTrigger value="email" data-testid="tab-email-body">
+            <Mail className="h-3.5 w-3.5 mr-1.5" />
+            Email Body
+          </TabsTrigger>
+          <TabsTrigger value="documents" data-testid="tab-documents">
+            <FileText className="h-3.5 w-3.5 mr-1.5" />
+            Documents{docCount > 0 ? ` (${docCount})` : ""}
+          </TabsTrigger>
+        </TabsList>
       </div>
-      <DocumentsPanel email={email} />
-    </div>
+      <TabsContent value="email" className="flex-1 overflow-auto mt-0">
+        <EmailBodyViewer emailId={email.id} />
+      </TabsContent>
+      <TabsContent value="documents" className="flex-1 overflow-auto mt-0">
+        <DocumentsPanel email={email} />
+      </TabsContent>
+    </Tabs>
   );
 
   const detailsPanel = (
