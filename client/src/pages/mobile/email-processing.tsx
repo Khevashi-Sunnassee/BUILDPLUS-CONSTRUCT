@@ -167,25 +167,32 @@ export default function MobileEmailProcessing() {
     queryKey: [DRAFTING_INBOX_ROUTES.COUNTS],
   });
 
-  const { data: apEmails = [], isLoading: loadingAp } = useQuery<InboxEmail[]>({
+  const { data: apData, isLoading: loadingAp } = useQuery<any>({
     queryKey: [AP_INBOX_ROUTES.EMAILS],
     enabled: category === "ap",
   });
 
-  const { data: tenderEmails = [], isLoading: loadingTender } = useQuery<InboxEmail[]>({
+  const { data: tenderData, isLoading: loadingTender } = useQuery<any>({
     queryKey: [TENDER_INBOX_ROUTES.LIST],
     enabled: category === "tender",
   });
 
-  const { data: draftingEmails = [], isLoading: loadingDrafting } = useQuery<InboxEmail[]>({
+  const { data: draftingData, isLoading: loadingDrafting } = useQuery<any>({
     queryKey: [DRAFTING_INBOX_ROUTES.LIST],
     enabled: category === "drafting",
   });
 
+  const extractEmails = (data: any): InboxEmail[] => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data.emails)) return data.emails;
+    return [];
+  };
+
   const emailsMap: Record<InboxCategory, InboxEmail[]> = {
-    ap: apEmails,
-    tender: tenderEmails,
-    drafting: draftingEmails,
+    ap: extractEmails(apData),
+    tender: extractEmails(tenderData),
+    drafting: extractEmails(draftingData),
   };
 
   const loadingMap: Record<InboxCategory, boolean> = {
