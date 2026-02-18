@@ -30,7 +30,7 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Advanced Features:** Panel consolidation, contract retention tracking, visual document comparison, and an Asset Register.
 - **Employee Licences & Tickets:** Comprehensive licence/ticket management with automated expiry email notifications.
 - **Hire Booking Engine:** Equipment hire management with approval workflows.
-- **Project Activities / Workflow System:** Template-driven activity workflow system for job types, with nested tasks, statuses, comments, and MS Project-style dependencies.
+- **Project Activities / Workflow System:** Template-driven activity workflow system for job types, with nested tasks, statuses, comments, and MS Project-style dependencies. Task groups support job association with auto-created `{JOB} Programme Activities` and `{JOB} Email Actions` naming patterns.
 - **User Invitation System:** Admin-initiated email invitations with secure tokens and public registration.
 - **CAPEX Module:** Capital expenditure request management with approval workflows, audit trails, and bidirectional PO integration.
 - **Scope of Works Builder:** AI-powered scope generation for tender management.

@@ -28,6 +28,8 @@ import {
   Check,
   Users,
   GripVertical,
+  Briefcase,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -144,6 +146,8 @@ export function TaskGroupComponent({
   const [sortOption, setSortOption] = useState<SortOption>("default");
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
   const [showMembersPopover, setShowMembersPopover] = useState(false);
+  const [showJobPopover, setShowJobPopover] = useState(false);
+  const [jobSearch, setJobSearch] = useState("");
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const { data: groupMembers = [] } = useQuery<GroupMember[]>({
@@ -169,6 +173,18 @@ export function TaskGroupComponent({
       : [...currentIds, userId];
     setMembersMutation.mutate(newIds);
   };
+
+  const handleSetJob = (jobId: string | null) => {
+    updateGroupMutation.mutate({ jobId } as any);
+    setShowJobPopover(false);
+    setJobSearch("");
+  };
+
+  const filteredJobs = jobs.filter(j => {
+    if (!jobSearch) return true;
+    const q = jobSearch.toLowerCase();
+    return j.jobNumber.toLowerCase().includes(q) || j.name.toLowerCase().includes(q);
+  }).slice(0, 20);
 
   const [itemColWidth, setItemColWidth] = useState<number>(() => {
     const saved = localStorage.getItem(ITEM_COL_STORAGE_KEY);
@@ -382,6 +398,13 @@ export function TaskGroupComponent({
           {group.tasks.length} items
         </Badge>
 
+        {group.job && (
+          <Badge variant="outline" className="ml-1 gap-1">
+            <Briefcase className="h-3 w-3" />
+            {group.job.jobNumber}
+          </Badge>
+        )}
+
         <Popover open={showMembersPopover} onOpenChange={setShowMembersPopover}>
           <PopoverTrigger asChild>
             <Button
@@ -515,6 +538,22 @@ export function TaskGroupComponent({
               <ArrowDown className="h-4 w-4 mr-2" />
               Move Down
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setShowJobPopover(true)}
+              data-testid={`menu-set-job-group-${group.id}`}
+            >
+              <Briefcase className="h-4 w-4 mr-2" />
+              {group.jobId ? "Change job" : "Link to job"}
+            </DropdownMenuItem>
+            {group.jobId && (
+              <DropdownMenuItem
+                onClick={() => handleSetJob(null)}
+                data-testid={`menu-unlink-job-group-${group.id}`}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Unlink job
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger data-testid={`menu-color-group-${group.id}`}>
                 <Palette className="h-4 w-4 mr-2" />
@@ -561,6 +600,50 @@ export function TaskGroupComponent({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {showJobPopover && (
+          <Popover open={showJobPopover} onOpenChange={setShowJobPopover}>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 gap-1" data-testid={`btn-job-trigger-${group.id}`}>
+                <Briefcase className="h-3.5 w-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-2" align="end">
+              <div className="space-y-2">
+                <Input
+                  placeholder="Search jobs..."
+                  value={jobSearch}
+                  onChange={(e) => setJobSearch(e.target.value)}
+                  className="h-8"
+                  autoFocus
+                  data-testid={`input-job-search-${group.id}`}
+                />
+                <div className="max-h-48 overflow-y-auto space-y-0.5">
+                  {filteredJobs.length === 0 && (
+                    <p className="text-xs text-muted-foreground p-2">No jobs found</p>
+                  )}
+                  {filteredJobs.map((j) => (
+                    <Button
+                      key={j.id}
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "w-full justify-start gap-2",
+                        group.jobId === j.id && "bg-primary/10"
+                      )}
+                      onClick={() => handleSetJob(j.id)}
+                      data-testid={`job-option-${j.id}`}
+                    >
+                      <Briefcase className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{j.jobNumber} - {j.name}</span>
+                      {group.jobId === j.id && <Check className="h-3 w-3 ml-auto shrink-0" />}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
       </div>
 
       {!isCollapsed && (

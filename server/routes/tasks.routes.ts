@@ -1,6 +1,9 @@
 import { Router } from "express";
 import multer from "multer";
 import { z } from "zod";
+import { eq, and } from "drizzle-orm";
+import { db } from "../db";
+import { jobs } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
@@ -49,6 +52,7 @@ const upload = multer({
 const taskGroupSchema = z.object({
   name: z.string().min(1, "Name is required").max(255),
   color: z.string().optional(),
+  jobId: z.string().nullable().optional(),
 });
 
 const taskCreateSchema = z.object({
@@ -122,6 +126,15 @@ router.post("/api/task-groups", requireAuth, requirePermission("tasks", "VIEW_AN
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
+
+    if (parsed.data.jobId) {
+      const [job] = await db.select({ id: jobs.id }).from(jobs)
+        .where(and(eq(jobs.id, parsed.data.jobId), eq(jobs.companyId, companyId))).limit(1);
+      if (!job) {
+        return res.status(400).json({ error: "Invalid job for this company" });
+      }
+    }
+
     const userId = req.session.userId;
     const group = await storage.createTaskGroup({ ...parsed.data, companyId, createdById: userId });
     res.status(201).json(group);
@@ -139,6 +152,14 @@ router.patch("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VI
     const parsed = taskGroupSchema.partial().safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    if (parsed.data.jobId) {
+      const [job] = await db.select({ id: jobs.id }).from(jobs)
+        .where(and(eq(jobs.id, parsed.data.jobId), eq(jobs.companyId, companyId))).limit(1);
+      if (!job) {
+        return res.status(400).json({ error: "Invalid job for this company" });
+      }
     }
 
     if (parsed.data.color) {
@@ -258,13 +279,15 @@ router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDA
     const userId = req.session.userId;
     const taskData = { ...parsed.data } as Record<string, unknown>;
     
-    // Verify task group belongs to company
     const group = await storage.getTaskGroup(taskData.groupId);
     if (!group || group.companyId !== companyId) {
       return res.status(400).json({ error: "Invalid task group" });
     }
     
-    // Convert date strings to Date objects for Drizzle timestamp columns
+    if (group.jobId && !taskData.jobId) {
+      taskData.jobId = group.jobId;
+    }
+    
     if (taskData.dueDate !== undefined) {
       taskData.dueDate = taskData.dueDate ? new Date(taskData.dueDate) : null;
     }

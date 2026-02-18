@@ -48,11 +48,13 @@ export interface Task {
 
 export interface TaskGroup {
   id: string;
+  jobId: string | null;
   name: string;
   color: string;
   sortOrder: number;
   isCollapsed: boolean;
   tasks: Task[];
+  job?: Job | null;
 }
 
 export interface TaskUpdate {

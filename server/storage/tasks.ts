@@ -126,9 +126,22 @@ export const taskMethods = {
     if (groups.length === 0) return [];
 
     const groupIds = groups.map(g => g.id);
-    const allTopLevelTasks = await db.select().from(tasks)
-      .where(and(inArray(tasks.groupId, groupIds), isNull(tasks.parentId)))
-      .orderBy(asc(tasks.sortOrder));
+    const groupJobIds = new Set<string>();
+    for (const g of groups) {
+      if (g.jobId) groupJobIds.add(g.jobId);
+    }
+
+    const [allTopLevelTasks, groupJobs] = await Promise.all([
+      db.select().from(tasks)
+        .where(and(inArray(tasks.groupId, groupIds), isNull(tasks.parentId)))
+        .orderBy(asc(tasks.sortOrder)),
+      groupJobIds.size > 0
+        ? db.select().from(jobs).where(inArray(jobs.id, Array.from(groupJobIds)))
+        : Promise.resolve([]),
+    ]);
+
+    const jobsMap = new Map<string, Job>();
+    for (const j of groupJobs) jobsMap.set(j.id, j);
 
     const allTasksWithDetails = await batchEnrichTasks(allTopLevelTasks);
 
@@ -143,6 +156,7 @@ export const taskMethods = {
     const result: TaskGroupWithTasks[] = [];
     for (const group of groups) {
       const tasksWithDetails = tasksByGroup.get(group.id) || [];
+      const groupJob = group.jobId ? jobsMap.get(group.jobId) || null : null;
 
       if (userId) {
         const filtered = tasksWithDetails.filter(task => {
@@ -152,10 +166,10 @@ export const taskMethods = {
         });
         const groupCreatedByUser = group.createdById === userId;
         if (filtered.length > 0 || groupCreatedByUser) {
-          result.push({ ...group, tasks: filtered });
+          result.push({ ...group, tasks: filtered, job: groupJob });
         }
       } else {
-        result.push({ ...group, tasks: tasksWithDetails });
+        result.push({ ...group, tasks: tasksWithDetails, job: groupJob });
       }
     }
 
@@ -166,15 +180,21 @@ export const taskMethods = {
     const [group] = await db.select().from(taskGroups).where(eq(taskGroups.id, id));
     if (!group) return undefined;
 
-    const groupTasks = await db.select().from(tasks)
-      .where(and(eq(tasks.groupId, id), isNull(tasks.parentId)))
-      .orderBy(asc(tasks.sortOrder));
+    const [groupTasks, groupJob] = await Promise.all([
+      db.select().from(tasks)
+        .where(and(eq(tasks.groupId, id), isNull(tasks.parentId)))
+        .orderBy(asc(tasks.sortOrder)),
+      group.jobId
+        ? db.select().from(jobs).where(eq(jobs.id, group.jobId)).limit(1).then(r => r[0] || null)
+        : Promise.resolve(null),
+    ]);
 
     const tasksWithDetails = await batchEnrichTasks(groupTasks);
 
     return {
       ...group,
       tasks: tasksWithDetails,
+      job: groupJob,
     };
   },
 

@@ -835,32 +835,57 @@ router.post("/api/drafting-inbox/emails/:id/tasks", requireAuth, async (req: Req
 
     const { title, actionType, description, jobId, dueDate, priority, assigneeIds } = parsed.data;
 
+    let resolvedJob: { id: string; jobNumber: string; name: string } | null = null;
     if (jobId) {
-      const [job] = await db.select({ id: jobs.id }).from(jobs)
+      const [job] = await db.select({ id: jobs.id, jobNumber: jobs.jobNumber, name: jobs.name }).from(jobs)
         .where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId))).limit(1);
       if (!job) {
         return res.status(400).json({ error: "Invalid job for this company" });
       }
+      resolvedJob = job;
     }
 
-    let draftingGroupId: string | null = null;
-    const [draftingGroup] = await db.select().from(taskGroups)
-      .where(and(eq(taskGroups.companyId, companyId), eq(taskGroups.name, "DRAFTING")))
-      .limit(1);
-    if (draftingGroup) {
-      draftingGroupId = draftingGroup.id;
+    let emailActionsGroupId: string;
+    if (resolvedJob) {
+      const groupName = `${resolvedJob.jobNumber} Email Actions`;
+      const [existingGroup] = await db.select().from(taskGroups)
+        .where(and(
+          eq(taskGroups.companyId, companyId),
+          eq(taskGroups.jobId, resolvedJob.id),
+          eq(taskGroups.name, groupName),
+        ))
+        .limit(1);
+      if (existingGroup) {
+        emailActionsGroupId = existingGroup.id;
+      } else {
+        const newGroup = await storage.createTaskGroup({
+          name: groupName,
+          companyId,
+          jobId: resolvedJob.id,
+          createdById: userId,
+        });
+        emailActionsGroupId = newGroup.id;
+      }
     } else {
-      const newGroup = await storage.createTaskGroup({
-        name: "DRAFTING",
-        companyId,
-        createdById: userId,
-      });
-      draftingGroupId = newGroup.id;
+      const fallbackName = "Email Actions (Unassigned)";
+      const [fallbackGroup] = await db.select().from(taskGroups)
+        .where(and(eq(taskGroups.companyId, companyId), eq(taskGroups.name, fallbackName)))
+        .limit(1);
+      if (fallbackGroup) {
+        emailActionsGroupId = fallbackGroup.id;
+      } else {
+        const newGroup = await storage.createTaskGroup({
+          name: fallbackName,
+          companyId,
+          createdById: userId,
+        });
+        emailActionsGroupId = newGroup.id;
+      }
     }
 
     const fullTitle = `[${actionType}] ${title}`;
     const task = await storage.createTask({
-      groupId: draftingGroupId,
+      groupId: emailActionsGroupId,
       title: fullTitle,
       status: "NOT_STARTED",
       jobId: jobId || null,

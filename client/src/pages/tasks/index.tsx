@@ -49,6 +49,7 @@ export default function TasksPage() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupJobId, setNewGroupJobId] = useState<string | null>(null);
   const [jobFilter, setJobFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showCompleted, setShowCompleted] = useState(false);
@@ -224,12 +225,13 @@ export default function TasksPage() {
   }, [groups, reorderGroupsMutation]);
 
   const createGroupMutation = useMutation({
-    mutationFn: async (name: string) => {
-      return apiRequest("POST", TASKS_ROUTES.GROUPS, { name });
+    mutationFn: async (data: { name: string; jobId?: string | null }) => {
+      return apiRequest("POST", TASKS_ROUTES.GROUPS, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       setNewGroupName("");
+      setNewGroupJobId(null);
       setShowNewGroupInput(false);
       toast({ title: "Group created" });
     },
@@ -776,17 +778,18 @@ export default function TasksPage() {
       </div>
 
       {showNewGroupInput && (
-        <div className="flex items-center gap-2 p-4 border rounded-lg bg-muted/30">
+        <div className="flex items-center gap-2 p-4 border rounded-lg bg-muted/30 flex-wrap">
           <Input
             value={newGroupName}
             onChange={(e) => setNewGroupName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && newGroupName.trim()) {
-                createGroupMutation.mutate(newGroupName);
+                createGroupMutation.mutate({ name: newGroupName, jobId: newGroupJobId });
               }
               if (e.key === "Escape") {
                 setShowNewGroupInput(false);
                 setNewGroupName("");
+                setNewGroupJobId(null);
               }
             }}
             placeholder="Enter group name..."
@@ -794,8 +797,19 @@ export default function TasksPage() {
             autoFocus
             data-testid="input-new-group-name"
           />
+          <select
+            value={newGroupJobId || ""}
+            onChange={(e) => setNewGroupJobId(e.target.value || null)}
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            data-testid="select-new-group-job"
+          >
+            <option value="">No job linked</option>
+            {jobs.map((j) => (
+              <option key={j.id} value={j.id}>{j.jobNumber} - {j.name}</option>
+            ))}
+          </select>
           <Button
-            onClick={() => newGroupName.trim() && createGroupMutation.mutate(newGroupName)}
+            onClick={() => newGroupName.trim() && createGroupMutation.mutate({ name: newGroupName, jobId: newGroupJobId })}
             disabled={!newGroupName.trim() || createGroupMutation.isPending}
             data-testid="btn-create-group"
           >
@@ -806,6 +820,7 @@ export default function TasksPage() {
             onClick={() => {
               setShowNewGroupInput(false);
               setNewGroupName("");
+              setNewGroupJobId(null);
             }}
             data-testid="btn-cancel-new-group"
           >

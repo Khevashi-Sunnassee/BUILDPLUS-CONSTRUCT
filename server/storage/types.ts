@@ -123,6 +123,7 @@ export interface TaskWithDetails extends Task {
 
 export interface TaskGroupWithTasks extends TaskGroup {
   tasks: TaskWithDetails[];
+  job?: Job | null;
 }
 
 export interface IStorage {

@@ -9,7 +9,7 @@ import {
   activityTemplates, activityTemplateSubtasks, activityTemplateChecklists,
   jobActivities, jobActivityAssignees, jobActivityUpdates, jobActivityFiles,
   jobActivityChecklists,
-  taskGroups, tasks,
+  taskGroups, tasks, jobs,
   InsertTask,
 } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
@@ -1917,12 +1917,34 @@ router.post("/api/job-activities/:activityId/tasks", requireAuth, requirePermiss
 
     let groupId = activity.taskGroupId;
     if (!groupId) {
-      const group = await storage.createTaskGroup({
-        companyId: companyId!,
-        name: `Activity: ${activity.name}`,
-        color: "#6366f1",
-      });
-      groupId = group.id;
+      const [job] = activity.jobId
+        ? await db.select({ id: jobs.id, jobNumber: jobs.jobNumber }).from(jobs)
+            .where(eq(jobs.id, activity.jobId)).limit(1)
+        : [null];
+
+      const programmeGroupName = job ? `${job.jobNumber} Programme Activities` : `Programme Activities`;
+
+      if (job) {
+        const [existingGroup] = await db.select().from(taskGroups)
+          .where(and(
+            eq(taskGroups.companyId, companyId!),
+            eq(taskGroups.jobId, job.id),
+            eq(taskGroups.name, programmeGroupName),
+          ))
+          .limit(1);
+        if (existingGroup) {
+          groupId = existingGroup.id;
+        }
+      }
+
+      if (!groupId) {
+        const group = await storage.createTaskGroup({
+          companyId: companyId!,
+          name: programmeGroupName,
+          jobId: job?.id || null,
+        });
+        groupId = group.id;
+      }
       await db.update(jobActivities).set({ taskGroupId: groupId }).where(eq(jobActivities.id, activityId));
     }
 

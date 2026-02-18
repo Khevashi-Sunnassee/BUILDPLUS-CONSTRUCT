@@ -1884,6 +1884,7 @@ export const taskStatusEnum = pgEnum("task_status", ["NOT_STARTED", "IN_PROGRESS
 export const taskGroups = pgTable("task_groups", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   color: text("color").default("#6366f1"),
   sortOrder: integer("sort_order").default(0).notNull(),
@@ -1894,6 +1895,7 @@ export const taskGroups = pgTable("task_groups", {
 }, (table) => ({
   sortOrderIdx: index("task_groups_sort_order_idx").on(table.sortOrder),
   companyIdx: index("task_groups_company_idx").on(table.companyId),
+  jobIdx: index("task_groups_job_idx").on(table.jobId),
 }));
 
 export const tasks = pgTable("tasks", {
