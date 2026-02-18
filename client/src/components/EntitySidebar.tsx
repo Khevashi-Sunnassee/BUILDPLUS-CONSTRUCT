@@ -29,13 +29,13 @@ import {
 } from "@/lib/sidebar-utils";
 
 function LinkifiedText({ text, className }: { text: string; className?: string }) {
-  const urlRegex = /((?:https?:\/\/[^\s]+)|(?:\/[a-zA-Z0-9\-_/?=&%#]+))/g;
-  const parts = text.split(urlRegex);
+  const urlPattern = /((?:https?:\/\/[^\s]+)|(?:\/[a-zA-Z0-9\-_/?=&%#]+))/g;
+  const parts = text.split(urlPattern);
+  const testRegex = /^(?:https?:\/\/[^\s]+|\/[a-zA-Z0-9\-_/?=&%#]+)$/;
   return (
     <span className={className}>
       {parts.map((part, i) => {
-        if (urlRegex.test(part)) {
-          urlRegex.lastIndex = 0;
+        if (part && testRegex.test(part)) {
           const isExternal = part.startsWith("http");
           return (
             <a
