@@ -110,24 +110,26 @@ function EmailListItem({ email, category }: { email: InboxEmail; category: Inbox
   const [, navigate] = useLocation();
   const statusLabel = email.status.replace(/_/g, " ");
 
+  const isClickable = category === "drafting" || category === "tender" || (category === "ap" && !!email.invoiceId);
+
   const handleClick = () => {
+    if (!isClickable) return;
     if (category === "drafting") {
       navigate(`/mobile/drafting-emails/${email.id}`);
     } else if (category === "tender") {
       navigate(`/mobile/tender-emails/${email.id}`);
-    } else if (category === "ap") {
-      if (email.invoiceId) {
-        navigate(`/mobile/ap-invoices/${email.invoiceId}`);
-      } else {
-        navigate(`/mobile/ap-invoices/${email.id}`);
-      }
+    } else if (category === "ap" && email.invoiceId) {
+      navigate(`/mobile/ap-invoices/${email.invoiceId}`);
     }
   };
 
   return (
     <button
       onClick={handleClick}
-      className="w-full flex items-start gap-3 p-3 rounded-xl border border-white/10 bg-white/5 text-left active:scale-[0.99]"
+      disabled={!isClickable}
+      className={`w-full flex items-start gap-3 p-3 rounded-xl border border-white/10 bg-white/5 text-left ${
+        isClickable ? "active:scale-[0.99]" : "opacity-60"
+      }`}
       data-testid={`email-item-${email.id}`}
     >
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 shrink-0 mt-0.5">
@@ -144,6 +146,9 @@ function EmailListItem({ email, category }: { email: InboxEmail; category: Inbox
           <Badge className={`text-[10px] px-1.5 py-0 ${STATUS_COLORS[email.status.toUpperCase()] || "bg-gray-500 text-white"}`}>
             {statusLabel}
           </Badge>
+          {!isClickable && category === "ap" && (
+            <span className="text-[10px] text-white/40">Pending processing</span>
+          )}
           {email.attachmentCount && email.attachmentCount > 0 && (
             <span className="text-[10px] text-white/50 flex items-center gap-0.5">
               <FileText className="h-3 w-3" />
@@ -153,7 +158,7 @@ function EmailListItem({ email, category }: { email: InboxEmail; category: Inbox
           <span className="text-[10px] text-white/40">{formatDate(email.createdAt)}</span>
         </div>
       </div>
-      <ChevronRight className="h-4 w-4 text-white/30 mt-1 shrink-0" />
+      {isClickable && <ChevronRight className="h-4 w-4 text-white/30 mt-1 shrink-0" />}
     </button>
   );
 }
