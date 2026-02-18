@@ -195,6 +195,9 @@ router.get("/api/drafting-inbox/counts", requireAuth, async (req: Request, res: 
       matched: 0,
       archived: 0,
       failed: 0,
+      allocated: 0,
+      duplicate: 0,
+      irrelevant: 0,
       all: 0,
     };
 
@@ -868,20 +871,13 @@ router.post("/api/drafting-inbox/emails/:id/tasks", requireAuth, async (req: Req
       createdById: userId,
     });
 
-    const assignees = new Set<string>();
     if (assigneeIds && assigneeIds.length > 0) {
-      assigneeIds.forEach(uid => assignees.add(uid));
-    } else {
-      const managers = await db.select().from(users)
-        .where(and(eq(users.companyId, companyId), eq(users.role, "MANAGER")))
-        .limit(20);
-      managers.forEach(m => assignees.add(m.id));
+      await storage.setTaskAssignees(task.id, assigneeIds);
     }
-    assignees.add(userId);
 
-    if (assignees.size > 0) {
-      await storage.setTaskAssignees(task.id, Array.from(assignees));
-    }
+    await db.update(draftingInboundEmails)
+      .set({ status: "ALLOCATED" })
+      .where(eq(draftingInboundEmails.id, id));
 
     await logDraftingEmailActivity(
       id,

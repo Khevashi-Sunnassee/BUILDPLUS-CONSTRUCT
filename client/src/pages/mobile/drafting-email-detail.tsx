@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft, FileText, CheckCircle2, Clock, Pencil,
   Loader2, LinkIcon, RefreshCw, Mail, Eye,
-  Code, Type, Sparkles,
+  Code, Type, Sparkles, Copy, Ban,
 } from "lucide-react";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
@@ -76,6 +76,9 @@ const STATUS_COLORS: Record<string, string> = {
   matched: "bg-green-600 text-white",
   archived: "bg-gray-400 text-white",
   failed: "bg-red-500 text-white",
+  allocated: "bg-blue-600 text-white",
+  duplicate: "bg-orange-500 text-white",
+  irrelevant: "bg-slate-500 text-white",
 };
 
 const DRAFTING_ACTION_TYPES = [
@@ -456,7 +459,10 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.EMAIL_TASKS(emailId)] });
       queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.ACTIVITY(emailId)] });
-      toast({ title: "Task created successfully" });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.BY_ID(emailId)] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.COUNTS] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.LIST] });
+      toast({ title: "Task created and email marked as Allocated" });
       setDismissed(true);
       setShowManual(false);
       setAssigneeId("");
@@ -911,6 +917,25 @@ export default function MobileDraftingEmailDetail() {
     },
   });
 
+  const markStatusMutation = useMutation({
+    mutationFn: async (newStatus: string) => {
+      if (!emailId) return;
+      await apiRequest("PATCH", DRAFTING_INBOX_ROUTES.BY_ID(emailId), { status: newStatus });
+    },
+    onSuccess: (_data, newStatus) => {
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.BY_ID(emailId!)] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.LIST] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.COUNTS] });
+      const label = newStatus === "DUPLICATE" ? "duplicate" : "irrelevant";
+      toast({ title: `Email marked as ${label}` });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Status update failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const canDismissEmail = email && ["PROCESSED", "MATCHED"].includes(email.status);
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden">
@@ -1050,6 +1075,33 @@ export default function MobileDraftingEmailDetail() {
           </div>
         )}
       </div>
+
+      {canDismissEmail && (
+        <div className="flex-shrink-0 border-t border-white/10 bg-[#070B12]/95 backdrop-blur px-4 py-3 flex gap-2" style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 border-orange-500/50 text-orange-400 hover:bg-orange-500/20"
+            onClick={() => markStatusMutation.mutate("DUPLICATE")}
+            disabled={markStatusMutation.isPending}
+            data-testid="button-mark-duplicate-mobile"
+          >
+            <Copy className="h-3.5 w-3.5 mr-1.5" />
+            Duplicate
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 border-slate-500/50 text-slate-400 hover:bg-slate-500/20"
+            onClick={() => markStatusMutation.mutate("IRRELEVANT")}
+            disabled={markStatusMutation.isPending}
+            data-testid="button-mark-irrelevant-mobile"
+          >
+            <Ban className="h-3.5 w-3.5 mr-1.5" />
+            Irrelevant
+          </Button>
+        </div>
+      )}
 
       <MobileBottomNav />
     </div>

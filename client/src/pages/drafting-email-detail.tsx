@@ -18,7 +18,7 @@ import {
   ArrowLeft, FileText, CheckCircle2, Clock, Pencil,
   ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, LinkIcon, RefreshCw, Mail, Eye, Trash2, Archive,
-  Code, Type, ExternalLink, Download, Sparkles
+  Code, Type, ExternalLink, Download, Sparkles, Copy, Ban
 } from "lucide-react";
 
 interface DraftingEmailDetail {
@@ -76,6 +76,9 @@ const STATUS_BADGE_CONFIG: Record<string, { variant: "secondary" | "default" | "
   processing: { variant: "default", className: "bg-amber-500 text-white dark:bg-amber-600" },
   processed: { variant: "default", className: "bg-indigo-500 text-white dark:bg-indigo-600" },
   matched: { variant: "default", className: "bg-green-600 text-white dark:bg-green-700" },
+  allocated: { variant: "default", className: "bg-teal-600 text-white dark:bg-teal-700" },
+  duplicate: { variant: "secondary" },
+  irrelevant: { variant: "secondary" },
   archived: { variant: "secondary" },
   failed: { variant: "destructive" },
 };
@@ -733,7 +736,10 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.EMAIL_TASKS(emailId)] });
       queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.ACTIVITY(emailId)] });
-      toast({ title: "Task created successfully" });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.BY_ID(emailId)] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.COUNTS] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.LIST] });
+      toast({ title: "Task created and email marked as Allocated" });
       setDismissed(true);
       setShowManual(false);
       setAssigneeId("");
@@ -1257,6 +1263,25 @@ export default function DraftingEmailDetailPage() {
     },
   });
 
+  const markStatusMutation = useMutation({
+    mutationFn: async (newStatus: string) => {
+      if (!emailId) return;
+      await apiRequest("PATCH", DRAFTING_INBOX_ROUTES.BY_ID(emailId), { status: newStatus });
+    },
+    onSuccess: (_data, newStatus) => {
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.BY_ID(emailId!)] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.LIST] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.COUNTS] });
+      const label = newStatus === "DUPLICATE" ? "duplicate" : "irrelevant";
+      toast({ title: `Email marked as ${label}` });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Status update failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const canDismissEmail = email && ["PROCESSED", "MATCHED"].includes(email.status);
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-[calc(100vh-73px)]" data-testid="page-drafting-email-detail">
@@ -1390,6 +1415,30 @@ export default function DraftingEmailDetailPage() {
             )}
             Re-extract
           </Button>
+          {canDismissEmail && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => markStatusMutation.mutate("DUPLICATE")}
+                disabled={markStatusMutation.isPending}
+                data-testid="button-mark-duplicate"
+              >
+                {markStatusMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Copy className="h-3 w-3 mr-1" />}
+                Duplicate
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => markStatusMutation.mutate("IRRELEVANT")}
+                disabled={markStatusMutation.isPending}
+                data-testid="button-mark-irrelevant"
+              >
+                {markStatusMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Ban className="h-3 w-3 mr-1" />}
+                Irrelevant
+              </Button>
+            </>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -1460,6 +1509,30 @@ export default function DraftingEmailDetailPage() {
                 Close
               </Button>
               <div className="flex items-center gap-2 flex-wrap">
+                {canDismissEmail && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => markStatusMutation.mutate("DUPLICATE")}
+                      disabled={markStatusMutation.isPending}
+                      data-testid="button-mark-duplicate-mobile"
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Duplicate
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => markStatusMutation.mutate("IRRELEVANT")}
+                      disabled={markStatusMutation.isPending}
+                      data-testid="button-mark-irrelevant-mobile"
+                    >
+                      <Ban className="h-3 w-3 mr-1" />
+                      Irrelevant
+                    </Button>
+                  </>
+                )}
                 <Button
                   variant="outline"
                   size="sm"

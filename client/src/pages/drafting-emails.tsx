@@ -48,6 +48,9 @@ interface StatusCounts {
   PROCESSING: number;
   PROCESSED: number;
   MATCHED: number;
+  ALLOCATED: number;
+  DUPLICATE: number;
+  IRRELEVANT: number;
   ARCHIVED: number;
   FAILED: number;
   all: number;
@@ -59,6 +62,9 @@ const STATUS_TABS = [
   { key: "PROCESSING", label: "Processing", showCount: true },
   { key: "PROCESSED", label: "Processed", showCount: true },
   { key: "MATCHED", label: "Matched", showCount: true },
+  { key: "ALLOCATED", label: "Allocated", showCount: true },
+  { key: "DUPLICATE", label: "Duplicate", showCount: false },
+  { key: "IRRELEVANT", label: "Irrelevant", showCount: false },
   { key: "ARCHIVED", label: "Archived", showCount: false },
   { key: "FAILED", label: "Failed", showCount: true },
 ] as const;
@@ -68,6 +74,9 @@ const STATUS_BADGE_CONFIG: Record<string, { variant: "secondary" | "default" | "
   processing: { variant: "default", className: "bg-amber-500 text-white dark:bg-amber-600" },
   processed: { variant: "default", className: "bg-indigo-500 text-white dark:bg-indigo-600" },
   matched: { variant: "default", className: "bg-green-600 text-white dark:bg-green-700" },
+  allocated: { variant: "default", className: "bg-teal-600 text-white dark:bg-teal-700" },
+  duplicate: { variant: "secondary" },
+  irrelevant: { variant: "secondary" },
   archived: { variant: "secondary" },
   failed: { variant: "destructive" },
   no_attachments: { variant: "outline", className: "text-muted-foreground" },
