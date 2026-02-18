@@ -28,6 +28,34 @@ import {
   type SidebarFile,
 } from "@/lib/sidebar-utils";
 
+function LinkifiedText({ text, className }: { text: string; className?: string }) {
+  const urlRegex = /((?:https?:\/\/[^\s]+)|(?:\/[a-zA-Z0-9\-_/?=&%#]+))/g;
+  const parts = text.split(urlRegex);
+  return (
+    <span className={className}>
+      {parts.map((part, i) => {
+        if (urlRegex.test(part)) {
+          urlRegex.lastIndex = 0;
+          const isExternal = part.startsWith("http");
+          return (
+            <a
+              key={i}
+              href={part}
+              target={isExternal ? "_blank" : undefined}
+              rel={isExternal ? "noopener noreferrer" : undefined}
+              className="text-blue-600 dark:text-blue-400 underline hover-elevate"
+              data-testid={`link-update-${i}`}
+            >
+              {isExternal ? part : "View Record"}
+            </a>
+          );
+        }
+        return part;
+      })}
+    </span>
+  );
+}
+
 export type EntityTab = "updates" | "files" | "activity" | string;
 
 interface ExtraTab {
@@ -484,7 +512,9 @@ export function EntitySidebar({
                             </div>
                           ) : (
                             update.content && (
-                              <p className="text-sm mt-1 whitespace-pre-wrap">{update.content}</p>
+                              <p className="text-sm mt-1 whitespace-pre-wrap">
+                                <LinkifiedText text={update.content} />
+                              </p>
                             )
                           )}
 

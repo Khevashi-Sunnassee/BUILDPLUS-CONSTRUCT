@@ -1948,10 +1948,35 @@ router.post("/api/job-activities/:activityId/tasks", requireAuth, requirePermiss
       await db.update(jobActivities).set({ taskGroupId: groupId }).where(eq(jobActivities.id, activityId));
     }
 
+    let parentTaskId: string | null = null;
+    const activityParentTitle = activity.name || `Activity ${activityId}`;
+    const [existingParent] = await db.select().from(tasks).where(
+      and(
+        eq(tasks.groupId, groupId),
+        eq(tasks.jobActivityId, activityId),
+        isNull(tasks.parentId),
+      )
+    ).limit(1);
+
+    if (existingParent) {
+      parentTaskId = existingParent.id;
+    } else {
+      const parentTask = await storage.createTask({
+        groupId,
+        jobActivityId: activityId,
+        jobId: activity.jobId,
+        title: activityParentTitle,
+        status: "NOT_STARTED",
+        createdById: userId,
+      } as InsertTask);
+      parentTaskId = parentTask.id;
+    }
+
     const taskData: Record<string, unknown> = {
       groupId,
       jobActivityId: activityId,
       jobId: activity.jobId,
+      parentId: parentTaskId,
       title: validatedData.title,
       status: validatedData.status,
       priority: validatedData.priority || null,

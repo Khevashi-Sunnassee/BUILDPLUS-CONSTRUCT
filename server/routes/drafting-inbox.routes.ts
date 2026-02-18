@@ -900,6 +900,14 @@ router.post("/api/drafting-inbox/emails/:id/tasks", requireAuth, async (req: Req
       await storage.setTaskAssignees(task.id, assigneeIds);
     }
 
+    const emailLink = `/drafting-inbox?emailId=${id}`;
+    await storage.createTaskUpdate({
+      taskId: task.id,
+      userId: userId!,
+      content: `Created from drafting email. View original: ${emailLink}`,
+      contentType: "note",
+    });
+
     await db.update(draftingInboundEmails)
       .set({ status: "ALLOCATED" })
       .where(eq(draftingInboundEmails.id, id));
