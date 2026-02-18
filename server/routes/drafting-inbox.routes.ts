@@ -900,7 +900,7 @@ router.post("/api/drafting-inbox/emails/:id/tasks", requireAuth, async (req: Req
       await storage.setTaskAssignees(task.id, assigneeIds);
     }
 
-    const emailLink = `/drafting-inbox?emailId=${id}`;
+    const emailLink = `/drafting-emails/${id}`;
     await storage.createTaskUpdate({
       taskId: task.id,
       userId: userId!,
