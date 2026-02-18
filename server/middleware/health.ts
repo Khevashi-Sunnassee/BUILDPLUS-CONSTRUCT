@@ -102,6 +102,29 @@ router.get("/health/metrics", async (req: Request, res: Response) => {
   const requestMetrics = getMetrics();
   const mem = process.memoryUsage();
 
+  let sessionStats = null;
+  try {
+    const sessionResult = await pool.query(`
+      SELECT 
+        count(*) as total_sessions,
+        count(*) FILTER (WHERE expire > NOW()) as active_sessions,
+        count(*) FILTER (WHERE expire <= NOW()) as expired_sessions,
+        min(expire) as oldest_expiry,
+        max(expire) as newest_expiry
+      FROM "session"
+    `);
+    const row = sessionResult.rows[0];
+    sessionStats = {
+      totalSessions: parseInt(row.total_sessions),
+      activeSessions: parseInt(row.active_sessions),
+      expiredSessions: parseInt(row.expired_sessions),
+      oldestExpiry: row.oldest_expiry,
+      newestExpiry: row.newest_expiry,
+    };
+  } catch (err) {
+    logger.debug("Could not query session stats");
+  }
+
   res.json({
     application: {
       uptime: process.uptime(),
@@ -115,6 +138,7 @@ router.get("/health/metrics", async (req: Request, res: Response) => {
       externalMB: Math.round(mem.external / 1024 / 1024),
     },
     requests: requestMetrics,
+    sessions: sessionStats,
   });
 });
 

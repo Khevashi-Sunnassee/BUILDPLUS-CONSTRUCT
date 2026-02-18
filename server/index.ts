@@ -21,6 +21,8 @@ import { requestMetrics, getEventLoopLag } from "./lib/metrics";
 import { sanitizeRequestBody, validateContentType, enforceBodyLimits, validateAllParams, sanitizeQueryStrings } from "./middleware/sanitize";
 import { requestTimingMiddleware } from "./middleware/request-timing";
 import { healthRouter } from "./middleware/health";
+import { errorSanitizer, globalErrorHandler } from "./middleware/error-sanitizer";
+import { generatePrometheusMetrics } from "./lib/prometheus";
 
 const app = express();
 
@@ -166,6 +168,7 @@ app.use("/api", enforceBodyLimits);
 app.use("/api", validateAllParams);
 app.use("/api", sanitizeQueryStrings);
 app.use(requestTimingMiddleware);
+app.use(errorSanitizer);
 app.use(healthRouter);
 
 // Request-ID middleware for tracing
@@ -324,6 +327,20 @@ app.get("/api/admin/pool-metrics", (req, res) => {
   });
 });
 
+app.get("/api/metrics/prometheus", async (req, res) => {
+  if (!req.session?.userId || (req.session as unknown as Record<string, unknown>).role !== "ADMIN") {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+  try {
+    const metrics = await generatePrometheusMetrics();
+    res.set("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+    res.send(metrics);
+  } catch (err) {
+    logger.error({ err }, "Failed to generate Prometheus metrics");
+    res.status(500).json({ error: "Failed to generate metrics" });
+  }
+});
+
 process.on("unhandledRejection", (reason, promise) => {
   const err = reason instanceof Error ? reason : new Error(String(reason));
   errorMonitor.track(err, { route: "unhandledRejection" });
@@ -336,6 +353,38 @@ process.on("uncaughtException", (err) => {
 });
 
 let isShuttingDown = false;
+let activeRequests = 0;
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (isShuttingDown) {
+    res.setHeader("Connection", "close");
+    if (req.path.startsWith("/api/")) {
+      return res.status(503).json({ error: "Server is shutting down" });
+    }
+  }
+  activeRequests++;
+  let decremented = false;
+  const decrement = () => {
+    if (!decremented) {
+      decremented = true;
+      activeRequests = Math.max(0, activeRequests - 1);
+    }
+  };
+  res.on("finish", decrement);
+  res.on("close", decrement);
+  next();
+});
+
+async function waitForActiveRequests(timeoutMs: number): Promise<void> {
+  const start = Date.now();
+  while (activeRequests > 0 && Date.now() - start < timeoutMs) {
+    logger.info({ activeRequests }, "Waiting for in-flight requests to complete");
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  if (activeRequests > 0) {
+    logger.warn({ activeRequests }, "Drain timeout reached — proceeding with shutdown");
+  }
+}
 
 async function gracefulShutdown(signal: string) {
   if (isShuttingDown) return;
@@ -344,9 +393,9 @@ async function gracefulShutdown(signal: string) {
   logger.info(`Received ${signal} — starting graceful shutdown`);
   
   const forceExitTimer = setTimeout(() => {
-    logger.error("Graceful shutdown timed out after 15s — forcing exit");
+    logger.error("Graceful shutdown timed out after 20s — forcing exit");
     process.exit(1);
-  }, 15000);
+  }, 20000);
   forceExitTimer.unref();
 
   try {
@@ -366,6 +415,8 @@ async function gracefulShutdown(signal: string) {
   } catch (err) {
     logger.error({ err }, "Error draining job queues");
   }
+
+  await waitForActiveRequests(5000);
   
   httpServer.close(async () => {
     logger.info("HTTP server closed");
@@ -429,24 +480,7 @@ async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean>
 
   await registerRoutes(httpServer, app);
 
-  app.use((err: Error & { status?: number; statusCode?: number }, req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    errorMonitor.track(err instanceof Error ? err : new Error(String(err)), {
-      route: req.path,
-      method: req.method,
-      statusCode: status,
-    });
-
-    logger.error({ err, route: req.path, method: req.method, statusCode: status }, "Internal Server Error");
-
-    if (res.headersSent) {
-      return next(err);
-    }
-
-    return res.status(status).json({ message });
-  });
+  app.use(globalErrorHandler);
 
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
