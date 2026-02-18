@@ -38,6 +38,9 @@ interface InboxEmail {
   jobId?: string | null;
   requestType?: string | null;
   impactArea?: string | null;
+  invoiceId?: string | null;
+  invoiceNumber?: string | null;
+  supplierName?: string | null;
 }
 
 function getUnprocessedCount(counts: InboxCounts | undefined): number {
@@ -110,18 +113,21 @@ function EmailListItem({ email, category }: { email: InboxEmail; category: Inbox
   const handleClick = () => {
     if (category === "drafting") {
       navigate(`/mobile/drafting-emails/${email.id}`);
+    } else if (category === "tender") {
+      navigate(`/mobile/tender-emails/${email.id}`);
+    } else if (category === "ap") {
+      if (email.invoiceId) {
+        navigate(`/mobile/ap-invoices/${email.invoiceId}`);
+      } else {
+        navigate(`/mobile/ap-invoices/${email.id}`);
+      }
     }
   };
-
-  const isClickable = category === "drafting";
 
   return (
     <button
       onClick={handleClick}
-      disabled={!isClickable}
-      className={`w-full flex items-start gap-3 p-3 rounded-xl border border-white/10 bg-white/5 text-left ${
-        isClickable ? "active:scale-[0.99]" : "opacity-80"
-      }`}
+      className="w-full flex items-start gap-3 p-3 rounded-xl border border-white/10 bg-white/5 text-left active:scale-[0.99]"
       data-testid={`email-item-${email.id}`}
     >
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 shrink-0 mt-0.5">
@@ -147,7 +153,7 @@ function EmailListItem({ email, category }: { email: InboxEmail; category: Inbox
           <span className="text-[10px] text-white/40">{formatDate(email.createdAt)}</span>
         </div>
       </div>
-      {isClickable && <ChevronRight className="h-4 w-4 text-white/30 mt-1 shrink-0" />}
+      <ChevronRight className="h-4 w-4 text-white/30 mt-1 shrink-0" />
     </button>
   );
 }
@@ -284,13 +290,6 @@ export default function MobileEmailProcessing() {
           </div>
         )}
 
-        {category !== "drafting" && currentEmails.length > 0 && (
-          <div className="mt-4 p-3 rounded-xl border border-white/10 bg-white/5">
-            <p className="text-xs text-white/50 text-center">
-              {category === "ap" ? "AP invoice" : "Tender"} processing is available on the web version
-            </p>
-          </div>
-        )}
       </div>
 
       <MobileBottomNav />
