@@ -357,15 +357,52 @@ function MobileJobMatchPanel({ email, emailId }: { email: DraftingEmailDetail; e
   );
 }
 
+function mapRequestTypeToAction(requestType: string | null): string {
+  if (!requestType) return "";
+  const mapping: Record<string, string> = {
+    change_request: "Update Drawing",
+    drawing_update: "Update Drawing",
+    rfi: "Respond to RFI",
+    submittal: "Review Specification",
+    approval: "Confirm Detail",
+    general: "Other",
+  };
+  return mapping[requestType.toLowerCase().replace(/\s+/g, "_")] || "";
+}
+
+function mapUrgencyToPriority(urgency: string | null): string {
+  if (!urgency) return "MEDIUM";
+  const u = urgency.toLowerCase();
+  if (u === "high" || u === "urgent" || u === "critical") return "HIGH";
+  if (u === "low") return "LOW";
+  return "MEDIUM";
+}
+
 function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; emailId: string }) {
-  const [actionType, setActionType] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [priority, setPriority] = useState("MEDIUM");
+  const [dismissed, setDismissed] = useState(false);
+  const [showManual, setShowManual] = useState(false);
   const [assigneeId, setAssigneeId] = useState("");
+  const [manualActionType, setManualActionType] = useState("");
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualDescription, setManualDescription] = useState("");
+  const [manualDueDate, setManualDueDate] = useState("");
+  const [manualPriority, setManualPriority] = useState("MEDIUM");
+  const [manualAssigneeId, setManualAssigneeId] = useState("");
+  const [aiDueDate, setAiDueDate] = useState("");
   const [aiReason, setAiReason] = useState("");
+  const [manualAiReason, setManualAiReason] = useState("");
   const { toast } = useToast();
+
+  const extractedAction = email.extractedFields?.find(f => f.fieldKey === "action_required");
+  const extractedSummary = email.extractedFields?.find(f => f.fieldKey === "summary");
+  const extractedUrgency = email.extractedFields?.find(f => f.fieldKey === "urgency");
+  const extractedRequestType = email.extractedFields?.find(f => f.fieldKey === "request_type");
+
+  const hasAiRecommendation = !!extractedAction?.fieldValue;
+  const aiTitle = extractedAction?.fieldValue || "";
+  const aiActionType = mapRequestTypeToAction(extractedRequestType?.fieldValue || email.requestType);
+  const aiPriority = mapUrgencyToPriority(extractedUrgency?.fieldValue);
+  const aiDescription = extractedSummary?.fieldValue || "";
 
   const { data: companyUsers = [] } = useQuery<Array<{ id: string; fullName: string; role: string }>>({
     queryKey: ["/api/users"],
@@ -374,6 +411,42 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
       return list.filter((u: any) => u.fullName).sort((a: any, b: any) => a.fullName.localeCompare(b.fullName));
     },
   });
+
+  const suggestDueDateMutation = useMutation({
+    mutationFn: async (actionType?: string) => {
+      const res = await apiRequest("POST", DRAFTING_INBOX_ROUTES.SUGGEST_DUE_DATE(emailId), { actionType: actionType || undefined });
+      return res.json();
+    },
+    onSuccess: (data: { days: number; date: string; reason: string }) => {
+      if (showManual) {
+        setManualDueDate(data.date);
+        setManualAiReason(data.reason);
+      } else {
+        setAiDueDate(data.date);
+        setAiReason(data.reason);
+      }
+    },
+    onError: () => {},
+  });
+
+  const dueDateFetched = useRef(false);
+  useEffect(() => {
+    if (hasAiRecommendation && !dismissed && !aiDueDate && !dueDateFetched.current) {
+      dueDateFetched.current = true;
+      suggestDueDateMutation.mutate(aiActionType || undefined);
+    }
+  }, [hasAiRecommendation, dismissed]);
+
+  const switchToManualWithAiValues = () => {
+    setManualTitle(aiTitle);
+    setManualActionType(aiActionType || "");
+    setManualDescription(aiDescription);
+    setManualPriority(aiPriority);
+    setManualDueDate(aiDueDate);
+    setManualAiReason(aiReason);
+    if (assigneeId) setManualAssigneeId(assigneeId);
+    setShowManual(true);
+  };
 
   const createTaskMutation = useMutation({
     mutationFn: async (data: { title: string; actionType: string; description?: string; jobId?: string | null; dueDate?: string | null; priority?: string | null; assigneeIds?: string[] }) => {
@@ -384,194 +457,318 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
       queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.EMAIL_TASKS(emailId)] });
       queryClient.invalidateQueries({ queryKey: [DRAFTING_INBOX_ROUTES.ACTIVITY(emailId)] });
       toast({ title: "Task created successfully" });
-      setActionType("");
-      setTitle("");
-      setDescription("");
-      setDueDate("");
-      setPriority("MEDIUM");
+      setDismissed(true);
+      setShowManual(false);
       setAssigneeId("");
-      setAiReason("");
+      setManualActionType("");
+      setManualTitle("");
+      setManualDescription("");
+      setManualDueDate("");
+      setManualPriority("MEDIUM");
+      setManualAssigneeId("");
     },
     onError: (err: Error) => {
       toast({ title: "Failed to create task", description: err.message, variant: "destructive" });
     },
   });
 
-  const suggestDueDateMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", DRAFTING_INBOX_ROUTES.SUGGEST_DUE_DATE(emailId), { actionType: actionType || undefined });
-      return res.json();
-    },
-    onSuccess: (data: { days: number; date: string; reason: string }) => {
-      setDueDate(data.date);
-      setAiReason(data.reason);
-    },
-    onError: () => {
-      toast({ title: "Could not get AI suggestion", variant: "destructive" });
-    },
-  });
-
-  const handleSubmit = () => {
-    if (!actionType) {
-      toast({ title: "Select an action type", variant: "destructive" });
-      return;
-    }
-    if (!title.trim()) {
-      toast({ title: "Enter a task title", variant: "destructive" });
-      return;
-    }
+  const handleAddRecommended = () => {
     if (!assigneeId) {
       toast({ title: "Select a user to assign this task to", variant: "destructive" });
       return;
     }
     createTaskMutation.mutate({
-      title: title.trim(),
-      actionType,
-      description: description.trim() || undefined,
+      title: aiTitle,
+      actionType: aiActionType || "Other",
+      description: aiDescription || undefined,
       jobId: email.jobId || null,
-      dueDate: dueDate || null,
-      priority,
+      dueDate: aiDueDate || null,
+      priority: aiPriority,
       assigneeIds: [assigneeId],
     });
   };
 
-  const extractedAction = email.extractedFields?.find(f => f.fieldKey === "action_required");
-  useEffect(() => {
-    if (extractedAction?.fieldValue && !title) {
-      setTitle(extractedAction.fieldValue);
+  const handleManualSubmit = () => {
+    if (!manualActionType) {
+      toast({ title: "Select an action type", variant: "destructive" });
+      return;
     }
-  }, [extractedAction?.fieldValue]);
+    if (!manualTitle.trim()) {
+      toast({ title: "Enter a task title", variant: "destructive" });
+      return;
+    }
+    if (!manualAssigneeId) {
+      toast({ title: "Select a user to assign this task to", variant: "destructive" });
+      return;
+    }
+    createTaskMutation.mutate({
+      title: manualTitle.trim(),
+      actionType: manualActionType,
+      description: manualDescription.trim() || undefined,
+      jobId: email.jobId || null,
+      dueDate: manualDueDate || null,
+      priority: manualPriority,
+      assigneeIds: [manualAssigneeId],
+    });
+  };
 
   const matchedJobLabel = email.job
     ? `${email.job.jobNumber ? `${email.job.jobNumber} - ` : ""}${email.job.name}`
     : null;
 
+  const priorityColors: Record<string, string> = {
+    LOW: "bg-gray-400 text-white",
+    MEDIUM: "bg-amber-500 text-white",
+    HIGH: "bg-orange-500 text-white",
+    CRITICAL: "bg-red-600 text-white",
+  };
+
   return (
     <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-3" data-testid="card-create-task-mobile">
-      <h3 className="text-sm font-semibold text-white/90">Create Task</h3>
-
-      {matchedJobLabel && (
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 text-sm" data-testid="field-task-job-display-mobile">
-          <LinkIcon className="h-3.5 w-3.5 text-white/40 shrink-0" />
-          <span className="text-white/50">Job:</span>
-          <span className="font-medium text-white/80 truncate">{matchedJobLabel}</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-indigo-400" />
+          <h3 className="text-sm font-semibold text-white/90">AI Recommended Action</h3>
         </div>
-      )}
-      {!matchedJobLabel && (
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm" data-testid="field-task-no-job-mobile">
-          <span className="text-amber-300 text-xs">Match a job above first to link this task</span>
-        </div>
-      )}
-
-      <Select value={actionType} onValueChange={setActionType}>
-        <SelectTrigger className="bg-white/10 border-white/20 text-white" data-testid="select-action-type-mobile">
-          <SelectValue placeholder="Select action type..." />
-        </SelectTrigger>
-        <SelectContent>
-          {DRAFTING_ACTION_TYPES.map(type => (
-            <SelectItem key={type} value={type}>{type}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Task title..."
-        className="bg-white/10 border-white/20 text-white placeholder:text-white/40 text-sm"
-        data-testid="input-task-title-mobile"
-      />
-
-      <Input
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Description (optional)..."
-        className="bg-white/10 border-white/20 text-white placeholder:text-white/40 text-sm"
-        data-testid="input-task-description-mobile"
-      />
-
-      <Select value={priority} onValueChange={setPriority}>
-        <SelectTrigger className="bg-white/10 border-white/20 text-white" data-testid="select-task-priority-mobile">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="LOW">Low</SelectItem>
-          <SelectItem value="MEDIUM">Medium</SelectItem>
-          <SelectItem value="HIGH">High</SelectItem>
-          <SelectItem value="CRITICAL">Critical</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <div>
-        <label className="text-xs text-white/50 mb-1 block">Assign To <span className="text-red-400">*</span></label>
-        <Select value={assigneeId} onValueChange={setAssigneeId}>
-          <SelectTrigger className={`bg-white/10 border-white/20 text-white ${!assigneeId ? "border-red-500/50" : ""}`} data-testid="select-task-assignee-mobile">
-            <SelectValue placeholder="Select a user..." />
-          </SelectTrigger>
-          <SelectContent>
-            {companyUsers.map(user => (
-              <SelectItem key={user.id} value={user.id} data-testid={`option-assignee-mobile-${user.id}`}>
-                {user.fullName}
-              </SelectItem>
-            ))}
-            {companyUsers.length === 0 && (
-              <div className="px-3 py-2 text-sm text-muted-foreground">No users found</div>
-            )}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div>
-        <Input
-          type="date"
-          value={dueDate}
-          onChange={(e) => { setDueDate(e.target.value); setAiReason(""); }}
-          className="bg-white/10 border-white/20 text-white text-sm"
-          data-testid="input-task-due-date-mobile"
-        />
-        <div className="flex items-center gap-1 mt-2 flex-wrap">
-          {DUE_DATE_PRESETS.map(preset => (
-            <Button
-              key={preset.days}
-              type="button"
-              variant={dueDate === addDays(preset.days) ? "default" : "outline"}
-              size="sm"
-              className="text-xs h-7 px-2"
-              onClick={() => { setDueDate(addDays(preset.days)); setAiReason(""); }}
-              data-testid={`button-due-${preset.days}d-mobile`}
-            >
-              {preset.label}
-            </Button>
-          ))}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="text-xs h-7 px-2 ml-auto"
-            onClick={() => suggestDueDateMutation.mutate()}
-            disabled={suggestDueDateMutation.isPending}
-            data-testid="button-ai-suggest-due-mobile"
-          >
-            {suggestDueDateMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
-            AI
+        {(dismissed || !hasAiRecommendation) && !showManual && (
+          <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => { setShowManual(true); setDismissed(false); }} data-testid="button-open-create-task-mobile">
+            <Pencil className="h-3 w-3 mr-1" />
+            Custom
           </Button>
-        </div>
-        {aiReason && (
-          <p className="text-xs text-white/50 mt-1.5 italic" data-testid="text-ai-reason-mobile">
-            {aiReason}
-          </p>
         )}
       </div>
 
-      <Button
-        onClick={handleSubmit}
-        disabled={createTaskMutation.isPending || !actionType || !title.trim() || !assigneeId}
-        className="w-full"
-        data-testid="button-submit-task-mobile"
-      >
-        {createTaskMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
-        Create Task
-      </Button>
+      {hasAiRecommendation && !dismissed && !showManual && (
+        <div className="space-y-3" data-testid="panel-ai-recommendation-mobile">
+          <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3 space-y-2">
+            <p className="text-sm font-medium text-white" data-testid="text-ai-task-title-mobile">{aiTitle}</p>
+            {aiDescription && (
+              <p className="text-xs text-white/50 leading-relaxed" data-testid="text-ai-task-description-mobile">{aiDescription}</p>
+            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {aiActionType && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-white/20 text-white/70" data-testid="badge-ai-action-type-mobile">{aiActionType}</Badge>
+              )}
+              <Badge className={`text-[10px] px-1.5 py-0 ${priorityColors[aiPriority]}`} data-testid="badge-ai-priority-mobile">{aiPriority}</Badge>
+              {aiDueDate && (
+                <span className="text-[10px] text-white/50" data-testid="text-ai-due-date-mobile">
+                  Due: {new Date(aiDueDate).toLocaleDateString("en-AU", { day: "2-digit", month: "short" })}
+                </span>
+              )}
+              {suggestDueDateMutation.isPending && (
+                <span className="text-[10px] text-white/40 flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                </span>
+              )}
+            </div>
+            {aiReason && (
+              <p className="text-[10px] text-white/40 italic" data-testid="text-ai-reason-mobile">{aiReason}</p>
+            )}
+            {matchedJobLabel && (
+              <div className="flex items-center gap-1.5 text-[10px] text-white/40">
+                <LinkIcon className="h-3 w-3 shrink-0" />
+                <span className="truncate">{matchedJobLabel}</span>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs text-white/50 mb-1 block">Assign To <span className="text-red-400">*</span></label>
+            <Select value={assigneeId} onValueChange={setAssigneeId}>
+              <SelectTrigger className={`bg-white/10 border-white/20 text-white ${!assigneeId ? "border-red-500/50" : ""}`} data-testid="select-task-assignee-mobile">
+                <SelectValue placeholder="Select a user..." />
+              </SelectTrigger>
+              <SelectContent>
+                {companyUsers.map(user => (
+                  <SelectItem key={user.id} value={user.id} data-testid={`option-assignee-mobile-${user.id}`}>
+                    {user.fullName}
+                  </SelectItem>
+                ))}
+                {companyUsers.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">No users found</div>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={handleAddRecommended}
+              disabled={createTaskMutation.isPending || !assigneeId}
+              className="flex-1"
+              data-testid="button-add-task-mobile"
+            >
+              {createTaskMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+              Add
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDismissed(true)}
+              className="flex-1"
+              data-testid="button-ignore-task-mobile"
+            >
+              Ignore
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={switchToManualWithAiValues}
+              data-testid="button-edit-task-mobile"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!hasAiRecommendation && !showManual && !dismissed && (
+        <div className="text-center py-3">
+          <p className="text-xs text-white/40 mb-2">No AI recommendation available.</p>
+          <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setShowManual(true)} data-testid="button-open-create-task-mobile">
+            <Pencil className="h-3 w-3 mr-1" />
+            Create Task Manually
+          </Button>
+        </div>
+      )}
+
+      {showManual && (
+        <div className="space-y-3" data-testid="panel-manual-task-mobile">
+          {matchedJobLabel && (
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-white/5 text-sm" data-testid="field-task-job-display-mobile">
+              <LinkIcon className="h-3.5 w-3.5 text-white/40 shrink-0" />
+              <span className="text-white/50">Job:</span>
+              <span className="font-medium text-white/80 truncate">{matchedJobLabel}</span>
+            </div>
+          )}
+          {!matchedJobLabel && (
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm" data-testid="field-task-no-job-mobile">
+              <span className="text-amber-300 text-xs">Match a job above first to link this task</span>
+            </div>
+          )}
+
+          <Select value={manualActionType} onValueChange={setManualActionType}>
+            <SelectTrigger className="bg-white/10 border-white/20 text-white" data-testid="select-action-type-mobile">
+              <SelectValue placeholder="Select action type..." />
+            </SelectTrigger>
+            <SelectContent>
+              {DRAFTING_ACTION_TYPES.map(type => (
+                <SelectItem key={type} value={type}>{type}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Input
+            value={manualTitle}
+            onChange={(e) => setManualTitle(e.target.value)}
+            placeholder="Task title..."
+            className="bg-white/10 border-white/20 text-white placeholder:text-white/40 text-sm"
+            data-testid="input-task-title-mobile"
+          />
+
+          <Input
+            value={manualDescription}
+            onChange={(e) => setManualDescription(e.target.value)}
+            placeholder="Description (optional)..."
+            className="bg-white/10 border-white/20 text-white placeholder:text-white/40 text-sm"
+            data-testid="input-task-description-mobile"
+          />
+
+          <Select value={manualPriority} onValueChange={setManualPriority}>
+            <SelectTrigger className="bg-white/10 border-white/20 text-white" data-testid="select-task-priority-mobile">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="LOW">Low</SelectItem>
+              <SelectItem value="MEDIUM">Medium</SelectItem>
+              <SelectItem value="HIGH">High</SelectItem>
+              <SelectItem value="CRITICAL">Critical</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <div>
+            <label className="text-xs text-white/50 mb-1 block">Assign To <span className="text-red-400">*</span></label>
+            <Select value={manualAssigneeId} onValueChange={setManualAssigneeId}>
+              <SelectTrigger className={`bg-white/10 border-white/20 text-white ${!manualAssigneeId ? "border-red-500/50" : ""}`} data-testid="select-task-assignee-mobile">
+                <SelectValue placeholder="Select a user..." />
+              </SelectTrigger>
+              <SelectContent>
+                {companyUsers.map(user => (
+                  <SelectItem key={user.id} value={user.id} data-testid={`option-assignee-mobile-${user.id}`}>
+                    {user.fullName}
+                  </SelectItem>
+                ))}
+                {companyUsers.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">No users found</div>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Input
+              type="date"
+              value={manualDueDate}
+              onChange={(e) => { setManualDueDate(e.target.value); setManualAiReason(""); }}
+              className="bg-white/10 border-white/20 text-white text-sm"
+              data-testid="input-task-due-date-mobile"
+            />
+            <div className="flex items-center gap-1 mt-2 flex-wrap">
+              {DUE_DATE_PRESETS.map(preset => (
+                <Button
+                  key={preset.days}
+                  type="button"
+                  variant={manualDueDate === addDays(preset.days) ? "default" : "outline"}
+                  size="sm"
+                  className="text-xs h-7 px-2"
+                  onClick={() => { setManualDueDate(addDays(preset.days)); setManualAiReason(""); }}
+                  data-testid={`button-due-${preset.days}d-mobile`}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-xs h-7 px-2 ml-auto"
+                onClick={() => suggestDueDateMutation.mutate(manualActionType || undefined)}
+                disabled={suggestDueDateMutation.isPending}
+                data-testid="button-ai-suggest-due-mobile"
+              >
+                {suggestDueDateMutation.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                AI
+              </Button>
+            </div>
+            {manualAiReason && (
+              <p className="text-xs text-white/50 mt-1.5 italic" data-testid="text-ai-reason-mobile">
+                {manualAiReason}
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleManualSubmit}
+              disabled={createTaskMutation.isPending || !manualActionType || !manualTitle.trim() || !manualAssigneeId}
+              className="flex-1"
+              data-testid="button-submit-task-mobile"
+            >
+              {createTaskMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+              Create Task
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowManual(false)}
+              data-testid="button-cancel-task-mobile"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
