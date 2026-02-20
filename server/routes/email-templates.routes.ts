@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { db } from "../db";
 import { emailTemplates, emailSendLogs } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { emailService } from "../services/email.service";
@@ -62,7 +62,7 @@ const emailSendSchema = z.object({
     { message: "Invalid email address format in BCC field" }
   ),
   subject: z.string().min(1, "Subject is required").max(500),
-  htmlBody: z.string().min(1, "Email body is required"),
+  htmlBody: z.string().min(1, "Email body is required").max(500000, "Email body too large (max 500KB)"),
 });
 
 router.get("/api/email-templates", requireAuth, async (req: Request, res: Response) => {
@@ -243,18 +243,37 @@ router.get("/api/email-send-logs", requireAuth, async (req: Request, res: Respon
     if (!companyId) return res.status(400).json({ error: "Company context required" });
 
     const taskId = req.query.taskId as string | undefined;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const status = req.query.status as string | undefined;
+    const offset = (page - 1) * limit;
 
     const conditions: any[] = [eq(emailSendLogs.companyId, companyId)];
     if (taskId) {
       conditions.push(eq(emailSendLogs.taskId, taskId));
     }
+    if (status) {
+      conditions.push(eq(emailSendLogs.status, status));
+    }
+
+    const [totalResult] = await db.select({ count: count() }).from(emailSendLogs)
+      .where(and(...conditions));
 
     const logs = await db.select().from(emailSendLogs)
       .where(and(...conditions))
       .orderBy(desc(emailSendLogs.sentAt))
-      .limit(100);
+      .limit(limit)
+      .offset(offset);
 
-    res.json(logs);
+    res.json({
+      data: logs,
+      pagination: {
+        page,
+        limit,
+        total: totalResult?.count ?? 0,
+        totalPages: Math.ceil((totalResult?.count ?? 0) / limit),
+      },
+    });
   } catch (err) {
     logger.error({ err }, "Error fetching email send logs");
     res.status(500).json({ error: "Failed to fetch email send logs" });

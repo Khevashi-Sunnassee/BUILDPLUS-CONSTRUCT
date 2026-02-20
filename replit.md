@@ -20,7 +20,7 @@ The system utilizes a client-server architecture. The frontend is a React applic
 **Technical Implementations & Features:**
 - **Core Management:** Time management, approval workflows, reporting, analytics, and administration for users, jobs, customers, and global settings.
 - **Job & Panel Lifecycle:** CRUD for customer/job management, panel registration, production approvals, estimate import, and detailed panel field management with 14-stage panel and 5-phase job lifecycles, both with audit logging. Company-specific auto-generated job numbers with configurable prefix, minimum digits, and atomic sequential numbering stored in global_settings.
-- **AI Integration:** OpenAI for PDF analysis and AI-powered visual comparisons.
+- **AI Integration:** OpenAI for PDF analysis and AI-powered visual comparisons. Knowledge Base with RAG (pgvector semantic search, intelligent chunking with overlap, OpenAI embeddings, streaming responses, KB-only/Hybrid answer modes). AI usage quotas (200 requests/user/day) with tracking table. LRU embedding cache (O(1) eviction, 5000 entries, 30min TTL). Conversation ownership isolation (users can only access their own conversations). Prompt injection sanitization with audit logging. Enhanced markdown rendering (headers, code blocks, lists, links, inline code).
 - **Financial & Logistics:** Configurable rates, cost analysis, production tracking, load list creation, and delivery recording.
 - **Scheduling:** Drafting and procurement scheduling linked to production slots, supporting multi-factory operations; enhanced job program scheduling with pour labels, sequence ordering, and drag-and-drop.
 - **Communication:** Teams-style chat with DMs, groups, channels, @mentions, notifications, and file attachments.

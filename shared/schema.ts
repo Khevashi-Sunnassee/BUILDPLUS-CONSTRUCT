@@ -5457,6 +5457,21 @@ export const kbMessages = pgTable("kb_messages", {
   roleIdx: index("kb_messages_role_idx").on(table.role),
 }));
 
+export const aiUsageTracking = pgTable("ai_usage_tracking", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  usageDate: varchar("usage_date", { length: 10 }).notNull(),
+  requestCount: integer("request_count").notNull().default(0),
+  totalTokens: integer("total_tokens").notNull().default(0),
+  lastRequestAt: timestamp("last_request_at").defaultNow().notNull(),
+}, (table) => ({
+  companyDateIdx: index("ai_usage_company_date_idx").on(table.companyId, table.usageDate),
+  uniqueUserDate: uniqueIndex("ai_usage_unique_user_date_idx").on(table.userId, table.usageDate),
+}));
+
+export type AiUsageTracking = typeof aiUsageTracking.$inferSelect;
+
 export const insertKbProjectSchema = createInsertSchema(kbProjects).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertKbProject = z.infer<typeof insertKbProjectSchema>;
 export type KbProject = typeof kbProjects.$inferSelect;

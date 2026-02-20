@@ -103,6 +103,7 @@ const kbChatLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many AI chat requests, please slow down and try again shortly" },
+  validate: { xForwardedForHeader: false, ip: false, default: false },
   keyGenerator: sessionKeyGenerator,
 });
 

@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import OpenAI from "openai";
 import { db } from "../db";
 import {
-  kbProjects, kbDocuments, kbChunks, kbConversations, kbMessages,
+  kbProjects, kbDocuments, kbChunks, kbConversations, kbMessages, aiUsageTracking,
 } from "@shared/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import { requireAuth } from "./middleware/auth.middleware";
@@ -279,6 +279,9 @@ router.get("/api/kb/conversations", requireAuth, async (req: Request, res: Respo
     if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
 
     const projectId = req.query.projectId as string | undefined;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const offset = (page - 1) * limit;
 
     const conditions = [
       eq(kbConversations.companyId, companyId),
@@ -286,14 +289,27 @@ router.get("/api/kb/conversations", requireAuth, async (req: Request, res: Respo
     ];
     if (projectId) conditions.push(eq(kbConversations.projectId, projectId));
 
+    const [totalResult] = await db.select({ count: count() })
+      .from(kbConversations)
+      .where(and(...conditions));
+
     const convos = await db
       .select()
       .from(kbConversations)
       .where(and(...conditions))
       .orderBy(desc(kbConversations.updatedAt))
-      .limit(100);
+      .limit(limit)
+      .offset(offset);
 
-    res.json(convos);
+    res.json({
+      data: convos,
+      pagination: {
+        page,
+        limit,
+        total: totalResult?.count ?? 0,
+        totalPages: Math.ceil((totalResult?.count ?? 0) / limit),
+      },
+    });
   } catch (error) {
     logger.error({ err: error }, "[KB] Failed to fetch conversations");
     res.status(500).json({ error: "Failed to fetch conversations" });
@@ -359,7 +375,16 @@ router.delete("/api/kb/conversations/:id", requireAuth, async (req: Request, res
 router.get("/api/kb/conversations/:id/messages", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId;
-    if (!companyId) return res.status(403).json({ error: "Company context required" });
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
+
+    const [convo] = await db.select({ id: kbConversations.id, createdById: kbConversations.createdById })
+      .from(kbConversations)
+      .where(and(eq(kbConversations.id, req.params.id), eq(kbConversations.companyId, companyId)))
+      .limit(1);
+
+    if (!convo) return res.status(404).json({ error: "Conversation not found" });
+    if (convo.createdById !== userId) return res.status(403).json({ error: "Access denied" });
 
     const messages = await db
       .select()
@@ -395,6 +420,27 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
       .where(and(eq(kbConversations.id, req.params.id), eq(kbConversations.companyId, companyId)));
 
     if (!convo) return res.status(404).json({ error: "Conversation not found" });
+    if (convo.createdById !== userId) return res.status(403).json({ error: "Access denied" });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const [usage] = await db.select()
+      .from(aiUsageTracking)
+      .where(and(eq(aiUsageTracking.userId, userId), eq(aiUsageTracking.usageDate, today)))
+      .limit(1);
+
+    const MAX_DAILY_REQUESTS = 200;
+    if (usage && usage.requestCount >= MAX_DAILY_REQUESTS) {
+      return res.status(429).json({ error: `Daily AI request limit reached (${MAX_DAILY_REQUESTS}). Try again tomorrow.` });
+    }
+
+    await db.execute(sql`
+      INSERT INTO ai_usage_tracking (id, company_id, user_id, usage_date, request_count, total_tokens, last_request_at)
+      VALUES (gen_random_uuid(), ${companyId}, ${userId}, ${today}, 1, 0, NOW())
+      ON CONFLICT (user_id, usage_date)
+      DO UPDATE SET request_count = ai_usage_tracking.request_count + 1, last_request_at = NOW()
+    `).catch(err => {
+      logger.warn({ err }, "[KB] Failed to update AI usage tracking");
+    });
 
     await db.insert(kbMessages).values({
       companyId,

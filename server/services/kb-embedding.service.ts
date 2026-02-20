@@ -9,8 +9,48 @@ const openai = new OpenAI({
 
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const BATCH_SIZE = 64;
-const embeddingCache = new Map<string, { embedding: number[]; timestamp: number }>();
+const CACHE_MAX_SIZE = 5000;
 const CACHE_TTL = 30 * 60 * 1000;
+
+class LRUEmbeddingCache {
+  private cache = new Map<string, { embedding: number[]; timestamp: number }>();
+  private maxSize: number;
+  private ttl: number;
+
+  constructor(maxSize: number, ttl: number) {
+    this.maxSize = maxSize;
+    this.ttl = ttl;
+  }
+
+  get(key: string): number[] | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.timestamp > this.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+    return entry.embedding;
+  }
+
+  set(key: string, embedding: number[]): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey !== undefined) this.cache.delete(firstKey);
+    }
+    this.cache.set(key, { embedding, timestamp: Date.now() });
+  }
+
+  get size(): number {
+    return this.cache.size;
+  }
+}
+
+const embeddingCache = new LRUEmbeddingCache(CACHE_MAX_SIZE, CACHE_TTL);
 
 function getCacheKey(text: string): string {
   let hash = 0;
@@ -25,9 +65,7 @@ function getCacheKey(text: string): string {
 export async function generateEmbedding(text: string): Promise<number[]> {
   const cacheKey = getCacheKey(text);
   const cached = embeddingCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    return cached.embedding;
-  }
+  if (cached) return cached;
 
   return openAIBreaker.execute(async () => {
     const response = await openai.embeddings.create({
@@ -35,16 +73,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
       input: text.slice(0, 8000),
     });
     const embedding = response.data[0].embedding;
-
-    embeddingCache.set(cacheKey, { embedding, timestamp: Date.now() });
-
-    if (embeddingCache.size > 5000) {
-      const now = Date.now();
-      for (const [key, val] of embeddingCache) {
-        if (now - val.timestamp > CACHE_TTL) embeddingCache.delete(key);
-      }
-    }
-
+    embeddingCache.set(cacheKey, embedding);
     return embedding;
   });
 }
@@ -57,8 +86,8 @@ export async function generateEmbeddingsBatch(texts: string[]): Promise<number[]
   for (let i = 0; i < texts.length; i++) {
     const cacheKey = getCacheKey(texts[i]);
     const cached = embeddingCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      results[i] = cached.embedding;
+    if (cached) {
+      results[i] = cached;
     } else {
       uncachedIndices.push(i);
       uncachedTexts.push(texts[i].slice(0, 8000));
@@ -84,7 +113,7 @@ export async function generateEmbeddingsBatch(texts: string[]): Promise<number[]
       results[originalIdx] = embeddings[j];
 
       const cacheKey = getCacheKey(texts[originalIdx]);
-      embeddingCache.set(cacheKey, { embedding: embeddings[j], timestamp: Date.now() });
+      embeddingCache.set(cacheKey, embeddings[j]);
     }
 
     logger.debug({ batchSize: batchTexts.length, batchStart }, "[KB] Embedding batch completed");
