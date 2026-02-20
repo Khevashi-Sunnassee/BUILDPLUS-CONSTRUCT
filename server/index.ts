@@ -97,6 +97,15 @@ const uploadLimiter = rateLimit({
   message: { error: "Too many upload requests, please try again later" },
 });
 
+const kbChatLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many AI chat requests, please slow down and try again shortly" },
+  keyGenerator: sessionKeyGenerator,
+});
+
 app.use('/api', (req: Request, res: Response, next: NextFunction) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
@@ -187,6 +196,7 @@ app.use("/api/tasks/:id/files", uploadLimiter);
 app.use("/api/purchase-orders/:id/attachments", uploadLimiter);
 app.use("/api/chat/:conversationId/files", uploadLimiter);
 app.use("/api/procurement/items/import", uploadLimiter);
+app.use("/api/kb/conversations/:id/messages", kbChatLimiter);
 app.use("/api/", apiLimiter);
 
 app.use("/api/", (req, res, next) => {

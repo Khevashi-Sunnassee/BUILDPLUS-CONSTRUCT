@@ -386,6 +386,7 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
 
     const { content, mode } = req.body;
     if (!content?.trim()) return res.status(400).json({ error: "Message content is required" });
+    if (content.length > 10000) return res.status(400).json({ error: "Message too long (max 10,000 characters)" });
 
     const answerMode = mode === "HYBRID" ? "HYBRID" : "KB_ONLY";
 

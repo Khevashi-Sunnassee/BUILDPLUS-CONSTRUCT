@@ -62,6 +62,36 @@ export async function searchKnowledgeBase(
   }));
 }
 
+function sanitizeChunkContent(content: string): string {
+  let sanitized = content;
+  let filtered = false;
+
+  const patterns: [RegExp, string][] = [
+    [/^(system|assistant|user)\s*:/gim, '[role reference]:'],
+    [/ignore\s+(all\s+)?previous\s+instructions/gi, '[filtered]'],
+    [/forget\s+(all\s+)?(your\s+)?instructions/gi, '[filtered]'],
+    [/you\s+are\s+now\s+a/gi, '[filtered]'],
+    [/act\s+as\s+(if\s+you\s+are\s+)?a/gi, '[filtered]'],
+    [/pretend\s+(to\s+be|you\s+are)/gi, '[filtered]'],
+    [/disregard\s+(all\s+)?(previous\s+)?/gi, '[filtered]'],
+    [/override\s+(your\s+)?(instructions|rules|system)/gi, '[filtered]'],
+  ];
+
+  for (const [pattern, replacement] of patterns) {
+    const result = sanitized.replace(pattern, replacement);
+    if (result !== sanitized) {
+      filtered = true;
+      sanitized = result;
+    }
+  }
+
+  if (filtered) {
+    logger.warn("[KB] Prompt injection pattern detected and sanitized in document chunk content");
+  }
+
+  return sanitized;
+}
+
 export function buildRAGContext(chunks: RetrievedChunk[], mode: "KB_ONLY" | "HYBRID"): string {
   if (chunks.length === 0) {
     if (mode === "KB_ONLY") {
@@ -73,7 +103,8 @@ export function buildRAGContext(chunks: RetrievedChunk[], mode: "KB_ONLY" | "HYB
   const contextParts = chunks.map((chunk, i) => {
     const source = chunk.documentTitle || "Unknown Document";
     const section = chunk.metadata?.section ? ` > ${chunk.metadata.section}` : "";
-    return `[Source ${i + 1}: ${source}${section}]\n${chunk.content}`;
+    const sanitizedContent = sanitizeChunkContent(chunk.content);
+    return `[Source ${i + 1}: ${source}${section}]\n${sanitizedContent}`;
   });
 
   return contextParts.join("\n\n---\n\n");
