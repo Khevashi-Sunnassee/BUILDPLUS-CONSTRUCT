@@ -5374,6 +5374,76 @@ export type InsertEmailSendLog = z.infer<typeof insertEmailSendLogSchema>;
 export type EmailSendLog = typeof emailSendLogs.$inferSelect;
 
 // ============================================================================
+// MAIL REGISTER - FORMAL CORRESPONDENCE TRACKING
+// ============================================================================
+export const mailTypeCategoryEnum = pgEnum("mail_type_category", ["MAIL", "TRANSMITTAL"]);
+
+export const mailTypes = pgTable("mail_types", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 100 }).notNull(),
+  abbreviation: varchar("abbreviation", { length: 20 }).notNull(),
+  category: mailTypeCategoryEnum("category").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  categoryIdx: index("mail_types_category_idx").on(table.category),
+  nameUniqueIdx: uniqueIndex("mail_types_name_unique_idx").on(table.name),
+}));
+
+export const insertMailTypeSchema = createInsertSchema(mailTypes).omit({ id: true, createdAt: true });
+export type InsertMailType = z.infer<typeof insertMailTypeSchema>;
+export type MailType = typeof mailTypes.$inferSelect;
+
+export const mailRegisterStatusEnum = pgEnum("mail_register_status", ["DRAFT", "SENT", "DELIVERED", "REPLIED", "CLOSED", "FAILED"]);
+export const responseRequiredEnum = pgEnum("response_required_type", ["YES", "NO", "FOR_INFORMATION"]);
+
+export const mailRegister = pgTable("mail_register", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  mailNumber: varchar("mail_number", { length: 50 }).notNull(),
+  mailTypeId: varchar("mail_type_id", { length: 36 }).notNull().references(() => mailTypes.id),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
+  taskId: varchar("task_id", { length: 36 }).references(() => tasks.id),
+  toAddresses: text("to_addresses").notNull(),
+  ccAddresses: text("cc_addresses"),
+  subject: varchar("subject", { length: 500 }).notNull(),
+  htmlBody: text("html_body").notNull(),
+  responseRequired: responseRequiredEnum("response_required"),
+  responseDueDate: timestamp("response_due_date"),
+  status: mailRegisterStatusEnum("status").notNull().default("SENT"),
+  sentById: varchar("sent_by_id", { length: 36 }).notNull().references(() => users.id),
+  messageId: varchar("message_id", { length: 255 }),
+  threadId: varchar("thread_id", { length: 255 }),
+  parentMailId: varchar("parent_mail_id", { length: 36 }),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("mail_register_company_idx").on(table.companyId),
+  mailNumberIdx: uniqueIndex("mail_register_mail_number_idx").on(table.mailNumber),
+  companyTypeIdx: index("mail_register_company_type_idx").on(table.companyId, table.mailTypeId),
+  companyDateIdx: index("mail_register_company_date_idx").on(table.companyId, table.sentAt),
+  threadIdx: index("mail_register_thread_idx").on(table.threadId),
+  taskIdx: index("mail_register_task_idx").on(table.taskId),
+  jobIdx: index("mail_register_job_idx").on(table.jobId),
+  sentByIdx: index("mail_register_sent_by_idx").on(table.sentById),
+}));
+
+export const insertMailRegisterSchema = createInsertSchema(mailRegister).omit({ id: true, createdAt: true, updatedAt: true, sentAt: true });
+export type InsertMailRegister = z.infer<typeof insertMailRegisterSchema>;
+export type MailRegisterEntry = typeof mailRegister.$inferSelect;
+
+export const mailTypeSequences = pgTable("mail_type_sequences", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  mailTypeId: varchar("mail_type_id", { length: 36 }).notNull().references(() => mailTypes.id),
+  lastSequence: integer("last_sequence").notNull().default(0),
+}, (table) => ({
+  companyTypeUniqueIdx: uniqueIndex("mail_type_sequences_company_type_idx").on(table.companyId, table.mailTypeId),
+}));
+
+// ============================================================================
 // KNOWLEDGE BASE - AI ASSISTANT
 // ============================================================================
 export const kbDocStatusEnum = pgEnum("kb_doc_status", ["UPLOADED", "PROCESSING", "READY", "FAILED"]);

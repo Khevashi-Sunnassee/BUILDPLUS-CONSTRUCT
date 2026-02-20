@@ -1047,3 +1047,12 @@ export const DRAFTING_INBOX_ROUTES = {
   SUGGEST_DUE_DATE: (id: string | number) => `/api/drafting-inbox/emails/${id}/suggest-due-date`,
 } as const;
 export type DraftingInboxRoutes = typeof DRAFTING_INBOX_ROUTES;
+
+export const MAIL_REGISTER_ROUTES = {
+  TYPES: '/api/mail-register/types',
+  LIST: '/api/mail-register',
+  CREATE: '/api/mail-register',
+  BY_ID: (id: string | number) => `/api/mail-register/${id}`,
+  NEXT_NUMBER: '/api/mail-register/next-number',
+} as const;
+export type MailRegisterRoutes = typeof MAIL_REGISTER_ROUTES;

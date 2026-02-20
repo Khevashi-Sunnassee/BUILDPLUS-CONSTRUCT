@@ -93,6 +93,7 @@ const AdminDocumentConfigPage = lazyWithRetry(() => import("@/pages/admin/docume
 const AdminCompaniesPage = lazyWithRetry(() => import("@/pages/admin/companies"));
 const AdminChecklistTemplatesPage = lazyWithRetry(() => import("@/pages/admin/checklist-templates"));
 const AdminEmailTemplatesPage = lazyWithRetry(() => import("@/pages/admin/email-templates"));
+const MailRegisterPage = lazyWithRetry(() => import("@/pages/mail-register"));
 const AssetRegisterPage = lazyWithRetry(() => import("@/pages/admin/asset-register"));
 const AssetDetailPage = lazyWithRetry(() => import("@/pages/admin/asset-detail"));
 const AssetRepairFormPage = lazyWithRetry(() => import("@/pages/admin/asset-repair-form"));
@@ -900,6 +901,14 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminEmailTemplatesPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/mail-register">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <MailRegisterPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

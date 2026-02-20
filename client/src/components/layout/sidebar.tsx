@@ -70,6 +70,7 @@ import {
   Inbox,
   MailPlus,
   Brain,
+  Mail,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -105,6 +106,7 @@ const mainNavItems = [
   { title: "Photo Gallery", url: "/photo-gallery", icon: ImageIcon },
   { title: "Checklists", url: "/checklists", icon: CheckSquare },
   { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
+  { title: "Mail Register", url: "/mail-register", icon: Mail },
   { title: "Broadcast", url: "/broadcast", icon: Radio },
   { title: "Help Center", url: "/help", icon: BookOpen },
   { title: "Knowledge Base", url: "/knowledge-base", icon: Brain },
