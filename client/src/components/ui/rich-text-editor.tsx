@@ -13,7 +13,8 @@ import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { DOMParser as ProseMirrorDOMParser } from "@tiptap/pm/model";
 import {
   Bold,
   Italic,
@@ -543,6 +544,7 @@ function EditorToolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
   );
 }
 
+
 export function RichTextEditor({
   content,
   onChange,
@@ -560,11 +562,15 @@ export function RichTextEditor({
         types: ["heading", "paragraph"],
       }),
       Image.configure({
-        inline: false,
+        inline: true,
         allowBase64: true,
+        HTMLAttributes: {
+          style: "max-width: 100%; height: auto;",
+        },
       }),
       Link.configure({
         openOnClick: false,
+        autolink: true,
         HTMLAttributes: {
           class: "editor-link",
         },
@@ -590,6 +596,85 @@ export function RichTextEditor({
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
     },
+    editorProps: {
+      handlePaste: (view, event) => {
+        const clipboardData = event.clipboardData;
+        if (!clipboardData) return false;
+
+        const items = Array.from(clipboardData.items || []);
+        const imageItem = items.find(item => item.type.startsWith("image/"));
+
+        if (imageItem) {
+          event.preventDefault();
+          const file = imageItem.getAsFile();
+          if (!file) return false;
+
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64 = reader.result as string;
+            view.dispatch(
+              view.state.tr.replaceSelectionWith(
+                view.state.schema.nodes.image.create({ src: base64 })
+              )
+            );
+          };
+          reader.readAsDataURL(file);
+          return true;
+        }
+
+        const html = clipboardData.getData("text/html");
+        if (html && /<img[^>]+src\s*=\s*["']https?:\/\//i.test(html)) {
+          event.preventDefault();
+
+          const cleaned = html
+            .replace(/<!--\[if[\s\S]*?endif\]-->/gi, "")
+            .replace(/<!--[\s\S]*?-->/g, "")
+            .replace(/<style[\s\S]*?<\/style>/gi, "")
+            .replace(/<meta[^>]*>/gi, "")
+            .replace(/<link[^>]*>/gi, "")
+            .replace(/<o:p>[\s\S]*?<\/o:p>/gi, "");
+
+          const tempDiv = document.createElement("div");
+          tempDiv.innerHTML = cleaned;
+
+          const bodyEl = tempDiv.querySelector("body");
+          const contentEl = bodyEl || tempDiv;
+
+          contentEl.querySelectorAll("img").forEach((img) => {
+            const src = img.getAttribute("src");
+            if (!src || (!src.startsWith("http://") && !src.startsWith("https://") && !src.startsWith("data:"))) {
+              img.remove();
+              return;
+            }
+            img.removeAttribute("width");
+            img.removeAttribute("height");
+            img.setAttribute("style", "max-width: 100%; height: auto;");
+          });
+
+          const editor = (view as any)._tiptapEditor;
+          if (editor && editor.commands) {
+            editor.commands.insertContent(contentEl.innerHTML);
+          } else {
+            const { state, dispatch } = view;
+            const parser = ProseMirrorDOMParser.fromSchema(state.schema);
+            const parsedDoc = document.createElement("div");
+            parsedDoc.innerHTML = contentEl.innerHTML;
+            const slice = parser.parseSlice(parsedDoc);
+            const tr = state.tr.replaceSelection(slice);
+            dispatch(tr);
+          }
+          return true;
+        }
+
+        return false;
+      },
+      transformPastedHTML(html) {
+        return html
+          .replace(/<!--\[if[\s\S]*?endif\]-->/gi, "")
+          .replace(/<!--[\s\S]*?-->/g, "")
+          .replace(/<o:p>[\s\S]*?<\/o:p>/gi, "");
+      },
+    },
   });
 
   useEffect(() => {
@@ -614,7 +699,8 @@ export function RichTextEditor({
           font-family: Arial, sans-serif;
           font-size: 14px;
           line-height: 1.6;
-          color: var(--foreground, #000);
+          color: #000000;
+          background-color: #ffffff;
         }
         .tiptap-editor .ProseMirror p {
           margin: 0 0 0.5em 0;
@@ -649,27 +735,29 @@ export function RichTextEditor({
           list-style-type: decimal;
         }
         .tiptap-editor .ProseMirror blockquote {
-          border-left: 3px solid hsl(var(--border));
+          border-left: 3px solid #d1d5db;
           padding-left: 1em;
           margin: 0.5em 0;
-          color: hsl(var(--muted-foreground));
+          color: #6b7280;
           font-style: italic;
         }
         .tiptap-editor .ProseMirror pre {
-          background: hsl(var(--muted));
+          background: #f3f4f6;
           border-radius: 6px;
           padding: 12px 16px;
           font-family: "Courier New", monospace;
           font-size: 0.9em;
           overflow-x: auto;
           margin: 0.5em 0;
+          color: #1f2937;
         }
         .tiptap-editor .ProseMirror code {
-          background: hsl(var(--muted));
+          background: #f3f4f6;
           border-radius: 3px;
           padding: 2px 4px;
           font-family: "Courier New", monospace;
           font-size: 0.9em;
+          color: #1f2937;
         }
         .tiptap-editor .ProseMirror pre code {
           background: none;
@@ -677,12 +765,12 @@ export function RichTextEditor({
         }
         .tiptap-editor .ProseMirror hr {
           border: none;
-          border-top: 1px solid hsl(var(--border));
+          border-top: 1px solid #d1d5db;
           margin: 1em 0;
         }
         .tiptap-editor .ProseMirror .editor-link,
         .tiptap-editor .ProseMirror a {
-          color: hsl(var(--primary));
+          color: #2563eb;
           text-decoration: underline;
           cursor: pointer;
         }
@@ -704,24 +792,25 @@ export function RichTextEditor({
         }
         .tiptap-editor .ProseMirror table td,
         .tiptap-editor .ProseMirror table th {
-          border: 1px solid hsl(var(--border));
+          border: 1px solid #d1d5db;
           padding: 6px 10px;
           vertical-align: top;
           min-width: 80px;
           position: relative;
+          color: #000000;
         }
         .tiptap-editor .ProseMirror table th {
-          background: hsl(var(--muted));
+          background: #f3f4f6;
           font-weight: 600;
           text-align: left;
         }
         .tiptap-editor .ProseMirror table .selectedCell {
-          background: hsl(var(--accent));
+          background: #dbeafe;
         }
         .tiptap-editor .ProseMirror .is-empty::before {
           content: attr(data-placeholder);
           float: left;
-          color: hsl(var(--muted-foreground));
+          color: #9ca3af;
           pointer-events: none;
           height: 0;
           font-style: italic;
@@ -735,7 +824,7 @@ export function RichTextEditor({
         }
       `}</style>
       {editable && <EditorToolbar editor={editor} />}
-      <div className="tiptap-editor bg-white dark:bg-background">
+      <div className="tiptap-editor" style={{ backgroundColor: "#ffffff" }}>
         <EditorContent editor={editor} />
       </div>
     </div>
