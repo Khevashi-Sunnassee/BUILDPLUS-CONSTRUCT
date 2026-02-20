@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -315,9 +315,14 @@ export default function KnowledgeBasePage() {
     );
 
     try {
+      const token = getCsrfToken();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) {
+        headers["x-csrf-token"] = token;
+      }
       const res = await fetch(`/api/kb/conversations/${selectedConvoId}/messages`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         credentials: "include",
         body: JSON.stringify({ content: userMessage, mode: answerMode }),
       });
@@ -1081,8 +1086,46 @@ export default function KnowledgeBasePage() {
   );
 }
 
-function renderMarkdown(text: string): string {
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1');
+function renderMarkdown(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let key = 0;
+
+  while (remaining.length > 0) {
+    const boldMatch = remaining.match(/\*\*(.*?)\*\*/);
+    const italicMatch = remaining.match(/(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/);
+
+    let firstMatch: { index: number; length: number; node: React.ReactNode } | null = null;
+
+    if (boldMatch && boldMatch.index !== undefined) {
+      firstMatch = {
+        index: boldMatch.index,
+        length: boldMatch[0].length,
+        node: <strong key={key++}>{boldMatch[1]}</strong>,
+      };
+    }
+
+    if (italicMatch && italicMatch.index !== undefined) {
+      if (!firstMatch || italicMatch.index < firstMatch.index) {
+        firstMatch = {
+          index: italicMatch.index,
+          length: italicMatch[0].length,
+          node: <em key={key++}>{italicMatch[1]}</em>,
+        };
+      }
+    }
+
+    if (firstMatch) {
+      if (firstMatch.index > 0) {
+        parts.push(remaining.slice(0, firstMatch.index));
+      }
+      parts.push(firstMatch.node);
+      remaining = remaining.slice(firstMatch.index + firstMatch.length);
+    } else {
+      parts.push(remaining);
+      break;
+    }
+  }
+
+  return <>{parts}</>;
 }

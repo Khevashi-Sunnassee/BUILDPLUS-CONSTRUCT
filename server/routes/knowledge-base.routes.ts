@@ -426,9 +426,15 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
 
     let fullResponse = "";
     const sourceChunkIds = chunks.map(c => c.id);
+    let clientDisconnected = false;
+
+    req.on("close", () => {
+      clientDisconnected = true;
+    });
 
     try {
       const stream = await openAIBreaker.execute(async () => {
@@ -442,6 +448,7 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
       });
 
       for await (const chunk of stream as any) {
+        if (clientDisconnected) break;
         const delta = chunk.choices?.[0]?.delta?.content || "";
         if (delta) {
           fullResponse += delta;
