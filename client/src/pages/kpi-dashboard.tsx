@@ -14,6 +14,7 @@ import {
   Layers,
   Users,
 } from "lucide-react";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -267,7 +268,7 @@ export default function KPIDashboardPage() {
     };
   }, [periodType, customStartDate, customEndDate]);
 
-  const { data: productionData, isLoading: productionLoading } = useQuery<ProductionReportResponse>({
+  const { data: productionData, isLoading: productionLoading, isError, error, refetch } = useQuery<ProductionReportResponse>({
     queryKey: [REPORTS_ROUTES.PRODUCTION_DAILY, { startDate, endDate }],
     enabled: !!startDate && !!endDate,
   });
@@ -507,6 +508,14 @@ export default function KPIDashboardPage() {
   };
 
   const isLoading = productionLoading || costsLoading || draftingLoading;
+
+  if (isError) {
+    return (
+      <div className="space-y-6" role="main" aria-label="KPI Dashboard">
+        <QueryErrorState error={error} onRetry={refetch} message="Failed to load KPI data" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" role="main" aria-label="KPI Dashboard">

@@ -25,6 +25,7 @@ import {
 import { ADMIN_ROUTES, USER_ROUTES, INVITATION_ROUTES } from "@shared/api-routes";
 import { Factory as FactoryIcon } from "lucide-react";
 import type { Factory } from "@shared/schema";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -230,7 +231,7 @@ export default function AdminUsersPage() {
   });
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
-  const { data: users, isLoading } = useQuery<UserType[]>({
+  const { data: users, isLoading, isError, error, refetch } = useQuery<UserType[]>({
     queryKey: [ADMIN_ROUTES.USERS],
   });
 
@@ -535,6 +536,14 @@ export default function AdminUsersPage() {
       <div className="space-y-6" role="main" aria-label="User Management" aria-busy="true">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-[400px] w-full" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6" role="main" aria-label="User Management">
+        <QueryErrorState error={error} onRetry={refetch} message="Failed to load users" />
       </div>
     );
   }

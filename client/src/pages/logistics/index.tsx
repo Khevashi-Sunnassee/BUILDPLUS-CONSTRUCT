@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Layers,
 } from "lucide-react";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -86,7 +87,7 @@ export default function LogisticsPage() {
     }
   }, [userSettings, factoriesList, factoryFilterInitialized]);
 
-  const { data: loadLists, isLoading: loadListsLoading } = useQuery<LoadListWithDetails[]>({
+  const { data: loadLists, isLoading: loadListsLoading, isError, error, refetch } = useQuery<LoadListWithDetails[]>({
     queryKey: [LOGISTICS_ROUTES.LOAD_LISTS],
     select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
@@ -690,6 +691,14 @@ export default function LogisticsPage() {
         {[1, 2, 3].map((i) => (
           <Skeleton key={i} className="h-32 w-full" />
         ))}
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <QueryErrorState error={error} onRetry={refetch} message="Failed to load logistics data" />
       </div>
     );
   }

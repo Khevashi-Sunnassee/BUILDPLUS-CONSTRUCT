@@ -259,12 +259,14 @@ router.post("/api/broadcasts/send", requireAuth, async (req, res) => {
 
     const { subject, message, channels, recipientType, recipientIds, customRecipients, templateId } = parsed.data;
 
+    const normalizedChannels = channels.map(c => c.toUpperCase());
+
     const broadcastMessage = await storage.createBroadcastMessage({
       companyId,
       templateId: templateId || null,
       subject: subject || null,
       message,
-      channels,
+      channels: normalizedChannels,
       recipientType,
       recipientIds: recipientIds || null,
       customRecipients: customRecipients || null,

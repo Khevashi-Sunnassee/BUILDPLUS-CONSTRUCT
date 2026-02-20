@@ -24,6 +24,7 @@ import {
   Printer,
   Combine,
 } from "lucide-react";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -176,7 +177,7 @@ export default function AdminPanelsPage() {
   if (debouncedSearch) queryParams.set("search", debouncedSearch);
   if (statusFilter !== "all") queryParams.set("status", statusFilter);
 
-  const { data: panelData, isLoading: panelsLoading } = useQuery<PaginatedResponse>({
+  const { data: panelData, isLoading: panelsLoading, isError, error, refetch } = useQuery<PaginatedResponse>({
     queryKey: [ADMIN_ROUTES.PANELS, currentPage, pageSize, jobFilter, factoryFilter, debouncedSearch, statusFilter],
     queryFn: async () => {
       const res = await fetch(`${ADMIN_ROUTES.PANELS}?${queryParams.toString()}`, { credentials: "include" });
@@ -1280,6 +1281,14 @@ export default function AdminPanelsPage() {
       <div className="space-y-6" role="main" aria-label="Panels Management" aria-busy="true">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-[400px]" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6" role="main" aria-label="Panels Management">
+        <QueryErrorState error={error} onRetry={refetch} message="Failed to load panels" />
       </div>
     );
   }

@@ -6,6 +6,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { dateInputProps } from "@/lib/validation";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -152,7 +153,7 @@ export default function TenderCenterPage() {
 
   const tendersUrl = `/api/tenders${queryParams ? `?${queryParams}` : ""}`;
 
-  const { data: tenders = [], isLoading: loadingTenders } = useQuery<TenderWithDetails[]>({
+  const { data: tenders = [], isLoading: loadingTenders, isError, error, refetch } = useQuery<TenderWithDetails[]>({
     queryKey: ["/api/tenders", jobFilter, statusFilter],
     queryFn: async () => {
       const res = await fetch(tendersUrl, { credentials: "include" });
@@ -389,6 +390,14 @@ export default function TenderCenterPage() {
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="p-6 space-y-6" role="main" aria-label="Tender Center">
+        <QueryErrorState error={error} onRetry={refetch} message="Failed to load tenders" />
       </div>
     );
   }

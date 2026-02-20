@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -238,7 +239,7 @@ export default function ChatPage() {
     panelId: null as string | null,
   });
 
-  const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
+  const { data: conversations = [], isLoading: conversationsLoading, isError, error, refetch } = useQuery<Conversation[]>({
     queryKey: [CHAT_ROUTES.CONVERSATIONS],
     refetchInterval: 10000,
   });
@@ -676,6 +677,14 @@ export default function ChatPage() {
     if (name) return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
     return email?.slice(0, 2).toUpperCase() || "?";
   };
+
+  if (isError) {
+    return (
+      <div className="flex h-full min-h-0 overflow-hidden items-center justify-center" role="main" aria-label="Chat">
+        <QueryErrorState error={error} onRetry={refetch} message="Failed to load conversations" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden" data-testid="chat-page" role="main" aria-label="Chat">

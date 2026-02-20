@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   ChevronRight,
 } from "lucide-react";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -100,7 +101,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
 
-  const { data: stats, isLoading } = useQuery<DashboardStats>({
+  const { data: stats, isLoading, isError, error, refetch } = useQuery<DashboardStats>({
     queryKey: [DASHBOARD_ROUTES.STATS],
   });
 
@@ -156,6 +157,14 @@ export default function DashboardPage() {
     const config = variants[status] || variants.PENDING;
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
+
+  if (isError) {
+    return (
+      <div className="space-y-6" role="main" aria-label="Dashboard">
+        <QueryErrorState error={error} onRetry={refetch} message="Failed to load dashboard" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" role="main" aria-label="Dashboard">

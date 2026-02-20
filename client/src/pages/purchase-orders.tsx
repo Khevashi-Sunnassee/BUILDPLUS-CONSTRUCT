@@ -9,6 +9,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.mjs",
   import.meta.url,
 ).toString();
+import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -860,7 +861,7 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  const { data: purchaseOrders = [], isLoading } = useQuery<PurchaseOrderWithDetails[]>({
+  const { data: purchaseOrders = [], isLoading, isError, error, refetch } = useQuery<PurchaseOrderWithDetails[]>({
     queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS],
   });
 
@@ -1033,6 +1034,14 @@ export default function PurchaseOrdersPage() {
       toast({ title: "Failed to generate PDF", variant: "destructive" });
     }
   }, [settings, poTermsData, toast]);
+
+  if (isError) {
+    return (
+      <div className="space-y-6" role="main" aria-label="Purchase Orders">
+        <QueryErrorState error={error} onRetry={refetch} message="Failed to load purchase orders" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" role="main" aria-label="Purchase Orders">

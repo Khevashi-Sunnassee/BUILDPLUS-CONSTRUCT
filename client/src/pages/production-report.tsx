@@ -21,6 +21,7 @@ import {
   Circle,
   CheckCircle2,
 } from "lucide-react";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -173,7 +174,7 @@ export default function ProductionReportPage() {
     };
   }, [dateRange]);
 
-  const { data: reports, isLoading } = useQuery<ProductionReportSummary[]>({
+  const { data: reports, isLoading, isError, error, refetch } = useQuery<ProductionReportSummary[]>({
     queryKey: [PRODUCTION_ROUTES.REPORTS, { startDate, endDate }],
     queryFn: async () => {
       const res = await fetch(`${PRODUCTION_ROUTES.REPORTS}?startDate=${startDate}&endDate=${endDate}`);
@@ -424,6 +425,14 @@ export default function ProductionReportPage() {
       setIsExporting(false);
     }
   };
+
+  if (isError) {
+    return (
+      <div className="space-y-6" role="main" aria-label="Production Booking">
+        <QueryErrorState error={error} onRetry={refetch} message="Failed to load production reports" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" role="main" aria-label="Production Booking">

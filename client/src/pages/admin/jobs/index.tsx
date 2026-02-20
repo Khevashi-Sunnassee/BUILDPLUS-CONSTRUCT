@@ -30,6 +30,7 @@ import {
   Wallet,
   ListChecks,
 } from "lucide-react";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -171,7 +172,7 @@ export default function AdminJobsPage() {
   const [quickAddCustomerOpen, setQuickAddCustomerOpen] = useState(false);
   const [quickAddCustomerName, setQuickAddCustomerName] = useState("");
 
-  const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
+  const { data: jobs, isLoading, isError, error, refetch } = useQuery<JobWithPanels[]>({
     queryKey: [ADMIN_ROUTES.JOBS],
   });
 
@@ -928,6 +929,14 @@ export default function AdminJobsPage() {
       <div className="space-y-6" role="main" aria-label="Jobs Management" aria-busy="true">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-[400px]" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6" role="main" aria-label="Jobs Management">
+        <QueryErrorState error={error} onRetry={refetch} message="Failed to load jobs" />
       </div>
     );
   }

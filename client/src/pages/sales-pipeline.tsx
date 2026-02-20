@@ -5,6 +5,7 @@ import { JOBS_ROUTES, PROCUREMENT_ROUTES, PROJECT_ACTIVITIES_ROUTES } from "@sha
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { SuburbLookup } from "@/components/suburb-lookup";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -173,7 +174,7 @@ export default function SalesPipelinePage() {
     jobTypeId: "",
   });
 
-  const { data: opportunities = [], isLoading } = useQuery<Opportunity[]>({
+  const { data: opportunities = [], isLoading, isError, error, refetch } = useQuery<Opportunity[]>({
     queryKey: [JOBS_ROUTES.OPPORTUNITIES],
     select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
@@ -289,6 +290,14 @@ export default function SalesPipelinePage() {
   SALES_STAGES.forEach((s) => {
     stageCounts[s] = opportunities.filter((o) => o.salesStage === s).length;
   });
+
+  if (isError) {
+    return (
+      <div className="flex-1 overflow-y-auto p-6" role="main" aria-label="Sales Pipeline">
+        <QueryErrorState error={error} onRetry={refetch} message="Failed to load sales pipeline" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto p-6" data-testid="page-sales-pipeline" role="main" aria-label="Sales Pipeline">

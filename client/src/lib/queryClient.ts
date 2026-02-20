@@ -112,7 +112,13 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: true,
       refetchOnReconnect: true,
       staleTime: 30_000,
-      retry: false,
+      retry: (failureCount, error) => {
+        if (error instanceof Error) {
+          const msg = error.message;
+          if (msg.startsWith("401") || msg.startsWith("403") || msg.startsWith("404")) return false;
+        }
+        return failureCount < 2;
+      },
     },
     mutations: {
       retry: false,

@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -151,7 +152,7 @@ export default function AdminCustomersPage() {
     return sortDirection === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
   }, [sortColumn, sortDirection]);
 
-  const { data: customersList, isLoading } = useQuery<Customer[]>({
+  const { data: customersList, isLoading, isError, error, refetch } = useQuery<Customer[]>({
     queryKey: [PROCUREMENT_ROUTES.CUSTOMERS],
   });
 
@@ -358,6 +359,14 @@ export default function AdminCustomersPage() {
       <div className="space-y-6" role="main" aria-label="Customers Management">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-[400px]" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6" role="main" aria-label="Customers Management">
+        <QueryErrorState error={error} onRetry={refetch} message="Failed to load customers" />
       </div>
     );
   }
