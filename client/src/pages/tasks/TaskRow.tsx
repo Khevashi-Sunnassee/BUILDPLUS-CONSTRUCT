@@ -464,7 +464,7 @@ export function TaskRow({
           )}
         </div>
 
-        <div className="flex items-center justify-center gap-0.5">
+        <div className="flex items-center justify-center gap-1.5">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
