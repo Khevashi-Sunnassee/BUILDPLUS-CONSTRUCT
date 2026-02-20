@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import OpenAI from "openai";
+import multer from "multer";
 import { db } from "../db";
 import {
   kbProjects, kbDocuments, kbChunks, kbConversations, kbMessages, aiUsageTracking,
@@ -9,10 +10,16 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { chunkText } from "../services/kb-chunking.service";
 import { generateEmbeddingsBatch, generateEmbedding } from "../services/kb-embedding.service";
 import { searchKnowledgeBase, buildRAGContext, buildSystemPrompt, getConversationHistory } from "../services/kb-retrieval.service";
+import { searchHelpEntries, buildHelpContext } from "../seed-kb-help";
 import { openAIBreaker } from "../lib/circuit-breaker";
 import logger from "../lib/logger";
 
 const router = Router();
+
+const kbUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -27,7 +34,7 @@ router.get("/api/kb/projects", requireAuth, async (req: Request, res: Response) 
     const projects = await db
       .select()
       .from(kbProjects)
-      .where(eq(kbProjects.companyId, companyId))
+      .where(eq(kbProjects.companyId, String(companyId)))
       .orderBy(desc(kbProjects.updatedAt))
       .limit(100);
 
@@ -48,10 +55,10 @@ router.post("/api/kb/projects", requireAuth, async (req: Request, res: Response)
     if (!name?.trim()) return res.status(400).json({ error: "Project name is required" });
 
     const [project] = await db.insert(kbProjects).values({
-      companyId,
+      companyId: String(companyId),
       name: name.trim(),
       description: description?.trim() || null,
-      createdById: userId,
+      createdById: String(userId),
     }).returning();
 
     res.status(201).json(project);
@@ -69,7 +76,7 @@ router.get("/api/kb/projects/:id", requireAuth, async (req: Request, res: Respon
     const [project] = await db
       .select()
       .from(kbProjects)
-      .where(and(eq(kbProjects.id, req.params.id), eq(kbProjects.companyId, companyId)));
+      .where(and(eq(kbProjects.id, String(req.params.id)), eq(kbProjects.companyId, String(companyId))));
 
     if (!project) return res.status(404).json({ error: "Project not found" });
 
@@ -99,7 +106,7 @@ router.patch("/api/kb/projects/:id", requireAuth, async (req: Request, res: Resp
 
     const [updated] = await db.update(kbProjects)
       .set(updates)
-      .where(and(eq(kbProjects.id, req.params.id), eq(kbProjects.companyId, companyId)))
+      .where(and(eq(kbProjects.id, String(req.params.id)), eq(kbProjects.companyId, String(companyId))))
       .returning();
 
     if (!updated) return res.status(404).json({ error: "Project not found" });
@@ -116,7 +123,7 @@ router.delete("/api/kb/projects/:id", requireAuth, async (req: Request, res: Res
     if (!companyId) return res.status(403).json({ error: "Company context required" });
 
     await db.delete(kbProjects)
-      .where(and(eq(kbProjects.id, req.params.id), eq(kbProjects.companyId, companyId)));
+      .where(and(eq(kbProjects.id, String(req.params.id)), eq(kbProjects.companyId, String(companyId))));
 
     res.status(204).send();
   } catch (error) {
@@ -137,18 +144,18 @@ router.post("/api/kb/projects/:projectId/documents", requireAuth, async (req: Re
 
     const [project] = await db.select()
       .from(kbProjects)
-      .where(and(eq(kbProjects.id, req.params.projectId), eq(kbProjects.companyId, companyId)));
+      .where(and(eq(kbProjects.id, String(req.params.projectId)), eq(kbProjects.companyId, String(companyId))));
 
     if (!project) return res.status(404).json({ error: "Project not found" });
 
     const [doc] = await db.insert(kbDocuments).values({
-      companyId,
+      companyId: String(companyId),
       projectId: project.id,
       title: title.trim(),
       sourceType: sourceType || "TEXT",
       rawText: content.trim(),
       status: "UPLOADED",
-      createdById: userId,
+      createdById: String(userId),
     }).returning();
 
     res.status(201).json(doc);
@@ -167,8 +174,8 @@ router.get("/api/kb/projects/:projectId/documents", requireAuth, async (req: Req
       .select()
       .from(kbDocuments)
       .where(and(
-        eq(kbDocuments.projectId, req.params.projectId),
-        eq(kbDocuments.companyId, companyId)
+        eq(kbDocuments.projectId, String(req.params.projectId)),
+        eq(kbDocuments.companyId, String(companyId))
       ))
       .orderBy(desc(kbDocuments.createdAt))
       .limit(200);
@@ -186,7 +193,7 @@ router.delete("/api/kb/documents/:id", requireAuth, async (req: Request, res: Re
     if (!companyId) return res.status(403).json({ error: "Company context required" });
 
     await db.delete(kbDocuments)
-      .where(and(eq(kbDocuments.id, req.params.id), eq(kbDocuments.companyId, companyId)));
+      .where(and(eq(kbDocuments.id, String(req.params.id)), eq(kbDocuments.companyId, String(companyId))));
 
     res.status(204).send();
   } catch (error) {
@@ -202,7 +209,7 @@ router.post("/api/kb/documents/:id/process", requireAuth, async (req: Request, r
 
     const [doc] = await db.select()
       .from(kbDocuments)
-      .where(and(eq(kbDocuments.id, req.params.id), eq(kbDocuments.companyId, companyId)));
+      .where(and(eq(kbDocuments.id, String(req.params.id)), eq(kbDocuments.companyId, String(companyId))));
 
     if (!doc) return res.status(404).json({ error: "Document not found" });
     if (!doc.rawText) return res.status(400).json({ error: "Document has no text content" });
@@ -213,7 +220,7 @@ router.post("/api/kb/documents/:id/process", requireAuth, async (req: Request, r
 
     res.json({ status: "PROCESSING", message: "Document processing started" });
 
-    processDocumentAsync(doc.id, doc.rawText, doc.title, companyId, doc.projectId).catch(err => {
+    processDocumentAsync(doc.id, doc.rawText, doc.title, String(companyId), doc.projectId).catch(err => {
       logger.error({ err, docId: doc.id }, "[KB] Background processing failed");
     });
   } catch (error) {
@@ -272,6 +279,62 @@ async function processDocumentAsync(
   }
 }
 
+router.post("/api/kb/projects/:projectId/documents/upload", requireAuth, kbUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId;
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
+
+    const file = (req as any).file;
+    if (!file) return res.status(400).json({ error: "No file uploaded" });
+
+    const title = (req.body.title || file.originalname).trim();
+
+    const [project] = await db.select()
+      .from(kbProjects)
+      .where(and(eq(kbProjects.id, String(req.params.projectId)), eq(kbProjects.companyId, String(companyId))));
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    let rawText = "";
+    const mime = (file.mimetype || "").toLowerCase();
+
+    if (mime.startsWith("text/") || mime === "application/json" || mime === "application/xml" || mime === "text/markdown") {
+      rawText = file.buffer.toString("utf-8");
+    } else if (mime === "application/pdf") {
+      rawText = file.buffer.toString("utf-8").replace(/[^\x20-\x7E\n\r\t]/g, " ").replace(/\s{3,}/g, " ").trim();
+    } else {
+      rawText = file.buffer.toString("utf-8");
+    }
+
+    if (!rawText.trim()) {
+      return res.status(400).json({ error: "Could not extract text from file. Try pasting the content directly." });
+    }
+
+    const [doc] = await db.insert(kbDocuments).values({
+      companyId: String(companyId),
+      projectId: project.id,
+      title,
+      sourceType: "UPLOAD",
+      rawText: rawText.trim(),
+      status: "UPLOADED",
+      createdById: String(userId),
+    }).returning();
+
+    await db.update(kbDocuments)
+      .set({ status: "PROCESSING" })
+      .where(eq(kbDocuments.id, doc.id));
+
+    res.status(201).json(doc);
+
+    processDocumentAsync(doc.id, rawText.trim(), title, String(companyId), project.id).catch(err => {
+      logger.error({ err, docId: doc.id }, "[KB] Background file processing failed");
+    });
+  } catch (error) {
+    logger.error({ err: error }, "[KB] Failed to upload KB document");
+    res.status(500).json({ error: "Failed to upload document" });
+  }
+});
+
 router.get("/api/kb/conversations", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId;
@@ -284,10 +347,10 @@ router.get("/api/kb/conversations", requireAuth, async (req: Request, res: Respo
     const offset = (page - 1) * limit;
 
     const conditions = [
-      eq(kbConversations.companyId, companyId),
-      eq(kbConversations.createdById, userId),
+      eq(kbConversations.companyId, String(companyId)),
+      eq(kbConversations.createdById, String(userId)),
     ];
-    if (projectId) conditions.push(eq(kbConversations.projectId, projectId));
+    if (projectId) conditions.push(eq(kbConversations.projectId, String(projectId)));
 
     const [totalResult] = await db.select({ count: count() })
       .from(kbConversations)
@@ -325,10 +388,10 @@ router.post("/api/kb/conversations", requireAuth, async (req: Request, res: Resp
     const { title, projectId } = req.body;
 
     const [convo] = await db.insert(kbConversations).values({
-      companyId,
+      companyId: String(companyId),
       projectId: projectId || null,
       title: title?.trim() || "New Chat",
-      createdById: userId,
+      createdById: String(userId),
     }).returning();
 
     res.status(201).json(convo);
@@ -346,7 +409,7 @@ router.patch("/api/kb/conversations/:id", requireAuth, async (req: Request, res:
     const { title } = req.body;
     const [updated] = await db.update(kbConversations)
       .set({ title: title?.trim() || "New Chat", updatedAt: new Date() })
-      .where(and(eq(kbConversations.id, req.params.id), eq(kbConversations.companyId, companyId)))
+      .where(and(eq(kbConversations.id, String(req.params.id)), eq(kbConversations.companyId, String(companyId))))
       .returning();
 
     if (!updated) return res.status(404).json({ error: "Conversation not found" });
@@ -363,7 +426,7 @@ router.delete("/api/kb/conversations/:id", requireAuth, async (req: Request, res
     if (!companyId) return res.status(403).json({ error: "Company context required" });
 
     await db.delete(kbConversations)
-      .where(and(eq(kbConversations.id, req.params.id), eq(kbConversations.companyId, companyId)));
+      .where(and(eq(kbConversations.id, String(req.params.id)), eq(kbConversations.companyId, String(companyId))));
 
     res.status(204).send();
   } catch (error) {
@@ -380,7 +443,7 @@ router.get("/api/kb/conversations/:id/messages", requireAuth, async (req: Reques
 
     const [convo] = await db.select({ id: kbConversations.id, createdById: kbConversations.createdById })
       .from(kbConversations)
-      .where(and(eq(kbConversations.id, req.params.id), eq(kbConversations.companyId, companyId)))
+      .where(and(eq(kbConversations.id, String(req.params.id)), eq(kbConversations.companyId, String(companyId))))
       .limit(1);
 
     if (!convo) return res.status(404).json({ error: "Conversation not found" });
@@ -390,8 +453,8 @@ router.get("/api/kb/conversations/:id/messages", requireAuth, async (req: Reques
       .select()
       .from(kbMessages)
       .where(and(
-        eq(kbMessages.conversationId, req.params.id),
-        eq(kbMessages.companyId, companyId)
+        eq(kbMessages.conversationId, String(req.params.id)),
+        eq(kbMessages.companyId, String(companyId))
       ))
       .orderBy(kbMessages.createdAt)
       .limit(200);
@@ -417,7 +480,7 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
 
     const [convo] = await db.select()
       .from(kbConversations)
-      .where(and(eq(kbConversations.id, req.params.id), eq(kbConversations.companyId, companyId)));
+      .where(and(eq(kbConversations.id, String(req.params.id)), eq(kbConversations.companyId, String(companyId))));
 
     if (!convo) return res.status(404).json({ error: "Conversation not found" });
     if (convo.createdById !== userId) return res.status(403).json({ error: "Access denied" });
@@ -425,7 +488,7 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
     const today = new Date().toISOString().slice(0, 10);
     const [usage] = await db.select()
       .from(aiUsageTracking)
-      .where(and(eq(aiUsageTracking.userId, userId), eq(aiUsageTracking.usageDate, today)))
+      .where(and(eq(aiUsageTracking.userId, String(userId)), eq(aiUsageTracking.usageDate, today)))
       .limit(1);
 
     const MAX_DAILY_REQUESTS = 200;
@@ -443,15 +506,18 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
     });
 
     await db.insert(kbMessages).values({
-      companyId,
+      companyId: String(companyId),
       conversationId: convo.id,
       role: "USER",
       content: content.trim(),
       mode: answerMode,
     });
 
-    const chunks = await searchKnowledgeBase(content.trim(), companyId, convo.projectId || undefined);
+    const chunks = await searchKnowledgeBase(content.trim(), String(companyId), convo.projectId || undefined);
     const context = buildRAGContext(chunks, answerMode);
+
+    const helpResults = await searchHelpEntries(content.trim());
+    const helpContext = buildHelpContext(helpResults);
 
     let projectName: string | undefined;
     if (convo.projectId) {
@@ -461,7 +527,8 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
       projectName = proj?.name;
     }
 
-    const systemPrompt = buildSystemPrompt(answerMode, context, projectName);
+    const fullContext = [context, helpContext].filter(Boolean).join("\n\n---\n\n");
+    const systemPrompt = buildSystemPrompt(answerMode, fullContext, projectName);
     const history = await getConversationHistory(convo.id, 16);
 
     const chatMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
@@ -504,7 +571,7 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
       }
 
       await db.insert(kbMessages).values({
-        companyId,
+        companyId: String(companyId),
         conversationId: convo.id,
         role: "ASSISTANT",
         content: fullResponse,
@@ -560,7 +627,7 @@ router.post("/api/kb/search", requireAuth, async (req: Request, res: Response) =
     const { query, projectId, topK } = req.body;
     if (!query?.trim()) return res.status(400).json({ error: "Query is required" });
 
-    const results = await searchKnowledgeBase(query.trim(), companyId, projectId, topK || 8);
+    const results = await searchKnowledgeBase(query.trim(), String(companyId), projectId, topK || 8);
     res.json(results);
   } catch (error) {
     logger.error({ err: error }, "[KB] Search failed");
@@ -575,19 +642,19 @@ router.get("/api/kb/stats", requireAuth, async (req: Request, res: Response) => 
 
     const [projectCount] = await db.select({ count: count() })
       .from(kbProjects)
-      .where(eq(kbProjects.companyId, companyId));
+      .where(eq(kbProjects.companyId, String(companyId)));
 
     const [docCount] = await db.select({ count: count() })
       .from(kbDocuments)
-      .where(eq(kbDocuments.companyId, companyId));
+      .where(eq(kbDocuments.companyId, String(companyId)));
 
     const [chunkCount] = await db.select({ count: count() })
       .from(kbChunks)
-      .where(eq(kbChunks.companyId, companyId));
+      .where(eq(kbChunks.companyId, String(companyId)));
 
     const [convoCount] = await db.select({ count: count() })
       .from(kbConversations)
-      .where(eq(kbConversations.companyId, companyId));
+      .where(eq(kbConversations.companyId, String(companyId)));
 
     res.json({
       projects: projectCount?.count || 0,
