@@ -73,7 +73,7 @@ export default function KnowledgeBasePage() {
   });
 
   const handleNewChat = () => {
-    createConvoMutation.mutate();
+    createConvoMutation.mutate(undefined);
   };
 
   const handleSelectConvo = (convoId: string) => {
