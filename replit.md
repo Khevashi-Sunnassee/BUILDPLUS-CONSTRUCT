@@ -41,6 +41,7 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **AP Invoice Status Workflow:** Multi-stage approval workflow for invoices.
 - **Opportunity Submission Date & Reminders:** Opportunities have a submission date field for tender deadlines; automated 7-day reminder emails are sent.
 - **Drafting Email Inbox:** Polls drafting@metdul.resend.app for inbound emails, AI-powered extraction identifying change requests, job matching, production impact, drawing references.
+- **Email Template System:** Rich text email templates (TipTap editor) with template types (Activity, General, Tender, etc.), email compose dialog with template selection and To/CC/BCC fields, email send via Resend with audit logging in email_send_logs, integrated into activity task rows for sending correspondence directly from tasks.
 
 **System Design Choices:**
 - **Multi-Tenancy:** Designed for multi-company deployment with strict data isolation.
@@ -84,3 +85,4 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **MYOB Business API**: Accounting software integration.
 - **Twilio**: SMS and voice communication services.
 - **Mailgun**: Email automation service.
+- **TipTap**: Rich text editor framework for email template composition.

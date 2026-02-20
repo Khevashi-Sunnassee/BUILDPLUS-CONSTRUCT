@@ -92,6 +92,7 @@ const PublicBundlePage = lazyWithRetry(() => import("@/pages/public-bundle"));
 const AdminDocumentConfigPage = lazyWithRetry(() => import("@/pages/admin/document-config"));
 const AdminCompaniesPage = lazyWithRetry(() => import("@/pages/admin/companies"));
 const AdminChecklistTemplatesPage = lazyWithRetry(() => import("@/pages/admin/checklist-templates"));
+const AdminEmailTemplatesPage = lazyWithRetry(() => import("@/pages/admin/email-templates"));
 const AssetRegisterPage = lazyWithRetry(() => import("@/pages/admin/asset-register"));
 const AssetDetailPage = lazyWithRetry(() => import("@/pages/admin/asset-detail"));
 const AssetRepairFormPage = lazyWithRetry(() => import("@/pages/admin/asset-repair-form"));
@@ -890,6 +891,14 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminChecklistTemplatesPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/email-templates">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AdminEmailTemplatesPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

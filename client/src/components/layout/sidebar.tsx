@@ -68,6 +68,7 @@ import {
   Link2,
   Receipt,
   Inbox,
+  MailPlus,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -157,6 +158,7 @@ const adminNavItems = [
   { title: "Cost Codes", url: "/admin/cost-codes", icon: Hash },
   { title: "Data Management", url: "/admin/data-management", icon: Database },
   { title: "Help Management", url: "/admin/help", icon: BookOpen },
+  { title: "Email Templates", url: "/admin/email-templates", icon: MailPlus },
 ];
 
 const contactsNavItems = [

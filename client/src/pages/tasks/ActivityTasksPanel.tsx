@@ -22,10 +22,11 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  Plus, Calendar as CalendarIcon, MessageSquare, Paperclip,
+  Plus, Calendar as CalendarIcon, MessageSquare, Paperclip, Mail,
   GripVertical, Users, Bell, Eye, EyeOff, Loader2, MoreHorizontal, Trash2,
   ChevronRight, ChevronDown,
 } from "lucide-react";
+import { EmailComposeDialog } from "@/components/email/email-compose-dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -314,6 +315,7 @@ function ActivityTaskRow({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssigneePopover, setShowAssigneePopover] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showEmailCompose, setShowEmailCompose] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const subtaskInputRef = useRef<HTMLInputElement>(null);
@@ -821,6 +823,21 @@ function ActivityTaskRow({
           </Tooltip>
         </div>
 
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="opacity-0 group-hover:opacity-100"
+              onClick={() => setShowEmailCompose(true)}
+              data-testid={`btn-email-${task.id}`}
+            >
+              <Mail className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Send Email</TooltipContent>
+        </Tooltip>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -993,6 +1010,15 @@ function ActivityTaskRow({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EmailComposeDialog
+        open={showEmailCompose}
+        onOpenChange={setShowEmailCompose}
+        taskId={task.id}
+        jobId={jobId}
+        defaultSubject={task.title}
+        templateType="ACTIVITY"
+      />
     </>
   );
 }

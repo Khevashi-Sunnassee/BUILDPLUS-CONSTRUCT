@@ -5305,3 +5305,67 @@ export const myobExportLogs = pgTable("myob_export_logs", {
 export const insertMyobExportLogSchema = createInsertSchema(myobExportLogs).omit({ id: true });
 export type InsertMyobExportLog = z.infer<typeof insertMyobExportLogSchema>;
 export type MyobExportLog = typeof myobExportLogs.$inferSelect;
+
+// ============================================================================
+// EMAIL TEMPLATES
+// ============================================================================
+export const emailTemplateTypeEnum = pgEnum("email_template_type", [
+  "ACTIVITY",
+  "GENERAL",
+  "TENDER",
+  "PROCUREMENT",
+  "DRAFTING",
+  "INVOICE",
+  "OTHER",
+]);
+
+export const emailTemplates = pgTable("email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  templateType: emailTemplateTypeEnum("template_type").notNull().default("GENERAL"),
+  subject: varchar("subject", { length: 500 }).notNull().default(""),
+  htmlBody: text("html_body").notNull().default(""),
+  placeholders: jsonb("placeholders").$type<Array<{ key: string; label: string; sample?: string }>>().default([]),
+  isActive: boolean("is_active").notNull().default(true),
+  createdById: varchar("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("email_templates_company_idx").on(table.companyId),
+  companyTypeIdx: index("email_templates_company_type_idx").on(table.companyId, table.templateType),
+}));
+
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+
+// ============================================================================
+// EMAIL SEND LOGS
+// ============================================================================
+export const emailSendLogs = pgTable("email_send_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  templateId: varchar("template_id").references(() => emailTemplates.id),
+  taskId: varchar("task_id").references(() => tasks.id),
+  jobId: varchar("job_id").references(() => jobs.id),
+  sentById: varchar("sent_by_id").notNull().references(() => users.id),
+  toAddresses: text("to_addresses").notNull(),
+  ccAddresses: text("cc_addresses"),
+  bccAddresses: text("bcc_addresses"),
+  subject: varchar("subject", { length: 500 }).notNull(),
+  htmlBody: text("html_body").notNull(),
+  status: varchar("status", { length: 50 }).notNull().default("SENT"),
+  messageId: varchar("message_id", { length: 255 }),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("email_send_logs_company_idx").on(table.companyId),
+  taskIdx: index("email_send_logs_task_idx").on(table.taskId),
+  sentByIdx: index("email_send_logs_sent_by_idx").on(table.sentById),
+  companyDateIdx: index("email_send_logs_company_date_idx").on(table.companyId, table.sentAt),
+}));
+
+export const insertEmailSendLogSchema = createInsertSchema(emailSendLogs).omit({ id: true, sentAt: true });
+export type InsertEmailSendLog = z.infer<typeof insertEmailSendLogSchema>;
+export type EmailSendLog = typeof emailSendLogs.$inferSelect;
