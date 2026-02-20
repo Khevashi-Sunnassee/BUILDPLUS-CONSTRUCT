@@ -4,7 +4,7 @@ import { mailTypes, mailRegister, mailTypeSequences, companies, users, emailSend
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "./middleware/auth.middleware";
 import { z } from "zod";
-import { emailService } from "../services/email.service";
+import { emailDispatchService } from "../services/email-dispatch.service";
 import logger from "../lib/logger";
 
 export const mailRegisterRouter = Router();
@@ -201,18 +201,16 @@ mailRegisterRouter.post("/api/mail-register", requireAuth, async (req, res) => {
 
     const htmlBody = data.htmlBody || `<p>${data.subject}</p>`;
 
-    const emailResult = await emailService.sendEmailWithAttachment({
-      to: data.toAddresses,
-      cc: data.ccAddresses || undefined,
-      bcc: data.sendCopy ? (await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1))?.[0]?.email || undefined : undefined,
-      subject: `[${mailNumber}] ${data.subject}`,
-    body: htmlBody,
-    });
-
     let parentThread: string | null = null;
     if (data.parentMailId) {
       const [parent] = await db.select({ threadId: mailRegister.threadId }).from(mailRegister).where(and(eq(mailRegister.id, data.parentMailId), eq(mailRegister.companyId, companyId))).limit(1);
       parentThread = parent?.threadId || data.parentMailId;
+    }
+
+    let bccAddress: string | undefined;
+    if (data.sendCopy) {
+      const [sender] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+      bccAddress = sender?.email || undefined;
     }
 
     const [entry] = await db.insert(mailRegister).values({
@@ -227,11 +225,11 @@ mailRegisterRouter.post("/api/mail-register", requireAuth, async (req, res) => {
       htmlBody,
       responseRequired: data.responseRequired || null,
       responseDueDate: data.responseDueDate ? new Date(data.responseDueDate) : null,
-      status: emailResult.success ? "SENT" : "FAILED",
+      status: "QUEUED",
       sentById: userId,
-      messageId: emailResult.messageId || null,
       threadId: parentThread || mailNumber,
       parentMailId: data.parentMailId || null,
+      queuedAt: new Date(),
     }).returning();
 
     await db.insert(emailSendLogs).values({
@@ -241,20 +239,67 @@ mailRegisterRouter.post("/api/mail-register", requireAuth, async (req, res) => {
       ccAddresses: data.ccAddresses || null,
       subject: `[${mailNumber}] ${data.subject}`,
       htmlBody,
-      status: emailResult.success ? "SENT" : "FAILED",
-      messageId: emailResult.messageId || null,
-      errorMessage: emailResult.error || null,
+      status: "QUEUED",
+      queuedAt: new Date(),
     });
 
-    if (!emailResult.success) {
-      logger.error({ error: emailResult.error, mailNumber }, "Mail register email failed to send");
-      return res.status(500).json({ error: emailResult.error || "Failed to send email", mailNumber, entry });
-    }
+    emailDispatchService.enqueueMailRegister({
+      mailRegisterId: entry.id,
+      companyId,
+      to: data.toAddresses,
+      cc: data.ccAddresses || undefined,
+      bcc: bccAddress,
+      subject: `[${mailNumber}] ${data.subject}`,
+      htmlBody,
+      userId,
+    }).catch((err) => {
+      logger.error({ err, mailNumber }, "[MailRegister] Failed to enqueue email");
+    });
 
-    res.json({ success: true, mailNumber, entry });
+    res.json({ success: true, mailNumber, entry, queued: true });
   } catch (error) {
     logger.error({ err: error }, "Error creating mail register entry");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create mail register entry" });
+  }
+});
+
+mailRegisterRouter.post("/api/mail-register/:id/retry", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.companyId as string;
+    const [entry] = await db
+      .select()
+      .from(mailRegister)
+      .where(and(eq(mailRegister.id, String(req.params.id)), eq(mailRegister.companyId, companyId)))
+      .limit(1);
+
+    if (!entry) {
+      return res.status(404).json({ error: "Mail register entry not found" });
+    }
+
+    if (entry.status !== "FAILED") {
+      return res.status(400).json({ error: "Only failed emails can be retried" });
+    }
+
+    await db.update(mailRegister)
+      .set({ status: "QUEUED", lastError: null, retryCount: 0, queuedAt: new Date(), updatedAt: new Date() })
+      .where(eq(mailRegister.id, entry.id));
+
+    emailDispatchService.enqueueMailRegister({
+      mailRegisterId: entry.id,
+      companyId,
+      to: entry.toAddresses,
+      cc: entry.ccAddresses || undefined,
+      subject: `[${entry.mailNumber}] ${entry.subject}`,
+      htmlBody: entry.htmlBody,
+      userId: req.session.userId!,
+    }).catch((err) => {
+      logger.error({ err, mailNumber: entry.mailNumber }, "[MailRegister] Failed to enqueue retry");
+    });
+
+    res.json({ success: true, message: "Email queued for retry" });
+  } catch (error) {
+    logger.error({ err: error }, "Error retrying mail register entry");
+    res.status(500).json({ error: "Failed to retry email" });
   }
 });
 

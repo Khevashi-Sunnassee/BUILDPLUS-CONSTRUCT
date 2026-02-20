@@ -3,6 +3,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { users, broadcastMessages, broadcastDeliveries, customers, suppliers, employees } from "@shared/schema";
 import { twilioService } from "./twilio.service";
 import { emailService } from "./email.service";
+import { emailDispatchService } from "./email-dispatch.service";
 import { buildBrandedEmail } from "../lib/email-template";
 import logger from "../lib/logger";
 
@@ -83,11 +84,20 @@ class BroadcastService {
                 body: message.message,
                 companyId: message.companyId,
               });
-              result = await emailService.sendEmail(
-                recipient.email,
-                message.subject || "Broadcast Message",
-                emailHtml
-              );
+              try {
+                await emailDispatchService.enqueueBroadcastDelivery({
+                  deliveryId: delivery.id,
+                  broadcastMessageId: broadcastMessageId,
+                  companyId: message.companyId,
+                  to: recipient.email,
+                  subject: message.subject || "Broadcast Message",
+                  htmlBody: emailHtml,
+                  channel: "EMAIL",
+                });
+                result = { success: true, messageId: "queued" };
+              } catch (err: any) {
+                result = { success: false, error: err.message || "Failed to queue email" };
+              }
             }
             break;
 
@@ -327,11 +337,20 @@ class BroadcastService {
             body: message.message,
             companyId: message.companyId,
           });
-          result = await emailService.sendEmail(
-            currentEmail,
-            message.subject || "Broadcast Message",
-            resendEmailHtml
-          );
+          try {
+            await emailDispatchService.enqueueBroadcastDelivery({
+              deliveryId: deliveryId,
+              broadcastMessageId: message.id,
+              companyId: message.companyId,
+              to: currentEmail,
+              subject: message.subject || "Broadcast Message",
+              htmlBody: resendEmailHtml,
+              channel: "EMAIL",
+            });
+            result = { success: true, messageId: "queued" };
+          } catch (err: any) {
+            result = { success: false, error: err.message || "Failed to queue email" };
+          }
         }
         break;
 

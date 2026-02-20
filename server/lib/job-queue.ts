@@ -57,9 +57,8 @@ export class JobQueue {
       throw new Error(`No handler registered for job type: ${type}`);
     }
     if (this.queue.length >= this.maxQueueSize) {
-      logger.warn({ queue: this.name, size: this.queue.length }, "Job queue is full — dropping oldest pending job");
-      const oldestIdx = this.queue.findIndex(j => j.status === "PENDING");
-      if (oldestIdx >= 0) this.queue.splice(oldestIdx, 1);
+      logger.error({ queue: this.name, size: this.queue.length, jobType: type }, "Job queue is full — rejecting new job");
+      throw new Error(`Queue '${this.name}' is full (${this.maxQueueSize} jobs). Cannot enqueue new job.`);
     }
 
     const id = `${this.name}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -174,9 +173,10 @@ export class JobQueue {
 
 export const emailQueue = new JobQueue({
   name: "email",
-  concurrency: 2,
+  concurrency: 3,
   maxRetries: 3,
-  retryDelayMs: 10000,
+  retryDelayMs: 5000,
+  maxQueueSize: 50000,
 });
 
 export const aiQueue = new JobQueue({

@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MAIL_REGISTER_ROUTES } from "@shared/api-routes";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +75,7 @@ interface MailEntry {
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-500",
+  QUEUED: "bg-yellow-500",
   SENT: "bg-blue-500",
   DELIVERED: "bg-green-500",
   REPLIED: "bg-purple-500",
@@ -89,6 +92,24 @@ export default function MailRegisterPage() {
   const [filterStatus, setFilterStatus] = useState("");
   const [page, setPage] = useState(0);
   const [selectedMailId, setSelectedMailId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const retryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/mail-register/${id}/retry`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Email queued for retry" });
+      queryClient.invalidateQueries({ queryKey: [MAIL_REGISTER_ROUTES.LIST] });
+      if (selectedMailId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/mail-register", selectedMailId] });
+      }
+    },
+    onError: () => {
+      toast({ title: "Failed to retry email", variant: "destructive" });
+    },
+  });
 
   const { data: mailTypes = [] } = useQuery<MailType[]>({
     queryKey: [MAIL_REGISTER_ROUTES.TYPES],
@@ -169,6 +190,7 @@ export default function MailRegisterPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="QUEUED">Queued</SelectItem>
             <SelectItem value="SENT">Sent</SelectItem>
             <SelectItem value="DELIVERED">Delivered</SelectItem>
             <SelectItem value="REPLIED">Replied</SelectItem>
@@ -299,6 +321,17 @@ export default function MailRegisterPage() {
                   <Badge className={`text-white text-[10px] ${STATUS_COLORS[selectedMail.status] || "bg-gray-500"}`}>
                     {selectedMail.status}
                   </Badge>
+                  {selectedMail.status === "FAILED" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => retryMutation.mutate(selectedMail.id)}
+                      disabled={retryMutation.isPending}
+                      data-testid="button-retry-email"
+                    >
+                      {retryMutation.isPending ? "Retrying..." : "Retry"}
+                    </Button>
+                  )}
                 </div>
 
                 <div className="space-y-2 text-sm">

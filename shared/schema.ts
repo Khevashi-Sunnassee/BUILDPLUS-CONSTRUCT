@@ -5395,7 +5395,7 @@ export const insertMailTypeSchema = createInsertSchema(mailTypes).omit({ id: tru
 export type InsertMailType = z.infer<typeof insertMailTypeSchema>;
 export type MailType = typeof mailTypes.$inferSelect;
 
-export const mailRegisterStatusEnum = pgEnum("mail_register_status", ["DRAFT", "SENT", "DELIVERED", "REPLIED", "CLOSED", "FAILED"]);
+export const mailRegisterStatusEnum = pgEnum("mail_register_status", ["DRAFT", "QUEUED", "SENT", "DELIVERED", "REPLIED", "CLOSED", "FAILED"]);
 export const responseRequiredEnum = pgEnum("response_required_type", ["YES", "NO", "FOR_INFORMATION"]);
 
 export const mailRegister = pgTable("mail_register", {
@@ -5416,6 +5416,11 @@ export const mailRegister = pgTable("mail_register", {
   messageId: varchar("message_id", { length: 255 }),
   threadId: varchar("thread_id", { length: 255 }),
   parentMailId: varchar("parent_mail_id", { length: 36 }),
+  retryCount: integer("retry_count").default(0).notNull(),
+  maxRetries: integer("max_retries").default(3).notNull(),
+  lastRetryAt: timestamp("last_retry_at"),
+  lastError: text("last_error"),
+  queuedAt: timestamp("queued_at"),
   sentAt: timestamp("sent_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -5428,6 +5433,7 @@ export const mailRegister = pgTable("mail_register", {
   taskIdx: index("mail_register_task_idx").on(table.taskId),
   jobIdx: index("mail_register_job_idx").on(table.jobId),
   sentByIdx: index("mail_register_sent_by_idx").on(table.sentById),
+  statusIdx: index("mail_register_status_idx").on(table.status),
 }));
 
 export const insertMailRegisterSchema = createInsertSchema(mailRegister).omit({ id: true, createdAt: true, updatedAt: true, sentAt: true });

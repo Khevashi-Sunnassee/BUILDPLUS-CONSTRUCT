@@ -37,9 +37,10 @@ The system employs a client-server architecture. The frontend is a React applica
 - **Data Integrity:** Enforced through CHECK constraints, unique constraints, foreign keys, and performance indexes; list endpoints use `.limit()` safeguards.
 - **Testing:** Comprehensive five-tier testing system including Frontend Component Tests, Backend API Tests, API Smoke Tests, CRUD Flow E2E Tests, and Load Testing.
 - **Background Processes:** Interval-based scheduler and an in-memory priority job queue with concurrency control.
-- **Circuit Breakers:** Implemented for external services.
+- **Email Dispatch:** Enterprise async queue-based email dispatch with token bucket rate limiting (1.8 req/sec for Resend), per-company daily quotas (5000/day), exponential backoff retry, and 2-minute background retry sweep. Mail Register creates QUEUED entries and returns immediately (<50ms). Rate limiter stats exposed via /api/metrics/system.
+- **Circuit Breakers:** Implemented for external services; 429-aware (rate limits don't trip breaker).
 - **Caching:** LRU cache with TTL.
-- **Rate Limiting:** Applied to API, Auth, and Upload endpoints.
+- **Rate Limiting:** Applied to API, Auth, Upload endpoints, and email dispatch (token bucket).
 - **Monitoring:** Metrics collection, event loop lag measurement, request timing, and error monitoring.
 - **Graceful Shutdown:** Handlers for SIGTERM/SIGINT.
 - **Session Management:** PostgreSQL-backed session store.
@@ -85,6 +86,7 @@ The system employs a client-server architecture. The frontend is a React applica
 - 15 route directories with sub-routers: documents, tender, project-activities, jobs, scopes, data-management, budget, cost-codes, checklist, assets, progress-claims, ap-inbox, procurement, drafting-inbox, ap-invoices
 
 ## Recent Changes
+- **Feb 2026:** Enterprise email dispatch architecture: Async queue-based email dispatch (email-dispatch.service.ts) with TokenBucketRateLimiter (1.8 req/sec, Resend-safe), per-company daily quotas (5000/day), exponential backoff retry, QUEUED status in mail_register, background retry sweep (2min). Mail Register POST returns <50ms (was 150-400ms). Circuit breaker now 429-aware. Broadcast service refactored to queue-based delivery. Rate limiter stats in /api/metrics/system. Frontend: QUEUED status badge + retry button for failed/queued emails.
 - **Feb 2026:** Mail Register system: Added mail_types (17 types: Mail + Transmittal categories), mail_register, and mail_type_sequences tables. Backend routes for creating/sending registered mail with auto-generated unique mail numbers (format: COMPANY_CODE-TYPE_ABBREV-000001), mail register list/detail with threading support. Frontend: EmailComposeDialog with type dropdown (grouped by category), response required/due date fields, live preview. Mail Register page with search, type/status filters, pagination, and detail sheet with thread display. Sidebar navigation added.
 - **Feb 2026:** Comprehensive quality push: Added 144 new tests (api-validation 61, api-authorization 46, api-pagination-limits 37) raising total to 1,550+. Split 5 largest frontend pages into sub-components (asset-register 712, production-slots 860, purchase-order-form 920, employee-detail 683, logistics 863 LOC main files). Added `.limit()` safeguards to 28 repository/storage files (~262 queries). Full auth and company isolation audits confirmed 100% business route coverage.
 - **Feb 2026:** Security hardening: Fixed timer routes multi-tenant isolation (companyId validation via innerJoin with jobs table for panelRegisterId lookups). Added 25 edge case tests for isolation, input validation, auth, and error handling. Added `.limit()` safeguards to 19 repository/storage files (~184 queries). Split settings.tsx (2,244 LOC) into 6 files (main 932 LOC + 5 tab components). Extracted reusable SortableTableHeader component.

@@ -17,6 +17,7 @@ import { pool, db } from "./db";
 import { getAllCacheStats } from "./lib/cache";
 import { getAllCircuitStats } from "./lib/circuit-breaker";
 import { getAllQueueStats } from "./lib/job-queue";
+import { resendRateLimiter } from "./lib/rate-limiter";
 import { requestMetrics, getEventLoopLag } from "./lib/metrics";
 import { sanitizeRequestBody, validateContentType, enforceBodyLimits, validateAllParams, sanitizeQueryStrings } from "./middleware/sanitize";
 import { requestTimingMiddleware } from "./middleware/request-timing";
@@ -332,6 +333,7 @@ app.get("/api/admin/pool-metrics", (req, res) => {
     cache: getAllCacheStats(),
     circuitBreakers: getAllCircuitStats(),
     queues: getAllQueueStats(),
+    rateLimiters: { resend: resendRateLimiter.getStats() },
     eventLoopLagMs: getEventLoopLag(),
     memory: process.memoryUsage(),
     uptime: Math.round(process.uptime()),
@@ -419,10 +421,12 @@ async function gracefulShutdown(signal: string) {
 
   try {
     const { emailQueue, aiQueue, pdfQueue } = await import("./lib/job-queue");
+    const { resendRateLimiter } = await import("./lib/rate-limiter");
     emailQueue.drain();
     aiQueue.drain();
     pdfQueue.drain();
-    logger.info("Job queues drained");
+    resendRateLimiter.destroy();
+    logger.info("Job queues drained and rate limiters destroyed");
   } catch (err) {
     logger.error({ err }, "Error draining job queues");
   }
@@ -509,6 +513,9 @@ async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean>
   const { pollDraftingEmailsJob } = await import("./lib/drafting-inbox-jobs");
   const { checkLicenceExpiriesJob } = await import("./lib/licence-expiry-jobs");
   const { checkOpportunitySubmissionRemindersJob } = await import("./lib/opportunity-reminder-jobs");
+  const { emailDispatchService } = await import("./services/email-dispatch.service");
+
+  emailDispatchService.initialize();
 
   const EMAIL_POLL_INTERVAL = 5 * 60 * 1000;
   const EXTRACT_INTERVAL = 2 * 60 * 1000;
@@ -516,6 +523,7 @@ async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean>
   const DRAFTING_POLL_INTERVAL = 5 * 60 * 1000;
   const LICENCE_EXPIRY_CHECK_INTERVAL = 6 * 60 * 60 * 1000;
   const OPPORTUNITY_REMINDER_INTERVAL = 6 * 60 * 60 * 1000;
+  const EMAIL_RETRY_INTERVAL = 2 * 60 * 1000;
 
   scheduler.register("ap-email-poll", pollEmailsJob, EMAIL_POLL_INTERVAL);
   scheduler.register("ap-invoice-extract", processImportedInvoicesJob, EXTRACT_INTERVAL);
@@ -523,8 +531,9 @@ async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean>
   scheduler.register("drafting-email-poll", pollDraftingEmailsJob, DRAFTING_POLL_INTERVAL);
   scheduler.register("licence-expiry-check", checkLicenceExpiriesJob, LICENCE_EXPIRY_CHECK_INTERVAL);
   scheduler.register("opportunity-submission-reminder", checkOpportunitySubmissionRemindersJob, OPPORTUNITY_REMINDER_INTERVAL);
+  scheduler.register("email-retry-sweep", async () => { await emailDispatchService.retryFailedEmails(); }, EMAIL_RETRY_INTERVAL);
   scheduler.start();
-  logger.info("[Background] AP email poll (5min), invoice extraction (2min), tender email poll (5min), drafting email poll (5min), licence expiry check (6hr), and opportunity submission reminder (6hr) jobs started");
+  logger.info("[Background] AP email poll (5min), invoice extraction (2min), tender email poll (5min), drafting email poll (5min), licence expiry check (6hr), opportunity submission reminder (6hr), and email retry sweep (2min) jobs started");
 
   try {
     const { eq, count } = await import("drizzle-orm");

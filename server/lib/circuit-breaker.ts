@@ -7,6 +7,7 @@ interface CircuitBreakerOptions {
   failureThreshold?: number;
   resetTimeoutMs?: number;
   halfOpenMaxAttempts?: number;
+  ignoreRateLimits?: boolean;
   onStateChange?: (from: CircuitState, to: CircuitState) => void;
 }
 
@@ -35,6 +36,7 @@ export class CircuitBreaker {
   private readonly failureThreshold: number;
   private readonly resetTimeoutMs: number;
   private readonly halfOpenMaxAttempts: number;
+  private readonly ignoreRateLimits: boolean;
   private readonly onStateChange?: (from: CircuitState, to: CircuitState) => void;
 
   constructor(options: CircuitBreakerOptions) {
@@ -42,6 +44,7 @@ export class CircuitBreaker {
     this.failureThreshold = options.failureThreshold || 5;
     this.resetTimeoutMs = options.resetTimeoutMs || 30000;
     this.halfOpenMaxAttempts = options.halfOpenMaxAttempts || 3;
+    this.ignoreRateLimits = options.ignoreRateLimits ?? false;
     this.onStateChange = options.onStateChange;
   }
 
@@ -71,10 +74,22 @@ export class CircuitBreaker {
       this.onSuccess();
       return result;
     } catch (error) {
+      if (this.ignoreRateLimits && this.isRateLimitError(error)) {
+        logger.warn({ circuit: this.name }, "Rate limit hit — not counting as circuit failure");
+        if (fallback) return fallback();
+        throw error;
+      }
       this.onFailure();
       if (fallback) return fallback();
       throw error;
     }
+  }
+
+  private isRateLimitError(error: any): boolean {
+    const statusCode = error?.statusCode || error?.status;
+    if (statusCode === 429) return true;
+    const msg = String(error?.message || "").toLowerCase();
+    return msg.includes("rate limit") || msg.includes("too many requests");
   }
 
   private onSuccess(): void {
@@ -154,9 +169,10 @@ export const mailgunBreaker = new CircuitBreaker({
 
 export const resendBreaker = new CircuitBreaker({
   name: "resend",
-  failureThreshold: 4,
-  resetTimeoutMs: 45000,
-  halfOpenMaxAttempts: 2,
+  failureThreshold: 5,
+  resetTimeoutMs: 30000,
+  halfOpenMaxAttempts: 3,
+  ignoreRateLimits: true,
 });
 
 export function getAllCircuitStats() {

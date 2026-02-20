@@ -1,10 +1,11 @@
-// Resend integration via Replit Resend connector
 import { Resend } from "resend";
 import logger from "../lib/logger";
 import { resendBreaker } from "../lib/circuit-breaker";
+import { resendRateLimiter } from "../lib/rate-limiter";
 
 let connectionSettings: any;
 let cachedCredentials: { apiKey: string; fromEmail: string; cachedAt: number } | null = null;
+let cachedClient: { client: Resend; apiKey: string } | null = null;
 const CREDENTIAL_CACHE_TTL = 5 * 60 * 1000;
 
 async function getCredentials(): Promise<{ apiKey: string; fromEmail: string }> {
@@ -48,10 +49,32 @@ async function getCredentials(): Promise<{ apiKey: string; fromEmail: string }> 
 
 async function getResendClient(): Promise<{ client: Resend; fromEmail: string }> {
   const { apiKey, fromEmail } = await getCredentials();
-  return {
-    client: new Resend(apiKey),
-    fromEmail,
-  };
+
+  if (cachedClient && cachedClient.apiKey === apiKey) {
+    return { client: cachedClient.client, fromEmail };
+  }
+
+  const client = new Resend(apiKey);
+  cachedClient = { client, apiKey };
+  return { client, fromEmail };
+}
+
+function isRetryableError(err: any): boolean {
+  const statusCode = err?.statusCode || err?.status;
+  if (statusCode === 429) return true;
+  if (statusCode >= 500) return true;
+  if (err?.code === "ECONNRESET" || err?.code === "ETIMEDOUT" || err?.code === "ECONNREFUSED") return true;
+  const msg = String(err?.message || "").toLowerCase();
+  if (msg.includes("rate limit") || msg.includes("too many requests")) return true;
+  if (msg.includes("timeout") || msg.includes("network")) return true;
+  return false;
+}
+
+function isRateLimitError(err: any): boolean {
+  const statusCode = err?.statusCode || err?.status;
+  if (statusCode === 429) return true;
+  const msg = String(err?.message || "").toLowerCase();
+  return msg.includes("rate limit") || msg.includes("too many requests");
 }
 
 class EmailService {
@@ -63,33 +86,8 @@ class EmailService {
     to: string,
     subject: string,
     body: string
-  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    type EmailResult = { success: boolean; messageId?: string; error?: string };
-    try {
-      return await resendBreaker.execute<EmailResult>(async () => {
-        const { client, fromEmail } = await getResendClient();
-
-        const result = await client.emails.send({
-          from: fromEmail,
-          to: to.split(",").map((e) => e.trim()),
-          subject,
-          html: body,
-        });
-
-        if (result.error) {
-          logger.error({ err: result.error, to }, "Failed to send email via Resend");
-          throw new Error(result.error.message);
-        }
-
-        const messageId = result.data?.id || undefined;
-        logger.info({ messageId, to }, "Email sent successfully via Resend");
-        return { success: true, messageId };
-      }, () => ({ success: false, error: "Resend circuit breaker open — email service temporarily unavailable" }));
-    } catch (err: any) {
-      const errorMessage = err?.message || "Unknown Resend error";
-      logger.error({ err, to }, "Failed to send email via Resend");
-      return { success: false, error: errorMessage };
-    }
+  ): Promise<{ success: boolean; messageId?: string; error?: string; retryable?: boolean }> {
+    return this.sendEmailWithAttachment({ to, subject, body });
   }
 
   async sendEmailWithAttachment(options: {
@@ -104,10 +102,15 @@ class EmailService {
       contentType: string;
     }>;
     replyTo?: string;
-  }): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    type EmailResult = { success: boolean; messageId?: string; error?: string };
+    skipRateLimit?: boolean;
+  }): Promise<{ success: boolean; messageId?: string; error?: string; retryable?: boolean }> {
+    type EmailResult = { success: boolean; messageId?: string; error?: string; retryable?: boolean };
     try {
       return await resendBreaker.execute<EmailResult>(async () => {
+        if (!options.skipRateLimit) {
+          await resendRateLimiter.acquire();
+        }
+
         const { client, fromEmail } = await getResendClient();
 
         const resendAttachments = options.attachments?.map((att) => ({
@@ -139,18 +142,22 @@ class EmailService {
         const result = await client.emails.send(sendOptions);
 
         if (result.error) {
-          logger.error({ err: result.error, to: options.to }, "Failed to send email with attachment via Resend");
-          throw new Error(result.error.message);
+          const retryable = isRetryableError(result.error);
+          logger.error({ err: result.error, to: options.to, retryable }, "Failed to send email via Resend");
+          const error: any = new Error(result.error.message);
+          error.statusCode = (result.error as any).statusCode;
+          throw error;
         }
 
         const messageId = result.data?.id || undefined;
-        logger.info({ messageId, to: options.to }, "Email with attachment sent successfully via Resend");
+        logger.info({ messageId, to: options.to }, "Email sent successfully via Resend");
         return { success: true, messageId };
-      }, () => ({ success: false, error: "Resend circuit breaker open — email service temporarily unavailable" }));
+      }, () => ({ success: false, error: "Resend circuit breaker open — email service temporarily unavailable", retryable: true }));
     } catch (err: any) {
       const errorMessage = err?.message || "Unknown Resend error";
-      logger.error({ err, to: options.to }, "Failed to send email with attachment via Resend");
-      return { success: false, error: errorMessage };
+      const retryable = isRetryableError(err);
+      logger.error({ err, to: options.to, retryable }, "Failed to send email via Resend");
+      return { success: false, error: errorMessage, retryable };
     }
   }
 }
@@ -161,3 +168,5 @@ export async function getResendApiKey(): Promise<string> {
   const { apiKey } = await getCredentials();
   return apiKey;
 }
+
+export { isRetryableError, isRateLimitError };
