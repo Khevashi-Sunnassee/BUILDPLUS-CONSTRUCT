@@ -36,7 +36,8 @@ class BroadcastService {
     let failedCount = 0;
 
     for (const recipient of recipients) {
-      for (const channel of message.channels) {
+      for (const rawChannel of message.channels) {
+        const channel = rawChannel.toUpperCase();
         const [delivery] = await db
           .insert(broadcastDeliveries)
           .values({
