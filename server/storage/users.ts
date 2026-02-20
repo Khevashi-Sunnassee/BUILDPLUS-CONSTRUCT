@@ -10,12 +10,12 @@ import bcrypt from "bcrypt";
 
 export const userMethods = {
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
     return user;
   },
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
+    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase())).limit(1);
     return user;
   },
 
@@ -53,9 +53,9 @@ export const userMethods = {
 
   async getAllUsers(companyId?: string): Promise<User[]> {
     if (companyId) {
-      return db.select().from(users).where(eq(users.companyId, companyId)).orderBy(desc(users.createdAt));
+      return db.select().from(users).where(eq(users.companyId, companyId)).orderBy(desc(users.createdAt)).limit(1000);
     }
-    return db.select().from(users).orderBy(desc(users.createdAt));
+    return db.select().from(users).orderBy(desc(users.createdAt)).limit(1000);
   },
 
   async validatePassword(user: User, password: string): Promise<boolean> {
@@ -77,12 +77,12 @@ export const userMethods = {
   },
 
   async getDepartment(id: string): Promise<any | undefined> {
-    const result = await db.select().from(departments).where(eq(departments.id, id));
+    const result = await db.select().from(departments).where(eq(departments.id, id)).limit(1);
     return result[0];
   },
 
   async getDepartmentsByCompany(companyId: string): Promise<any[]> {
-    return db.select().from(departments).where(eq(departments.companyId, companyId)).orderBy(departments.name);
+    return db.select().from(departments).where(eq(departments.companyId, companyId)).orderBy(departments.name).limit(1000);
   },
 
   async createDepartment(data: any): Promise<any> {
@@ -100,14 +100,14 @@ export const userMethods = {
   },
 
   async getDevice(id: string): Promise<(Device & { user: User }) | undefined> {
-    const result = await db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).where(eq(devices.id, id));
+    const result = await db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).where(eq(devices.id, id)).limit(1);
     if (!result[0]) return undefined;
     return { ...result[0].devices, user: result[0].users };
   },
 
   async getDeviceByApiKey(apiKeyHash: string): Promise<(Device & { user: User }) | undefined> {
     const result = await db.select().from(devices).innerJoin(users, eq(devices.userId, users.id))
-      .where(and(eq(devices.apiKeyHash, apiKeyHash), eq(devices.isActive, true)));
+      .where(and(eq(devices.apiKeyHash, apiKeyHash), eq(devices.isActive, true))).limit(1);
     if (!result[0]) return undefined;
     return { ...result[0].devices, user: result[0].users };
   },
@@ -136,9 +136,9 @@ export const userMethods = {
   },
 
   async getAllDevices(companyId?: string): Promise<(Device & { user: User })[]> {
-    const query = db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).orderBy(desc(devices.createdAt));
+    const query = db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).orderBy(desc(devices.createdAt)).limit(1000);
     if (companyId) {
-      const result = await db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).where(eq(devices.companyId, companyId)).orderBy(desc(devices.createdAt));
+      const result = await db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).where(eq(devices.companyId, companyId)).orderBy(desc(devices.createdAt)).limit(1000);
       return result.map(r => ({ ...r.devices, user: r.users }));
     }
     const result = await query;
@@ -155,11 +155,11 @@ export const userMethods = {
   },
 
   async getMappingRule(id: string): Promise<MappingRule | undefined> {
-    const [rule] = await db.select().from(mappingRules).where(eq(mappingRules.id, id));
+    const [rule] = await db.select().from(mappingRules).where(eq(mappingRules.id, id)).limit(1);
     return rule;
   },
 
   async getMappingRules(companyId: string): Promise<MappingRule[]> {
-    return db.select().from(mappingRules).where(eq(mappingRules.companyId, companyId)).orderBy(asc(mappingRules.priority));
+    return db.select().from(mappingRules).where(eq(mappingRules.companyId, companyId)).orderBy(asc(mappingRules.priority)).limit(1000);
   },
 };

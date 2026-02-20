@@ -1,18 +1,15 @@
-import { useState, useRef, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database, RefreshCw, CheckCircle, FileText, Plus, Pencil, Users, Mail, Hash } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Building2, Calendar, Clock, Mail, Database, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -23,28 +20,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import type { GlobalSettings, Department } from "@shared/schema";
 import { ADMIN_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-const ReactQuill = lazy(() => import("react-quill-new"));
 import "react-quill-new/dist/quill.snow.css";
+import { CompanyTab } from "./settings/CompanyTab";
+import { SchedulingTab } from "./settings/SchedulingTab";
+import { TimeTrackingTab } from "./settings/TimeTrackingTab";
+import { EmailTab } from "./settings/EmailTab";
+import { DataTab } from "./settings/DataTab";
 
 const settingsSchema = z.object({
   tz: z.string().min(1, "Timezone is required"),
@@ -736,1277 +722,121 @@ export default function AdminSettingsPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* ── Company Tab ── */}
-        <TabsContent value="company" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" aria-hidden="true" />
-                Company Branding
-              </CardTitle>
-              <CardDescription>
-                Configure your company name and logo for the app and reports
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name</Label>
-                <Input
-                  id="companyName"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="Enter company name"
-                  data-testid="input-company-name"
-                />
-                <p className="text-sm text-muted-foreground">
-                  Displayed on all reports and exports
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => saveCompanyNameMutation.mutate(companyName)}
-                  disabled={saveCompanyNameMutation.isPending || companyName === settings?.companyName}
-                  data-testid="button-save-company-name"
-                >
-                  {saveCompanyNameMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  Save Company Name
-                </Button>
-              </div>
+        <CompanyTab
+          settings={settings}
+          companyName={companyName}
+          setCompanyName={setCompanyName}
+          saveCompanyNameMutation={saveCompanyNameMutation}
+          logoPreview={logoPreview}
+          logoInputRef={logoInputRef}
+          handleLogoUpload={handleLogoUpload}
+          uploadLogoMutation={uploadLogoMutation}
+          removeLogoMutation={removeLogoMutation}
+          departments={departments}
+          deptsLoading={deptsLoading}
+          openDeptDialog={openDeptDialog}
+          setDeletingDept={setDeletingDept}
+          setShowDeleteDeptDialog={setShowDeleteDeptDialog}
+          jobNumberPrefix={jobNumberPrefix}
+          setJobNumberPrefix={setJobNumberPrefix}
+          jobNumberMinDigits={jobNumberMinDigits}
+          setJobNumberMinDigits={setJobNumberMinDigits}
+          jobNumberNextSequence={jobNumberNextSequence}
+          setJobNumberNextSequence={setJobNumberNextSequence}
+          saveJobNumberSettingsMutation={saveJobNumberSettingsMutation}
+          includePOTerms={includePOTerms}
+          setIncludePOTerms={setIncludePOTerms}
+          saveIncludePOTermsMutation={saveIncludePOTermsMutation}
+        />
 
-              <div className="space-y-2">
-                <Label>Company Logo</Label>
-                <div className="flex items-center gap-6">
-                  <div className="flex-shrink-0">
-                    <div className="w-24 h-24 rounded-lg border bg-background flex items-center justify-center overflow-hidden">
-                      {(logoPreview || settings?.logoBase64) ? (
-                        <img 
-                          src={logoPreview || settings?.logoBase64 || ""} 
-                          alt="Company Logo" 
-                          className="max-w-full max-h-full object-contain"
-                          data-testid="img-logo-preview"
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center gap-1" data-testid="img-logo-preview">
-                          <Building2 className="h-8 w-8 text-primary" />
-                          <span className="text-xs font-semibold text-muted-foreground">BuildPlus Ai</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <input
-                        type="file"
-                        ref={logoInputRef}
-                        accept="image/*"
-                        onChange={handleLogoUpload}
-                        className="hidden"
-                        data-testid="input-logo-file"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => logoInputRef.current?.click()}
-                        disabled={uploadLogoMutation.isPending}
-                        data-testid="button-upload-logo"
-                      >
-                        {uploadLogoMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Upload className="h-4 w-4 mr-2" />
-                        )}
-                        Upload Logo
-                      </Button>
-                      {settings?.logoBase64 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => removeLogoMutation.mutate()}
-                          disabled={removeLogoMutation.isPending}
-                          data-testid="button-remove-logo"
-                        >
-                          {removeLogoMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4 mr-2 text-destructive" />
-                          )}
-                          Remove
-                        </Button>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      PNG, JPG or SVG. Max 2MB. Displayed in sidebar and reports.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <SchedulingTab
+          settings={settings}
+          dayNames={dayNames}
+          weekStartDay={weekStartDay}
+          setWeekStartDay={setWeekStartDay}
+          saveWeekStartDayMutation={saveWeekStartDayMutation}
+          productionWindowDays={productionWindowDays}
+          setProductionWindowDays={setProductionWindowDays}
+          saveProductionWindowDaysMutation={saveProductionWindowDaysMutation}
+          ifcDaysInAdvance={ifcDaysInAdvance}
+          setIfcDaysInAdvance={setIfcDaysInAdvance}
+          saveIfcDaysInAdvanceMutation={saveIfcDaysInAdvanceMutation}
+          daysToAchieveIfc={daysToAchieveIfc}
+          setDaysToAchieveIfc={setDaysToAchieveIfc}
+          saveDaysToAchieveIfcMutation={saveDaysToAchieveIfcMutation}
+          productionDaysInAdvance={productionDaysInAdvance}
+          setProductionDaysInAdvance={setProductionDaysInAdvance}
+          saveProductionDaysInAdvanceMutation={saveProductionDaysInAdvanceMutation}
+          procurementDaysInAdvance={procurementDaysInAdvance}
+          setProcurementDaysInAdvance={setProcurementDaysInAdvance}
+          saveProcurementDaysInAdvanceMutation={saveProcurementDaysInAdvanceMutation}
+          procurementTimeDays={procurementTimeDays}
+          setProcurementTimeDays={setProcurementTimeDays}
+          saveProcurementTimeDaysMutation={saveProcurementTimeDaysMutation}
+          productionWorkDays={productionWorkDays}
+          setProductionWorkDays={setProductionWorkDays}
+          saveProductionWorkDaysMutation={saveProductionWorkDaysMutation}
+          draftingWorkDays={draftingWorkDays}
+          setDraftingWorkDays={setDraftingWorkDays}
+          saveDraftingWorkDaysMutation={saveDraftingWorkDaysMutation}
+          cfmeuCalendar={cfmeuCalendar}
+          setCfmeuCalendar={setCfmeuCalendar}
+          saveCfmeuCalendarMutation={saveCfmeuCalendarMutation}
+          cfmeuCalendarData={cfmeuCalendarData}
+          cfmeuLoading={cfmeuLoading}
+          syncCfmeuCalendarMutation={syncCfmeuCalendarMutation}
+          syncAllCfmeuCalendarsMutation={syncAllCfmeuCalendarsMutation}
+        />
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" aria-hidden="true" />
-                Departments
-              </CardTitle>
-              <CardDescription>
-                Manage departments that users can be assigned to
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openDeptDialog()}
-                  data-testid="button-add-department"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Department
-                </Button>
-              </div>
+        <TimeTrackingTab
+          form={form}
+          onSubmit={onSubmit}
+          updateMutation={updateMutation}
+        />
 
-              {deptsLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              ) : departments.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">
-                  No departments created yet. Add one to get started.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {departments.map((dept) => (
-                    <div
-                      key={dept.id}
-                      className="flex items-center justify-between gap-4 p-3 rounded-md border flex-wrap"
-                      data-testid={`dept-row-${dept.id}`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm" data-testid={`text-dept-name-${dept.id}`}>
-                              {dept.name}
-                            </span>
-                            <Badge variant="outline" className="text-xs">{dept.code}</Badge>
-                            {!dept.isActive && (
-                              <Badge variant="secondary" className="text-xs">Inactive</Badge>
-                            )}
-                          </div>
-                          {dept.description && (
-                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                              {dept.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label="Edit department"
-                          onClick={() => openDeptDialog(dept)}
-                          data-testid={`button-edit-dept-${dept.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          aria-label="Delete department"
-                          onClick={() => { setDeletingDept(dept); setShowDeleteDeptDialog(true); }}
-                          data-testid={`button-delete-dept-${dept.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <EmailTab
+          inboxApEmail={inboxApEmail}
+          setInboxApEmail={setInboxApEmail}
+          inboxTenderEmail={inboxTenderEmail}
+          setInboxTenderEmail={setInboxTenderEmail}
+          inboxDraftingEmail={inboxDraftingEmail}
+          setInboxDraftingEmail={setInboxDraftingEmail}
+          inboxEmailsLoading={inboxEmailsLoading}
+          saveInboxEmailsMutation={saveInboxEmailsMutation}
+          emailTemplateData={emailTemplateData}
+          emailTemplateLoading={emailTemplateLoading}
+          emailTemplatePreviewMutation={emailTemplatePreviewMutation}
+          emailTemplatePreviewHtml={emailTemplatePreviewHtml}
+          showEditTemplateDialog={showEditTemplateDialog}
+          setShowEditTemplateDialog={setShowEditTemplateDialog}
+          editTemplateValue={editTemplateValue}
+          setEditTemplateValue={setEditTemplateValue}
+          templateEditMode={templateEditMode}
+          setTemplateEditMode={setTemplateEditMode}
+          saveEmailTemplateMutation={saveEmailTemplateMutation}
+          resetEmailTemplateMutation={resetEmailTemplateMutation}
+        />
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Hash className="h-5 w-5" aria-hidden="true" />
-                Job Number Auto-Generation
-              </CardTitle>
-              <CardDescription>
-                Configure automatic job number formatting when creating new jobs
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="jobNumberPrefix">Prefix</Label>
-                  <Input
-                    id="jobNumberPrefix"
-                    value={jobNumberPrefix}
-                    onChange={(e) => setJobNumberPrefix(e.target.value.toUpperCase())}
-                    placeholder="e.g. LTE-"
-                    maxLength={20}
-                    data-testid="input-job-number-prefix"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Text prepended to every job number
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="jobNumberMinDigits">Minimum Digits</Label>
-                  <Input
-                    id="jobNumberMinDigits"
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={jobNumberMinDigits}
-                    onChange={(e) => setJobNumberMinDigits(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
-                    data-testid="input-job-number-min-digits"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Zero-padded digit count (e.g. 4 = 0001)
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="jobNumberNextSequence">Next Sequence</Label>
-                  <Input
-                    id="jobNumberNextSequence"
-                    type="number"
-                    min={1}
-                    value={jobNumberNextSequence}
-                    onChange={(e) => setJobNumberNextSequence(Math.max(1, parseInt(e.target.value) || 1))}
-                    data-testid="input-job-number-next-sequence"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    The next number in the sequence
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label className="text-base">Preview</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Next job number: <span className="font-mono font-semibold text-foreground" data-testid="text-job-number-preview">
-                      {jobNumberPrefix ? `${jobNumberPrefix}${String(jobNumberNextSequence).padStart(jobNumberMinDigits, "0")}` : "Not configured"}
-                    </span>
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => saveJobNumberSettingsMutation.mutate({ jobNumberPrefix, jobNumberMinDigits, jobNumberNextSequence })}
-                  disabled={saveJobNumberSettingsMutation.isPending || (
-                    jobNumberPrefix === (settings?.jobNumberPrefix || "") &&
-                    jobNumberMinDigits === (settings?.jobNumberMinDigits || 3) &&
-                    jobNumberNextSequence === (settings?.jobNumberNextSequence || 1)
-                  )}
-                  data-testid="button-save-job-number-settings"
-                >
-                  {saveJobNumberSettingsMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  Save
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Purchase Order Settings
-              </CardTitle>
-              <CardDescription>
-                Configure how Purchase Orders are printed and distributed
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-row items-center justify-between gap-4 rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label className="text-base">Include PO Terms & Conditions</Label>
-                  <p className="text-sm text-muted-foreground">
-                    When enabled, printed Purchase Orders will include a separate page with your Terms & Conditions
-                  </p>
-                </div>
-                <Switch
-                  checked={includePOTerms}
-                  onCheckedChange={(checked) => {
-                    setIncludePOTerms(checked);
-                    saveIncludePOTermsMutation.mutate(checked);
-                  }}
-                  disabled={saveIncludePOTermsMutation.isPending}
-                  data-testid="switch-include-po-terms"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ── Scheduling Tab ── */}
-        <TabsContent value="scheduling" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Week Configuration
-              </CardTitle>
-              <CardDescription>
-                Configure the first day of the week for reports and scheduling
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="weekStartDay">Week Start Day</Label>
-                <div className="flex items-center gap-4">
-                  <Select
-                    value={weekStartDay.toString()}
-                    onValueChange={(value) => setWeekStartDay(parseInt(value))}
-                  >
-                    <SelectTrigger className="w-48" data-testid="select-week-start-day">
-                      <SelectValue placeholder="Select day" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {dayNames.map((day, index) => (
-                        <SelectItem key={index} value={index.toString()}>
-                          {day}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => saveWeekStartDayMutation.mutate(weekStartDay)}
-                    disabled={saveWeekStartDayMutation.isPending || weekStartDay === settings?.weekStartDay}
-                    data-testid="button-save-week-start-day"
-                  >
-                    {saveWeekStartDayMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Weekly Job Reports will be aligned to this day. Users can only select dates that fall on this day.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Factory className="h-5 w-5" />
-                Production Configuration
-              </CardTitle>
-              <CardDescription>
-                Configure production scheduling parameters
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="productionWindowDays">Production Window Days</Label>
-                <div className="flex items-center gap-4">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={60}
-                    value={productionWindowDays}
-                    onChange={(e) => setProductionWindowDays(parseInt(e.target.value) || 10)}
-                    className="w-24"
-                    data-testid="input-production-window-days"
-                  />
-                  <span className="text-muted-foreground">days before due date</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => saveProductionWindowDaysMutation.mutate(productionWindowDays)}
-                    disabled={saveProductionWindowDaysMutation.isPending || productionWindowDays === settings?.productionWindowDays}
-                    data-testid="button-save-production-window-days"
-                  >
-                    {saveProductionWindowDaysMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Number of days before the Production Due Date when production can start. This defines the production window for scheduling panels.
-                </p>
-              </div>
-              
-              <div className="space-y-2 pt-4 border-t">
-                <Label htmlFor="ifcDaysInAdvance">IFC Days in Advance</Label>
-                <div className="flex items-center gap-4">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={60}
-                    value={ifcDaysInAdvance}
-                    onChange={(e) => setIfcDaysInAdvance(parseInt(e.target.value) || 14)}
-                    className="w-24"
-                    data-testid="input-ifc-days-in-advance"
-                  />
-                  <span className="text-muted-foreground">days before production</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => saveIfcDaysInAdvanceMutation.mutate(ifcDaysInAdvance)}
-                    disabled={saveIfcDaysInAdvanceMutation.isPending || ifcDaysInAdvance === settings?.ifcDaysInAdvance}
-                    data-testid="button-save-ifc-days"
-                  >
-                    {saveIfcDaysInAdvanceMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Number of days before production that a drawing needs to reach IFC (Issued For Construction) stage. Used for scheduling and deadline tracking.
-                </p>
-              </div>
-              
-              <div className="space-y-2 pt-4 border-t">
-                <Label htmlFor="daysToAchieveIfc">Days to Achieve IFC</Label>
-                <div className="flex items-center gap-4">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={60}
-                    value={daysToAchieveIfc}
-                    onChange={(e) => setDaysToAchieveIfc(parseInt(e.target.value) || 21)}
-                    className="w-24"
-                    data-testid="input-days-to-achieve-ifc"
-                  />
-                  <span className="text-muted-foreground">days to complete drafting</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => saveDaysToAchieveIfcMutation.mutate(daysToAchieveIfc)}
-                    disabled={saveDaysToAchieveIfcMutation.isPending || daysToAchieveIfc === settings?.daysToAchieveIfc}
-                    data-testid="button-save-days-to-achieve-ifc"
-                  >
-                    {saveDaysToAchieveIfcMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Number of days required to complete drafting work from start to reaching IFC stage. This defines the drafting window for scheduling resources.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="productionDaysInAdvance">Production Days in Advance of Site</Label>
-                <div className="flex items-center gap-4">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={90}
-                    value={productionDaysInAdvance}
-                    onChange={(e) => setProductionDaysInAdvance(parseInt(e.target.value) || 10)}
-                    className="w-24"
-                    data-testid="input-production-days-in-advance"
-                  />
-                  <span className="text-muted-foreground">days before site delivery</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => saveProductionDaysInAdvanceMutation.mutate(productionDaysInAdvance)}
-                    disabled={saveProductionDaysInAdvanceMutation.isPending || productionDaysInAdvance === settings?.productionDaysInAdvance}
-                    data-testid="button-save-production-days-in-advance"
-                  >
-                    {saveProductionDaysInAdvanceMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Number of days before panels need to be delivered to site that production should complete. This is used for production scheduling.
-                </p>
-              </div>
-
-              <div className="space-y-2 pt-4 border-t">
-                <Label htmlFor="procurementDaysInAdvance">Procurement Days in Advance</Label>
-                <div className="flex items-center gap-4 flex-wrap">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={ifcDaysInAdvance - 1}
-                    value={procurementDaysInAdvance}
-                    onChange={(e) => setProcurementDaysInAdvance(parseInt(e.target.value) || 7)}
-                    className="w-24"
-                    data-testid="input-procurement-days-in-advance"
-                  />
-                  <span className="text-muted-foreground">days before production</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => saveProcurementDaysInAdvanceMutation.mutate(procurementDaysInAdvance)}
-                    disabled={saveProcurementDaysInAdvanceMutation.isPending || procurementDaysInAdvance === settings?.procurementDaysInAdvance || procurementDaysInAdvance >= ifcDaysInAdvance}
-                    data-testid="button-save-procurement-days-in-advance"
-                  >
-                    {saveProcurementDaysInAdvanceMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save
-                  </Button>
-                </div>
-                {procurementDaysInAdvance >= ifcDaysInAdvance && (
-                  <p className="text-sm text-destructive flex items-center gap-1">
-                    <AlertTriangle className="h-4 w-4" />
-                    Must be less than IFC Days in Advance ({ifcDaysInAdvance}) - procurement occurs after IFC date
-                  </p>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  Number of days before production when procurement orders should be issued. Must be less than IFC days to ensure procurement happens after IFC date.
-                </p>
-              </div>
-
-              <div className="space-y-2 pt-4 border-t">
-                <Label htmlFor="procurementTimeDays">Procurement Time (Days)</Label>
-                <div className="flex items-center gap-4 flex-wrap">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={90}
-                    value={procurementTimeDays}
-                    onChange={(e) => setProcurementTimeDays(parseInt(e.target.value) || 14)}
-                    className="w-24"
-                    data-testid="input-procurement-time-days"
-                  />
-                  <span className="text-muted-foreground">days for procurement</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => saveProcurementTimeDaysMutation.mutate(procurementTimeDays)}
-                    disabled={saveProcurementTimeDaysMutation.isPending || procurementTimeDays === settings?.procurementTimeDays}
-                    data-testid="button-save-procurement-time-days"
-                  >
-                    {saveProcurementTimeDaysMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Number of days required to complete procurement from order placement to delivery. This defines the procurement window for scheduling.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Work Days Settings
-              </CardTitle>
-              <CardDescription>
-                Configure work days for production and drafting staff
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <Label>Production Staff Work Days</Label>
-                <div className="flex flex-wrap gap-4">
-                  {dayNames.map((day, index) => (
-                    <div key={`production-${day}`} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`production-day-${index}`}
-                        checked={productionWorkDays[index]}
-                        onCheckedChange={(checked) => {
-                          const newDays = [...productionWorkDays];
-                          newDays[index] = !!checked;
-                          setProductionWorkDays(newDays);
-                        }}
-                        data-testid={`checkbox-production-${day.toLowerCase()}`}
-                      />
-                      <Label htmlFor={`production-day-${index}`} className="text-sm font-normal cursor-pointer">
-                        {day}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => saveProductionWorkDaysMutation.mutate(productionWorkDays)}
-                  disabled={saveProductionWorkDaysMutation.isPending || JSON.stringify(productionWorkDays) === JSON.stringify(settings?.productionWorkDays)}
-                  data-testid="button-save-production-work-days"
-                >
-                  {saveProductionWorkDaysMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  Save Production Days
-                </Button>
-              </div>
-
-              <div className="space-y-3 pt-4 border-t">
-                <Label>Drafting Staff Work Days</Label>
-                <div className="flex flex-wrap gap-4">
-                  {dayNames.map((day, index) => (
-                    <div key={`drafting-${day}`} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`drafting-day-${index}`}
-                        checked={draftingWorkDays[index]}
-                        onCheckedChange={(checked) => {
-                          const newDays = [...draftingWorkDays];
-                          newDays[index] = !!checked;
-                          setDraftingWorkDays(newDays);
-                        }}
-                        data-testid={`checkbox-drafting-${day.toLowerCase()}`}
-                      />
-                      <Label htmlFor={`drafting-day-${index}`} className="text-sm font-normal cursor-pointer">
-                        {day}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => saveDraftingWorkDaysMutation.mutate(draftingWorkDays)}
-                  disabled={saveDraftingWorkDaysMutation.isPending || JSON.stringify(draftingWorkDays) === JSON.stringify(settings?.draftingWorkDays)}
-                  data-testid="button-save-drafting-work-days"
-                >
-                  {saveDraftingWorkDaysMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  Save Drafting Days
-                </Button>
-              </div>
-
-              <div className="space-y-3 pt-4 border-t">
-                <Label>CFMEU Calendar</Label>
-                <div className="flex items-center gap-4">
-                  <Select value={cfmeuCalendar} onValueChange={setCfmeuCalendar}>
-                    <SelectTrigger className="w-[200px]" data-testid="select-cfmeu-calendar">
-                      <SelectValue placeholder="Select calendar" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NONE">None</SelectItem>
-                      <SelectItem value="CFMEU_QLD">CFMEU QLD</SelectItem>
-                      <SelectItem value="CFMEU_VIC">CFMEU VIC</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => saveCfmeuCalendarMutation.mutate(cfmeuCalendar)}
-                    disabled={saveCfmeuCalendarMutation.isPending || cfmeuCalendar === settings?.cfmeuCalendar}
-                    data-testid="button-save-cfmeu-calendar"
-                  >
-                    {saveCfmeuCalendarMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Select a CFMEU calendar to exclude public holidays from work day calculations
-                </p>
-              </div>
-
-              <div className="space-y-4 pt-4 border-t">
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <Label className="text-base font-medium">CFMEU Calendar Data</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => syncAllCfmeuCalendarsMutation.mutate()}
-                    disabled={syncAllCfmeuCalendarsMutation.isPending}
-                    data-testid="button-sync-all-cfmeu"
-                  >
-                    {syncAllCfmeuCalendarsMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                    )}
-                    Sync All Calendars
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Import RDOs and public holidays from CFMEU websites for accurate work day calculations.
-                </p>
-
-                {cfmeuLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {[
-                      { type: "VIC_ONSITE", label: "VIC On-Site (36hr)", description: "Victoria on-site construction RDOs" },
-                      { type: "VIC_OFFSITE", label: "VIC Off-Site (38hr)", description: "Victoria off-site/factory RDOs" },
-                      { type: "QLD", label: "QLD", description: "Queensland construction RDOs" },
-                    ].map((cal) => {
-                      const summary = cfmeuCalendarData?.summary?.[cal.type];
-                      return (
-                        <div key={cal.type} className="flex items-center justify-between gap-4 p-3 border rounded-lg flex-wrap">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{cal.label}</span>
-                              {summary && summary.count > 0 && (
-                                <span className="flex items-center gap-1 text-xs text-green-600">
-                                  <CheckCircle className="h-3 w-3" />
-                                  {summary.count} holidays
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground">{cal.description}</p>
-                            {summary && summary.years.length > 0 && (
-                              <p className="text-xs text-muted-foreground">
-                                Years: {summary.years.sort().join(", ")}
-                              </p>
-                            )}
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => syncCfmeuCalendarMutation.mutate(cal.type)}
-                            disabled={syncCfmeuCalendarMutation.isPending}
-                            data-testid={`button-sync-${cal.type.toLowerCase()}`}
-                          >
-                            {syncCfmeuCalendarMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <RefreshCw className="h-4 w-4 mr-2" />
-                            )}
-                            Sync
-                          </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {cfmeuCalendarData?.holidays && cfmeuCalendarData.holidays.length > 0 && (
-                  <details className="pt-4">
-                    <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
-                      View imported holidays ({cfmeuCalendarData.holidays.length} total)
-                    </summary>
-                    <div className="mt-3 max-h-64 overflow-y-auto border rounded-lg">
-                      <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-muted">
-                          <tr>
-                            <th className="text-left p-2">Date</th>
-                            <th className="text-left p-2">Name</th>
-                            <th className="text-left p-2">Calendar</th>
-                            <th className="text-left p-2">Type</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {cfmeuCalendarData.holidays.slice(0, 100).map((h, i) => (
-                            <tr key={h.id || i} className="border-t">
-                              <td className="p-2">{new Date(h.date).toLocaleDateString()}</td>
-                              <td className="p-2">{h.name}</td>
-                              <td className="p-2">{h.calendarType}</td>
-                              <td className="p-2">
-                                <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                  h.holidayType === 'PUBLIC_HOLIDAY' 
-                                    ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' 
-                                    : h.holidayType === 'RDO' 
-                                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
-                                      : 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300'
-                                }`}>
-                                  {h.holidayType}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {cfmeuCalendarData.holidays.length > 100 && (
-                        <p className="text-xs text-muted-foreground p-2 text-center border-t">
-                          Showing first 100 of {cfmeuCalendarData.holidays.length} holidays
-                        </p>
-                      )}
-                    </div>
-                  </details>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ── Time Tracking Tab ── */}
-        <TabsContent value="time-tracking" className="space-y-6">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Globe className="h-5 w-5" />
-                    Timezone & Locale
-                  </CardTitle>
-                  <CardDescription>
-                    Configure the default timezone for all time calculations
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="tz"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Timezone</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Australia/Melbourne" data-testid="input-timezone" />
-                        </FormControl>
-                        <FormDescription>
-                          IANA timezone identifier (e.g., Australia/Melbourne)
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Capture Settings
-                  </CardTitle>
-                  <CardDescription>
-                    Configure how the Windows Agent captures time
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="captureIntervalS"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Capture Interval (seconds)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value))}
-                            data-testid="input-capture-interval"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          How often the agent captures time blocks (60-900 seconds)
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="idleThresholdS"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Idle Threshold (seconds)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value))}
-                            data-testid="input-idle-threshold"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Time without input before marking as idle (60-900 seconds)
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="trackedApps"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Tracked Applications</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="revit,acad" data-testid="input-tracked-apps" />
-                        </FormControl>
-                        <FormDescription>
-                          Comma-separated list of tracked applications
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="requireAddins"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between gap-4 rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base">Require Add-ins</FormLabel>
-                          <FormDescription>
-                            Only count time when add-ins provide context data
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="switch-require-addins"
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-end">
-                <Button
-                  type="submit"
-                  disabled={updateMutation.isPending}
-                  data-testid="button-save-settings"
-                >
-                  {updateMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4 mr-2" />
-                  )}
-                  Save Settings
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </TabsContent>
-
-        {/* ── Email Tab ── */}
-        <TabsContent value="email" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Email Inbox Addresses
-              </CardTitle>
-              <CardDescription>
-                Configure unique email addresses for each inbox type. These addresses determine which company receives incoming emails. Each address must be unique across all companies and inbox types.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {inboxEmailsLoading ? (
-                <Skeleton className="h-40 w-full" />
-              ) : (
-                <>
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="ap-inbox-email" data-testid="label-ap-inbox-email">AP Invoice Inbox</Label>
-                      <Input
-                        id="ap-inbox-email"
-                        type="email"
-                        placeholder="e.g. invoices@yourcompany.resend.app"
-                        value={inboxApEmail}
-                        onChange={(e) => setInboxApEmail(e.target.value)}
-                        data-testid="input-ap-inbox-email"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="tender-inbox-email" data-testid="label-tender-inbox-email">Tender Inbox</Label>
-                      <Input
-                        id="tender-inbox-email"
-                        type="email"
-                        placeholder="e.g. tenders@yourcompany.resend.app"
-                        value={inboxTenderEmail}
-                        onChange={(e) => setInboxTenderEmail(e.target.value)}
-                        data-testid="input-tender-inbox-email"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="drafting-inbox-email" data-testid="label-drafting-inbox-email">Drafting Inbox</Label>
-                      <Input
-                        id="drafting-inbox-email"
-                        type="email"
-                        placeholder="e.g. drafting@yourcompany.resend.app"
-                        value={inboxDraftingEmail}
-                        onChange={(e) => setInboxDraftingEmail(e.target.value)}
-                        data-testid="input-drafting-inbox-email"
-                      />
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => saveInboxEmailsMutation.mutate({
-                      apInboxEmail: inboxApEmail.trim() || null,
-                      tenderInboxEmail: inboxTenderEmail.trim() || null,
-                      draftingInboxEmail: inboxDraftingEmail.trim() || null,
-                    })}
-                    disabled={saveInboxEmailsMutation.isPending}
-                    data-testid="button-save-inbox-emails"
-                  >
-                    {saveInboxEmailsMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save Inbox Emails
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Email Notification Template
-              </CardTitle>
-              <CardDescription>
-                Configure the email template used for all system notifications. Available placeholders: {"{{TITLE}}"}, {"{{SUBTITLE}}"}, {"{{LOGO}}"}, {"{{GREETING}}"}, {"{{BODY}}"}, {"{{ATTACHMENT_SUMMARY}}"}, {"{{COMPANY_NAME}}"}, {"{{FOOTER_NOTE}}"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {emailTemplateLoading ? (
-                <Skeleton className="h-20 w-full" />
-              ) : (
-                <>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => emailTemplatePreviewMutation.mutate()}
-                      disabled={emailTemplatePreviewMutation.isPending}
-                      data-testid="button-preview-email-template"
-                    >
-                      {emailTemplatePreviewMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <FileText className="h-4 w-4 mr-2" />
-                      )}
-                      Preview
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setEditTemplateValue(emailTemplateData?.emailTemplateHtml || emailTemplateData?.defaultTemplate || "");
-                        setShowEditTemplateDialog(true);
-                      }}
-                      data-testid="button-edit-email-template"
-                    >
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit Template
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => resetEmailTemplateMutation.mutate()}
-                      disabled={resetEmailTemplateMutation.isPending}
-                      data-testid="button-reset-email-template"
-                    >
-                      {resetEmailTemplateMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                      )}
-                      Reset to Default
-                    </Button>
-                  </div>
-
-                  {emailTemplateData?.emailTemplateHtml && (
-                    <Badge variant="secondary" data-testid="badge-custom-template">Custom template active</Badge>
-                  )}
-
-                  {emailTemplatePreviewHtml && (
-                    <div className="space-y-2">
-                      <Label>Preview</Label>
-                      <iframe
-                        srcDoc={emailTemplatePreviewHtml}
-                        className="w-full border rounded-md"
-                        style={{ height: "500px" }}
-                        title="Email Template Preview"
-                        data-testid="iframe-email-template-preview"
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ── Data Management Tab ── */}
-        <TabsContent value="data" className="space-y-6">
-          <Card className="border-destructive/50">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-destructive">
-                <Database className="h-5 w-5" />
-                Data Management
-              </CardTitle>
-              <CardDescription>
-                Delete data from the system. This action cannot be undone.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!showDeletePanel ? (
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    setShowDeletePanel(true);
-                    setTimeout(() => refetchCounts(), 100);
-                  }}
-                  data-testid="button-show-delete-panel"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Data
-                </Button>
-              ) : (
-                <div className="space-y-4">
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Warning</AlertTitle>
-                    <AlertDescription>
-                      Deleting data is permanent and cannot be undone. Please review your selections carefully.
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {deletionCategories.map((category) => {
-                      const count = dataCounts?.[category.key] ?? 0;
-                      return (
-                        <div
-                          key={category.key}
-                          className="flex items-start space-x-3 rounded-lg border p-3"
-                        >
-                          <Checkbox
-                            id={`delete-${category.key}`}
-                            checked={selectedCategories.has(category.key)}
-                            onCheckedChange={(checked) =>
-                              handleCategoryToggle(category.key, checked === true)
-                            }
-                            disabled={count === 0}
-                            data-testid={`checkbox-delete-${category.key}`}
-                          />
-                          <div className="flex-1 space-y-1">
-                            <Label
-                              htmlFor={`delete-${category.key}`}
-                              className={`font-medium ${count === 0 ? "text-muted-foreground" : ""}`}
-                            >
-                              {category.label}
-                              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                                ({count} records)
-                              </span>
-                            </Label>
-                            <p className="text-sm text-muted-foreground">
-                              {category.description}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {validationResult && !validationResult.valid && (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Validation Errors</AlertTitle>
-                      <AlertDescription>
-                        <ul className="list-disc pl-4 mt-2 space-y-1">
-                          {validationResult.errors.map((error, i) => (
-                            <li key={i}>{error}</li>
-                          ))}
-                        </ul>
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  {validationResult && validationResult.warnings.length > 0 && (
-                    <Alert>
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Warnings</AlertTitle>
-                      <AlertDescription>
-                        <ul className="list-disc pl-4 mt-2 space-y-1">
-                          {validationResult.warnings.map((warning, i) => (
-                            <li key={i}>{warning}</li>
-                          ))}
-                        </ul>
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowDeletePanel(false);
-                        setSelectedCategories(new Set());
-                        setValidationResult(null);
-                      }}
-                      data-testid="button-cancel-delete"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={handleValidateAndDelete}
-                      disabled={selectedCategories.size === 0 || validateDeletionMutation.isPending}
-                      data-testid="button-validate-delete"
-                    >
-                      {validateDeletionMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4 mr-2" />
-                      )}
-                      Delete Selected Data
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <DataTab
+          showDeletePanel={showDeletePanel}
+          setShowDeletePanel={setShowDeletePanel}
+          refetchCounts={refetchCounts}
+          deletionCategories={deletionCategories}
+          dataCounts={dataCounts}
+          selectedCategories={selectedCategories}
+          handleCategoryToggle={handleCategoryToggle}
+          validationResult={validationResult}
+          setValidationResult={setValidationResult}
+          handleValidateAndDelete={handleValidateAndDelete}
+          validateDeletionMutation={validateDeletionMutation}
+          setSelectedCategories={setSelectedCategories}
+          showConfirmDialog={showConfirmDialog}
+          setShowConfirmDialog={setShowConfirmDialog}
+          handleConfirmDelete={handleConfirmDelete}
+          performDeletionMutation={performDeletionMutation}
+        />
       </Tabs>
 
-      {/* ── Dialogs (shared across all tabs) ── */}
       <Dialog open={showDeptDialog} onOpenChange={(o) => !o && closeDeptDialog()}>
         <DialogContent>
           <DialogHeader>
@@ -2093,147 +923,6 @@ export default function AdminSettingsPage() {
             >
               {deleteDeptMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showEditTemplateDialog} onOpenChange={setShowEditTemplateDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Edit Email Template</DialogTitle>
-            <DialogDescription>
-              Edit the email notification template. Use placeholders like {"{{TITLE}}"}, {"{{BODY}}"}, {"{{GREETING}}"}, {"{{COMPANY_NAME}}"} for dynamic content.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex items-center gap-2 pb-2">
-            <Button
-              variant={templateEditMode === "visual" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setTemplateEditMode("visual")}
-              data-testid="button-template-mode-visual"
-            >
-              <Pencil className="h-3 w-3 mr-1" />
-              Visual Editor
-            </Button>
-            <Button
-              variant={templateEditMode === "source" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setTemplateEditMode("source")}
-              data-testid="button-template-mode-source"
-            >
-              <FileText className="h-3 w-3 mr-1" />
-              HTML Source
-            </Button>
-          </div>
-          <div className="flex-1 min-h-0 overflow-auto">
-            {templateEditMode === "visual" ? (
-              <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
-                <div className="border rounded-md" data-testid="editor-email-template-visual">
-                  <ReactQuill
-                    theme="snow"
-                    value={editTemplateValue}
-                    onChange={setEditTemplateValue}
-                    modules={{
-                      toolbar: [
-                        [{ 'header': [1, 2, 3, false] }],
-                        ['bold', 'italic', 'underline', 'strike'],
-                        [{ 'color': [] }, { 'background': [] }],
-                        [{ 'align': [] }],
-                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                        ['link'],
-                        ['clean'],
-                      ],
-                    }}
-                    style={{ minHeight: '400px' }}
-                  />
-                </div>
-              </Suspense>
-            ) : (
-              <Textarea
-                value={editTemplateValue}
-                onChange={(e) => setEditTemplateValue(e.target.value)}
-                className="font-mono text-sm min-h-[400px]"
-                data-testid="textarea-email-template"
-              />
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowEditTemplateDialog(false)}
-              data-testid="button-cancel-email-template"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => saveEmailTemplateMutation.mutate(editTemplateValue)}
-              disabled={saveEmailTemplateMutation.isPending}
-              data-testid="button-save-email-template"
-            >
-              {saveEmailTemplateMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-destructive">Confirm Deletion</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete the selected data? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="font-medium mb-2">You are about to delete:</p>
-            <ul className="list-disc pl-6 space-y-1">
-              {Array.from(selectedCategories).map((key) => {
-                const category = deletionCategories.find((c) => c.key === key);
-                const count = dataCounts?.[key] ?? 0;
-                return (
-                  <li key={key}>
-                    {category?.label} ({count} records)
-                  </li>
-                );
-              })}
-            </ul>
-            {validationResult && validationResult.warnings.length > 0 && (
-              <div className="mt-4">
-                <p className="font-medium text-amber-600 mb-1">Warnings:</p>
-                <ul className="list-disc pl-6 text-sm text-muted-foreground">
-                  {validationResult.warnings.map((warning, i) => (
-                    <li key={i}>{warning}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowConfirmDialog(false)}
-              data-testid="button-cancel-confirm"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmDelete}
-              disabled={performDeletionMutation.isPending}
-              data-testid="button-confirm-delete"
-            >
-              {performDeletionMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4 mr-2" />
-              )}
-              Yes, Delete Data
             </Button>
           </DialogFooter>
         </DialogContent>

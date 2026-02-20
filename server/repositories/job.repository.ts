@@ -9,14 +9,14 @@ import {
 
 export class JobRepository {
   async getJob(id: string): Promise<(Job & { panels: PanelRegister[] }) | undefined> {
-    const [job] = await db.select().from(jobs).where(eq(jobs.id, id));
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, id)).limit(1);
     if (!job) return undefined;
-    const panels = await db.select().from(panelRegister).where(eq(panelRegister.jobId, id)).orderBy(asc(panelRegister.panelMark));
+    const panels = await db.select().from(panelRegister).where(eq(panelRegister.jobId, id)).orderBy(asc(panelRegister.panelMark)).limit(1000);
     return { ...job, panels };
   }
 
   async getJobByNumber(jobNumber: string): Promise<Job | undefined> {
-    const [job] = await db.select().from(jobs).where(eq(jobs.jobNumber, jobNumber));
+    const [job] = await db.select().from(jobs).where(eq(jobs.jobNumber, jobNumber)).limit(1);
     return job;
   }
 
@@ -36,8 +36,8 @@ export class JobRepository {
   }
 
   async getAllJobs(): Promise<(Job & { panels: PanelRegister[]; mappingRules: MappingRule[]; panelCount: number; completedPanelCount: number })[]> {
-    const allJobs = await db.select().from(jobs).orderBy(desc(jobs.createdAt));
-    const allRules = await db.select().from(mappingRules);
+    const allJobs = await db.select().from(jobs).orderBy(desc(jobs.createdAt)).limit(1000);
+    const allRules = await db.select().from(mappingRules).limit(1000);
     
     const panelCounts = await db.select({
       jobId: panelRegister.jobId,
@@ -71,7 +71,7 @@ export class JobRepository {
   }
 
   async getActiveJobs(): Promise<Job[]> {
-    return db.select().from(jobs).where(eq(jobs.status, "ACTIVE")).orderBy(desc(jobs.createdAt));
+    return db.select().from(jobs).where(eq(jobs.status, "ACTIVE")).orderBy(desc(jobs.createdAt)).limit(1000);
   }
 
   async importJobs(data: InsertJob[]): Promise<{ imported: number; skipped: number }> {
@@ -96,12 +96,12 @@ export class JobRepository {
   }
 
   async getWorkType(id: number): Promise<WorkType | undefined> {
-    const [workType] = await db.select().from(workTypes).where(eq(workTypes.id, id));
+    const [workType] = await db.select().from(workTypes).where(eq(workTypes.id, id)).limit(1);
     return workType;
   }
 
   async getWorkTypeByCode(code: string): Promise<WorkType | undefined> {
-    const [workType] = await db.select().from(workTypes).where(eq(workTypes.code, code));
+    const [workType] = await db.select().from(workTypes).where(eq(workTypes.code, code)).limit(1);
     return workType;
   }
 
@@ -123,15 +123,15 @@ export class JobRepository {
   }
 
   async getAllWorkTypes(): Promise<WorkType[]> {
-    return db.select().from(workTypes).orderBy(asc(workTypes.name));
+    return db.select().from(workTypes).orderBy(asc(workTypes.name)).limit(1000);
   }
 
   async getActiveWorkTypes(): Promise<WorkType[]> {
-    return db.select().from(workTypes).where(eq(workTypes.isActive, true)).orderBy(asc(workTypes.name));
+    return db.select().from(workTypes).where(eq(workTypes.isActive, true)).orderBy(asc(workTypes.name)).limit(1000);
   }
 
   async getJobLevelCycleTimes(jobId: string): Promise<JobLevelCycleTime[]> {
-    return db.select().from(jobLevelCycleTimes).where(eq(jobLevelCycleTimes.jobId, jobId));
+    return db.select().from(jobLevelCycleTimes).where(eq(jobLevelCycleTimes.jobId, jobId)).limit(1000);
   }
 
   async createJobLevelCycleTime(data: InsertJobLevelCycleTime): Promise<JobLevelCycleTime> {
@@ -154,13 +154,15 @@ export class JobRepository {
   async getJobsForProjectManager(projectManagerId: string): Promise<Job[]> {
     return db.select().from(jobs)
       .where(eq(jobs.projectManagerId, projectManagerId))
-      .orderBy(desc(jobs.createdAt));
+      .orderBy(desc(jobs.createdAt))
+      .limit(1000);
   }
 
   async getJobsWithoutProductionSlots(): Promise<Job[]> {
     return db.select().from(jobs)
       .where(eq(jobs.status, "ACTIVE"))
-      .orderBy(desc(jobs.createdAt));
+      .orderBy(desc(jobs.createdAt))
+      .limit(1000);
   }
 }
 

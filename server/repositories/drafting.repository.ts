@@ -34,14 +34,16 @@ export class DraftingRepository {
             .innerJoin(jobs, eq(draftingProgram.jobId, jobs.id))
             .where(and(...conditions))
             .orderBy(asc(draftingProgram.drawingDueDate))
+            .limit(1000)
         : await db.select({ draftingProgram }).from(draftingProgram)
             .innerJoin(jobs, eq(draftingProgram.jobId, jobs.id))
-            .orderBy(asc(draftingProgram.drawingDueDate));
+            .orderBy(asc(draftingProgram.drawingDueDate))
+            .limit(1000);
       programs = result.map(r => r.draftingProgram);
     } else {
       programs = conditions.length > 0
-        ? await db.select().from(draftingProgram).where(and(...conditions)).orderBy(asc(draftingProgram.drawingDueDate))
-        : await db.select().from(draftingProgram).orderBy(asc(draftingProgram.drawingDueDate));
+        ? await db.select().from(draftingProgram).where(and(...conditions)).orderBy(asc(draftingProgram.drawingDueDate)).limit(1000)
+        : await db.select().from(draftingProgram).orderBy(asc(draftingProgram.drawingDueDate)).limit(1000);
     }
     
     return this.enrichDraftingPrograms(programs);
@@ -50,10 +52,10 @@ export class DraftingRepository {
   private async enrichDraftingPrograms(programs: DraftingProgram[]): Promise<DraftingProgramWithDetails[]> {
     const result: DraftingProgramWithDetails[] = [];
     for (const program of programs) {
-      const [panel] = program.panelId ? await db.select().from(panelRegister).where(eq(panelRegister.id, program.panelId)) : [];
-      const [job] = await db.select().from(jobs).where(eq(jobs.id, program.jobId));
-      const [assignedTo] = program.assignedToId ? await db.select().from(users).where(eq(users.id, program.assignedToId)) : [];
-      const [slot] = program.productionSlotId ? await db.select().from(productionSlots).where(eq(productionSlots.id, program.productionSlotId)) : [];
+      const [panel] = program.panelId ? await db.select().from(panelRegister).where(eq(panelRegister.id, program.panelId)).limit(1) : [];
+      const [job] = await db.select().from(jobs).where(eq(jobs.id, program.jobId)).limit(1);
+      const [assignedTo] = program.assignedToId ? await db.select().from(users).where(eq(users.id, program.assignedToId)).limit(1) : [];
+      const [slot] = program.productionSlotId ? await db.select().from(productionSlots).where(eq(productionSlots.id, program.productionSlotId)).limit(1) : [];
       
       result.push({
         ...program,
@@ -67,14 +69,14 @@ export class DraftingRepository {
   }
 
   async getDraftingProgram(id: string): Promise<DraftingProgramWithDetails | undefined> {
-    const [program] = await db.select().from(draftingProgram).where(eq(draftingProgram.id, id));
+    const [program] = await db.select().from(draftingProgram).where(eq(draftingProgram.id, id)).limit(1);
     if (!program) return undefined;
     const enriched = await this.enrichDraftingPrograms([program]);
     return enriched[0];
   }
 
   async getDraftingProgramByPanelId(panelId: string): Promise<DraftingProgram | undefined> {
-    const [program] = await db.select().from(draftingProgram).where(eq(draftingProgram.panelId, panelId));
+    const [program] = await db.select().from(draftingProgram).where(eq(draftingProgram.panelId, panelId)).limit(1);
     return program;
   }
 
@@ -108,7 +110,8 @@ export class DraftingRepository {
   async getMyAllocatedDraftingPrograms(userId: string): Promise<DraftingProgramWithDetails[]> {
     const programs = await db.select().from(draftingProgram)
       .where(eq(draftingProgram.assignedToId, userId))
-      .orderBy(asc(draftingProgram.drawingDueDate));
+      .orderBy(asc(draftingProgram.drawingDueDate))
+      .limit(1000);
     return this.enrichDraftingPrograms(programs);
   }
 }

@@ -7,7 +7,7 @@ import {
 
 export const permissionMethods = {
   async getUserPermissions(userId: string): Promise<UserPermission[]> {
-    return await db.select().from(userPermissions).where(eq(userPermissions.userId, userId));
+    return await db.select().from(userPermissions).where(eq(userPermissions.userId, userId)).limit(1000);
   },
 
   async getUserPermission(userId: string, functionKey: FunctionKey): Promise<UserPermission | undefined> {
@@ -15,7 +15,7 @@ export const permissionMethods = {
       .where(and(
         eq(userPermissions.userId, userId),
         eq(userPermissions.functionKey, functionKey)
-      ));
+      )).limit(1);
     return permission;
   },
 
@@ -70,11 +70,11 @@ export const permissionMethods = {
     if (companyId) {
       conditions.push(eq(users.companyId, companyId));
     }
-    const allUsers = await db.select().from(users).where(and(...conditions));
+    const allUsers = await db.select().from(users).where(and(...conditions)).limit(1000);
     const userIds = allUsers.map(u => u.id);
     
     const allPerms = userIds.length > 0 
-      ? await db.select().from(userPermissions).where(inArray(userPermissions.userId, userIds))
+      ? await db.select().from(userPermissions).where(inArray(userPermissions.userId, userIds)).limit(1000)
       : [];
     
     const permsByUser = new Map<string, UserPermission[]>();

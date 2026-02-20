@@ -84,6 +84,7 @@ The system employs a client-server architecture. The frontend is a React applica
 - 15 route directories with sub-routers: documents, tender, project-activities, jobs, scopes, data-management, budget, cost-codes, checklist, assets, progress-claims, ap-inbox, procurement, drafting-inbox, ap-invoices
 
 ## Recent Changes
+- **Feb 2026:** Security hardening: Fixed timer routes multi-tenant isolation (companyId validation via innerJoin with jobs table for panelRegisterId lookups). Added 25 edge case tests for isolation, input validation, auth, and error handling. Added `.limit()` safeguards to 19 repository/storage files (~184 queries). Split settings.tsx (2,244 LOC) into 6 files (main 932 LOC + 5 tab components). Extracted reusable SortableTableHeader component.
 - **Feb 2026:** Fixed all test skip mechanisms (describe.skipIf to beforeAll pattern), enabled 885 previously skipped tests.
 - **Feb 2026:** Split all oversized route files (over 1000 LOC) into domain sub-routers across 15 directories. Zero route files over 1000 LOC.
 - **Feb 2026:** Fixed all LSP type errors across codebase (email-templates, panel-import, production-entries, budget, progress-claims). Zero LSP errors.

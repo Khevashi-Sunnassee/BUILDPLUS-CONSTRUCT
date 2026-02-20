@@ -13,7 +13,8 @@ export class PanelRepository {
   async getPanelRegisterItem(id: string): Promise<(PanelRegister & { job: Job }) | undefined> {
     const result = await db.select().from(panelRegister)
       .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
-      .where(eq(panelRegister.id, id));
+      .where(eq(panelRegister.id, id))
+      .limit(1);
     if (result.length === 0) return undefined;
     return { ...result[0].panel_register, job: result[0].jobs };
   }
@@ -23,7 +24,7 @@ export class PanelRepository {
     if (!includeRetired) {
       conditions.push(ne(panelRegister.lifecycleStatus, 0));
     }
-    return db.select().from(panelRegister).where(and(...conditions)).orderBy(asc(panelRegister.panelMark));
+    return db.select().from(panelRegister).where(and(...conditions)).orderBy(asc(panelRegister.panelMark)).limit(1000);
   }
 
   async getPanelsByJobAndLevel(jobId: string, level: string, includeRetired: boolean = false): Promise<PanelRegister[]> {
@@ -33,7 +34,8 @@ export class PanelRepository {
     }
     return db.select().from(panelRegister)
       .where(and(...conditions))
-      .orderBy(asc(panelRegister.panelMark));
+      .orderBy(asc(panelRegister.panelMark))
+      .limit(1000);
   }
 
   async createPanelRegisterItem(data: InsertPanelRegister): Promise<PanelRegister> {
@@ -53,22 +55,23 @@ export class PanelRepository {
   async getAllPanelRegisterItems(): Promise<(PanelRegister & { job: Job })[]> {
     const result = await db.select().from(panelRegister)
       .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
-      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
+      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark))
+      .limit(1000);
     return result.map(r => ({ ...r.panel_register, job: r.jobs }));
   }
 
   async getPanelById(id: string): Promise<PanelRegister | undefined> {
-    const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, id));
+    const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, id)).limit(1);
     return panel;
   }
 
   async getPanelType(id: string): Promise<PanelTypeConfig | undefined> {
-    const [type] = await db.select().from(panelTypes).where(eq(panelTypes.id, id));
+    const [type] = await db.select().from(panelTypes).where(eq(panelTypes.id, id)).limit(1);
     return type;
   }
 
   async getPanelTypeByCode(code: string): Promise<PanelTypeConfig | undefined> {
-    const [type] = await db.select().from(panelTypes).where(eq(panelTypes.code, code));
+    const [type] = await db.select().from(panelTypes).where(eq(panelTypes.code, code)).limit(1);
     return type;
   }
 
@@ -87,13 +90,14 @@ export class PanelRepository {
   }
 
   async getAllPanelTypes(): Promise<PanelTypeConfig[]> {
-    return db.select().from(panelTypes).orderBy(asc(panelTypes.code));
+    return db.select().from(panelTypes).orderBy(asc(panelTypes.code)).limit(1000);
   }
 
   async getJobPanelRate(id: string): Promise<(JobPanelRate & { panelType: PanelTypeConfig }) | undefined> {
     const result = await db.select().from(jobPanelRates)
       .innerJoin(panelTypes, eq(jobPanelRates.panelTypeId, panelTypes.id))
-      .where(eq(jobPanelRates.id, id));
+      .where(eq(jobPanelRates.id, id))
+      .limit(1);
     if (result.length === 0) return undefined;
     return { ...result[0].job_panel_rates, panelType: result[0].panel_types };
   }
@@ -101,13 +105,15 @@ export class PanelRepository {
   async getJobPanelRates(jobId: string): Promise<(JobPanelRate & { panelType: PanelTypeConfig })[]> {
     const result = await db.select().from(jobPanelRates)
       .innerJoin(panelTypes, eq(jobPanelRates.panelTypeId, panelTypes.id))
-      .where(eq(jobPanelRates.jobId, jobId));
+      .where(eq(jobPanelRates.jobId, jobId))
+      .limit(1000);
     return result.map(r => ({ ...r.job_panel_rates, panelType: r.panel_types }));
   }
 
   async upsertJobPanelRate(jobId: string, panelTypeId: string, data: Partial<InsertJobPanelRate>): Promise<JobPanelRate> {
     const existing = await db.select().from(jobPanelRates)
-      .where(and(eq(jobPanelRates.jobId, jobId), eq(jobPanelRates.panelTypeId, panelTypeId)));
+      .where(and(eq(jobPanelRates.jobId, jobId), eq(jobPanelRates.panelTypeId, panelTypeId)))
+      .limit(1);
     if (existing.length > 0) {
       const [updated] = await db.update(jobPanelRates)
         .set({ ...data, updatedAt: new Date() })
@@ -126,7 +132,7 @@ export class PanelRepository {
   }
 
   async getCostComponentsByPanelType(panelTypeId: string): Promise<PanelTypeCostComponent[]> {
-    return db.select().from(panelTypeCostComponents).where(eq(panelTypeCostComponents.panelTypeId, panelTypeId));
+    return db.select().from(panelTypeCostComponents).where(eq(panelTypeCostComponents.panelTypeId, panelTypeId)).limit(1000);
   }
 
   async createCostComponent(data: InsertPanelTypeCostComponent): Promise<PanelTypeCostComponent> {
@@ -153,12 +159,13 @@ export class PanelRepository {
   }
 
   async getJobCostOverrides(jobId: string): Promise<JobCostOverride[]> {
-    return db.select().from(jobCostOverrides).where(eq(jobCostOverrides.jobId, jobId));
+    return db.select().from(jobCostOverrides).where(eq(jobCostOverrides.jobId, jobId)).limit(1000);
   }
 
   async getJobCostOverridesByPanelType(jobId: string, panelTypeId: string): Promise<JobCostOverride[]> {
     return db.select().from(jobCostOverrides)
-      .where(and(eq(jobCostOverrides.jobId, jobId), eq(jobCostOverrides.panelTypeId, panelTypeId)));
+      .where(and(eq(jobCostOverrides.jobId, jobId), eq(jobCostOverrides.panelTypeId, panelTypeId)))
+      .limit(1000);
   }
 
   async createJobCostOverride(data: InsertJobCostOverride): Promise<JobCostOverride> {
@@ -211,7 +218,8 @@ export class PanelRepository {
   async getExistingPanelSourceIds(jobId: string): Promise<Set<string>> {
     const panels = await db.select({ panelSourceId: panelRegister.panelSourceId })
       .from(panelRegister)
-      .where(eq(panelRegister.jobId, jobId));
+      .where(eq(panelRegister.jobId, jobId))
+      .limit(1000);
     return new Set(panels.filter(p => p.panelSourceId).map(p => p.panelSourceId!));
   }
 
@@ -226,7 +234,8 @@ export class PanelRepository {
         ne(panelRegister.lifecycleStatus, 0),
         notInArray(panelRegister.id, panelsOnLoadLists)
       ))
-      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
+      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark))
+      .limit(1000);
     return result.map(r => ({ ...r.panel_register, job: r.jobs }));
   }
 
@@ -237,7 +246,8 @@ export class PanelRepository {
     const result = await db.select().from(panelRegister)
       .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
       .where(and(...conditions))
-      .orderBy(asc(panelRegister.panelMark));
+      .orderBy(asc(panelRegister.panelMark))
+      .limit(1000);
     return result.map(r => ({ ...r.panel_register, job: r.jobs }));
   }
 

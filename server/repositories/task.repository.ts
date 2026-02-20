@@ -25,13 +25,14 @@ export interface TaskGroupWithTasks extends TaskGroup {
 
 export class TaskRepository {
   async getAllTaskGroups(): Promise<TaskGroupWithTasks[]> {
-    const groups = await db.select().from(taskGroups).orderBy(asc(taskGroups.sortOrder));
+    const groups = await db.select().from(taskGroups).orderBy(asc(taskGroups.sortOrder)).limit(1000);
     const groupIds = groups.map(g => g.id);
     if (!groupIds.length) return groups.map(g => ({ ...g, tasks: [] }));
 
     const allTasks = await db.select().from(tasks)
       .where(inArray(tasks.groupId, groupIds))
-      .orderBy(asc(tasks.sortOrder));
+      .orderBy(asc(tasks.sortOrder))
+      .limit(1000);
 
     const enrichedTasks = await this.enrichTasksBatch(allTasks);
 
@@ -46,7 +47,7 @@ export class TaskRepository {
   }
 
   private async getTasksByGroupId(groupId: string): Promise<TaskWithDetails[]> {
-    const groupTasks = await db.select().from(tasks).where(eq(tasks.groupId, groupId)).orderBy(asc(tasks.sortOrder));
+    const groupTasks = await db.select().from(tasks).where(eq(tasks.groupId, groupId)).orderBy(asc(tasks.sortOrder)).limit(1000);
     return this.enrichTasksBatch(groupTasks);
   }
 
@@ -58,19 +59,19 @@ export class TaskRepository {
     const creatorIds = [...new Set(tasksList.filter(t => t.createdById).map(t => t.createdById!))];
     const panelIds = [...new Set(tasksList.filter(t => (t as any).panelId).map(t => (t as any).panelId!))];
 
-    const allAssignees = await db.select().from(taskAssignees).where(inArray(taskAssignees.taskId, taskIds));
+    const allAssignees = await db.select().from(taskAssignees).where(inArray(taskAssignees.taskId, taskIds)).limit(1000);
     const assigneeUserIds = [...new Set(allAssignees.map(a => a.userId))];
     const allUserIds = [...new Set([...assigneeUserIds, ...creatorIds])];
 
     const [allUsers, allJobs, allPanels] = await Promise.all([
       allUserIds.length > 0
-        ? db.select().from(users).where(inArray(users.id, allUserIds))
+        ? db.select().from(users).where(inArray(users.id, allUserIds)).limit(1000)
         : Promise.resolve([]),
       jobIds.length > 0
-        ? db.select().from(jobs).where(inArray(jobs.id, jobIds))
+        ? db.select().from(jobs).where(inArray(jobs.id, jobIds)).limit(1000)
         : Promise.resolve([]),
       panelIds.length > 0
-        ? db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds))
+        ? db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds)).limit(1000)
         : Promise.resolve([]),
     ]);
 
@@ -98,7 +99,7 @@ export class TaskRepository {
   }
 
   async getTaskGroup(id: string): Promise<TaskGroupWithTasks | undefined> {
-    const [group] = await db.select().from(taskGroups).where(eq(taskGroups.id, id));
+    const [group] = await db.select().from(taskGroups).where(eq(taskGroups.id, id)).limit(1);
     if (!group) return undefined;
     const groupTasks = await this.getTasksByGroupId(id);
     return { ...group, tasks: groupTasks };
@@ -115,7 +116,7 @@ export class TaskRepository {
   }
 
   async deleteTaskGroup(id: string): Promise<void> {
-    const groupTasks = await db.select().from(tasks).where(eq(tasks.groupId, id));
+    const groupTasks = await db.select().from(tasks).where(eq(tasks.groupId, id)).limit(1000);
     for (const task of groupTasks) {
       await this.deleteTask(task.id);
     }
@@ -129,7 +130,7 @@ export class TaskRepository {
   }
 
   async getTask(id: string): Promise<TaskWithDetails | undefined> {
-    const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
     if (!task) return undefined;
     const enriched = await this.enrichTasksBatch([task]);
     return enriched[0];
@@ -160,10 +161,10 @@ export class TaskRepository {
   }
 
   async getTaskAssignees(taskId: string): Promise<(TaskAssignee & { user: User })[]> {
-    const assignees = await db.select().from(taskAssignees).where(eq(taskAssignees.taskId, taskId));
+    const assignees = await db.select().from(taskAssignees).where(eq(taskAssignees.taskId, taskId)).limit(1000);
     if (!assignees.length) return [];
     const userIds = [...new Set(assignees.map(a => a.userId))];
-    const allUsers = await db.select().from(users).where(inArray(users.id, userIds));
+    const allUsers = await db.select().from(users).where(inArray(users.id, userIds)).limit(1000);
     const userMap = new Map(allUsers.map(u => [u.id, u]));
     return assignees
       .filter(a => userMap.has(a.userId))
@@ -179,10 +180,10 @@ export class TaskRepository {
   }
 
   async getTaskUpdates(taskId: string): Promise<(TaskUpdate & { user: User })[]> {
-    const updates = await db.select().from(taskUpdates).where(eq(taskUpdates.taskId, taskId)).orderBy(desc(taskUpdates.createdAt));
+    const updates = await db.select().from(taskUpdates).where(eq(taskUpdates.taskId, taskId)).orderBy(desc(taskUpdates.createdAt)).limit(1000);
     if (!updates.length) return [];
     const userIds = [...new Set(updates.map(u => u.userId))];
-    const allUsers = await db.select().from(users).where(inArray(users.id, userIds));
+    const allUsers = await db.select().from(users).where(inArray(users.id, userIds)).limit(1000);
     const userMap = new Map(allUsers.map(u => [u.id, u]));
     return updates
       .filter(u => userMap.has(u.userId))
@@ -199,11 +200,11 @@ export class TaskRepository {
   }
 
   async getTaskFiles(taskId: string): Promise<(TaskFile & { uploadedBy?: User | null })[]> {
-    const files = await db.select().from(taskFiles).where(eq(taskFiles.taskId, taskId));
+    const files = await db.select().from(taskFiles).where(eq(taskFiles.taskId, taskId)).limit(1000);
     if (!files.length) return [];
     const uploaderIds = [...new Set(files.filter(f => f.uploadedById).map(f => f.uploadedById!))];
     const allUsers = uploaderIds.length > 0
-      ? await db.select().from(users).where(inArray(users.id, uploaderIds))
+      ? await db.select().from(users).where(inArray(users.id, uploaderIds)).limit(1000)
       : [];
     const userMap = new Map(allUsers.map(u => [u.id, u]));
     return files.map(f => ({
@@ -224,12 +225,13 @@ export class TaskRepository {
   async getTaskNotifications(userId: string): Promise<any[]> {
     const notifications = await db.select().from(taskNotifications)
       .where(eq(taskNotifications.userId, userId))
-      .orderBy(desc(taskNotifications.createdAt));
+      .orderBy(desc(taskNotifications.createdAt))
+      .limit(1000);
     
     if (!notifications.length) return [];
     const taskIds = [...new Set(notifications.filter(n => n.taskId).map(n => n.taskId!))];
     const allTasks = taskIds.length > 0
-      ? await db.select().from(tasks).where(inArray(tasks.id, taskIds))
+      ? await db.select().from(tasks).where(inArray(tasks.id, taskIds)).limit(1000)
       : [];
     const taskMap = new Map(allTasks.map(t => [t.id, t]));
     return notifications.map(n => ({
@@ -240,7 +242,8 @@ export class TaskRepository {
 
   async getUnreadTaskNotificationCount(userId: string): Promise<number> {
     const notifications = await db.select().from(taskNotifications)
-      .where(and(eq(taskNotifications.userId, userId), isNull(taskNotifications.readAt)));
+      .where(and(eq(taskNotifications.userId, userId), isNull(taskNotifications.readAt)))
+      .limit(1000);
     return notifications.length;
   }
 

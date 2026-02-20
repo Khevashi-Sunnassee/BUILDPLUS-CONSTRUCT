@@ -21,49 +21,52 @@ export interface ProductionSlotAdjustmentWithDetails extends ProductionSlotAdjus
 
 export class ProductionRepository {
   async getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined> {
-    const [entry] = await db.select().from(productionEntries).where(eq(productionEntries.id, id));
+    const [entry] = await db.select().from(productionEntries).where(eq(productionEntries.id, id)).limit(1);
     if (!entry) return undefined;
     
-    const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, entry.panelId));
+    const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, entry.panelId)).limit(1);
     if (!panel) return undefined;
     
-    const [job] = await db.select().from(jobs).where(eq(jobs.id, panel.jobId));
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, panel.jobId)).limit(1);
     if (!job) return undefined;
     
     return { ...entry, panel, job };
   }
 
   async getProductionEntriesByDate(date: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
-    const entries = await db.select().from(productionEntries).where(eq(productionEntries.productionDate, date));
+    const entries = await db.select().from(productionEntries).where(eq(productionEntries.productionDate, date)).limit(1000);
     return this.enrichProductionEntries(entries);
   }
 
   async getProductionEntriesByDateAndFactory(date: string, factory: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
     const entries = await db.select().from(productionEntries)
-      .where(and(eq(productionEntries.productionDate, date), eq(productionEntries.factory, factory)));
+      .where(and(eq(productionEntries.productionDate, date), eq(productionEntries.factory, factory)))
+      .limit(1000);
     return this.enrichProductionEntries(entries);
   }
 
   async getProductionEntriesByDateAndFactoryId(date: string, factoryId: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
     const entries = await db.select().from(productionEntries)
-      .where(and(eq(productionEntries.productionDate, date), eq(productionEntries.factoryId, factoryId)));
+      .where(and(eq(productionEntries.productionDate, date), eq(productionEntries.factoryId, factoryId)))
+      .limit(1000);
     return this.enrichProductionEntries(entries);
   }
 
   async getProductionEntriesInRange(startDate: string, endDate: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
     const entries = await db.select().from(productionEntries)
-      .where(and(gte(productionEntries.productionDate, startDate), lte(productionEntries.productionDate, endDate)));
+      .where(and(gte(productionEntries.productionDate, startDate), lte(productionEntries.productionDate, endDate)))
+      .limit(1000);
     return this.enrichProductionEntries(entries);
   }
 
   private async enrichProductionEntries(entries: ProductionEntry[]): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
     const result: (ProductionEntry & { panel: PanelRegister; job: Job; user: User })[] = [];
     for (const entry of entries) {
-      const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, entry.panelId));
+      const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, entry.panelId)).limit(1);
       if (!panel) continue;
-      const [job] = await db.select().from(jobs).where(eq(jobs.id, panel.jobId));
+      const [job] = await db.select().from(jobs).where(eq(jobs.id, panel.jobId)).limit(1);
       if (!job) continue;
-      const [user] = await db.select().from(users).where(eq(users.id, entry.userId));
+      const [user] = await db.select().from(users).where(eq(users.id, entry.userId)).limit(1);
       if (!user) continue;
       result.push({ ...entry, panel, job, user });
     }
@@ -85,30 +88,33 @@ export class ProductionRepository {
   }
 
   async getProductionEntryByPanelId(panelId: string): Promise<ProductionEntry | undefined> {
-    const [entry] = await db.select().from(productionEntries).where(eq(productionEntries.panelId, panelId));
+    const [entry] = await db.select().from(productionEntries).where(eq(productionEntries.panelId, panelId)).limit(1);
     return entry;
   }
 
   async getAllProductionEntries(): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
-    const entries = await db.select().from(productionEntries).orderBy(desc(productionEntries.productionDate));
+    const entries = await db.select().from(productionEntries).orderBy(desc(productionEntries.productionDate)).limit(1000);
     return this.enrichProductionEntries(entries);
   }
 
   async getProductionDays(startDate: string, endDate: string): Promise<ProductionDay[]> {
     return db.select().from(productionDays)
       .where(and(gte(productionDays.productionDate, startDate), lte(productionDays.productionDate, endDate)))
-      .orderBy(asc(productionDays.productionDate));
+      .orderBy(asc(productionDays.productionDate))
+      .limit(1000);
   }
 
   async getProductionDay(date: string, factory: string): Promise<ProductionDay | undefined> {
     const [day] = await db.select().from(productionDays)
-      .where(and(eq(productionDays.productionDate, date), eq(productionDays.factory, factory)));
+      .where(and(eq(productionDays.productionDate, date), eq(productionDays.factory, factory)))
+      .limit(1);
     return day;
   }
 
   async getProductionDayByFactoryId(date: string, factoryId: string): Promise<ProductionDay | undefined> {
     const [day] = await db.select().from(productionDays)
-      .where(and(eq(productionDays.productionDate, date), eq(productionDays.factoryId, factoryId)));
+      .where(and(eq(productionDays.productionDate, date), eq(productionDays.factoryId, factoryId)))
+      .limit(1);
     return day;
   }
 
@@ -139,8 +145,8 @@ export class ProductionRepository {
     if (filters?.dateTo) conditions.push(lte(productionSlots.productionSlotDate, filters.dateTo));
     
     const slots = conditions.length > 0 
-      ? await db.select().from(productionSlots).where(and(...conditions)).orderBy(asc(productionSlots.productionSlotDate))
-      : await db.select().from(productionSlots).orderBy(asc(productionSlots.productionSlotDate));
+      ? await db.select().from(productionSlots).where(and(...conditions)).orderBy(asc(productionSlots.productionSlotDate)).limit(1000)
+      : await db.select().from(productionSlots).orderBy(asc(productionSlots.productionSlotDate)).limit(1000);
     
     return this.enrichProductionSlots(slots);
   }
@@ -148,16 +154,17 @@ export class ProductionRepository {
   private async enrichProductionSlots(slots: ProductionSlot[]): Promise<ProductionSlotWithDetails[]> {
     const result: ProductionSlotWithDetails[] = [];
     for (const slot of slots) {
-      const [job] = await db.select().from(jobs).where(eq(jobs.id, slot.jobId));
+      const [job] = await db.select().from(jobs).where(eq(jobs.id, slot.jobId)).limit(1);
       const panels = await db.select().from(panelRegister)
-        .where(and(eq(panelRegister.jobId, slot.jobId), eq(panelRegister.level, slot.level)));
+        .where(and(eq(panelRegister.jobId, slot.jobId), eq(panelRegister.level, slot.level)))
+        .limit(1000);
       result.push({ ...slot, job: job || undefined, panels });
     }
     return result;
   }
 
   async getProductionSlot(id: string): Promise<ProductionSlotWithDetails | undefined> {
-    const [slot] = await db.select().from(productionSlots).where(eq(productionSlots.id, id));
+    const [slot] = await db.select().from(productionSlots).where(eq(productionSlots.id, id)).limit(1);
     if (!slot) return undefined;
     const enriched = await this.enrichProductionSlots([slot]);
     return enriched[0];
@@ -181,11 +188,12 @@ export class ProductionRepository {
   async getProductionSlotAdjustments(slotId: string): Promise<ProductionSlotAdjustmentWithDetails[]> {
     const adjustments = await db.select().from(productionSlotAdjustments)
       .where(eq(productionSlotAdjustments.productionSlotId, slotId))
-      .orderBy(desc(productionSlotAdjustments.createdAt));
+      .orderBy(desc(productionSlotAdjustments.createdAt))
+      .limit(1000);
     
     const result: ProductionSlotAdjustmentWithDetails[] = [];
     for (const adj of adjustments) {
-      const [user] = adj.changedById ? await db.select().from(users).where(eq(users.id, adj.changedById)) : [];
+      const [user] = adj.changedById ? await db.select().from(users).where(eq(users.id, adj.changedById)).limit(1) : [];
       result.push({ ...adj, changedBy: user || undefined });
     }
     return result;

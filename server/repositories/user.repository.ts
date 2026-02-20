@@ -19,12 +19,12 @@ export function randomKey(bytes = 32) {
 
 export class UserRepository {
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
     return user;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
+    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase())).limit(1);
     return user;
   }
 
@@ -60,7 +60,7 @@ export class UserRepository {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return db.select().from(users).orderBy(desc(users.createdAt));
+    return db.select().from(users).orderBy(desc(users.createdAt)).limit(1000);
   }
 
   async validatePassword(user: User, password: string): Promise<boolean> {
@@ -78,14 +78,15 @@ export class UserRepository {
   }
 
   async getDevice(id: string): Promise<(Device & { user: User }) | undefined> {
-    const result = await db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).where(eq(devices.id, id));
+    const result = await db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).where(eq(devices.id, id)).limit(1);
     if (!result[0]) return undefined;
     return { ...result[0].devices, user: result[0].users };
   }
 
   async getDeviceByApiKey(apiKeyHash: string): Promise<(Device & { user: User }) | undefined> {
     const result = await db.select().from(devices).innerJoin(users, eq(devices.userId, users.id))
-      .where(and(eq(devices.apiKeyHash, apiKeyHash), eq(devices.isActive, true)));
+      .where(and(eq(devices.apiKeyHash, apiKeyHash), eq(devices.isActive, true)))
+      .limit(1);
     if (!result[0]) return undefined;
     return { ...result[0].devices, user: result[0].users };
   }
@@ -114,17 +115,18 @@ export class UserRepository {
   }
 
   async getAllDevices(): Promise<(Device & { user: User })[]> {
-    const result = await db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).orderBy(desc(devices.createdAt));
+    const result = await db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).orderBy(desc(devices.createdAt)).limit(1000);
     return result.map(r => ({ ...r.devices, user: r.users }));
   }
 
   async getUserPermissions(userId: string): Promise<UserPermission[]> {
-    return db.select().from(userPermissions).where(eq(userPermissions.userId, userId));
+    return db.select().from(userPermissions).where(eq(userPermissions.userId, userId)).limit(1000);
   }
 
   async getUserPermission(userId: string, functionKey: FunctionKey): Promise<UserPermission | undefined> {
     const [permission] = await db.select().from(userPermissions)
-      .where(and(eq(userPermissions.userId, userId), eq(userPermissions.functionKey, functionKey)));
+      .where(and(eq(userPermissions.userId, userId), eq(userPermissions.functionKey, functionKey)))
+      .limit(1);
     return permission;
   }
 

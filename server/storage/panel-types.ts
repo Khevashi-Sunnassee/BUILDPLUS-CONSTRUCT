@@ -11,12 +11,12 @@ import {
 
 export const panelTypeMethods = {
   async getPanelType(id: string): Promise<PanelTypeConfig | undefined> {
-    const [pt] = await db.select().from(panelTypes).where(eq(panelTypes.id, id));
+    const [pt] = await db.select().from(panelTypes).where(eq(panelTypes.id, id)).limit(1);
     return pt;
   },
 
   async getPanelTypeByCode(code: string): Promise<PanelTypeConfig | undefined> {
-    const [pt] = await db.select().from(panelTypes).where(eq(panelTypes.code, code));
+    const [pt] = await db.select().from(panelTypes).where(eq(panelTypes.code, code)).limit(1);
     return pt;
   },
 
@@ -36,15 +36,15 @@ export const panelTypeMethods = {
 
   async getAllPanelTypes(companyId?: string): Promise<PanelTypeConfig[]> {
     if (companyId) {
-      return await db.select().from(panelTypes).where(eq(panelTypes.companyId, companyId)).orderBy(asc(panelTypes.name));
+      return await db.select().from(panelTypes).where(eq(panelTypes.companyId, companyId)).orderBy(asc(panelTypes.name)).limit(1000);
     }
-    return await db.select().from(panelTypes).orderBy(asc(panelTypes.name));
+    return await db.select().from(panelTypes).orderBy(asc(panelTypes.name)).limit(1000);
   },
 
   async getJobPanelRate(id: string): Promise<(JobPanelRate & { panelType: PanelTypeConfig }) | undefined> {
     const result = await db.select().from(jobPanelRates)
       .innerJoin(panelTypes, eq(jobPanelRates.panelTypeId, panelTypes.id))
-      .where(eq(jobPanelRates.id, id));
+      .where(eq(jobPanelRates.id, id)).limit(1);
     if (!result.length) return undefined;
     return { ...result[0].job_panel_rates, panelType: result[0].panel_types };
   },
@@ -52,13 +52,13 @@ export const panelTypeMethods = {
   async getJobPanelRates(jobId: string): Promise<(JobPanelRate & { panelType: PanelTypeConfig })[]> {
     const result = await db.select().from(jobPanelRates)
       .innerJoin(panelTypes, eq(jobPanelRates.panelTypeId, panelTypes.id))
-      .where(eq(jobPanelRates.jobId, jobId));
+      .where(eq(jobPanelRates.jobId, jobId)).limit(1000);
     return result.map(r => ({ ...r.job_panel_rates, panelType: r.panel_types }));
   },
 
   async upsertJobPanelRate(jobId: string, panelTypeId: string, data: Partial<InsertJobPanelRate>): Promise<JobPanelRate> {
     const existing = await db.select().from(jobPanelRates)
-      .where(and(eq(jobPanelRates.jobId, jobId), eq(jobPanelRates.panelTypeId, panelTypeId)));
+      .where(and(eq(jobPanelRates.jobId, jobId), eq(jobPanelRates.panelTypeId, panelTypeId))).limit(1000);
     
     if (existing.length > 0) {
       const [updated] = await db.update(jobPanelRates)
@@ -91,12 +91,12 @@ export const panelTypeMethods = {
   },
 
   async getWorkType(id: number): Promise<WorkType | undefined> {
-    const [workType] = await db.select().from(workTypes).where(eq(workTypes.id, id));
+    const [workType] = await db.select().from(workTypes).where(eq(workTypes.id, id)).limit(1);
     return workType;
   },
 
   async getWorkTypeByCode(code: string): Promise<WorkType | undefined> {
-    const [workType] = await db.select().from(workTypes).where(eq(workTypes.code, code));
+    const [workType] = await db.select().from(workTypes).where(eq(workTypes.code, code)).limit(1);
     return workType;
   },
 
@@ -119,24 +119,26 @@ export const panelTypeMethods = {
 
   async getAllWorkTypes(companyId?: string): Promise<WorkType[]> {
     if (companyId) {
-      return db.select().from(workTypes).where(eq(workTypes.companyId, companyId)).orderBy(asc(workTypes.sortOrder), asc(workTypes.name));
+      return db.select().from(workTypes).where(eq(workTypes.companyId, companyId)).orderBy(asc(workTypes.sortOrder), asc(workTypes.name)).limit(1000);
     }
-    return db.select().from(workTypes).orderBy(asc(workTypes.sortOrder), asc(workTypes.name));
+    return db.select().from(workTypes).orderBy(asc(workTypes.sortOrder), asc(workTypes.name)).limit(1000);
   },
 
   async getActiveWorkTypes(companyId?: string): Promise<WorkType[]> {
     if (companyId) {
-      return db.select().from(workTypes).where(and(eq(workTypes.companyId, companyId), eq(workTypes.isActive, true))).orderBy(asc(workTypes.sortOrder), asc(workTypes.name));
+      return db.select().from(workTypes).where(and(eq(workTypes.companyId, companyId), eq(workTypes.isActive, true))).orderBy(asc(workTypes.sortOrder), asc(workTypes.name)).limit(1000);
     }
     return db.select().from(workTypes)
       .where(eq(workTypes.isActive, true))
-      .orderBy(asc(workTypes.sortOrder), asc(workTypes.name));
+      .orderBy(asc(workTypes.sortOrder), asc(workTypes.name))
+      .limit(1000);
   },
 
   async getCostComponentsByPanelType(panelTypeId: string): Promise<PanelTypeCostComponent[]> {
     return db.select().from(panelTypeCostComponents)
       .where(eq(panelTypeCostComponents.panelTypeId, panelTypeId))
-      .orderBy(asc(panelTypeCostComponents.sortOrder));
+      .orderBy(asc(panelTypeCostComponents.sortOrder))
+      .limit(1000);
   },
 
   async createCostComponent(data: InsertPanelTypeCostComponent): Promise<PanelTypeCostComponent> {
@@ -166,7 +168,8 @@ export const panelTypeMethods = {
   async getJobCostOverrides(jobId: string): Promise<JobCostOverride[]> {
     return db.select().from(jobCostOverrides)
       .where(eq(jobCostOverrides.jobId, jobId))
-      .orderBy(asc(jobCostOverrides.panelTypeId), asc(jobCostOverrides.componentName));
+      .orderBy(asc(jobCostOverrides.panelTypeId), asc(jobCostOverrides.componentName))
+      .limit(1000);
   },
 
   async getJobCostOverridesByPanelType(jobId: string, panelTypeId: string): Promise<JobCostOverride[]> {
@@ -175,7 +178,8 @@ export const panelTypeMethods = {
         eq(jobCostOverrides.jobId, jobId),
         eq(jobCostOverrides.panelTypeId, panelTypeId)
       ))
-      .orderBy(asc(jobCostOverrides.componentName));
+      .orderBy(asc(jobCostOverrides.componentName))
+      .limit(1000);
   },
 
   async createJobCostOverride(data: InsertJobCostOverride): Promise<JobCostOverride> {

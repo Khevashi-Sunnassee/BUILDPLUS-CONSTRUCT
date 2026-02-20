@@ -26,15 +26,15 @@ export interface LoadListWithDetails extends LoadList {
 
 export class LogisticsRepository {
   async getAllTrailerTypes(): Promise<TrailerType[]> {
-    return db.select().from(trailerTypes).orderBy(asc(trailerTypes.name));
+    return db.select().from(trailerTypes).orderBy(asc(trailerTypes.name)).limit(1000);
   }
 
   async getActiveTrailerTypes(): Promise<TrailerType[]> {
-    return db.select().from(trailerTypes).where(eq(trailerTypes.isActive, true)).orderBy(asc(trailerTypes.name));
+    return db.select().from(trailerTypes).where(eq(trailerTypes.isActive, true)).orderBy(asc(trailerTypes.name)).limit(1000);
   }
 
   async getTrailerType(id: string): Promise<TrailerType | undefined> {
-    const [type] = await db.select().from(trailerTypes).where(eq(trailerTypes.id, id));
+    const [type] = await db.select().from(trailerTypes).where(eq(trailerTypes.id, id)).limit(1);
     return type;
   }
 
@@ -53,7 +53,7 @@ export class LogisticsRepository {
   }
 
   async getAllLoadLists(): Promise<LoadListWithDetails[]> {
-    const lists = await db.select().from(loadLists).orderBy(desc(loadLists.createdAt));
+    const lists = await db.select().from(loadLists).orderBy(desc(loadLists.createdAt)).limit(1000);
     const results: LoadListWithDetails[] = [];
     
     for (const list of lists) {
@@ -65,19 +65,19 @@ export class LogisticsRepository {
   }
 
   async getLoadList(id: string): Promise<LoadListWithDetails | undefined> {
-    const [list] = await db.select().from(loadLists).where(eq(loadLists.id, id));
+    const [list] = await db.select().from(loadLists).where(eq(loadLists.id, id)).limit(1);
     if (!list) return undefined;
     return this.getLoadListDetails(list);
   }
 
   private async getLoadListDetails(list: LoadList): Promise<LoadListWithDetails> {
     const [jobPromise, trailerPromise, deliveryPromise, createdByPromise, panelLinksPromise, returnRecordPromise] = await Promise.all([
-      list.jobId ? db.select().from(jobs).where(eq(jobs.id, list.jobId)) : Promise.resolve([]),
-      list.trailerTypeId ? db.select().from(trailerTypes).where(eq(trailerTypes.id, list.trailerTypeId)) : Promise.resolve([]),
-      db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, list.id)),
-      list.createdById ? db.select().from(users).where(eq(users.id, list.createdById)) : Promise.resolve([]),
-      db.select().from(loadListPanels).where(eq(loadListPanels.loadListId, list.id)).orderBy(asc(loadListPanels.sequence)),
-      db.select().from(loadReturns).where(eq(loadReturns.loadListId, list.id)),
+      list.jobId ? db.select().from(jobs).where(eq(jobs.id, list.jobId)).limit(1) : Promise.resolve([]),
+      list.trailerTypeId ? db.select().from(trailerTypes).where(eq(trailerTypes.id, list.trailerTypeId)).limit(1) : Promise.resolve([]),
+      db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, list.id)).limit(1),
+      list.createdById ? db.select().from(users).where(eq(users.id, list.createdById)).limit(1) : Promise.resolve([]),
+      db.select().from(loadListPanels).where(eq(loadListPanels.loadListId, list.id)).orderBy(asc(loadListPanels.sequence)).limit(1000),
+      db.select().from(loadReturns).where(eq(loadReturns.loadListId, list.id)).limit(1),
     ]);
 
     const [job] = jobPromise;
@@ -90,7 +90,7 @@ export class LogisticsRepository {
     const panelIds = panelLinks.map(l => l.panelId);
     const panelsMap = new Map<string, PanelRegister>();
     if (panelIds.length > 0) {
-      const panelsList = await db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds));
+      const panelsList = await db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds)).limit(1000);
       for (const p of panelsList) panelsMap.set(p.id, p);
     }
     
@@ -102,11 +102,11 @@ export class LogisticsRepository {
     
     let loadReturn: LoadReturnWithPanels | undefined;
     if (returnRecord) {
-      const returnPanelLinks = await db.select().from(loadReturnPanels).where(eq(loadReturnPanels.loadReturnId, returnRecord.id));
+      const returnPanelLinks = await db.select().from(loadReturnPanels).where(eq(loadReturnPanels.loadReturnId, returnRecord.id)).limit(1000);
       const returnPanelIds = returnPanelLinks.map(rp => rp.panelId);
       const returnPanelsMap = new Map<string, PanelRegister>();
       if (returnPanelIds.length > 0) {
-        const rpList = await db.select().from(panelRegister).where(inArray(panelRegister.id, returnPanelIds));
+        const rpList = await db.select().from(panelRegister).where(inArray(panelRegister.id, returnPanelIds)).limit(1000);
         for (const p of rpList) returnPanelsMap.set(p.id, p);
       }
       const returnPanels: (LoadReturnPanel & { panel: PanelRegister })[] = [];
@@ -114,7 +114,7 @@ export class LogisticsRepository {
         const panel = returnPanelsMap.get(rp.panelId);
         if (panel) returnPanels.push({ ...rp, panel });
       }
-      const [returnedByUser] = returnRecord.returnedById ? await db.select().from(users).where(eq(users.id, returnRecord.returnedById)) : [];
+      const [returnedByUser] = returnRecord.returnedById ? await db.select().from(users).where(eq(users.id, returnRecord.returnedById)).limit(1) : [];
       loadReturn = { ...returnRecord, panels: returnPanels, returnedBy: returnedByUser || undefined };
     }
 
@@ -155,7 +155,7 @@ export class LogisticsRepository {
   }
 
   async addPanelToLoadList(loadListId: string, panelId: string, sequence?: number): Promise<LoadListPanel> {
-    const existingPanels = await db.select().from(loadListPanels).where(eq(loadListPanels.loadListId, loadListId));
+    const existingPanels = await db.select().from(loadListPanels).where(eq(loadListPanels.loadListId, loadListId)).limit(1000);
     const newSequence = sequence ?? existingPanels.length + 1;
     const [panel] = await db.insert(loadListPanels).values({ loadListId, panelId, sequence: newSequence }).returning();
     return panel;
@@ -169,11 +169,12 @@ export class LogisticsRepository {
   async getLoadListPanels(loadListId: string): Promise<(LoadListPanel & { panel: PanelRegister })[]> {
     const links = await db.select().from(loadListPanels)
       .where(eq(loadListPanels.loadListId, loadListId))
-      .orderBy(asc(loadListPanels.sequence));
+      .orderBy(asc(loadListPanels.sequence))
+      .limit(1000);
     
     const result: (LoadListPanel & { panel: PanelRegister })[] = [];
     for (const link of links) {
-      const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, link.panelId));
+      const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, link.panelId)).limit(1);
       if (panel) {
         result.push({ ...link, panel });
       }
@@ -182,7 +183,7 @@ export class LogisticsRepository {
   }
 
   async getDeliveryRecord(loadListId: string): Promise<DeliveryRecord | undefined> {
-    const [record] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, loadListId));
+    const [record] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, loadListId)).limit(1);
     return record;
   }
 

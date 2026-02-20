@@ -12,17 +12,19 @@ export const employeeMethods = {
   async getAllEmployees(companyId: string): Promise<Employee[]> {
     return db.select().from(employees)
       .where(eq(employees.companyId, companyId))
-      .orderBy(asc(employees.lastName), asc(employees.firstName));
+      .orderBy(asc(employees.lastName), asc(employees.firstName))
+      .limit(1000);
   },
 
   async getActiveEmployees(companyId: string): Promise<Employee[]> {
     return db.select().from(employees)
       .where(and(eq(employees.companyId, companyId), eq(employees.isActive, true)))
-      .orderBy(asc(employees.lastName), asc(employees.firstName));
+      .orderBy(asc(employees.lastName), asc(employees.firstName))
+      .limit(1000);
   },
 
   async getEmployee(id: string): Promise<Employee | undefined> {
-    const [employee] = await db.select().from(employees).where(eq(employees.id, id));
+    const [employee] = await db.select().from(employees).where(eq(employees.id, id)).limit(1);
     return employee;
   },
 
@@ -46,12 +48,13 @@ export const employeeMethods = {
   async getEmployeeEmployments(employeeId: string): Promise<EmployeeEmployment[]> {
     return db.select().from(employeeEmployments)
       .where(eq(employeeEmployments.employeeId, employeeId))
-      .orderBy(desc(employeeEmployments.startDate));
+      .orderBy(desc(employeeEmployments.startDate))
+      .limit(1000);
   },
 
   async getEmployeeEmployment(id: string): Promise<EmployeeEmployment | undefined> {
     const [employment] = await db.select().from(employeeEmployments)
-      .where(eq(employeeEmployments.id, id));
+      .where(eq(employeeEmployments.id, id)).limit(1);
     return employment;
   },
 
@@ -75,12 +78,13 @@ export const employeeMethods = {
   async getEmployeeDocuments(employeeId: string): Promise<EmployeeDocument[]> {
     return db.select().from(employeeDocuments)
       .where(eq(employeeDocuments.employeeId, employeeId))
-      .orderBy(desc(employeeDocuments.createdAt));
+      .orderBy(desc(employeeDocuments.createdAt))
+      .limit(1000);
   },
 
   async getEmployeeDocument(id: string): Promise<EmployeeDocument | undefined> {
     const [doc] = await db.select().from(employeeDocuments)
-      .where(eq(employeeDocuments.id, id));
+      .where(eq(employeeDocuments.id, id)).limit(1);
     return doc;
   },
 
@@ -104,12 +108,13 @@ export const employeeMethods = {
   async getEmployeeLicences(employeeId: string): Promise<EmployeeLicence[]> {
     return db.select().from(employeeLicences)
       .where(eq(employeeLicences.employeeId, employeeId))
-      .orderBy(desc(employeeLicences.expiryDate));
+      .orderBy(desc(employeeLicences.expiryDate))
+      .limit(1000);
   },
 
   async getEmployeeLicence(id: string): Promise<EmployeeLicence | undefined> {
     const [licence] = await db.select().from(employeeLicences)
-      .where(eq(employeeLicences.id, id));
+      .where(eq(employeeLicences.id, id)).limit(1);
     return licence;
   },
 

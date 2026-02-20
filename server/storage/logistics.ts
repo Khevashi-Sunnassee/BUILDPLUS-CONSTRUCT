@@ -14,24 +14,26 @@ import type { LoadListWithDetails, LoadReturnWithDetails } from "./types";
 export const logisticsMethods = {
   async getAllTrailerTypes(companyId?: string): Promise<TrailerType[]> {
     if (companyId) {
-      return db.select().from(trailerTypes).where(eq(trailerTypes.companyId, companyId)).orderBy(asc(trailerTypes.sortOrder));
+      return db.select().from(trailerTypes).where(eq(trailerTypes.companyId, companyId)).orderBy(asc(trailerTypes.sortOrder)).limit(1000);
     }
-    return db.select().from(trailerTypes).orderBy(asc(trailerTypes.sortOrder));
+    return db.select().from(trailerTypes).orderBy(asc(trailerTypes.sortOrder)).limit(1000);
   },
 
   async getActiveTrailerTypes(companyId?: string): Promise<TrailerType[]> {
     if (companyId) {
       return db.select().from(trailerTypes)
         .where(and(eq(trailerTypes.isActive, true), eq(trailerTypes.companyId, companyId)))
-        .orderBy(asc(trailerTypes.sortOrder));
+        .orderBy(asc(trailerTypes.sortOrder))
+        .limit(1000);
     }
     return db.select().from(trailerTypes)
       .where(eq(trailerTypes.isActive, true))
-      .orderBy(asc(trailerTypes.sortOrder));
+      .orderBy(asc(trailerTypes.sortOrder))
+      .limit(1000);
   },
 
   async getTrailerType(id: string): Promise<TrailerType | undefined> {
-    const [trailerType] = await db.select().from(trailerTypes).where(eq(trailerTypes.id, id));
+    const [trailerType] = await db.select().from(trailerTypes).where(eq(trailerTypes.id, id)).limit(1);
     return trailerType;
   },
 
@@ -53,19 +55,19 @@ export const logisticsMethods = {
   },
 
   async getLoadReturn(loadListId: string): Promise<LoadReturnWithDetails | null> {
-    const [returnRecord] = await db.select().from(loadReturns).where(eq(loadReturns.loadListId, loadListId));
+    const [returnRecord] = await db.select().from(loadReturns).where(eq(loadReturns.loadListId, loadListId)).limit(1);
     if (!returnRecord) return null;
 
     const [returnedByUser] = returnRecord.returnedById
-      ? await db.select().from(users).where(eq(users.id, returnRecord.returnedById))
+      ? await db.select().from(users).where(eq(users.id, returnRecord.returnedById)).limit(1)
       : [];
 
     const returnPanelLinks = await db.select().from(loadReturnPanels)
-      .where(eq(loadReturnPanels.loadReturnId, returnRecord.id));
+      .where(eq(loadReturnPanels.loadReturnId, returnRecord.id)).limit(1000);
 
     const panels: (LoadReturnPanel & { panel: PanelRegister })[] = [];
     for (const link of returnPanelLinks) {
-      const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, link.panelId));
+      const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, link.panelId)).limit(1);
       if (panel) {
         panels.push({ ...link, panel });
       }
@@ -79,7 +81,7 @@ export const logisticsMethods = {
   },
 
   async getAllLoadLists(companyId?: string): Promise<LoadListWithDetails[]> {
-    const allLoadLists = await db.select().from(loadLists).orderBy(desc(loadLists.createdAt));
+    const allLoadLists = await db.select().from(loadLists).orderBy(desc(loadLists.createdAt)).limit(1000);
     
     const results: LoadListWithDetails[] = [];
     for (const loadList of allLoadLists) {
@@ -93,15 +95,15 @@ export const logisticsMethods = {
   },
 
   async getLoadList(id: string): Promise<LoadListWithDetails | undefined> {
-    const [loadList] = await db.select().from(loadLists).where(eq(loadLists.id, id));
+    const [loadList] = await db.select().from(loadLists).where(eq(loadLists.id, id)).limit(1);
     if (!loadList) return undefined;
 
-    const [job] = await db.select().from(jobs).where(eq(jobs.id, loadList.jobId));
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, loadList.jobId)).limit(1);
     if (!job) return undefined;
 
     let trailerType: TrailerType | null = null;
     if (loadList.trailerTypeId) {
-      const [tt] = await db.select().from(trailerTypes).where(eq(trailerTypes.id, loadList.trailerTypeId));
+      const [tt] = await db.select().from(trailerTypes).where(eq(trailerTypes.id, loadList.trailerTypeId)).limit(1);
       trailerType = tt || null;
     }
 
@@ -109,17 +111,18 @@ export const logisticsMethods = {
       .from(loadListPanels)
       .innerJoin(panelRegister, eq(loadListPanels.panelId, panelRegister.id))
       .where(eq(loadListPanels.loadListId, id))
-      .orderBy(asc(loadListPanels.sequence));
+      .orderBy(asc(loadListPanels.sequence))
+      .limit(1000);
 
     const panels = panelResults.map(r => ({ ...r.load_list_panels, panel: r.panel_register }));
 
-    const [deliveryRecord] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, id));
+    const [deliveryRecord] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, id)).limit(1);
 
     const loadReturn = await logisticsMethods.getLoadReturn(id);
 
     let createdBy: User | null = null;
     if (loadList.createdById) {
-      const [user] = await db.select().from(users).where(eq(users.id, loadList.createdById));
+      const [user] = await db.select().from(users).where(eq(users.id, loadList.createdById)).limit(1);
       createdBy = user || null;
     }
 
@@ -166,7 +169,8 @@ export const logisticsMethods = {
     if (!sequence) {
       const existingPanels = await db.select()
         .from(loadListPanels)
-        .where(eq(loadListPanels.loadListId, loadListId));
+        .where(eq(loadListPanels.loadListId, loadListId))
+        .limit(1000);
       sequence = existingPanels.length + 1;
     }
 
@@ -191,18 +195,19 @@ export const logisticsMethods = {
       .from(loadListPanels)
       .innerJoin(panelRegister, eq(loadListPanels.panelId, panelRegister.id))
       .where(eq(loadListPanels.loadListId, loadListId))
-      .orderBy(asc(loadListPanels.sequence));
+      .orderBy(asc(loadListPanels.sequence))
+      .limit(1000);
 
     return results.map(r => ({ ...r.load_list_panels, panel: r.panel_register }));
   },
 
   async getDeliveryRecord(loadListId: string): Promise<DeliveryRecord | undefined> {
-    const [record] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, loadListId));
+    const [record] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, loadListId)).limit(1);
     return record;
   },
 
   async getDeliveryRecordById(id: string): Promise<DeliveryRecord | undefined> {
-    const [record] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.id, id));
+    const [record] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.id, id)).limit(1);
     return record;
   },
 

@@ -8,7 +8,7 @@ import {
 
 export class SettingsRepository {
   async getGlobalSettings(companyId: string): Promise<GlobalSettings | undefined> {
-    const [settings] = await db.select().from(globalSettings).where(eq(globalSettings.companyId, companyId));
+    const [settings] = await db.select().from(globalSettings).where(eq(globalSettings.companyId, companyId)).limit(1);
     return settings;
   }
 
@@ -36,15 +36,15 @@ export class SettingsRepository {
   }
 
   async getMappingRules(companyId: string): Promise<MappingRule[]> {
-    return db.select().from(mappingRules).where(eq(mappingRules.companyId, companyId)).orderBy(desc(mappingRules.createdAt));
+    return db.select().from(mappingRules).where(eq(mappingRules.companyId, companyId)).orderBy(desc(mappingRules.createdAt)).limit(1000);
   }
 
   async getAllZones(companyId: string): Promise<Zone[]> {
-    return db.select().from(zones).where(eq(zones.companyId, companyId)).orderBy(zones.name);
+    return db.select().from(zones).where(eq(zones.companyId, companyId)).orderBy(zones.name).limit(1000);
   }
 
   async getZone(id: string): Promise<Zone | undefined> {
-    const [zone] = await db.select().from(zones).where(eq(zones.id, id));
+    const [zone] = await db.select().from(zones).where(eq(zones.id, id)).limit(1);
     return zone;
   }
 
@@ -52,10 +52,10 @@ export class SettingsRepository {
     if (companyId) {
       const [zone] = await db.select().from(zones).where(
         and(eq(zones.code, code), eq(zones.companyId, companyId))
-      );
+      ).limit(1);
       return zone;
     }
-    const [zone] = await db.select().from(zones).where(eq(zones.code, code));
+    const [zone] = await db.select().from(zones).where(eq(zones.code, code)).limit(1);
     return zone;
   }
 

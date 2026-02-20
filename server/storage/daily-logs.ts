@@ -8,11 +8,11 @@ import {
 
 export const dailyLogMethods = {
   async getDailyLog(id: string): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User }) | undefined> {
-    const [log] = await db.select().from(dailyLogs).innerJoin(users, eq(dailyLogs.userId, users.id)).where(eq(dailyLogs.id, id));
+    const [log] = await db.select().from(dailyLogs).innerJoin(users, eq(dailyLogs.userId, users.id)).where(eq(dailyLogs.id, id)).limit(1);
     if (!log) return undefined;
 
     const rows = await db.select().from(logRows).leftJoin(jobs, eq(logRows.jobId, jobs.id))
-      .where(eq(logRows.dailyLogId, id)).orderBy(asc(logRows.startAt));
+      .where(eq(logRows.dailyLogId, id)).orderBy(asc(logRows.startAt)).limit(1000);
 
     return {
       ...log.daily_logs,
@@ -50,7 +50,7 @@ export const dailyLogMethods = {
       }
     }
     
-    return db.select().from(dailyLogs).where(and(...conditions)).orderBy(desc(dailyLogs.logDay));
+    return db.select().from(dailyLogs).where(and(...conditions)).orderBy(desc(dailyLogs.logDay)).limit(1000);
   },
 
   async getSubmittedDailyLogs(companyId?: string): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User })[]> {
@@ -59,12 +59,12 @@ export const dailyLogMethods = {
       conditions.push(eq(users.companyId, companyId));
     }
     const logs = await db.select().from(dailyLogs).innerJoin(users, eq(dailyLogs.userId, users.id))
-      .where(and(...conditions)).orderBy(desc(dailyLogs.logDay));
+      .where(and(...conditions)).orderBy(desc(dailyLogs.logDay)).limit(1000);
 
     const result = [];
     for (const log of logs) {
       const rows = await db.select().from(logRows).leftJoin(jobs, eq(logRows.jobId, jobs.id))
-        .where(eq(logRows.dailyLogId, log.daily_logs.id)).orderBy(asc(logRows.startAt));
+        .where(eq(logRows.dailyLogId, log.daily_logs.id)).orderBy(asc(logRows.startAt)).limit(1000);
       result.push({
         ...log.daily_logs,
         user: log.users,
@@ -76,7 +76,7 @@ export const dailyLogMethods = {
 
   async getDailyLogByUserAndDay(userId: string, logDay: string): Promise<DailyLog | undefined> {
     const [log] = await db.select().from(dailyLogs)
-      .where(and(eq(dailyLogs.userId, userId), eq(dailyLogs.logDay, logDay), eq(dailyLogs.discipline, "DRAFTING")));
+      .where(and(eq(dailyLogs.userId, userId), eq(dailyLogs.logDay, logDay), eq(dailyLogs.discipline, "DRAFTING"))).limit(1);
     return log;
   },
 
@@ -93,7 +93,7 @@ export const dailyLogMethods = {
 
   async upsertDailyLog(data: { userId: string; logDay: string; tz: string }): Promise<DailyLog> {
     const existing = await db.select().from(dailyLogs)
-      .where(and(eq(dailyLogs.userId, data.userId), eq(dailyLogs.logDay, data.logDay), eq(dailyLogs.discipline, "DRAFTING")));
+      .where(and(eq(dailyLogs.userId, data.userId), eq(dailyLogs.logDay, data.logDay), eq(dailyLogs.discipline, "DRAFTING"))).limit(1);
     if (existing[0]) return existing[0];
 
     const [log] = await db.insert(dailyLogs).values({
@@ -112,12 +112,12 @@ export const dailyLogMethods = {
   },
 
   async getLogRow(id: string): Promise<LogRow | undefined> {
-    const [row] = await db.select().from(logRows).where(eq(logRows.id, id));
+    const [row] = await db.select().from(logRows).where(eq(logRows.id, id)).limit(1);
     return row;
   },
 
   async upsertLogRow(sourceEventId: string, data: Partial<InsertLogRow> & { dailyLogId: string }): Promise<LogRow> {
-    const existing = await db.select().from(logRows).where(eq(logRows.sourceEventId, sourceEventId));
+    const existing = await db.select().from(logRows).where(eq(logRows.sourceEventId, sourceEventId)).limit(1);
     if (existing[0]) {
       const [row] = await db.update(logRows).set({ ...data, updatedAt: new Date() }).where(eq(logRows.sourceEventId, sourceEventId)).returning();
       return row;
@@ -155,7 +155,8 @@ export const dailyLogMethods = {
         gte(dailyLogs.logDay, startDate),
         lte(dailyLogs.logDay, endDate)
       ))
-      .orderBy(asc(dailyLogs.logDay));
+      .orderBy(asc(dailyLogs.logDay))
+      .limit(1000);
   },
 
   async getDailyLogsWithRowsInRange(startDate: string, endDate: string, companyId?: string): Promise<Array<{
@@ -173,14 +174,16 @@ export const dailyLogMethods = {
     const logs = await db.select().from(dailyLogs)
       .innerJoin(users, eq(dailyLogs.userId, users.id))
       .where(and(...conditions))
-      .orderBy(asc(dailyLogs.logDay));
+      .orderBy(asc(dailyLogs.logDay))
+      .limit(1000);
     
     if (logs.length === 0) return [];
     
     const logIds = logs.map(l => l.daily_logs.id);
     const allRows = await db.select().from(logRows)
       .where(inArray(logRows.dailyLogId, logIds))
-      .orderBy(asc(logRows.startAt));
+      .orderBy(asc(logRows.startAt))
+      .limit(1000);
     
     const rowsByLogId = new Map<string, LogRow[]>();
     for (const row of allRows) {

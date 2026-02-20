@@ -7,7 +7,7 @@ import {
 
 export const configMethods = {
   async getGlobalSettings(companyId: string): Promise<GlobalSettings | undefined> {
-    const [settings] = await db.select().from(globalSettings).where(eq(globalSettings.companyId, companyId));
+    const [settings] = await db.select().from(globalSettings).where(eq(globalSettings.companyId, companyId)).limit(1);
     return settings;
   },
 
@@ -23,11 +23,11 @@ export const configMethods = {
   },
 
   async getAllZones(companyId: string): Promise<Zone[]> {
-    return db.select().from(zones).where(eq(zones.companyId, companyId)).orderBy(asc(zones.name));
+    return db.select().from(zones).where(eq(zones.companyId, companyId)).orderBy(asc(zones.name)).limit(1000);
   },
 
   async getZone(id: string): Promise<Zone | undefined> {
-    const [zone] = await db.select().from(zones).where(eq(zones.id, id));
+    const [zone] = await db.select().from(zones).where(eq(zones.id, id)).limit(1);
     return zone;
   },
 
@@ -35,10 +35,10 @@ export const configMethods = {
     if (companyId) {
       const [zone] = await db.select().from(zones).where(
         and(eq(zones.code, code), eq(zones.companyId, companyId))
-      );
+      ).limit(1);
       return zone;
     }
-    const [zone] = await db.select().from(zones).where(eq(zones.code, code));
+    const [zone] = await db.select().from(zones).where(eq(zones.code, code)).limit(1);
     return zone;
   },
 

@@ -191,6 +191,19 @@ router.post("/api/timer-sessions/start", requireAuth, async (req, res) => {
       return res.status(400).json({ error: result.error.format() });
     }
     const { jobId, panelRegisterId, workTypeId, app, dailyLogId } = result.data;
+    const companyId = req.companyId as string;
+
+    if (jobId) {
+      const [job] = await db.select({ id: jobs.id }).from(jobs)
+        .where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId))).limit(1);
+      if (!job) return res.status(404).json({ error: "Job not found" });
+    }
+    if (panelRegisterId) {
+      const [panel] = await db.select({ id: panelRegister.id }).from(panelRegister)
+        .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+        .where(and(eq(panelRegister.id, panelRegisterId), eq(jobs.companyId, companyId))).limit(1);
+      if (!panel) return res.status(404).json({ error: "Panel not found" });
+    }
 
     // Check if there's already an active or paused session
     const [existingSession] = await db
@@ -368,6 +381,19 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
       return res.status(400).json({ error: result.error.format() });
     }
     const { jobId, panelRegisterId, workTypeId, app, notes, panelMark, drawingCode } = result.data;
+    const companyId = req.companyId as string;
+
+    if (jobId) {
+      const [job] = await db.select({ id: jobs.id }).from(jobs)
+        .where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId))).limit(1);
+      if (!job) return res.status(404).json({ error: "Job not found" });
+    }
+    if (panelRegisterId) {
+      const [panel] = await db.select({ id: panelRegister.id }).from(panelRegister)
+        .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+        .where(and(eq(panelRegister.id, panelRegisterId), eq(jobs.companyId, companyId))).limit(1);
+      if (!panel) return res.status(404).json({ error: "Panel not found" });
+    }
 
     const [session] = await db
       .select()
@@ -641,6 +667,19 @@ router.patch("/api/timer-sessions/:id", requireAuth, async (req, res) => {
       return res.status(400).json({ error: result.error.format() });
     }
     const { jobId, panelRegisterId, workTypeId, app, notes } = result.data;
+    const companyId = req.companyId as string;
+
+    if (jobId) {
+      const [job] = await db.select({ id: jobs.id }).from(jobs)
+        .where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId))).limit(1);
+      if (!job) return res.status(404).json({ error: "Job not found" });
+    }
+    if (panelRegisterId) {
+      const [panel] = await db.select({ id: panelRegister.id }).from(panelRegister)
+        .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+        .where(and(eq(panelRegister.id, panelRegisterId), eq(jobs.companyId, companyId))).limit(1);
+      if (!panel) return res.status(404).json({ error: "Panel not found" });
+    }
 
     const [session] = await db
       .select()

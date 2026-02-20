@@ -19,18 +19,18 @@ export interface WeeklyJobReportWithDetails extends WeeklyJobReport {
 
 export class ReportsRepository {
   async getDailyLog(id: string): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User }) | undefined> {
-    const [log] = await db.select().from(dailyLogs).where(eq(dailyLogs.id, id));
+    const [log] = await db.select().from(dailyLogs).where(eq(dailyLogs.id, id)).limit(1);
     if (!log) return undefined;
     
-    const [user] = await db.select().from(users).where(eq(users.id, log.userId));
+    const [user] = await db.select().from(users).where(eq(users.id, log.userId)).limit(1);
     if (!user) return undefined;
     
-    const rows = await db.select().from(logRows).where(eq(logRows.dailyLogId, id)).orderBy(asc(logRows.startAt));
+    const rows = await db.select().from(logRows).where(eq(logRows.dailyLogId, id)).orderBy(asc(logRows.startAt)).limit(1000);
     
     const jobIds = [...new Set(rows.filter(r => r.jobId).map(r => r.jobId!))];
     const jobsMap = new Map<string, Job>();
     if (jobIds.length > 0) {
-      const jobsList = await db.select().from(jobs).where(inArray(jobs.id, jobIds));
+      const jobsList = await db.select().from(jobs).where(inArray(jobs.id, jobIds)).limit(1000);
       for (const job of jobsList) {
         jobsMap.set(job.id, job);
       }
@@ -48,25 +48,25 @@ export class ReportsRepository {
     const conditions = [eq(dailyLogs.userId, userId)];
     if (filters?.status) conditions.push(eq(dailyLogs.status, filters.status as typeof dailyLogs.status.enumValues[number]));
     
-    return db.select().from(dailyLogs).where(and(...conditions)).orderBy(desc(dailyLogs.logDay));
+    return db.select().from(dailyLogs).where(and(...conditions)).orderBy(desc(dailyLogs.logDay)).limit(1000);
   }
 
   async getSubmittedDailyLogs(): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User })[]> {
-    const logs = await db.select().from(dailyLogs).where(eq(dailyLogs.status, "SUBMITTED")).orderBy(desc(dailyLogs.logDay));
+    const logs = await db.select().from(dailyLogs).where(eq(dailyLogs.status, "SUBMITTED")).orderBy(desc(dailyLogs.logDay)).limit(1000);
     if (logs.length === 0) return [];
     
     const logIds = logs.map(l => l.id);
     const userIds = [...new Set(logs.map(l => l.userId))];
     
     const [allRows, allUsers] = await Promise.all([
-      db.select().from(logRows).where(inArray(logRows.dailyLogId, logIds)).orderBy(asc(logRows.startAt)),
-      db.select().from(users).where(inArray(users.id, userIds)),
+      db.select().from(logRows).where(inArray(logRows.dailyLogId, logIds)).orderBy(asc(logRows.startAt)).limit(1000),
+      db.select().from(users).where(inArray(users.id, userIds)).limit(1000),
     ]);
     
     const jobIds = [...new Set(allRows.filter(r => r.jobId).map(r => r.jobId!))];
     const jobsMap = new Map<string, Job>();
     if (jobIds.length > 0) {
-      const jobsList = await db.select().from(jobs).where(inArray(jobs.id, jobIds));
+      const jobsList = await db.select().from(jobs).where(inArray(jobs.id, jobIds)).limit(1000);
       for (const job of jobsList) jobsMap.set(job.id, job);
     }
     
@@ -90,7 +90,8 @@ export class ReportsRepository {
 
   async getDailyLogByUserAndDay(userId: string, logDay: string): Promise<DailyLog | undefined> {
     const [log] = await db.select().from(dailyLogs)
-      .where(and(eq(dailyLogs.userId, userId), eq(dailyLogs.logDay, logDay)));
+      .where(and(eq(dailyLogs.userId, userId), eq(dailyLogs.logDay, logDay)))
+      .limit(1);
     return log;
   }
 
@@ -111,12 +112,12 @@ export class ReportsRepository {
   }
 
   async getLogRow(id: string): Promise<LogRow | undefined> {
-    const [row] = await db.select().from(logRows).where(eq(logRows.id, id));
+    const [row] = await db.select().from(logRows).where(eq(logRows.id, id)).limit(1);
     return row;
   }
 
   async upsertLogRow(sourceEventId: string, data: Partial<InsertLogRow> & { dailyLogId: string }): Promise<LogRow> {
-    const [existing] = await db.select().from(logRows).where(eq(logRows.sourceEventId, sourceEventId));
+    const [existing] = await db.select().from(logRows).where(eq(logRows.sourceEventId, sourceEventId)).limit(1);
     if (existing) {
       const [updated] = await db.update(logRows).set({ ...data, updatedAt: new Date() }).where(eq(logRows.id, existing.id)).returning();
       return updated;
@@ -147,20 +148,22 @@ export class ReportsRepository {
   async getDailyLogsInRange(startDate: string, endDate: string): Promise<DailyLog[]> {
     return db.select().from(dailyLogs)
       .where(and(gte(dailyLogs.logDay, startDate), lte(dailyLogs.logDay, endDate)))
-      .orderBy(asc(dailyLogs.logDay));
+      .orderBy(asc(dailyLogs.logDay))
+      .limit(1000);
   }
 
   async getWeeklyWageReports(startDate?: string, endDate?: string): Promise<WeeklyWageReport[]> {
     if (startDate && endDate) {
       return db.select().from(weeklyWageReports)
         .where(and(gte(weeklyWageReports.weekStartDate, startDate), lte(weeklyWageReports.weekEndDate, endDate)))
-        .orderBy(desc(weeklyWageReports.weekStartDate));
+        .orderBy(desc(weeklyWageReports.weekStartDate))
+        .limit(1000);
     }
-    return db.select().from(weeklyWageReports).orderBy(desc(weeklyWageReports.weekStartDate));
+    return db.select().from(weeklyWageReports).orderBy(desc(weeklyWageReports.weekStartDate)).limit(1000);
   }
 
   async getWeeklyWageReport(id: string): Promise<WeeklyWageReport | undefined> {
-    const [report] = await db.select().from(weeklyWageReports).where(eq(weeklyWageReports.id, id));
+    const [report] = await db.select().from(weeklyWageReports).where(eq(weeklyWageReports.id, id)).limit(1);
     return report;
   }
 
@@ -170,7 +173,8 @@ export class ReportsRepository {
         eq(weeklyWageReports.weekStartDate, weekStartDate),
         eq(weeklyWageReports.weekEndDate, weekEndDate),
         eq(weeklyWageReports.factory, factory)
-      ));
+      ))
+      .limit(1);
     return report;
   }
 
@@ -180,7 +184,8 @@ export class ReportsRepository {
         eq(weeklyWageReports.weekStartDate, weekStartDate),
         eq(weeklyWageReports.weekEndDate, weekEndDate),
         eq(weeklyWageReports.factoryId, factoryId)
-      ));
+      ))
+      .limit(1);
     return report;
   }
 
@@ -200,8 +205,8 @@ export class ReportsRepository {
 
   async getWeeklyJobReports(projectManagerId?: string): Promise<WeeklyJobReportWithDetails[]> {
     const reports = projectManagerId
-      ? await db.select().from(weeklyJobReports).where(eq(weeklyJobReports.projectManagerId, projectManagerId)).orderBy(desc(weeklyJobReports.createdAt))
-      : await db.select().from(weeklyJobReports).orderBy(desc(weeklyJobReports.createdAt));
+      ? await db.select().from(weeklyJobReports).where(eq(weeklyJobReports.projectManagerId, projectManagerId)).orderBy(desc(weeklyJobReports.createdAt)).limit(1000)
+      : await db.select().from(weeklyJobReports).orderBy(desc(weeklyJobReports.createdAt)).limit(1000);
     
     return this.enrichWeeklyJobReports(reports);
   }
@@ -209,16 +214,16 @@ export class ReportsRepository {
   private async enrichWeeklyJobReports(reports: WeeklyJobReport[]): Promise<WeeklyJobReportWithDetails[]> {
     const result: WeeklyJobReportWithDetails[] = [];
     for (const report of reports) {
-      const [job] = await db.select().from(jobs).where(eq(jobs.id, (report as any).jobId));
-      const [pm] = await db.select().from(users).where(eq(users.id, report.projectManagerId));
-      const schedules = await db.select().from(weeklyJobReportSchedules).where(eq(weeklyJobReportSchedules.reportId, report.id));
+      const [job] = await db.select().from(jobs).where(eq(jobs.id, (report as any).jobId)).limit(1);
+      const [pm] = await db.select().from(users).where(eq(users.id, report.projectManagerId)).limit(1);
+      const schedules = await db.select().from(weeklyJobReportSchedules).where(eq(weeklyJobReportSchedules.reportId, report.id)).limit(1000);
       result.push({ ...report, job: job || undefined, projectManager: pm || undefined, schedules });
     }
     return result;
   }
 
   async getWeeklyJobReport(id: string): Promise<WeeklyJobReportWithDetails | undefined> {
-    const [report] = await db.select().from(weeklyJobReports).where(eq(weeklyJobReports.id, id));
+    const [report] = await db.select().from(weeklyJobReports).where(eq(weeklyJobReports.id, id)).limit(1);
     if (!report) return undefined;
     const enriched = await this.enrichWeeklyJobReports([report]);
     return enriched[0];

@@ -44,20 +44,21 @@ export const invitationMethods = {
   async getInvitationByToken(token: string): Promise<UserInvitation | undefined> {
     const tokenHash = hashToken(token);
     const [invitation] = await db.select().from(userInvitations)
-      .where(eq(userInvitations.tokenHash, tokenHash));
+      .where(eq(userInvitations.tokenHash, tokenHash)).limit(1);
     return invitation;
   },
 
   async getInvitationById(id: string): Promise<UserInvitation | undefined> {
     const [invitation] = await db.select().from(userInvitations)
-      .where(eq(userInvitations.id, id));
+      .where(eq(userInvitations.id, id)).limit(1);
     return invitation;
   },
 
   async getInvitationsByCompany(companyId: string): Promise<UserInvitation[]> {
     return db.select().from(userInvitations)
       .where(eq(userInvitations.companyId, companyId))
-      .orderBy(userInvitations.createdAt);
+      .orderBy(userInvitations.createdAt)
+      .limit(1000);
   },
 
   async markInvitationAccepted(id: string): Promise<void> {

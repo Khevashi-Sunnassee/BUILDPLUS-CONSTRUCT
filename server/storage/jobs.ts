@@ -7,14 +7,14 @@ import {
 
 export const jobMethods = {
   async getJob(id: string): Promise<(Job & { panels: PanelRegister[] }) | undefined> {
-    const [job] = await db.select().from(jobs).where(eq(jobs.id, id));
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, id)).limit(1);
     if (!job) return undefined;
-    const panels = await db.select().from(panelRegister).where(eq(panelRegister.jobId, id)).orderBy(asc(panelRegister.panelMark));
+    const panels = await db.select().from(panelRegister).where(eq(panelRegister.jobId, id)).orderBy(asc(panelRegister.panelMark)).limit(1000);
     return { ...job, panels };
   },
 
   async getJobByNumber(jobNumber: string): Promise<Job | undefined> {
-    const [job] = await db.select().from(jobs).where(eq(jobs.jobNumber, jobNumber));
+    const [job] = await db.select().from(jobs).where(eq(jobs.jobNumber, jobNumber)).limit(1);
     return job;
   },
 
@@ -35,11 +35,11 @@ export const jobMethods = {
 
   async getAllJobs(companyId?: string): Promise<(Job & { panels: PanelRegister[]; mappingRules: MappingRule[]; panelCount: number; completedPanelCount: number })[]> {
     const allJobs = companyId 
-      ? await db.select().from(jobs).where(eq(jobs.companyId, companyId)).orderBy(desc(jobs.createdAt))
-      : await db.select().from(jobs).orderBy(desc(jobs.createdAt));
+      ? await db.select().from(jobs).where(eq(jobs.companyId, companyId)).orderBy(desc(jobs.createdAt)).limit(1000)
+      : await db.select().from(jobs).orderBy(desc(jobs.createdAt)).limit(1000);
     const allRules = companyId
-      ? await db.select().from(mappingRules).where(eq(mappingRules.companyId, companyId))
-      : await db.select().from(mappingRules);
+      ? await db.select().from(mappingRules).where(eq(mappingRules.companyId, companyId)).limit(1000)
+      : await db.select().from(mappingRules).limit(1000);
     
     const panelCounts = await db.select({
       jobId: panelRegister.jobId,

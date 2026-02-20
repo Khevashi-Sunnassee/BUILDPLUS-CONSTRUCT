@@ -4,10 +4,10 @@ import { companies, users, type Company, type InsertCompany } from "@shared/sche
 
 export const companyMethods = {
   async getAllCompanies(): Promise<(Company & { userCount: number })[]> {
-    const allCompanies = await db.select().from(companies).orderBy(desc(companies.createdAt));
+    const allCompanies = await db.select().from(companies).orderBy(desc(companies.createdAt)).limit(1000);
     const result = await Promise.all(
       allCompanies.map(async (company) => {
-        const companyUsers = await db.select().from(users).where(eq(users.companyId, company.id));
+        const companyUsers = await db.select().from(users).where(eq(users.companyId, company.id)).limit(1000);
         return {
           ...company,
           userCount: companyUsers.length,
@@ -18,12 +18,12 @@ export const companyMethods = {
   },
 
   async getCompany(id: string): Promise<Company | undefined> {
-    const [company] = await db.select().from(companies).where(eq(companies.id, id));
+    const [company] = await db.select().from(companies).where(eq(companies.id, id)).limit(1);
     return company;
   },
 
   async getCompanyByCode(code: string): Promise<Company | undefined> {
-    const [company] = await db.select().from(companies).where(eq(companies.code, code));
+    const [company] = await db.select().from(companies).where(eq(companies.code, code)).limit(1);
     return company;
   },
 
