@@ -263,15 +263,29 @@ export function JobFormDialog({
                 <FormField
                   control={jobForm.control}
                   name="jobNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Job Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="JOB001" {...field} data-testid="input-job-number" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const hasAutoNumbering = !!globalSettings?.jobNumberPrefix;
+                    return (
+                      <FormItem>
+                        <FormLabel>Job Number</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder={hasAutoNumbering ? "Auto-generated" : "JOB001"}
+                            {...field}
+                            readOnly={hasAutoNumbering && !editingJob}
+                            className={hasAutoNumbering && !editingJob ? "bg-muted font-mono" : ""}
+                            data-testid="input-job-number"
+                          />
+                        </FormControl>
+                        {hasAutoNumbering && !editingJob && (
+                          <p className="text-xs text-muted-foreground">
+                            Auto-generated from company settings
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
                 <FormField
                   control={jobForm.control}

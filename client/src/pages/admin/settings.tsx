@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database, RefreshCw, CheckCircle, FileText, Plus, Pencil, Users, Mail } from "lucide-react";
+import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database, RefreshCw, CheckCircle, FileText, Plus, Pencil, Users, Mail, Hash } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +73,9 @@ export default function AdminSettingsPage() {
   const [draftingWorkDays, setDraftingWorkDays] = useState<boolean[]>([false, true, true, true, true, true, false]);
   const [cfmeuCalendar, setCfmeuCalendar] = useState<string>("NONE");
   const [includePOTerms, setIncludePOTerms] = useState(false);
+  const [jobNumberPrefix, setJobNumberPrefix] = useState("");
+  const [jobNumberMinDigits, setJobNumberMinDigits] = useState(3);
+  const [jobNumberNextSequence, setJobNumberNextSequence] = useState(1);
   const [showDeletePanel, setShowDeletePanel] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -169,7 +172,16 @@ export default function AdminSettingsPage() {
     if (settings?.includePOTerms !== undefined) {
       setIncludePOTerms(settings.includePOTerms);
     }
-  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance, settings?.daysToAchieveIfc, settings?.productionDaysInAdvance, settings?.procurementDaysInAdvance, settings?.procurementTimeDays, settings?.productionWorkDays, settings?.draftingWorkDays, settings?.cfmeuCalendar, settings?.includePOTerms]);
+    if (settings?.jobNumberPrefix !== undefined) {
+      setJobNumberPrefix(settings.jobNumberPrefix || "");
+    }
+    if (settings?.jobNumberMinDigits !== undefined) {
+      setJobNumberMinDigits(settings.jobNumberMinDigits);
+    }
+    if (settings?.jobNumberNextSequence !== undefined) {
+      setJobNumberNextSequence(settings.jobNumberNextSequence);
+    }
+  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance, settings?.daysToAchieveIfc, settings?.productionDaysInAdvance, settings?.procurementDaysInAdvance, settings?.procurementTimeDays, settings?.productionWorkDays, settings?.draftingWorkDays, settings?.cfmeuCalendar, settings?.includePOTerms, settings?.jobNumberPrefix, settings?.jobNumberMinDigits, settings?.jobNumberNextSequence]);
 
   const { data: departments = [], isLoading: deptsLoading } = useQuery<Department[]>({
     queryKey: [ADMIN_ROUTES.DEPARTMENTS],
@@ -391,6 +403,19 @@ export default function AdminSettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to save setting", variant: "destructive" });
+    },
+  });
+
+  const saveJobNumberSettingsMutation = useMutation({
+    mutationFn: async (data: { jobNumberPrefix: string; jobNumberMinDigits: number; jobNumberNextSequence: number }) => {
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
+      toast({ title: "Job number settings saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save job number settings", variant: "destructive" });
     },
   });
 
@@ -905,6 +930,94 @@ export default function AdminSettingsPage() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Hash className="h-5 w-5" aria-hidden="true" />
+                Job Number Auto-Generation
+              </CardTitle>
+              <CardDescription>
+                Configure automatic job number formatting when creating new jobs
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="jobNumberPrefix">Prefix</Label>
+                  <Input
+                    id="jobNumberPrefix"
+                    value={jobNumberPrefix}
+                    onChange={(e) => setJobNumberPrefix(e.target.value.toUpperCase())}
+                    placeholder="e.g. LTE-"
+                    maxLength={20}
+                    data-testid="input-job-number-prefix"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Text prepended to every job number
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="jobNumberMinDigits">Minimum Digits</Label>
+                  <Input
+                    id="jobNumberMinDigits"
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={jobNumberMinDigits}
+                    onChange={(e) => setJobNumberMinDigits(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+                    data-testid="input-job-number-min-digits"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Zero-padded digit count (e.g. 4 = 0001)
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="jobNumberNextSequence">Next Sequence</Label>
+                  <Input
+                    id="jobNumberNextSequence"
+                    type="number"
+                    min={1}
+                    value={jobNumberNextSequence}
+                    onChange={(e) => setJobNumberNextSequence(Math.max(1, parseInt(e.target.value) || 1))}
+                    data-testid="input-job-number-next-sequence"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The next number in the sequence
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Preview</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Next job number: <span className="font-mono font-semibold text-foreground" data-testid="text-job-number-preview">
+                      {jobNumberPrefix ? `${jobNumberPrefix}${String(jobNumberNextSequence).padStart(jobNumberMinDigits, "0")}` : "Not configured"}
+                    </span>
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => saveJobNumberSettingsMutation.mutate({ jobNumberPrefix, jobNumberMinDigits, jobNumberNextSequence })}
+                  disabled={saveJobNumberSettingsMutation.isPending || (
+                    jobNumberPrefix === (settings?.jobNumberPrefix || "") &&
+                    jobNumberMinDigits === (settings?.jobNumberMinDigits || 3) &&
+                    jobNumberNextSequence === (settings?.jobNumberNextSequence || 1)
+                  )}
+                  data-testid="button-save-job-number-settings"
+                >
+                  {saveJobNumberSettingsMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

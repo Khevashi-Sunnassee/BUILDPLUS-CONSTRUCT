@@ -266,6 +266,9 @@ export const globalSettings = pgTable("global_settings", {
   poTermsHtml: text("po_terms_html"),
   includePOTerms: boolean("include_po_terms").default(false).notNull(),
   emailTemplateHtml: text("email_template_html"),
+  jobNumberPrefix: text("job_number_prefix").default(""),
+  jobNumberMinDigits: integer("job_number_min_digits").default(3).notNull(),
+  jobNumberNextSequence: integer("job_number_next_sequence").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

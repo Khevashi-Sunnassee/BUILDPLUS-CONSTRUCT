@@ -3,7 +3,7 @@ import { z } from "zod";
 import multer from "multer";
 import { eq, and, inArray, desc, sql, count } from "drizzle-orm";
 import { storage, db, getFactoryWorkDays, getCfmeuHolidaysInRange, isWorkingDay, subtractWorkingDays, addWorkingDays } from "../storage";
-import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHistory, jobAuditLogs, jobLevelCycleTimes, jobMembers, users } from "@shared/schema";
+import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHistory, jobAuditLogs, jobLevelCycleTimes, jobMembers, users, globalSettings as globalSettingsTable } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { SALES_STAGES, STAGE_STATUSES, getDefaultStatus, isValidStatusForStage } from "@shared/sales-pipeline";
@@ -600,6 +600,24 @@ router.get("/api/admin/jobs/:id", requireAuth, async (req: Request, res: Respons
   }
 });
 
+// GET /api/admin/jobs/next-number - Get the next auto-generated job number
+router.get("/api/admin/jobs/next-number", requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!req.companyId) {
+      return res.status(403).json({ error: "Company context required" });
+    }
+    const settings = await storage.getGlobalSettings(req.companyId);
+    const prefix = settings?.jobNumberPrefix || "";
+    const minDigits = settings?.jobNumberMinDigits || 3;
+    const nextSeq = settings?.jobNumberNextSequence || 1;
+    const paddedNum = String(nextSeq).padStart(minDigits, "0");
+    const nextJobNumber = prefix ? `${prefix}${paddedNum}` : "";
+    res.json({ nextJobNumber, prefix, minDigits, nextSequence: nextSeq, hasAutoNumbering: !!prefix });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get next job number" });
+  }
+});
+
 // POST /api/admin/jobs - Create job
 router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
@@ -621,7 +639,7 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
       }
     }
     const jobCreateSchema = z.object({
-      jobNumber: z.string().min(1, "Job number is required").max(50),
+      jobNumber: z.string().max(50).optional().default(""),
       name: z.string().min(1, "Job name is required").max(255),
       code: z.string().max(50).optional().nullable(),
       client: z.string().max(255).optional().nullable(),
@@ -651,6 +669,21 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
     const parsed = jobCreateSchema.safeParse(body);
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    if (!parsed.data.jobNumber || parsed.data.jobNumber.trim() === "") {
+      const settings = await storage.getGlobalSettings(req.companyId);
+      const prefix = settings?.jobNumberPrefix || "";
+      if (!prefix) {
+        return res.status(400).json({ error: "Job number is required. Configure a prefix in Company Settings to enable auto-generation." });
+      }
+      const minDigits = settings?.jobNumberMinDigits || 3;
+      const result = await db.update(globalSettingsTable)
+        .set({ jobNumberNextSequence: sql`${globalSettingsTable.jobNumberNextSequence} + 1` })
+        .where(eq(globalSettingsTable.companyId, req.companyId))
+        .returning({ seq: globalSettingsTable.jobNumberNextSequence });
+      const nextSeq = result[0] ? result[0].seq - 1 : 1;
+      const paddedNum = String(nextSeq).padStart(minDigits, "0");
+      parsed.data.jobNumber = `${prefix}${paddedNum}`;
     }
     const existing = await storage.getJobByNumber(parsed.data.jobNumber);
     if (existing && existing.companyId === req.companyId) {

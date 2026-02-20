@@ -24,6 +24,9 @@ const updateSettingsSchema = z.object({
   draftingWorkDays: z.array(z.boolean()).length(7).optional(),
   cfmeuCalendar: z.enum(["NONE", "CFMEU_QLD", "CFMEU_VIC"]).optional(),
   includePOTerms: z.boolean().optional(),
+  jobNumberPrefix: z.string().max(20).optional(),
+  jobNumberMinDigits: z.number().int().min(1).max(10).optional(),
+  jobNumberNextSequence: z.number().int().min(1).optional(),
 }).strict();
 
 const logoSchema = z.object({
@@ -209,6 +212,21 @@ router.put("/api/settings/email-template", requireRole("ADMIN"), async (req, res
     res.json({ success: true, emailTemplateHtml: (settings as any).emailTemplateHtml });
   } catch (error: unknown) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Failed to save email template" });
+  }
+});
+
+router.get("/api/admin/settings/next-job-number", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId as string;
+    const settings = await storage.getGlobalSettings(companyId);
+    const prefix = settings?.jobNumberPrefix || "";
+    const minDigits = settings?.jobNumberMinDigits || 3;
+    const nextSeq = settings?.jobNumberNextSequence || 1;
+    const paddedNum = String(nextSeq).padStart(minDigits, "0");
+    const nextJobNumber = `${prefix}${paddedNum}`;
+    res.json({ nextJobNumber, prefix, minDigits, nextSequence: nextSeq });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get next job number" });
   }
 });
 

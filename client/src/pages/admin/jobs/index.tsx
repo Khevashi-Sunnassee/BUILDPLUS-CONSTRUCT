@@ -662,8 +662,12 @@ export default function AdminJobsPage() {
 
   const openCreateDialog = () => {
     setEditingJob(null);
+    const prefix = globalSettings?.jobNumberPrefix || "";
+    const minDigits = globalSettings?.jobNumberMinDigits || 3;
+    const nextSeq = globalSettings?.jobNumberNextSequence || 1;
+    const autoJobNumber = prefix ? `${prefix}${String(nextSeq).padStart(minDigits, "0")}` : "";
     jobForm.reset({
-      jobNumber: "",
+      jobNumber: autoJobNumber,
       name: "",
       client: "",
       customerId: null,
