@@ -28,7 +28,9 @@ import {
   Users,
   Bell,
   Check,
+  Mail,
 } from "lucide-react";
+import { EmailComposeDialog } from "@/components/email/email-compose-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -156,6 +158,7 @@ export function TaskRow({
   const subtaskInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssigneePopover, setShowAssigneePopover] = useState(false);
+  const [showEmailCompose, setShowEmailCompose] = useState(false);
   const pendingMutationRef = useRef<Promise<any> | null>(null);
   const settledTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
@@ -461,7 +464,7 @@ export function TaskRow({
           )}
         </div>
 
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center gap-0.5">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -480,6 +483,20 @@ export function TaskRow({
               </Button>
             </TooltipTrigger>
             <TooltipContent>Updates</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => setShowEmailCompose(true)}
+                data-testid={`btn-email-${task.id}`}
+              >
+                <Mail className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Send Email</TooltipContent>
           </Tooltip>
         </div>
 
@@ -1009,6 +1026,14 @@ export function TaskRow({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EmailComposeDialog
+        open={showEmailCompose}
+        onOpenChange={setShowEmailCompose}
+        taskId={task.id}
+        jobId={task.jobId || undefined}
+        defaultSubject={task.title}
+      />
     </>
   );
 }
