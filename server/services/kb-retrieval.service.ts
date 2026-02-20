@@ -26,12 +26,12 @@ export async function searchKnowledgeBase(
   const embeddingStr = `[${queryEmbedding.join(",")}]`;
 
   const conditions = [
-    sql`${kbChunks.companyId} = ${companyId}`,
-    sql`${kbChunks.embedding} IS NOT NULL`,
+    sql`c.company_id = ${companyId}`,
+    sql`c.embedding IS NOT NULL`,
   ];
 
   if (projectId) {
-    conditions.push(sql`${kbChunks.projectId} = ${projectId}`);
+    conditions.push(sql`c.project_id = ${projectId}`);
   }
 
   const whereClause = sql.join(conditions, sql` AND `);
