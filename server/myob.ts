@@ -117,7 +117,8 @@ function encodeCfToken(username: string, password: string): string {
 export async function myobFetch<T = unknown>(
   companyId: string,
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  _retried = false
 ): Promise<T> {
   const { accessToken, businessId } = await getValidAccessToken(companyId);
 
@@ -146,6 +147,18 @@ export async function myobFetch<T = unknown>(
   });
 
   const text = await res.text();
+
+  if (res.status === 401 && !_retried) {
+    logger.warn("[MYOB API] Got 401, forcing token refresh and retrying...");
+    try {
+      await refreshAccessToken(companyId);
+      return myobFetch<T>(companyId, endpoint, options, true);
+    } catch (refreshErr) {
+      const refreshMsg = refreshErr instanceof Error ? refreshErr.message : "Unknown refresh error";
+      logger.error({ err: refreshMsg }, "[MYOB API] Token refresh failed after 401");
+      throw new Error(`MYOB authentication failed. Please disconnect and reconnect your MYOB account in Settings. Details: ${refreshMsg}`);
+    }
+  }
 
   if (!res.ok) {
     logger.error({ status: res.status, body: text.slice(0, 500) }, "[MYOB API] Error");

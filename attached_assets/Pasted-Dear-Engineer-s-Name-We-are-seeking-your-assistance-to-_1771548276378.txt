@@ -1,0 +1,105 @@
+Dear [Engineer’s Name],
+
+We are seeking your assistance to undertake a comprehensive electrical infrastructure assessment for a proposed multi-storey development at [Site Address].
+
+The purpose of this engagement is to determine the feasibility, requirements, risks, and authority interfaces associated with supplying permanent mains power to the site.
+
+We require a detailed investigation and advice covering the following:
+
+1. Load Assessment
+
+Preliminary maximum demand calculation based on proposed building use and scale (including common areas, lifts, mechanical plant, car park ventilation, base building services, and tenancy allowances).
+
+Diversity assumptions adopted.
+
+Allowance for future capacity where appropriate.
+
+2. Existing Infrastructure Investigation
+
+Identification of existing electrical infrastructure servicing or adjacent to the site (HV/LV mains, overhead/underground assets).
+
+Confirmation of available capacity from the local distribution network.
+
+Identification of the serving authority and any known network constraints.
+
+Preliminary liaison (if required) with the relevant electricity distributor to confirm supply strategy.
+
+3. Substation Requirements
+
+Confirmation whether an on-site substation is required.
+
+Recommended substation type (kiosk, ground-mounted, internal chamber, basement, etc.).
+
+Preliminary sizing requirements.
+
+Authority-specific design constraints.
+
+Clear spatial requirements (footprint, clearances, ventilation, access).
+
+Typical construction and compliance requirements.
+
+4. Access & Constructability
+
+Access requirements for authority vehicles (crane, transformer delivery/removal).
+
+Easement requirements.
+
+Clearance zones and authority access restrictions.
+
+Impacts on architectural design and basement configuration.
+
+Identification of any abnormal site constraints affecting installation.
+
+5. Authority & Approval Pathway
+
+Outline of the application process with the distributor.
+
+High-level timeframe for approvals and energisation.
+
+Identification of long lead items (e.g., transformers, switchgear).
+
+Headworks or augmentation triggers.
+
+6. Budget & Risk Commentary
+
+Order-of-magnitude cost estimate for:
+
+Incoming supply works
+
+Substation supply and installation
+
+Authority augmentation (if triggered)
+
+Identification of key risks that could materially impact cost or programme.
+
+7. Deliverables Required
+Please provide:
+
+A brief written report addressing the above items
+
+Marked-up site plan showing preferred supply entry and substation location
+
+Preliminary load summary table
+
+Risk matrix (capacity, augmentation, programme, authority approvals)
+
+High-level programme for authority engagement and energisation
+
+Our objective is to understand:
+
+Whether the site can be serviced without major augmentation
+
+Whether an on-site substation is required and its implications
+
+The spatial and cost impacts on the development
+
+The authority approval pathway and programme risks
+
+Please confirm your proposed fee and timeframe to complete this assessment.
+
+We can provide architectural drawings, preliminary services layouts, and development yield assumptions upon confirmation.
+
+Kind regards,
+[Your Name]
+[Your Company]
+[Contact Details]

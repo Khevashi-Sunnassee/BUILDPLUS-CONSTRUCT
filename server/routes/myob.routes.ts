@@ -130,6 +130,16 @@ router.post("/api/myob/disconnect", requireAuth, async (req: Request, res: Respo
   }
 });
 
+function handleMyobError(err: unknown, res: Response, context: string) {
+  const message = err instanceof Error ? err.message : "Unknown error";
+  logger.error({ err: message }, `Error in MYOB ${context}`);
+  const isAuthError = message.includes("401") || message.includes("authentication failed") || message.includes("OAuthTokenIsInvalid");
+  const userMessage = isAuthError
+    ? "MYOB authentication expired. Please disconnect and reconnect your MYOB account from the Overview tab."
+    : `MYOB request failed: ${message}`;
+  res.status(isAuthError ? 401 : 500).json({ error: userMessage });
+}
+
 router.get("/api/myob/company", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
@@ -139,8 +149,7 @@ router.get("/api/myob/company", requireAuth, async (req: Request, res: Response)
     const data = await myob.getCompany();
     res.json(data);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    res.status(500).json({ error: "MYOB request failed", details: message });
+    handleMyobError(err, res, "company");
   }
 });
 
@@ -154,8 +163,7 @@ router.get("/api/myob/customers", requireAuth, async (req: Request, res: Respons
     const data = await myob.getCustomers(query);
     res.json(data);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    res.status(500).json({ error: "MYOB request failed", details: message });
+    handleMyobError(err, res, "customers");
   }
 });
 
@@ -169,8 +177,7 @@ router.get("/api/myob/suppliers", requireAuth, async (req: Request, res: Respons
     const data = await myob.getSuppliers(query);
     res.json(data);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    res.status(500).json({ error: "MYOB request failed", details: message });
+    handleMyobError(err, res, "suppliers");
   }
 });
 
@@ -184,8 +191,7 @@ router.get("/api/myob/accounts", requireAuth, async (req: Request, res: Response
     const data = await myob.getAccounts(query);
     res.json(data);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    res.status(500).json({ error: "MYOB request failed", details: message });
+    handleMyobError(err, res, "accounts");
   }
 });
 
@@ -199,8 +205,7 @@ router.get("/api/myob/invoices", requireAuth, async (req: Request, res: Response
     const data = await myob.getInvoices(query);
     res.json(data);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    res.status(500).json({ error: "MYOB request failed", details: message });
+    handleMyobError(err, res, "invoices");
   }
 });
 
@@ -214,8 +219,7 @@ router.get("/api/myob/items", requireAuth, async (req: Request, res: Response) =
     const data = await myob.getItems(query);
     res.json(data);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    res.status(500).json({ error: "MYOB request failed", details: message });
+    handleMyobError(err, res, "items");
   }
 });
 
@@ -296,9 +300,7 @@ router.get("/api/myob/profit-and-loss", requireAuth, async (req: Request, res: R
     const data = await myob.getProfitAndLoss(params.toString());
     res.json(data);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    logger.error({ err: message }, "Error fetching MYOB Profit & Loss");
-    res.status(500).json({ error: "MYOB request failed", details: message });
+    handleMyobError(err, res, "profit-and-loss");
   }
 });
 
