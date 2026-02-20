@@ -94,8 +94,9 @@ router.get("/api/email-templates/:id", requireAuth, async (req: Request, res: Re
     const companyId = (req as any).companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
 
+    const templateId = String(req.params.id);
     const [template] = await db.select().from(emailTemplates)
-      .where(and(eq(emailTemplates.id, req.params.id), eq(emailTemplates.companyId, companyId)))
+      .where(and(eq(emailTemplates.id, templateId), eq(emailTemplates.companyId, companyId)))
       .limit(1);
 
     if (!template) return res.status(404).json({ error: "Template not found" });
@@ -141,15 +142,16 @@ router.patch("/api/email-templates/:id", requireRole("ADMIN", "MANAGER"), async 
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
 
+    const templateId = String(req.params.id);
     const [existing] = await db.select({ id: emailTemplates.id }).from(emailTemplates)
-      .where(and(eq(emailTemplates.id, req.params.id), eq(emailTemplates.companyId, companyId)))
+      .where(and(eq(emailTemplates.id, templateId), eq(emailTemplates.companyId, companyId)))
       .limit(1);
 
     if (!existing) return res.status(404).json({ error: "Template not found" });
 
     const [updated] = await db.update(emailTemplates)
       .set({ ...parsed.data, updatedAt: new Date() })
-      .where(eq(emailTemplates.id, req.params.id))
+      .where(eq(emailTemplates.id, templateId))
       .returning();
 
     res.json(updated);
@@ -164,13 +166,14 @@ router.delete("/api/email-templates/:id", requireRole("ADMIN"), async (req: Requ
     const companyId = (req as any).companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
 
+    const templateId = String(req.params.id);
     const [existing] = await db.select({ id: emailTemplates.id }).from(emailTemplates)
-      .where(and(eq(emailTemplates.id, req.params.id), eq(emailTemplates.companyId, companyId)))
+      .where(and(eq(emailTemplates.id, templateId), eq(emailTemplates.companyId, companyId)))
       .limit(1);
 
     if (!existing) return res.status(404).json({ error: "Template not found" });
 
-    await db.delete(emailTemplates).where(eq(emailTemplates.id, req.params.id));
+    await db.delete(emailTemplates).where(eq(emailTemplates.id, templateId));
 
     res.json({ success: true });
   } catch (err) {
