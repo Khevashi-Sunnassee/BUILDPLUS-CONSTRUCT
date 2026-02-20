@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAuth } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { eq, and, desc, sql, ilike, or, count } from "drizzle-orm";
+import { eq, and, desc, asc, sql, ilike, or, count } from "drizzle-orm";
 import crypto from "crypto";
 import multer from "multer";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
@@ -107,6 +107,8 @@ router.get("/api/drafting-inbox/emails", requireAuth, async (req: Request, res: 
     const offset = parseInt(req.query.offset as string) || 0;
     const status = req.query.status as string | undefined;
     const q = req.query.q as string | undefined;
+    const sortBy = req.query.sortBy as string | undefined;
+    const sortOrder = req.query.sortOrder === "asc" ? "asc" : "desc";
 
     const conditions: any[] = [eq(draftingInboundEmails.companyId, companyId)];
 
@@ -152,7 +154,19 @@ router.get("/api/drafting-inbox/emails", requireAuth, async (req: Request, res: 
         .from(draftingInboundEmails)
         .leftJoin(jobs, eq(draftingInboundEmails.jobId, jobs.id))
         .where(whereClause)
-        .orderBy(desc(draftingInboundEmails.createdAt))
+        .orderBy((() => {
+          const sortFn = sortOrder === "asc" ? asc : desc;
+          const sortColumns: Record<string, any> = {
+            fromAddress: draftingInboundEmails.fromAddress,
+            subject: draftingInboundEmails.subject,
+            status: draftingInboundEmails.status,
+            requestType: draftingInboundEmails.requestType,
+            impactArea: draftingInboundEmails.impactArea,
+            createdAt: draftingInboundEmails.createdAt,
+          };
+          const col = sortBy && sortColumns[sortBy] ? sortColumns[sortBy] : draftingInboundEmails.createdAt;
+          return sortFn(col);
+        })())
         .limit(limit)
         .offset(offset),
       db

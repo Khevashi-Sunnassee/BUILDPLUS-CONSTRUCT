@@ -564,9 +564,21 @@ export default function DraftingEmailsPage({ embedded = false }: { embedded?: bo
                         Subject <SortIcon column="subject" />
                       </button>
                     </TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Impact</TableHead>
+                    <TableHead>
+                      <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("status")} data-testid="sort-drafting-status">
+                        Status <SortIcon column="status" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("requestType")} data-testid="sort-drafting-type">
+                        Type <SortIcon column="requestType" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("impactArea")} data-testid="sort-drafting-impact">
+                        Impact <SortIcon column="impactArea" />
+                      </button>
+                    </TableHead>
                     <TableHead>Job</TableHead>
                     <TableHead className="text-center">Attachments</TableHead>
                     <TableHead>
