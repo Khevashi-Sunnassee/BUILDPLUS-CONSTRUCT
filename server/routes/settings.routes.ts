@@ -4,6 +4,9 @@ import sanitizeHtml from "sanitize-html";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { getDefaultTemplate, clearBrandingCache } from "../lib/email-template";
+import { db } from "../db";
+import { companies } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -119,6 +122,59 @@ router.post("/api/admin/settings/company-name", requireRole("ADMIN"), async (req
     res.json({ success: true, companyName: settings.companyName });
   } catch (error: unknown) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Failed to save company name" });
+  }
+});
+
+const companyDetailsSchema = z.object({
+  abn: z.string().max(20).optional().nullable(),
+  acn: z.string().max(20).optional().nullable(),
+  address: z.string().max(500).optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+});
+
+router.get("/api/admin/settings/company-details", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId as string;
+    const [company] = await db.select({
+      abn: companies.abn,
+      acn: companies.acn,
+      address: companies.address,
+      phone: companies.phone,
+    }).from(companies).where(eq(companies.id, companyId)).limit(1);
+    if (!company) return res.status(404).json({ error: "Company not found" });
+    res.json(company);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch company details" });
+  }
+});
+
+router.patch("/api/admin/settings/company-details", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId as string;
+    const parsed = companyDetailsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+    }
+
+    const updates: Record<string, any> = { updatedAt: new Date() };
+    if (parsed.data.abn !== undefined) updates.abn = parsed.data.abn?.trim() || null;
+    if (parsed.data.acn !== undefined) updates.acn = parsed.data.acn?.trim() || null;
+    if (parsed.data.address !== undefined) updates.address = parsed.data.address?.trim() || null;
+    if (parsed.data.phone !== undefined) updates.phone = parsed.data.phone?.trim() || null;
+
+    const [updated] = await db.update(companies)
+      .set(updates)
+      .where(eq(companies.id, companyId))
+      .returning({
+        abn: companies.abn,
+        acn: companies.acn,
+        address: companies.address,
+        phone: companies.phone,
+      });
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update company details" });
   }
 });
 

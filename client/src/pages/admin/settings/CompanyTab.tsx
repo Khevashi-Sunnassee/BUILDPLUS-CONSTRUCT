@@ -1,4 +1,5 @@
-import { Save, Loader2, Upload, Trash2, Building2, FileText, Plus, Pencil, Users, Hash } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Save, Loader2, Upload, Trash2, Building2, FileText, Plus, Pencil, Users, Hash, MapPin, Phone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,11 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { TabsContent } from "@/components/ui/tabs";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { UseMutationResult } from "@tanstack/react-query";
 import type { GlobalSettings, Department } from "@shared/schema";
 
@@ -174,6 +179,8 @@ export function CompanyTab({
           </div>
         </CardContent>
       </Card>
+
+      <CompanyDetailsCard />
 
       <Card>
         <CardHeader>
@@ -381,5 +388,147 @@ export function CompanyTab({
         </CardContent>
       </Card>
     </TabsContent>
+  );
+}
+
+interface CompanyDetails {
+  abn: string | null;
+  acn: string | null;
+  address: string | null;
+  phone: string | null;
+}
+
+function CompanyDetailsCard() {
+  const { toast } = useToast();
+  const [abn, setAbn] = useState("");
+  const [acn, setAcn] = useState("");
+  const [address, setAddress] = useState("");
+  const [phone, setPhone] = useState("");
+
+  const { data: details, isLoading } = useQuery<CompanyDetails>({
+    queryKey: ["/api/admin/settings/company-details"],
+  });
+
+  useEffect(() => {
+    if (details) {
+      setAbn(details.abn || "");
+      setAcn(details.acn || "");
+      setAddress(details.address || "");
+      setPhone(details.phone || "");
+    }
+  }, [details]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: Partial<CompanyDetails>) => {
+      const res = await apiRequest("PATCH", "/api/admin/settings/company-details", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/company-details"] });
+      toast({ title: "Company details saved" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const hasChanges = abn !== (details?.abn || "") ||
+    acn !== (details?.acn || "") ||
+    address !== (details?.address || "") ||
+    phone !== (details?.phone || "");
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="h-5 w-5" aria-hidden="true" />
+          Company Details
+        </CardTitle>
+        <CardDescription>
+          Business registration numbers and head office contact information
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="companyAbn">ABN (Australian Business Number)</Label>
+                <Input
+                  id="companyAbn"
+                  value={abn}
+                  onChange={(e) => setAbn(e.target.value)}
+                  placeholder="e.g. 12 345 678 901"
+                  maxLength={20}
+                  data-testid="input-company-abn"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="companyAcn">ACN (Australian Company Number)</Label>
+                <Input
+                  id="companyAcn"
+                  value={acn}
+                  onChange={(e) => setAcn(e.target.value)}
+                  placeholder="e.g. 123 456 789"
+                  maxLength={20}
+                  data-testid="input-company-acn"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="companyAddress" className="flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5" />
+                Head Office Address
+              </Label>
+              <Textarea
+                id="companyAddress"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="e.g. Level 1, 123 Collins Street, Melbourne VIC 3000"
+                rows={2}
+                maxLength={500}
+                data-testid="input-company-address"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="companyPhone" className="flex items-center gap-1">
+                <Phone className="h-3.5 w-3.5" />
+                Telephone Number
+              </Label>
+              <Input
+                id="companyPhone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="e.g. (03) 9123 4567"
+                maxLength={50}
+                data-testid="input-company-phone"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => saveMutation.mutate({ abn, acn, address, phone })}
+              disabled={saveMutation.isPending || !hasChanges}
+              data-testid="button-save-company-details"
+            >
+              {saveMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save Company Details
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }

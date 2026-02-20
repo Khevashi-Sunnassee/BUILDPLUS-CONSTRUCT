@@ -48,6 +48,7 @@ export const companies = pgTable("companies", {
   email: text("email"),
   website: text("website"),
   abn: text("abn"),
+  acn: text("acn"),
   apInboxEmail: varchar("ap_inbox_email", { length: 255 }),
   tenderInboxEmail: varchar("tender_inbox_email", { length: 255 }),
   draftingInboxEmail: varchar("drafting_inbox_email", { length: 255 }),
