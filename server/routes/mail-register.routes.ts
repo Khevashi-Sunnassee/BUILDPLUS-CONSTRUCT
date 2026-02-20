@@ -261,7 +261,6 @@ mailRegisterRouter.post("/api/mail-register", requireAuth, async (req, res) => {
       subject: `[${mailNumber}] ${data.subject}`,
       htmlBody,
       status: "QUEUED",
-      queuedAt: new Date(),
     });
 
     emailDispatchService.enqueueMailRegister({

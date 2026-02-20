@@ -80,9 +80,10 @@ The system employs a client-server architecture. The frontend is a React applica
 - Auth coverage: 100% business routes (only help, address-lookup, public docs, webhooks, agent exempt)
 - Company isolation: 100% business data routes (only help, address-lookup, public docs exempt)
 - Zod validation: 97 route files, Query limits: all list endpoints with .limit() safeguards
-- 41 test files, 1,550+ tests, 0 failures, 0 skipped
-- 500 indexes, 477 foreign keys, 37 CHECK constraints
-- Frontend: 285 pages, 0 pages over 1000 LOC (5 largest split into sub-components), 31 shared components + shadcn/ui library
+- 42 test files, 1,744 tests, 0 failures, 0 skipped
+- 513 indexes, 486 foreign keys, 37 CHECK constraints
+- Frontend: 207 page files, 0 pages over 1000 LOC (5 largest split into sub-components), 32 shared components + 64 shadcn/ui components
+- 188 DB tables, 5,598-line schema
 - 15 route directories with sub-routers: documents, tender, project-activities, jobs, scopes, data-management, budget, cost-codes, checklist, assets, progress-claims, ap-inbox, procurement, drafting-inbox, ap-invoices
 
 ## Recent Changes
