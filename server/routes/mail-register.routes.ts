@@ -340,19 +340,21 @@ mailRegisterRouter.post("/api/mail-register/:id/retry", requireAuth, async (req,
     let retryFromName: string | undefined;
     let retryReplyTo: string | undefined;
 
+    let retryInbox: typeof companyEmailInboxes.$inferSelect | undefined;
+
     if (entry.fromInboxId) {
       const [inbox] = await db.select()
         .from(companyEmailInboxes)
-        .where(and(eq(companyEmailInboxes.id, entry.fromInboxId), eq(companyEmailInboxes.isActive, true)))
+        .where(and(
+          eq(companyEmailInboxes.id, entry.fromInboxId),
+          eq(companyEmailInboxes.companyId, companyId),
+          eq(companyEmailInboxes.isActive, true)
+        ))
         .limit(1);
-      if (inbox) {
-        retryFromEmail = inbox.emailAddress;
-        retryFromName = inbox.displayName || undefined;
-        retryReplyTo = inbox.replyToAddress || inbox.emailAddress;
-      }
+      if (inbox) retryInbox = inbox;
     }
 
-    if (!retryFromEmail) {
+    if (!retryInbox) {
       const [defaultInbox] = await db.select()
         .from(companyEmailInboxes)
         .where(and(
@@ -362,11 +364,25 @@ mailRegisterRouter.post("/api/mail-register/:id/retry", requireAuth, async (req,
           eq(companyEmailInboxes.isActive, true)
         ))
         .limit(1);
-      if (defaultInbox) {
-        retryFromEmail = defaultInbox.emailAddress;
-        retryFromName = defaultInbox.displayName || undefined;
-        retryReplyTo = defaultInbox.replyToAddress || defaultInbox.emailAddress;
-      }
+      if (defaultInbox) retryInbox = defaultInbox;
+    }
+
+    if (!retryInbox) {
+      const [anyGeneralInbox] = await db.select()
+        .from(companyEmailInboxes)
+        .where(and(
+          eq(companyEmailInboxes.companyId, companyId),
+          eq(companyEmailInboxes.inboxType, "GENERAL"),
+          eq(companyEmailInboxes.isActive, true)
+        ))
+        .limit(1);
+      if (anyGeneralInbox) retryInbox = anyGeneralInbox;
+    }
+
+    if (retryInbox) {
+      retryFromEmail = retryInbox.emailAddress;
+      retryFromName = retryInbox.displayName || undefined;
+      retryReplyTo = retryInbox.replyToAddress || retryInbox.emailAddress;
     }
 
     emailDispatchService.enqueueMailRegister({
