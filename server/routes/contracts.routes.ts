@@ -10,6 +10,7 @@ import mammoth from "mammoth";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import crypto from "crypto";
 import logger from "../lib/logger";
+import { validateUploads } from "../middleware/file-validation";
 
 const router = Router();
 
@@ -231,7 +232,7 @@ router.patch("/api/contracts/:id", requireAuth, async (req: Request, res: Respon
   }
 });
 
-router.post("/api/contracts/ai-analyze", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
+router.post("/api/contracts/ai-analyze", requireAuth, upload.single("file"), validateUploads(), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
     const file = req.file;

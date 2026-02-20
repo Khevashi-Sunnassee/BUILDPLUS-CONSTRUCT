@@ -7,6 +7,7 @@ import { requirePermission } from "./middleware/permissions.middleware";
 import { tasks, taskAssignees, taskGroups, jobs, permissionTypes, FUNCTION_KEYS } from "@shared/schema";
 import type { FunctionKey, PermissionLevel } from "@shared/schema";
 import logger from "../lib/logger";
+import { strongPasswordSchema, optionalStrongPasswordSchema } from "../lib/security";
 
 const router = Router();
 
@@ -121,7 +122,7 @@ const createUserSchema = z.object({
   name: z.string().optional(),
   phone: z.string().min(1, "Phone number is required"),
   address: z.string().min(1, "Address is required"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: strongPasswordSchema,
   role: z.enum(["USER", "MANAGER", "ADMIN"]).default("USER"),
   userType: z.enum(["EMPLOYEE", "EXTERNAL"]).default("EMPLOYEE"),
   departmentId: z.string().nullable().optional(),
@@ -135,7 +136,7 @@ const updateUserSchema = z.object({
   name: z.string().nullable().optional(),
   phone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
-  password: z.string().min(6).optional().or(z.literal("")),
+  password: optionalStrongPasswordSchema,
   role: z.enum(["USER", "MANAGER", "ADMIN"]).optional(),
   userType: z.enum(["EMPLOYEE", "EXTERNAL"]).optional(),
   departmentId: z.string().nullable().optional(),

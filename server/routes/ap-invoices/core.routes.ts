@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { requireAuth } from "../middleware/auth.middleware";
 import logger from "../../lib/logger";
+import { validateUploads } from "../../middleware/file-validation";
 import { eq, and, desc, asc, sql, ilike, or, inArray, count } from "drizzle-orm";
 import crypto from "crypto";
 import {
@@ -383,7 +384,7 @@ export function registerCoreRoutes(router: Router, deps: SharedDeps): void {
     }
   });
 
-  router.post("/api/ap-invoices/upload", requireAuth, upload.array("files", 20), async (req: Request, res: Response) => {
+  router.post("/api/ap-invoices/upload", requireAuth, upload.array("files", 20), validateUploads(), async (req: Request, res: Response) => {
     try {
       const companyId = req.companyId;
       const userId = req.session.userId;

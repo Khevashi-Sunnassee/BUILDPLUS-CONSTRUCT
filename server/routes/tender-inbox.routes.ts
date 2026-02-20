@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { requireAuth } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
+import { validateUploads } from "../middleware/file-validation";
 import { db } from "../db";
 import { eq, and, desc, sql, ilike, or, count } from "drizzle-orm";
 import crypto from "crypto";
@@ -261,7 +262,7 @@ router.get("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, res
   }
 });
 
-router.post("/api/tender-inbox/upload", requireAuth, upload.array("files", 20), async (req: Request, res: Response) => {
+router.post("/api/tender-inbox/upload", requireAuth, upload.array("files", 20), validateUploads(), async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
     const userId = req.session.userId;

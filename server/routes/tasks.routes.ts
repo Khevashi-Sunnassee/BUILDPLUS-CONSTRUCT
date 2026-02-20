@@ -8,6 +8,7 @@ import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
+import { validateUploads } from "../middleware/file-validation";
 import { emailService } from "../services/email.service";
 import { buildBrandedEmail } from "../lib/email-template";
 import { parseEmailFile, summarizeEmailBody } from "../utils/email-parser";
@@ -636,7 +637,7 @@ router.get("/api/tasks/:id/files", requireAuth, requirePermission("tasks"), asyn
   }
 });
 
-router.post("/api/tasks/:id/files", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), upload.single("file"), async (req, res) => {
+router.post("/api/tasks/:id/files", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), upload.single("file"), validateUploads(), async (req, res) => {
   try {
     const companyId = req.companyId;
     const task = await storage.getTask(String(req.params.id));

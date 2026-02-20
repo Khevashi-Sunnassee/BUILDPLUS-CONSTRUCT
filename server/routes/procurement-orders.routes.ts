@@ -5,6 +5,7 @@ import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
+import { validateUploads } from "../middleware/file-validation";
 import { twilioService } from "../services/twilio.service";
 import { insertPurchaseOrderSchema, purchaseOrderItems, purchaseOrders, InsertPurchaseOrder, InsertPurchaseOrderItem } from "@shared/schema";
 import { db } from "../db";
@@ -431,7 +432,7 @@ router.get("/api/purchase-orders/:id/attachments", requireAuth, async (req, res)
   }
 });
 
-router.post("/api/purchase-orders/:id/attachments", requireAuth, upload.array("files", 10), async (req, res) => {
+router.post("/api/purchase-orders/:id/attachments", requireAuth, upload.array("files", 10), validateUploads(), async (req, res) => {
   try {
     const userId = req.session.userId;
     const files = req.files as Express.Multer.File[];

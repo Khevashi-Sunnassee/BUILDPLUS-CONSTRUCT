@@ -21,6 +21,7 @@ import { chatUpload } from "./chat.files";
 import { extractMentionUserIds } from "./chat.utils";
 import { documentRegisterService } from "../services/document-register.service";
 import logger from "../lib/logger";
+import { validateUploads } from "../middleware/file-validation";
 
 export const chatRouter = Router();
 
@@ -336,7 +337,7 @@ chatRouter.get("/conversations/:conversationId/messages", requireAuth, requireCh
   }
 });
 
-chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireChatPermission, chatUpload.array("files", 10), async (req, res) => {
+chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireChatPermission, chatUpload.array("files", 10), validateUploads(), async (req, res) => {
   try {
     const userId = req.session.userId!;
     const conversationId = String(req.params.conversationId);
@@ -446,7 +447,7 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
   }
 });
 
-chatRouter.post("/upload", requireAuth, requireChatPermission, chatUpload.single("file"), async (req, res) => {
+chatRouter.post("/upload", requireAuth, requireChatPermission, chatUpload.single("file"), validateUploads(), async (req, res) => {
   try {
     const userId = req.session.userId!;
 
