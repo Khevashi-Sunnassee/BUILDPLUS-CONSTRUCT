@@ -310,7 +310,7 @@ router.post("/api/production-slots/:slotId/assign-panels", requireAuth, requireP
       return res.status(404).json({ error: "Job not found for production slot" });
     }
     
-    const settings = await storage.getGlobalSettings(req.companyId);
+    const settings = await storage.getGlobalSettings(req.companyId as string);
     const productionWindowDays = job.productionWindowDays ?? settings?.productionWindowDays ?? 10;
     
     const dueDate = new Date(slot.productionSlotDate);

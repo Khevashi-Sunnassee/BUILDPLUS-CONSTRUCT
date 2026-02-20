@@ -163,11 +163,14 @@ router.get("/api/load-lists", requireAuth, requirePermission("logistics"), async
         .from(loadListPanels)
         .innerJoin(panelRegister, eq(loadListPanels.panelId, panelRegister.id))
         .where(inArray(loadListPanels.loadListId, loadListIds))
-        .orderBy(asc(loadListPanels.sequence)),
+        .orderBy(asc(loadListPanels.sequence))
+        .limit(1000),
       db.select().from(deliveryRecords)
-        .where(inArray(deliveryRecords.loadListId, loadListIds)),
+        .where(inArray(deliveryRecords.loadListId, loadListIds))
+        .limit(1000),
       db.select().from(loadReturns)
-        .where(inArray(loadReturns.loadListId, loadListIds)),
+        .where(inArray(loadReturns.loadListId, loadListIds))
+        .limit(1000),
     ]);
 
     const panelsByLoadList = new Map<string, typeof allPanelRows>();

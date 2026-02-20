@@ -118,7 +118,8 @@ router.get("/api/daily-logs", requireAuth, requirePermission("daily_reports"), a
     const allRows = await db.select().from(logRows)
       .leftJoin(jobs, eq(logRows.jobId, jobs.id))
       .where(inArray(logRows.dailyLogId, pageIds))
-      .orderBy(asc(logRows.startAt));
+      .orderBy(asc(logRows.startAt))
+      .limit(1000);
 
     const rowsByLogId = new Map<string, Array<typeof allRows[number]>>();
     for (const row of allRows) {
@@ -254,7 +255,8 @@ router.get("/api/daily-logs/submitted", requireRole("MANAGER", "ADMIN"), async (
     const allRows = await db.select().from(logRows)
       .leftJoin(jobs, eq(logRows.jobId, jobs.id))
       .where(inArray(logRows.dailyLogId, pageIds))
-      .orderBy(asc(logRows.startAt));
+      .orderBy(asc(logRows.startAt))
+      .limit(1000);
 
     const rowsByLogId = new Map<string, Array<typeof allRows[number]>>();
     for (const row of allRows) {

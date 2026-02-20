@@ -1,9 +1,10 @@
 import { Router, Request, Response } from "express";
 import { australianSuburbs, SuburbEntry } from "../data/australian-suburbs";
+import { requireAuth } from "./middleware/auth.middleware";
 
 const router = Router();
 
-router.get("/api/address-lookup", (req: Request, res: Response) => {
+router.get("/api/address-lookup", requireAuth, (req: Request, res: Response) => {
   const query = (req.query.q as string || "").trim().toLowerCase();
   if (!query || query.length < 2) {
     return res.json([]);

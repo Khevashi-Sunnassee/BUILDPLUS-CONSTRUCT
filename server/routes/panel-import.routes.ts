@@ -143,7 +143,7 @@ router.post("/api/panels/admin/import", requireRole("ADMIN"), async (req: Reques
       const panelMark = String(row.panelMark || row["Panel Mark"] || row.panel_mark || row["Mark"] || "").trim();
       
       return {
-        jobId: resolvedJob.id,
+        jobId: resolvedJob!.id,
         panelMark,
         panelType,
         description: row.description || row["Description"] || null,
@@ -167,7 +167,7 @@ router.post("/api/panels/admin/import", requireRole("ADMIN"), async (req: Reques
         estimatedHours: row.estimatedHours || row["Estimated Hours"] || row.estimated_hours ? Number(row.estimatedHours || row["Estimated Hours"] || row.estimated_hours) : null,
         status: "NOT_STARTED" as const,
         // New detailed fields - all from row data
-        numRebates: row.numRebates || row["Num Rebates"] ? parseInt(row.numRebates || row["Num Rebates"]) || null : null,
+        numRebates: row.numRebates || row["Num Rebates"] ? parseInt(String(row.numRebates || row["Num Rebates"])) || null : null,
         fireRate: row.fireRate || row["Fire Rate"] || null,
         caulkingFire: row.caulkingFire || row["Caulking Fire"] || null,
         openings: row.openings || row["Openings"] || null,
@@ -712,13 +712,13 @@ router.post("/api/jobs/:jobId/import-estimate",
             rowData[field] = row[Number(colIdx)];
           });
           
-          const thickness = parseFloat(rowData.thickness) || null;
-          const width = parseFloat(rowData.width) || null;
-          const height = parseFloat(rowData.height) || null;
-          const areaM2 = parseFloat(rowData.areaM2) || null;
-          const volumeM3 = parseFloat(rowData.volumeM3) || null;
-          const weightT = parseFloat(rowData.weightT) || null;
-          const qty = parseInt(rowData.qty) || 1;
+          const thickness = parseFloat(String(rowData.thickness)) || null;
+          const width = parseFloat(String(rowData.width)) || null;
+          const height = parseFloat(String(rowData.height)) || null;
+          const areaM2 = parseFloat(String(rowData.areaM2)) || null;
+          const volumeM3 = parseFloat(String(rowData.volumeM3)) || null;
+          const weightT = parseFloat(String(rowData.weightT)) || null;
+          const qty = parseInt(String(rowData.qty)) || 1;
           const concreteStrength = String(rowData.concreteStrength || "");
           
           const thicknessMm = thickness ? (thickness < 1 ? thickness * 1000 : thickness) : null;
@@ -782,7 +782,7 @@ router.post("/api/jobs/:jobId/import-estimate",
             sourceRow: sourceRowNum, panelSourceId,
             source: 3, status: "PENDING" as const,
             // New detailed fields
-            numRebates: rowData.rebates ? parseInt(rowData.rebates) || null : null,
+            numRebates: rowData.rebates ? parseInt(String(rowData.rebates)) || null : null,
             fireRate: rowData.fireRate || null,
             caulkingFire: rowData.caulkingFire || null,
             openings: rowData.openings || null,
