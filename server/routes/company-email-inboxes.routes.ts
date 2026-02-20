@@ -78,13 +78,17 @@ companyEmailInboxesRouter.post("/api/company-email-inboxes", requireRole("ADMIN"
     }
 
     if (data.isDefault) {
-      await db.update(companyEmailInboxes)
-        .set({ isDefault: false, updatedAt: new Date() })
+      const [existingDefault] = await db.select({ id: companyEmailInboxes.id })
+        .from(companyEmailInboxes)
         .where(and(
           eq(companyEmailInboxes.companyId, companyId),
           eq(companyEmailInboxes.inboxType, data.inboxType),
           eq(companyEmailInboxes.isDefault, true)
-        ));
+        ))
+        .limit(1);
+      if (existingDefault) {
+        return res.status(409).json({ error: `A default ${data.inboxType} inbox already exists. Please remove the existing default before setting a new one.` });
+      }
     }
 
     const [inbox] = await db.insert(companyEmailInboxes).values({
@@ -145,14 +149,18 @@ companyEmailInboxesRouter.patch("/api/company-email-inboxes/:id", requireRole("A
     if (data.isActive !== undefined) updates.isActive = data.isActive;
 
     if (data.isDefault === true) {
-      await db.update(companyEmailInboxes)
-        .set({ isDefault: false, updatedAt: new Date() })
+      const [existingDefault] = await db.select({ id: companyEmailInboxes.id })
+        .from(companyEmailInboxes)
         .where(and(
           eq(companyEmailInboxes.companyId, companyId),
           eq(companyEmailInboxes.inboxType, existing.inboxType),
           eq(companyEmailInboxes.isDefault, true),
           ne(companyEmailInboxes.id, inboxId)
-        ));
+        ))
+        .limit(1);
+      if (existingDefault) {
+        return res.status(409).json({ error: `A default ${existing.inboxType} inbox already exists. Please remove the existing default before setting a new one.` });
+      }
       updates.isDefault = true;
     } else if (data.isDefault === false) {
       updates.isDefault = false;
