@@ -217,6 +217,8 @@ mailRegisterRouter.post("/api/mail-register", requireAuth, async (req, res) => {
     let fromEmail: string | undefined;
     let fromName: string | undefined;
     let replyTo: string | undefined;
+    let resolvedInbox: typeof companyEmailInboxes.$inferSelect | undefined;
+
     if (data.fromInboxId) {
       const [inbox] = await db.select()
         .from(companyEmailInboxes)
@@ -226,11 +228,38 @@ mailRegisterRouter.post("/api/mail-register", requireAuth, async (req, res) => {
           eq(companyEmailInboxes.isActive, true)
         ))
         .limit(1);
-      if (inbox) {
-        fromEmail = inbox.emailAddress;
-        fromName = inbox.displayName || undefined;
-        replyTo = inbox.replyToAddress || inbox.emailAddress;
-      }
+      if (inbox) resolvedInbox = inbox;
+    }
+
+    if (!resolvedInbox) {
+      const [defaultInbox] = await db.select()
+        .from(companyEmailInboxes)
+        .where(and(
+          eq(companyEmailInboxes.companyId, companyId),
+          eq(companyEmailInboxes.inboxType, "GENERAL"),
+          eq(companyEmailInboxes.isDefault, true),
+          eq(companyEmailInboxes.isActive, true)
+        ))
+        .limit(1);
+      if (defaultInbox) resolvedInbox = defaultInbox;
+    }
+
+    if (!resolvedInbox) {
+      const [anyGeneralInbox] = await db.select()
+        .from(companyEmailInboxes)
+        .where(and(
+          eq(companyEmailInboxes.companyId, companyId),
+          eq(companyEmailInboxes.inboxType, "GENERAL"),
+          eq(companyEmailInboxes.isActive, true)
+        ))
+        .limit(1);
+      if (anyGeneralInbox) resolvedInbox = anyGeneralInbox;
+    }
+
+    if (resolvedInbox) {
+      fromEmail = resolvedInbox.emailAddress;
+      fromName = resolvedInbox.displayName || undefined;
+      replyTo = resolvedInbox.replyToAddress || resolvedInbox.emailAddress;
     }
 
     const [entry] = await db.insert(mailRegister).values({
@@ -307,6 +336,39 @@ mailRegisterRouter.post("/api/mail-register/:id/retry", requireAuth, async (req,
       .set({ status: "QUEUED", lastError: null, retryCount: 0, queuedAt: new Date(), updatedAt: new Date() })
       .where(eq(mailRegister.id, entry.id));
 
+    let retryFromEmail: string | undefined;
+    let retryFromName: string | undefined;
+    let retryReplyTo: string | undefined;
+
+    if (entry.fromInboxId) {
+      const [inbox] = await db.select()
+        .from(companyEmailInboxes)
+        .where(and(eq(companyEmailInboxes.id, entry.fromInboxId), eq(companyEmailInboxes.isActive, true)))
+        .limit(1);
+      if (inbox) {
+        retryFromEmail = inbox.emailAddress;
+        retryFromName = inbox.displayName || undefined;
+        retryReplyTo = inbox.replyToAddress || inbox.emailAddress;
+      }
+    }
+
+    if (!retryFromEmail) {
+      const [defaultInbox] = await db.select()
+        .from(companyEmailInboxes)
+        .where(and(
+          eq(companyEmailInboxes.companyId, companyId),
+          eq(companyEmailInboxes.inboxType, "GENERAL"),
+          eq(companyEmailInboxes.isDefault, true),
+          eq(companyEmailInboxes.isActive, true)
+        ))
+        .limit(1);
+      if (defaultInbox) {
+        retryFromEmail = defaultInbox.emailAddress;
+        retryFromName = defaultInbox.displayName || undefined;
+        retryReplyTo = defaultInbox.replyToAddress || defaultInbox.emailAddress;
+      }
+    }
+
     emailDispatchService.enqueueMailRegister({
       mailRegisterId: entry.id,
       companyId,
@@ -315,6 +377,9 @@ mailRegisterRouter.post("/api/mail-register/:id/retry", requireAuth, async (req,
       subject: `[${entry.mailNumber}] ${entry.subject}`,
       htmlBody: entry.htmlBody,
       userId: req.session.userId!,
+      fromEmail: retryFromEmail,
+      fromName: retryFromName,
+      replyTo: retryReplyTo,
     }).catch((err) => {
       logger.error({ err, mailNumber: entry.mailNumber }, "[MailRegister] Failed to enqueue retry");
     });
