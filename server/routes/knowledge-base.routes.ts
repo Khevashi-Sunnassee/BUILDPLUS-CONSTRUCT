@@ -306,6 +306,8 @@ router.post("/api/kb/projects/:projectId/documents/upload", requireAuth, kbUploa
       rawText = file.buffer.toString("utf-8");
     }
 
+    rawText = rawText.replace(/\0/g, "");
+
     if (!rawText.trim()) {
       return res.status(400).json({ error: "Could not extract text from file. Try pasting the content directly." });
     }
