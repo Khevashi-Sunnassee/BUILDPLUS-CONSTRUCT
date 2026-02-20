@@ -102,6 +102,8 @@ class EmailService {
       contentType: string;
     }>;
     replyTo?: string;
+    fromEmail?: string;
+    fromName?: string;
     skipRateLimit?: boolean;
   }): Promise<{ success: boolean; messageId?: string; error?: string; retryable?: boolean }> {
     type EmailResult = { success: boolean; messageId?: string; error?: string; retryable?: boolean };
@@ -111,7 +113,7 @@ class EmailService {
           await resendRateLimiter.acquire();
         }
 
-        const { client, fromEmail } = await getResendClient();
+        const { client, fromEmail: defaultFromEmail } = await getResendClient();
 
         const resendAttachments = options.attachments?.map((att) => ({
           filename: att.filename,
@@ -119,8 +121,17 @@ class EmailService {
           content_type: att.contentType,
         }));
 
+        let fromAddress: string;
+        if (options.fromEmail) {
+          fromAddress = options.fromName
+            ? `${options.fromName} <${options.fromEmail}>`
+            : options.fromEmail;
+        } else {
+          fromAddress = defaultFromEmail;
+        }
+
         const sendOptions: any = {
-          from: fromEmail,
+          from: fromAddress,
           to: options.to.split(",").map((e) => e.trim()),
           subject: options.subject,
           html: options.body,

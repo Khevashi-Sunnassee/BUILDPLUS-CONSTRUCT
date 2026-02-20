@@ -66,6 +66,30 @@ export const insertCompanySchema = createInsertSchema(companies).omit({ id: true
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type Company = typeof companies.$inferSelect;
 
+export const inboxTypeEnum = pgEnum("inbox_type", ["DRAFTING", "TENDER", "AP_INVOICES", "GENERAL"]);
+
+export const companyEmailInboxes = pgTable("company_email_inboxes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  inboxType: inboxTypeEnum("inbox_type").notNull(),
+  emailAddress: varchar("email_address", { length: 255 }).notNull(),
+  displayName: varchar("display_name", { length: 255 }).notNull(),
+  replyToAddress: varchar("reply_to_address", { length: 255 }),
+  isDefault: boolean("is_default").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("company_email_inboxes_company_idx").on(table.companyId),
+  companyTypeIdx: index("company_email_inboxes_company_type_idx").on(table.companyId, table.inboxType),
+  emailIdx: uniqueIndex("company_email_inboxes_email_idx").on(table.emailAddress),
+  activeIdx: index("company_email_inboxes_active_idx").on(table.companyId, table.isActive),
+}));
+
+export const insertCompanyEmailInboxSchema = createInsertSchema(companyEmailInboxes).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCompanyEmailInbox = z.infer<typeof insertCompanyEmailInboxSchema>;
+export type CompanyEmailInbox = typeof companyEmailInboxes.$inferSelect;
+
 export const departments = pgTable("departments", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
@@ -5403,6 +5427,7 @@ export const mailRegister = pgTable("mail_register", {
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   mailNumber: varchar("mail_number", { length: 50 }).notNull(),
   mailTypeId: varchar("mail_type_id", { length: 36 }).notNull().references(() => mailTypes.id),
+  fromInboxId: varchar("from_inbox_id", { length: 36 }).references(() => companyEmailInboxes.id),
   jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
   taskId: varchar("task_id", { length: 36 }).references(() => tasks.id),
   toAddresses: text("to_addresses").notNull(),
@@ -5434,6 +5459,7 @@ export const mailRegister = pgTable("mail_register", {
   jobIdx: index("mail_register_job_idx").on(table.jobId),
   sentByIdx: index("mail_register_sent_by_idx").on(table.sentById),
   statusIdx: index("mail_register_status_idx").on(table.status),
+  fromInboxIdx: index("mail_register_from_inbox_idx").on(table.fromInboxId),
 }));
 
 export const insertMailRegisterSchema = createInsertSchema(mailRegister).omit({ id: true, createdAt: true, updatedAt: true, sentAt: true });

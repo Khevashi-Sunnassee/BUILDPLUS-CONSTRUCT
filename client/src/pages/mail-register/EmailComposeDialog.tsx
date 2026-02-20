@@ -38,7 +38,9 @@ import {
   Loader2,
   CalendarIcon,
   Hash,
+  Inbox,
 } from "lucide-react";
+import type { CompanyEmailInbox } from "@shared/schema";
 
 interface MailType {
   id: string;
@@ -84,9 +86,15 @@ export function EmailComposeDialog({
   const [responseDueDate, setResponseDueDate] = useState<Date | undefined>();
   const [sendCopy, setSendCopy] = useState(false);
   const [generatedMailNumber, setGeneratedMailNumber] = useState("");
+  const [fromInboxId, setFromInboxId] = useState<string>("");
 
   const { data: mailTypes = [] } = useQuery<MailType[]>({
     queryKey: [MAIL_REGISTER_ROUTES.TYPES],
+    enabled: open,
+  });
+
+  const { data: activeInboxes = [] } = useQuery<CompanyEmailInbox[]>({
+    queryKey: ["/api/company-email-inboxes/active"],
     enabled: open,
   });
 
@@ -108,8 +116,11 @@ export function EmailComposeDialog({
       setResponseDueDate(undefined);
       setSendCopy(false);
       setGeneratedMailNumber("");
+      const defaultInbox = activeInboxes.find((i) => i.isDefault && i.inboxType === "GENERAL")
+        || activeInboxes.find((i) => i.isDefault);
+      setFromInboxId(defaultInbox?.id || "");
     }
-  }, [open, defaultSubject, defaultTo, defaultMessage]);
+  }, [open, defaultSubject, defaultTo, defaultMessage, activeInboxes]);
 
   useEffect(() => {
     if (mailTypeId && open) {
@@ -141,6 +152,7 @@ export function EmailComposeDialog({
         taskId: taskId || null,
         parentMailId: parentMailId || null,
         sendCopy,
+        fromInboxId: (fromInboxId && fromInboxId !== "default") ? fromInboxId : null,
       });
       return res.json();
     },
@@ -235,6 +247,28 @@ export function EmailComposeDialog({
                   </SelectContent>
                 </Select>
               </div>
+
+              {activeInboxes.length > 0 && (
+                <div className="space-y-2">
+                  <Label>From Inbox</Label>
+                  <Select value={fromInboxId} onValueChange={setFromInboxId} data-testid="select-from-inbox">
+                    <SelectTrigger data-testid="trigger-from-inbox">
+                      <SelectValue placeholder="Default (no-reply)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="default" data-testid="option-inbox-default">
+                        Default (no-reply)
+                      </SelectItem>
+                      {activeInboxes.map((inbox) => (
+                        <SelectItem key={inbox.id} value={inbox.id} data-testid={`option-inbox-${inbox.id}`}>
+                          {inbox.displayName ? `${inbox.displayName} <${inbox.emailAddress}>` : inbox.emailAddress}
+                          {inbox.isDefault ? " (Default)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>To</Label>

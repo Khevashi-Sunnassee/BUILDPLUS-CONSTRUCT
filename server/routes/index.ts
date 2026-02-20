@@ -67,6 +67,7 @@ import { draftingInboxRouter } from "./drafting-inbox.routes";
 import { emailTemplatesRouter } from "./email-templates.routes";
 import { knowledgeBaseRouter } from "./knowledge-base.routes";
 import { mailRegisterRouter } from "./mail-register.routes";
+import { companyEmailInboxesRouter } from "./company-email-inboxes.routes";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
@@ -196,6 +197,7 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(emailTemplatesRouter);
   app.use(knowledgeBaseRouter);
   app.use(mailRegisterRouter);
+  app.use(companyEmailInboxesRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);

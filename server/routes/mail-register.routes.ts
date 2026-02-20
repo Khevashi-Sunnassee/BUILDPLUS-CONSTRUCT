@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db";
-import { mailTypes, mailRegister, mailTypeSequences, companies, users, emailSendLogs } from "@shared/schema";
+import { mailTypes, mailRegister, mailTypeSequences, companies, users, emailSendLogs, companyEmailInboxes } from "@shared/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "./middleware/auth.middleware";
 import { z } from "zod";
@@ -183,6 +183,7 @@ const createMailSchema = z.object({
   taskId: z.string().nullable().optional(),
   parentMailId: z.string().nullable().optional(),
   sendCopy: z.boolean().optional(),
+  fromInboxId: z.string().nullable().optional(),
 });
 
 mailRegisterRouter.post("/api/mail-register", requireAuth, async (req, res) => {
@@ -213,6 +214,25 @@ mailRegisterRouter.post("/api/mail-register", requireAuth, async (req, res) => {
       bccAddress = sender?.email || undefined;
     }
 
+    let fromEmail: string | undefined;
+    let fromName: string | undefined;
+    let replyTo: string | undefined;
+    if (data.fromInboxId) {
+      const [inbox] = await db.select()
+        .from(companyEmailInboxes)
+        .where(and(
+          eq(companyEmailInboxes.id, data.fromInboxId),
+          eq(companyEmailInboxes.companyId, companyId),
+          eq(companyEmailInboxes.isActive, true)
+        ))
+        .limit(1);
+      if (inbox) {
+        fromEmail = inbox.emailAddress;
+        fromName = inbox.displayName || undefined;
+        replyTo = inbox.replyToAddress || inbox.emailAddress;
+      }
+    }
+
     const [entry] = await db.insert(mailRegister).values({
       companyId,
       mailNumber,
@@ -229,6 +249,7 @@ mailRegisterRouter.post("/api/mail-register", requireAuth, async (req, res) => {
       sentById: userId,
       threadId: parentThread || mailNumber,
       parentMailId: data.parentMailId || null,
+      fromInboxId: data.fromInboxId || null,
       queuedAt: new Date(),
     }).returning();
 
@@ -252,6 +273,9 @@ mailRegisterRouter.post("/api/mail-register", requireAuth, async (req, res) => {
       subject: `[${mailNumber}] ${data.subject}`,
       htmlBody,
       userId,
+      fromEmail,
+      fromName,
+      replyTo,
     }).catch((err) => {
       logger.error({ err, mailNumber }, "[MailRegister] Failed to enqueue email");
     });

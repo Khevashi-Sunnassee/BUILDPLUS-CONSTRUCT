@@ -16,6 +16,8 @@ interface EmailJobPayload {
   subject: string;
   htmlBody: string;
   replyTo?: string;
+  fromEmail?: string;
+  fromName?: string;
   attachments?: Array<{ filename: string; content: string; contentType: string }>;
   attempt: number;
   maxAttempts: number;
@@ -50,6 +52,9 @@ class EmailDispatchService {
     subject: string;
     htmlBody: string;
     userId: string;
+    fromEmail?: string;
+    fromName?: string;
+    replyTo?: string;
   }): Promise<string> {
     const quotaCheck = await this.checkCompanyQuota(params.companyId);
     if (!quotaCheck.allowed) {
@@ -69,9 +74,12 @@ class EmailDispatchService {
       bcc: params.bcc,
       subject: params.subject,
       htmlBody: params.htmlBody,
+      replyTo: params.replyTo,
       attempt: 1,
       maxAttempts: 3,
       userId: params.userId,
+      fromEmail: params.fromEmail,
+      fromName: params.fromName,
     };
 
     try {
@@ -171,6 +179,8 @@ class EmailDispatchService {
       subject: payload.subject,
       body: payload.htmlBody,
       replyTo: payload.replyTo,
+      fromEmail: payload.fromEmail,
+      fromName: payload.fromName,
       attachments,
     });
 
