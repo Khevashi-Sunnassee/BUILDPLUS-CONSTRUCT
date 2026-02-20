@@ -168,6 +168,7 @@ const AdminHelpPage = lazyWithRetry(() => import("@/pages/admin/help"));
 const PmCallLogsPage = lazyWithRetry(() => import("@/pages/pm-call-logs"));
 const PmCallLogFormPage = lazyWithRetry(() => import("@/pages/pm-call-log-form"));
 const PmCallLogDetailPage = lazyWithRetry(() => import("@/pages/pm-call-log-detail"));
+const KnowledgeBasePage = lazyWithRetry(() => import("@/pages/knowledge-base"));
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -1019,6 +1020,14 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminHelpPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/knowledge-base">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <KnowledgeBasePage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

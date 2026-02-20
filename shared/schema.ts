@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum, uniqueIndex, index, decimal, real, json, jsonb, numeric, check } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum, uniqueIndex, index, decimal, real, json, jsonb, numeric, check, vector } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -5369,3 +5369,110 @@ export const emailSendLogs = pgTable("email_send_logs", {
 export const insertEmailSendLogSchema = createInsertSchema(emailSendLogs).omit({ id: true, sentAt: true });
 export type InsertEmailSendLog = z.infer<typeof insertEmailSendLogSchema>;
 export type EmailSendLog = typeof emailSendLogs.$inferSelect;
+
+// ============================================================================
+// KNOWLEDGE BASE - AI ASSISTANT
+// ============================================================================
+export const kbDocStatusEnum = pgEnum("kb_doc_status", ["UPLOADED", "PROCESSING", "READY", "FAILED"]);
+export const kbSourceTypeEnum = pgEnum("kb_source_type", ["UPLOAD", "URL", "TEXT"]);
+export const kbMessageRoleEnum = pgEnum("kb_message_role", ["USER", "ASSISTANT", "SYSTEM"]);
+export const kbAnswerModeEnum = pgEnum("kb_answer_mode", ["KB_ONLY", "HYBRID"]);
+
+export const kbProjects = pgTable("kb_projects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("kb_projects_company_idx").on(table.companyId),
+  createdByIdx: index("kb_projects_created_by_idx").on(table.createdById),
+}));
+
+export const kbDocuments = pgTable("kb_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  projectId: varchar("project_id").notNull().references(() => kbProjects.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 500 }).notNull(),
+  sourceType: kbSourceTypeEnum("source_type").notNull().default("UPLOAD"),
+  storageKey: text("storage_key"),
+  mimeType: varchar("mime_type", { length: 100 }),
+  fileSize: integer("file_size"),
+  status: kbDocStatusEnum("status").notNull().default("UPLOADED"),
+  chunkCount: integer("chunk_count").default(0),
+  errorMessage: text("error_message"),
+  rawText: text("raw_text"),
+  checksum: varchar("checksum", { length: 64 }),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("kb_documents_company_idx").on(table.companyId),
+  projectIdx: index("kb_documents_project_idx").on(table.projectId),
+  statusIdx: index("kb_documents_status_idx").on(table.status),
+}));
+
+export const kbChunks = pgTable("kb_chunks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  projectId: varchar("project_id").notNull().references(() => kbProjects.id, { onDelete: "cascade" }),
+  documentId: varchar("document_id").notNull().references(() => kbDocuments.id, { onDelete: "cascade" }),
+  chunkIndex: integer("chunk_index").notNull(),
+  content: text("content").notNull(),
+  tokenCount: integer("token_count").notNull(),
+  embedding: vector("embedding", { dimensions: 1536 }),
+  metadata: jsonb("metadata").$type<{ page?: number; section?: string; headings?: string[] }>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  companyProjectIdx: index("kb_chunks_company_project_idx").on(table.companyId, table.projectId),
+  documentIdx: index("kb_chunks_document_idx").on(table.documentId),
+}));
+
+export const kbConversations = pgTable("kb_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  projectId: varchar("project_id").references(() => kbProjects.id, { onDelete: "set null" }),
+  title: varchar("title", { length: 255 }).notNull().default("New Chat"),
+  createdById: varchar("created_by_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("kb_conversations_company_idx").on(table.companyId),
+  projectIdx: index("kb_conversations_project_idx").on(table.projectId),
+  createdByIdx: index("kb_conversations_created_by_idx").on(table.createdById),
+}));
+
+export const kbMessages = pgTable("kb_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  conversationId: varchar("conversation_id").notNull().references(() => kbConversations.id, { onDelete: "cascade" }),
+  role: kbMessageRoleEnum("role").notNull(),
+  content: text("content").notNull(),
+  mode: kbAnswerModeEnum("mode"),
+  sourceChunkIds: jsonb("source_chunk_ids").$type<string[]>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  conversationIdx: index("kb_messages_conversation_idx").on(table.conversationId),
+  roleIdx: index("kb_messages_role_idx").on(table.role),
+}));
+
+export const insertKbProjectSchema = createInsertSchema(kbProjects).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertKbProject = z.infer<typeof insertKbProjectSchema>;
+export type KbProject = typeof kbProjects.$inferSelect;
+
+export const insertKbDocumentSchema = createInsertSchema(kbDocuments).omit({ id: true, createdAt: true, chunkCount: true, errorMessage: true });
+export type InsertKbDocument = z.infer<typeof insertKbDocumentSchema>;
+export type KbDocument = typeof kbDocuments.$inferSelect;
+
+export const insertKbChunkSchema = createInsertSchema(kbChunks).omit({ id: true, createdAt: true });
+export type InsertKbChunk = z.infer<typeof insertKbChunkSchema>;
+export type KbChunk = typeof kbChunks.$inferSelect;
+
+export const insertKbConversationSchema = createInsertSchema(kbConversations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertKbConversation = z.infer<typeof insertKbConversationSchema>;
+export type KbConversation = typeof kbConversations.$inferSelect;
+
+export const insertKbMessageSchema = createInsertSchema(kbMessages).omit({ id: true, createdAt: true });
+export type InsertKbMessage = z.infer<typeof insertKbMessageSchema>;
+export type KbMessage = typeof kbMessages.$inferSelect;

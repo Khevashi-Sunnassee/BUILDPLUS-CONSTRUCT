@@ -69,6 +69,7 @@ import {
   Receipt,
   Inbox,
   MailPlus,
+  Brain,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -106,6 +107,7 @@ const mainNavItems = [
   { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
   { title: "Broadcast", url: "/broadcast", icon: Radio },
   { title: "Help Center", url: "/help", icon: BookOpen },
+  { title: "Knowledge Base", url: "/knowledge-base", icon: Brain },
 ];
 
 const productionNavItems = [
