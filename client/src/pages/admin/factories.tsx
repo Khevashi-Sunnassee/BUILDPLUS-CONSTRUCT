@@ -128,7 +128,7 @@ function MapCenterUpdater({ center, zoom }: { center: [number, number]; zoom?: n
   return null;
 }
 
-export default function AdminFactoriesPage() {
+export default function AdminFactoriesPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingFactory, setEditingFactory] = useState<FactoryWithBeds | null>(null);
@@ -431,22 +431,33 @@ export default function AdminFactoriesPage() {
 
   return (
     <div className="space-y-6" role="main" aria-label="Factories Management">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Factory className="h-8 w-8 text-primary" />
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-semibold">Factory Management</h1>
-              <PageHelpButton pageHelpKey="page.admin.factories" />
+      {!embedded && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Factory className="h-8 w-8 text-primary" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-semibold">Factory Management</h1>
+                <PageHelpButton pageHelpKey="page.admin.factories" />
+              </div>
+              <p className="text-sm text-muted-foreground">Manage production facilities and their beds</p>
             </div>
-            <p className="text-sm text-muted-foreground">Manage production facilities and their beds</p>
           </div>
+          <Button onClick={openCreateDialog} data-testid="button-add-factory">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Factory
+          </Button>
         </div>
-        <Button onClick={openCreateDialog} data-testid="button-add-factory">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Factory
-        </Button>
-      </div>
+      )}
+      {embedded && (
+        <div className="flex items-center justify-between">
+          <div />
+          <Button onClick={openCreateDialog} data-testid="button-add-factory">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Factory
+          </Button>
+        </div>
+      )}
 
       {factories && factories.length > 0 && factories.some(f => f.latitude && f.longitude) && (
         <Card>

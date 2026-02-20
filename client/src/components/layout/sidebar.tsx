@@ -149,7 +149,6 @@ const managerNavItems = [
 const adminNavItems = [
   { title: "Settings", url: "/admin/settings", icon: Settings },
   { title: "Companies", url: "/admin/companies", icon: Building2 },
-  { title: "Factories", url: "/admin/factories", icon: Factory },
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
   { title: "Document Config", url: "/admin/document-config", icon: FileText },
   { title: "Checklist Templates", url: "/admin/checklist-templates", icon: ClipboardList },
@@ -206,7 +205,6 @@ const urlToFunctionKey: Record<string, string> = {
   "/reports": "daily_reports",
   "/admin/settings": "admin_settings",
   "/admin/companies": "admin_companies",
-  "/admin/factories": "admin_factories",
   "/admin/panel-types": "admin_panel_types",
   "/admin/document-config": "admin_document_config",
   "/admin/checklist-templates": "admin_checklist_templates",

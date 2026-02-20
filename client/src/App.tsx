@@ -58,7 +58,6 @@ const AdminPanelsPage = lazyWithRetry(() => import("@/pages/admin/panels"));
 const AdminPanelTypesPage = lazyWithRetry(() => import("@/pages/admin/panel-types"));
 const AdminUserPermissionsPage = lazyWithRetry(() => import("@/pages/admin/user-permissions"));
 const AdminZonesPage = lazyWithRetry(() => import("@/pages/admin/zones"));
-const AdminFactoriesPage = lazyWithRetry(() => import("@/pages/admin/factories"));
 const AdminCustomersPage = lazyWithRetry(() => import("@/pages/admin/customers"));
 const AdminSuppliersPage = lazyWithRetry(() => import("@/pages/admin/suppliers"));
 const AdminEmployeesPage = lazyWithRetry(() => import("@/pages/admin/employees"));
@@ -777,13 +776,6 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      <Route path="/admin/factories">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
-          <AuthenticatedLayout>
-            <AdminFactoriesPage />
-          </AuthenticatedLayout>
-        </ProtectedRoute>
-      </Route>
 
       <Route path="/admin/customers">
         <ProtectedRoute requiredRole={["ADMIN"]}>

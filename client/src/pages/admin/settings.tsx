@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Building2, Calendar, Clock, Mail, Database, Loader2 } from "lucide-react";
+import { Building2, Calendar, Clock, Mail, Database, Loader2, Factory } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -31,6 +31,7 @@ import { SchedulingTab } from "./settings/SchedulingTab";
 import { TimeTrackingTab } from "./settings/TimeTrackingTab";
 import { EmailTab } from "./settings/EmailTab";
 import { DataTab } from "./settings/DataTab";
+import { FactoriesTab } from "./settings/FactoriesTab";
 
 const settingsSchema = z.object({
   tz: z.string().min(1, "Timezone is required"),
@@ -716,6 +717,10 @@ export default function AdminSettingsPage() {
             <Mail className="h-4 w-4 mr-1.5" />
             Email
           </TabsTrigger>
+          <TabsTrigger value="factories" data-testid="tab-factories">
+            <Factory className="h-4 w-4 mr-1.5" />
+            Factories
+          </TabsTrigger>
           <TabsTrigger value="data" data-testid="tab-data">
             <Database className="h-4 w-4 mr-1.5" />
             Data Management
@@ -816,6 +821,8 @@ export default function AdminSettingsPage() {
           saveEmailTemplateMutation={saveEmailTemplateMutation}
           resetEmailTemplateMutation={resetEmailTemplateMutation}
         />
+
+        <FactoriesTab />
 
         <DataTab
           showDeletePanel={showDeletePanel}
