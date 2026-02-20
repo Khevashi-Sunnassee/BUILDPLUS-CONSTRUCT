@@ -232,11 +232,14 @@ router.get("/api/broadcasts/recipients", requireAuth, async (req, res) => {
   }
 });
 
+const validRecipientTypes = ["ALL_USERS", "SPECIFIC_USERS", "CUSTOM_CONTACTS", "SPECIFIC_CUSTOMERS", "SPECIFIC_SUPPLIERS", "SPECIFIC_EMPLOYEES"] as const;
+const validChannels = ["EMAIL", "SMS", "WHATSAPP"] as const;
+
 const sendBroadcastSchema = z.object({
   subject: z.string().optional().nullable(),
   message: z.string().min(1, "Message is required"),
-  channels: z.array(z.string().min(1)).min(1, "At least one channel is required"),
-  recipientType: z.string().min(1, "Recipient type is required"),
+  channels: z.array(z.string().min(1).transform(c => c.toUpperCase()).pipe(z.enum(validChannels))).min(1, "At least one channel is required"),
+  recipientType: z.enum(validRecipientTypes),
   recipientIds: z.array(z.string()).optional().nullable(),
   customRecipients: z.array(z.object({
     name: z.string().optional(),
@@ -259,14 +262,12 @@ router.post("/api/broadcasts/send", requireAuth, async (req, res) => {
 
     const { subject, message, channels, recipientType, recipientIds, customRecipients, templateId } = parsed.data;
 
-    const normalizedChannels = channels.map(c => c.toUpperCase());
-
     const broadcastMessage = await storage.createBroadcastMessage({
       companyId,
       templateId: templateId || null,
       subject: subject || null,
       message,
-      channels: normalizedChannels,
+      channels,
       recipientType,
       recipientIds: recipientIds || null,
       customRecipients: customRecipients || null,
