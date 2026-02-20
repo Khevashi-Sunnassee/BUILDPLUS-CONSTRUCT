@@ -74,18 +74,18 @@ The system employs a client-server architecture. The frontend is a React applica
 - **Prerequisite Data:** E2E tests that need jobs/employees/suppliers use graceful degradation (set `authAvailable = false`) rather than hard `expect().toBeTruthy()` assertions in `beforeAll`.
 
 ## Codebase Metrics
-- 234,008 LOC TypeScript, 184 DB tables, 5,493-line schema
-- 61 route files, 854 handlers, 0 files over 1000 LOC (all split into sub-routers)
-- Auth coverage: 58/61 routes (95%), Company isolation: 57/61 (93%)
-- Zod validation: 51/61 route files (84%), Query limits: all list endpoints
-- 37 test files, 1,381 tests, 0 failures, 0 skipped
+- 234,932 LOC TypeScript, 185 DB tables, 5,493-line schema
+- 152 route files, 931 handlers, 0 route files over 1000 LOC (all split into sub-routers)
+- Auth coverage: 115/137 route files (84%), Company isolation: 117/137 (85%)
+- Zod validation: 97 route files, Query limits: all list endpoints
+- 37 test files, 1,381+ tests (dynamic generation), 0 failures, 0 skipped
 - 500 indexes, 477 foreign keys, 37 CHECK constraints
-- Frontend: 285 pages, 95 components
-- 13 route directories with sub-routers: documents, tender, project-activities, jobs, scopes, data-management, budget, cost-codes, checklist, assets, progress-claims, ap-inbox, procurement
+- Frontend: 285 pages, 31 shared components + shadcn/ui library
+- 15 route directories with sub-routers: documents, tender, project-activities, jobs, scopes, data-management, budget, cost-codes, checklist, assets, progress-claims, ap-inbox, procurement, drafting-inbox, ap-invoices
 
 ## Recent Changes
 - **Feb 2026:** Fixed all test skip mechanisms (describe.skipIf to beforeAll pattern), enabled 885 previously skipped tests.
-- **Feb 2026:** Split all 13 oversized route files (over 1000 LOC) into domain sub-routers. Zero files over 1000 LOC.
+- **Feb 2026:** Split all oversized route files (over 1000 LOC) into domain sub-routers across 15 directories. Zero route files over 1000 LOC.
 - **Feb 2026:** Fixed all LSP type errors across codebase (email-templates, panel-import, production-entries, budget, progress-claims). Zero LSP errors.
 - **Feb 2026:** Added .limit() safeguards, requireAuth to address-lookup, code-quality-audit.test.ts, comprehensive coding standards.
 
