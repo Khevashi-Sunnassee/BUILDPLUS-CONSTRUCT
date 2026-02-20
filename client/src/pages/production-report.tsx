@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { dateInputProps } from "@/lib/validation";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import { PRODUCTION_ROUTES, ADMIN_ROUTES, SETTINGS_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import {
@@ -477,6 +478,7 @@ export default function ProductionReportPage() {
                   <Input
                     id="productionDate"
                     type="date"
+                    {...dateInputProps}
                     value={newDayDate}
                     onChange={(e) => setNewDayDate(e.target.value)}
                     data-testid="input-new-day-date"

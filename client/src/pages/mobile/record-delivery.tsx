@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { format } from "date-fns";
 import {
   ChevronLeft,
@@ -312,6 +313,7 @@ export default function MobileRecordDeliveryPage() {
                 <FormRow label="Delivery Date">
                   <Input
                     type="date"
+                    {...dateInputProps}
                     value={deliveryDate}
                     onChange={(e) => setDeliveryDate(e.target.value)}
                     className={inputClass}
@@ -321,6 +323,8 @@ export default function MobileRecordDeliveryPage() {
                 <FormRow label="Number of Panels">
                   <Input
                     type="number"
+                    min="0"
+                    step="1"
                     placeholder="0"
                     value={numberPanels}
                     onChange={(e) => setNumberPanels(e.target.value)}

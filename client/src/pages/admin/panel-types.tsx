@@ -722,6 +722,7 @@ export default function AdminPanelTypesPage() {
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                                 <Input
                                   type="number"
+                                  min="0"
                                   step="0.01"
                                   placeholder="0.00"
                                   className="pl-7 h-9"
@@ -745,6 +746,7 @@ export default function AdminPanelTypesPage() {
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                                 <Input
                                   type="number"
+                                  min="0"
                                   step="0.01"
                                   placeholder="0.00"
                                   className="pl-7 h-9"
@@ -768,6 +770,7 @@ export default function AdminPanelTypesPage() {
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                                 <Input
                                   type="number"
+                                  min="0"
                                   step="0.01"
                                   placeholder="0.00"
                                   className="pl-7 h-9"
@@ -791,6 +794,7 @@ export default function AdminPanelTypesPage() {
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                                 <Input
                                   type="number"
+                                  min="0"
                                   step="0.01"
                                   placeholder="0.00"
                                   className="pl-7 h-9"
@@ -823,6 +827,7 @@ export default function AdminPanelTypesPage() {
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                                 <Input
                                   type="number"
+                                  min="0"
                                   step="0.01"
                                   placeholder="0.00"
                                   className="pl-7 h-9 bg-muted"
@@ -847,6 +852,7 @@ export default function AdminPanelTypesPage() {
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                                 <Input
                                   type="number"
+                                  min="0"
                                   step="0.01"
                                   placeholder="0.00"
                                   className="pl-7 h-9 bg-muted"
@@ -884,6 +890,8 @@ export default function AdminPanelTypesPage() {
                             <div className="relative w-28">
                               <Input
                                 type="number"
+                                min="0"
+                                max="100"
                                 step="0.1"
                                 placeholder="20"
                                 className="pr-7 h-9"
@@ -909,6 +917,7 @@ export default function AdminPanelTypesPage() {
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                                 <Input
                                   type="number"
+                                  min="0"
                                   step="0.01"
                                   placeholder="0.00"
                                   className="pl-7 h-9 bg-muted"
@@ -933,6 +942,7 @@ export default function AdminPanelTypesPage() {
                                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
                                 <Input
                                   type="number"
+                                  min="0"
                                   step="0.01"
                                   placeholder="0.00"
                                   className="pl-7 h-9 bg-muted"
@@ -959,6 +969,7 @@ export default function AdminPanelTypesPage() {
                           <div className="relative">
                             <Input
                               type="number"
+                              min="0"
                               step="1"
                               placeholder="2500"
                               className="pr-10 h-9"

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { PROCUREMENT_ROUTES, JOBS_ROUTES, PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import { useToast } from "@/hooks/use-toast";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -426,6 +427,8 @@ export default function MobileNewOpportunity() {
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 text-base">$</span>
                 <input
                   type="number"
+                  min="0"
+                  step="0.01"
                   className={`${inputClass} pl-8`}
                   placeholder="0.00"
                   value={form.estimatedValue}
@@ -438,6 +441,8 @@ export default function MobileNewOpportunity() {
               <FormField label="No. of Buildings">
                 <input
                   type="number"
+                  min="0"
+                  step="1"
                   className={inputClass}
                   placeholder="0"
                   value={form.numberOfBuildings}
@@ -448,6 +453,8 @@ export default function MobileNewOpportunity() {
               <FormField label="No. of Levels">
                 <input
                   type="number"
+                  min="0"
+                  step="1"
                   className={inputClass}
                   placeholder="0"
                   value={form.numberOfLevels}
@@ -533,6 +540,7 @@ export default function MobileNewOpportunity() {
                   placeholder="0"
                   min="0"
                   max="100"
+                  step="0.01"
                   value={form.probability}
                   onChange={(e) => setForm((f) => ({ ...f, probability: e.target.value }))}
                   data-testid="input-probability"
@@ -579,6 +587,7 @@ export default function MobileNewOpportunity() {
             <FormField label="Estimated Start Date">
               <input
                 type="date"
+                {...dateInputProps}
                 className={`${inputClass} [color-scheme:dark]`}
                 value={form.estimatedStartDate}
                 onChange={(e) => setForm((f) => ({ ...f, estimatedStartDate: e.target.value }))}

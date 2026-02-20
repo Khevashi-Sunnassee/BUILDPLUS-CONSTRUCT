@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { HIRE_ROUTES, PROCUREMENT_ROUTES, JOBS_ROUTES, EMPLOYEE_ROUTES, ASSET_ROUTES } from "@shared/api-routes";
@@ -581,6 +582,7 @@ export default function MobileHireBookingForm() {
           <FormField label="Start Date" required error={errors.hireStartDate}>
             <input
               type="date"
+              {...dateInputProps}
               className={inputClass}
               value={form.hireStartDate}
               onChange={(e) => setForm(f => ({ ...f, hireStartDate: e.target.value }))}
@@ -591,6 +593,7 @@ export default function MobileHireBookingForm() {
           <FormField label="End Date" required error={errors.hireEndDate}>
             <input
               type="date"
+              {...dateInputProps}
               className={inputClass}
               value={form.hireEndDate}
               onChange={(e) => setForm(f => ({ ...f, hireEndDate: e.target.value }))}
@@ -639,6 +642,7 @@ export default function MobileHireBookingForm() {
             value={form.quantity}
             onChange={(e) => setForm(f => ({ ...f, quantity: e.target.value }))}
             min="1"
+            step="1"
             data-testid="input-quantity"
           />
         </FormField>

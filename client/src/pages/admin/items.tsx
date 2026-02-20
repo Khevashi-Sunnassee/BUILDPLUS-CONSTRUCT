@@ -1368,6 +1368,7 @@ export default function AdminItemsPage() {
                       <FormControl>
                         <Input 
                           type="number" 
+                          min="0"
                           step="0.01" 
                           placeholder="0.00" 
                           {...field} 
@@ -1388,6 +1389,7 @@ export default function AdminItemsPage() {
                         <Input 
                           type="number" 
                           min="1" 
+                          step="1"
                           placeholder="1" 
                           {...field} 
                           data-testid="input-item-minqty" 
@@ -1409,6 +1411,7 @@ export default function AdminItemsPage() {
                       <Input 
                         type="number" 
                         min="0" 
+                        step="1"
                         placeholder="Number of days" 
                         {...field} 
                         data-testid="input-item-leadtime" 

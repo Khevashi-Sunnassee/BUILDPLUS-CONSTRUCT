@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { dateInputProps } from "@/lib/validation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SlotFiltersProps, StatusFilter, GroupBy } from "./types";
 
@@ -89,6 +90,7 @@ export function SlotFilters({
             <Label>Date From</Label>
             <Input 
               type="date" 
+              {...dateInputProps}
               value={dateFromFilter} 
               onChange={(e) => setDateFromFilter(e.target.value)} 
               data-testid="input-date-from-filter"
@@ -98,6 +100,7 @@ export function SlotFilters({
             <Label>Date To</Label>
             <Input 
               type="date" 
+              {...dateInputProps}
               value={dateToFilter} 
               onChange={(e) => setDateToFilter(e.target.value)} 
               data-testid="input-date-to-filter"

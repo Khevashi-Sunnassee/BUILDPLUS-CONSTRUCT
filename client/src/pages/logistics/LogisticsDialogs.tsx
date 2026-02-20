@@ -7,6 +7,7 @@ import {
   Loader2,
   ChevronDown,
 } from "lucide-react";
+import { dateInputProps } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -192,7 +193,7 @@ export function CreateLoadListDialog({
                   <FormItem>
                     <FormLabel>Scheduled Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} data-testid="input-scheduled-date" />
+                      <Input type="date" {...dateInputProps} {...field} data-testid="input-scheduled-date" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -348,7 +349,7 @@ export function DeliveryDialog({
                         <FormItem>
                           <FormLabel>Date</FormLabel>
                           <FormControl>
-                            <Input type="date" {...field} data-testid="input-delivery-date" />
+                            <Input type="date" {...dateInputProps} {...field} data-testid="input-delivery-date" />
                           </FormControl>
                         </FormItem>
                       )}
@@ -360,7 +361,7 @@ export function DeliveryDialog({
                         <FormItem>
                           <FormLabel>Number of Panels</FormLabel>
                           <FormControl>
-                            <Input type="number" placeholder="0" {...field} value={field.value ?? ""} data-testid="input-number-panels" />
+                            <Input type="number" min="0" step="1" placeholder="0" {...field} value={field.value ?? ""} data-testid="input-number-panels" />
                           </FormControl>
                         </FormItem>
                       )}
@@ -738,7 +739,7 @@ export function ReturnDialog({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Return Date</label>
-                <Input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} data-testid="input-return-date" />
+                <Input type="date" {...dateInputProps} value={returnDate} onChange={(e) => setReturnDate(e.target.value)} data-testid="input-return-date" />
               </div>
             </div>
 

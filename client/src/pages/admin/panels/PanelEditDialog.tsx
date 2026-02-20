@@ -383,6 +383,8 @@ export function PanelEditDialog({
                       <FormControl>
                         <Input
                           type="number"
+                          min="0"
+                          step="0.01"
                           placeholder="8"
                           {...field}
                           value={field.value || ""}
@@ -407,6 +409,8 @@ export function PanelEditDialog({
                           <FormControl>
                             <Input
                               type="number"
+                              min="1"
+                              step="1"
                               placeholder="1"
                               {...field}
                               value={field.value || 1}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { useToast } from "@/hooks/use-toast";
 import { TASKS_ROUTES, JOBS_ROUTES, PROJECT_ACTIVITIES_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import { Badge } from "@/components/ui/badge";
@@ -1476,6 +1477,7 @@ function TaskDetailSheet({
           <label className="text-sm font-medium text-white/60 mb-1.5 block">Due Date</label>
           <Input
             type="date"
+            {...dateInputProps}
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
             className="bg-white/10 border-white/20 text-white [color-scheme:dark]"

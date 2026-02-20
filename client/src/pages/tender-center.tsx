@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -630,6 +631,7 @@ export default function TenderCenterPage() {
                   <Input
                     id="tender-open-date"
                     type="date"
+                    {...dateInputProps}
                     value={formOpenDate}
                     onChange={(e) => setFormOpenDate(e.target.value)}
                     data-testid="input-tender-open-date"
@@ -642,6 +644,7 @@ export default function TenderCenterPage() {
                   <Input
                     id="tender-closed-date"
                     type="date"
+                    {...dateInputProps}
                     value={formClosedDate}
                     onChange={(e) => setFormClosedDate(e.target.value)}
                     data-testid="input-tender-closed-date"

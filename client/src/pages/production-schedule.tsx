@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { PRODUCTION_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -576,6 +577,7 @@ export default function ProductionSchedulePage() {
               <Label>From:</Label>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={scheduleStartDate}
                 onChange={(e) => setScheduleStartDate(e.target.value)}
                 className="w-[160px]"
@@ -586,6 +588,7 @@ export default function ProductionSchedulePage() {
               <Label>To:</Label>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={scheduleEndDate}
                 onChange={(e) => setScheduleEndDate(e.target.value)}
                 className="w-[160px]"
@@ -657,6 +660,7 @@ export default function ProductionSchedulePage() {
               <Input
                 id="productionDate"
                 type="date"
+                {...dateInputProps}
                 value={productionDate}
                 onChange={(e) => setProductionDate(e.target.value)}
                 data-testid="input-production-date"

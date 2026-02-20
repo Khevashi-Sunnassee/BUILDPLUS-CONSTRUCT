@@ -172,6 +172,7 @@ export function SchedulingTab({
                 type="number"
                 min={1}
                 max={60}
+                step="1"
                 value={productionWindowDays}
                 onChange={(e) => setProductionWindowDays(parseInt(e.target.value) || 10)}
                 className="w-24"
@@ -206,6 +207,7 @@ export function SchedulingTab({
                 type="number"
                 min={1}
                 max={60}
+                step="1"
                 value={ifcDaysInAdvance}
                 onChange={(e) => setIfcDaysInAdvance(parseInt(e.target.value) || 14)}
                 className="w-24"
@@ -240,6 +242,7 @@ export function SchedulingTab({
                 type="number"
                 min={1}
                 max={60}
+                step="1"
                 value={daysToAchieveIfc}
                 onChange={(e) => setDaysToAchieveIfc(parseInt(e.target.value) || 21)}
                 className="w-24"
@@ -274,6 +277,7 @@ export function SchedulingTab({
                 type="number"
                 min={1}
                 max={90}
+                step="1"
                 value={productionDaysInAdvance}
                 onChange={(e) => setProductionDaysInAdvance(parseInt(e.target.value) || 10)}
                 className="w-24"
@@ -308,6 +312,7 @@ export function SchedulingTab({
                 type="number"
                 min={1}
                 max={ifcDaysInAdvance - 1}
+                step="1"
                 value={procurementDaysInAdvance}
                 onChange={(e) => setProcurementDaysInAdvance(parseInt(e.target.value) || 7)}
                 className="w-24"
@@ -348,6 +353,7 @@ export function SchedulingTab({
                 type="number"
                 min={1}
                 max={90}
+                step="1"
                 value={procurementTimeDays}
                 onChange={(e) => setProcurementTimeDays(parseInt(e.target.value) || 14)}
                 className="w-24"

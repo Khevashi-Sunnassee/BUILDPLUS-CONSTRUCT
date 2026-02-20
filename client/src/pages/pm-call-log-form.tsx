@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { PM_CALL_LOGS_ROUTES, JOBS_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -466,6 +467,7 @@ export default function PmCallLogFormPage() {
                               <Label className="text-xs">Delivery Date</Label>
                               <Input
                                 type="date"
+                                {...dateInputProps}
                                 value={lvl.confirmedDeliveryDate}
                                 onChange={(e) => {
                                   setLevelStatuses((prev) => {
@@ -488,6 +490,7 @@ export default function PmCallLogFormPage() {
                             <Input
                               type="number"
                               min={1}
+                              step="1"
                               value={lvl.daysLate || ""}
                               onChange={(e) => handleDaysLateChange(idx, parseInt(e.target.value) || 0)}
                               className="w-24"

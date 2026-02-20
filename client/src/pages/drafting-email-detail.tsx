@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { dateInputProps } from "@/lib/validation";
 import { DRAFTING_INBOX_ROUTES } from "@shared/api-routes";
 import { useRoute, useLocation } from "wouter";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -994,6 +995,7 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
               <label className="text-xs text-muted-foreground mb-1 block">Due Date</label>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={manualDueDate}
                 onChange={(e) => { setManualDueDate(e.target.value); setManualAiReason(""); }}
                 data-testid="input-task-due-date"

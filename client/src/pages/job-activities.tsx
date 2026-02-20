@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { dateInputProps } from "@/lib/validation";
 import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1184,6 +1185,7 @@ function ActivityRow({
             defaultValue={activity.estimatedDays ?? ""}
             key={`days-${activity.id}-${activity.estimatedDays}`}
             min={1}
+            step="1"
             onBlur={(e) => {
               const val = parseInt(e.target.value);
               if (!isNaN(val) && val > 0 && val !== activity.estimatedDays) {
@@ -1245,6 +1247,7 @@ function ActivityRow({
         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
           <Input
             type="date"
+            {...dateInputProps}
             className={`h-7 text-xs w-[120px] ${isDatePast(activity.startDate, activity.status) ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
             value={activity.startDate ? format(new Date(activity.startDate), "yyyy-MM-dd") : ""}
             onChange={(e) => onFieldChange(activity.id, { startDate: e.target.value || null }, true)}
@@ -1254,6 +1257,7 @@ function ActivityRow({
         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
           <Input
             type="date"
+            {...dateInputProps}
             className={`h-7 text-xs w-[120px] ${isDatePast(activity.endDate, activity.status) ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
             value={activity.endDate ? format(new Date(activity.endDate), "yyyy-MM-dd") : ""}
             onChange={(e) => onFieldChange(activity.id, { endDate: e.target.value || null }, false)}
@@ -1312,6 +1316,7 @@ function ActivityRow({
                 defaultValue={child.estimatedDays ?? ""}
                 key={`days-${child.id}-${child.estimatedDays}`}
                 min={1}
+                step="1"
                 onBlur={(e) => {
                   const val = parseInt(e.target.value);
                   if (!isNaN(val) && val > 0 && val !== child.estimatedDays) {
@@ -1331,6 +1336,7 @@ function ActivityRow({
             <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
               <Input
                 type="date"
+                {...dateInputProps}
                 className={`h-6 text-xs w-[120px] ${isDatePast(child.startDate, child.status) ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
                 value={child.startDate ? format(new Date(child.startDate), "yyyy-MM-dd") : ""}
                 onChange={(e) => onFieldChange(child.id, { startDate: e.target.value || null }, false)}
@@ -1339,6 +1345,7 @@ function ActivityRow({
             <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
               <Input
                 type="date"
+                {...dateInputProps}
                 className={`h-6 text-xs w-[120px] ${isDatePast(child.endDate, child.status) ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
                 value={child.endDate ? format(new Date(child.endDate), "yyyy-MM-dd") : ""}
                 onChange={(e) => onFieldChange(child.id, { endDate: e.target.value || null }, false)}
@@ -1435,6 +1442,7 @@ function InstantiateDialog({
             {dateSource === "custom" && (
               <Input
                 type="date"
+                {...dateInputProps}
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
                 data-testid="input-custom-start-date"
@@ -1625,6 +1633,7 @@ function ActivitySidebar({
                   <Label className={`text-xs ${isDatePast(activity.startDate, activity.status) ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>Start Date</Label>
                   <Input
                     type="date"
+                    {...dateInputProps}
                     className={isDatePast(activity.startDate, activity.status) ? "border-red-500 text-red-600 dark:text-red-400" : ""}
                     value={activity.startDate ? format(new Date(activity.startDate), "yyyy-MM-dd") : ""}
                     onChange={(e) => updateActivityMutation.mutate({ id: activity.id, startDate: e.target.value || null, _recalculate: true })}
@@ -1635,6 +1644,7 @@ function ActivitySidebar({
                   <Label className={`text-xs ${isDatePast(activity.endDate, activity.status) ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>End Date</Label>
                   <Input
                     type="date"
+                    {...dateInputProps}
                     className={isDatePast(activity.endDate, activity.status) ? "border-red-500 text-red-600 dark:text-red-400" : ""}
                     value={activity.endDate ? format(new Date(activity.endDate), "yyyy-MM-dd") : ""}
                     onChange={(e) => updateActivityMutation.mutate({ id: activity.id, endDate: e.target.value || null })}
@@ -1647,6 +1657,7 @@ function ActivitySidebar({
                 <Label className="text-muted-foreground text-xs">Reminder Date</Label>
                 <Input
                   type="date"
+                  {...dateInputProps}
                   value={activity.reminderDate ? format(new Date(activity.reminderDate), "yyyy-MM-dd") : ""}
                   onChange={(e) => updateActivityMutation.mutate({ id: activity.id, reminderDate: e.target.value || null })}
                   data-testid="sidebar-input-reminder"

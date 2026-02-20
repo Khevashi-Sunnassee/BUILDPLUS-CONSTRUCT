@@ -13,6 +13,7 @@ import {
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { dateInputProps } from "@/lib/validation";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -453,6 +454,7 @@ export function JobFormDialog({
                           <Input 
                             type="number" 
                             min={0}
+                            step="1"
                             placeholder="e.g. 3" 
                             {...field}
                             value={field.value ?? ""}
@@ -663,6 +665,7 @@ export function JobFormDialog({
                       <FormControl>
                         <Input 
                           type="date" 
+                          {...dateInputProps}
                           {...field} 
                           onBlur={(e) => {
                             field.onBlur();
@@ -691,6 +694,7 @@ export function JobFormDialog({
                           <Input 
                             type="number" 
                             min="1"
+                            step="1"
                             placeholder="e.g., 5"
                             value={field.value ?? ""} 
                             onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
@@ -712,6 +716,7 @@ export function JobFormDialog({
                           <Input 
                             type="number" 
                             min="1"
+                            step="1"
                             placeholder="e.g., 14"
                             value={field.value ?? ""} 
                             onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
@@ -742,6 +747,7 @@ export function JobFormDialog({
                           <Input 
                             type="number" 
                             min="1"
+                            step="1"
                             placeholder="e.g., 21"
                             value={field.value ?? ""} 
                             onChange={(e) => {
@@ -770,6 +776,7 @@ export function JobFormDialog({
                           <Input 
                             type="number" 
                             min="1"
+                            step="1"
                             placeholder="e.g., 10"
                             value={field.value ?? ""} 
                             onChange={(e) => {
@@ -796,6 +803,7 @@ export function JobFormDialog({
                           <Input 
                             type="number" 
                             min="1"
+                            step="1"
                             placeholder="e.g., 10"
                             value={field.value ?? ""} 
                             onChange={(e) => {
@@ -826,6 +834,7 @@ export function JobFormDialog({
                               type="number" 
                               min="1"
                               max={daysInAdvance - 1}
+                              step="1"
                               placeholder="e.g., 7"
                               value={field.value ?? ""} 
                               onChange={(e) => {
@@ -856,6 +865,7 @@ export function JobFormDialog({
                           <Input 
                             type="number" 
                             min="1"
+                            step="1"
                             placeholder="e.g., 14"
                             value={field.value ?? ""} 
                             onChange={(e) => {
@@ -973,6 +983,7 @@ export function JobFormDialog({
                             <Input
                               type="number"
                               min={1}
+                              step="1"
                               value={item.cycleDays}
                               onChange={(e) => handleLevelCycleTimeChange(index, parseInt(e.target.value) || 1)}
                               className="w-20"

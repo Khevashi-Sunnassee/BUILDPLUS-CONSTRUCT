@@ -333,6 +333,8 @@ function DetailItemsTab({
                       <TableCell className="p-1">
                         <Input
                           type="number"
+                          min="0"
+                          step="any"
                           value={editValues.quantity}
                           onChange={(e) => setEditValues({ ...editValues, quantity: e.target.value })}
                           onKeyDown={(e) => handleKeyDown(e, item.id)}
@@ -355,6 +357,7 @@ function DetailItemsTab({
                       <TableCell className="p-1">
                         <Input
                           type="number"
+                          min="0"
                           step="0.01"
                           value={editValues.price}
                           onChange={(e) => setEditValues({ ...editValues, price: e.target.value })}
@@ -451,6 +454,8 @@ function DetailItemsTab({
               <TableCell className="p-1">
                 <Input
                   type="number"
+                  min="0"
+                  step="any"
                   value={newItem.quantity}
                   onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddItem(); } }}
@@ -473,6 +478,7 @@ function DetailItemsTab({
               <TableCell className="p-1">
                 <Input
                   type="number"
+                  min="0"
                   step="0.01"
                   value={newItem.price}
                   onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}

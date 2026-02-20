@@ -968,6 +968,8 @@ export default function AdminDocumentConfigPage() {
                     <FormControl>
                       <Input
                         type="number"
+                        min="0"
+                        step="1"
                         {...field}
                         onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                         data-testid="input-category-sort-order"

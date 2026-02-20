@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
+import { dateInputProps } from "@/lib/validation";
 import { format, parseISO, isBefore, startOfDay, eachDayOfInterval, addDays, eachMonthOfInterval, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -351,6 +352,7 @@ export default function HireBookingsPage() {
           <div className="flex items-center gap-2">
             <Input
               type="date"
+              {...dateInputProps}
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
               className="w-[150px]"
@@ -360,6 +362,7 @@ export default function HireBookingsPage() {
             <span className="text-xs text-muted-foreground">to</span>
             <Input
               type="date"
+              {...dateInputProps}
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
               className="w-[150px]"

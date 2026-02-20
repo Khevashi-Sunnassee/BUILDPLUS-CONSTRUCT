@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { dateInputProps } from "@/lib/validation";
 import { format } from "date-fns";
 import { useRoute, useLocation } from "wouter";
 import { PRODUCTION_ROUTES, ADMIN_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
@@ -875,7 +876,7 @@ export default function ProductionReportDetailPage() {
                   <FormItem>
                     <FormLabel>Production Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} data-testid="input-entry-date" />
+                      <Input type="date" {...dateInputProps} {...field} data-testid="input-entry-date" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -966,6 +967,8 @@ export default function ProductionReportDetailPage() {
                         <FormControl>
                           <Input 
                             type="number" 
+                            min="0"
+                            step="1"
                             {...field} 
                             data-testid="input-entry-load-width" 
                           />
@@ -982,6 +985,8 @@ export default function ProductionReportDetailPage() {
                         <FormControl>
                           <Input 
                             type="number" 
+                            min="0"
+                            step="1"
                             {...field} 
                             data-testid="input-entry-load-height" 
                           />
@@ -998,6 +1003,8 @@ export default function ProductionReportDetailPage() {
                         <FormControl>
                           <Input 
                             type="number" 
+                            min="0"
+                            step="1"
                             {...field} 
                             data-testid="input-entry-thickness" 
                           />
@@ -1016,6 +1023,7 @@ export default function ProductionReportDetailPage() {
                         <FormControl>
                           <Input 
                             type="number" 
+                            min="0"
                             step="0.01"
                             {...field} 
                             data-testid="input-entry-panel-volume" 
@@ -1033,6 +1041,7 @@ export default function ProductionReportDetailPage() {
                         <FormControl>
                           <Input 
                             type="number" 
+                            min="0"
                             step="0.01"
                             {...field} 
                             data-testid="input-entry-panel-mass" 
@@ -1053,6 +1062,7 @@ export default function ProductionReportDetailPage() {
                       <FormControl>
                         <Input 
                           type="number" 
+                          min="0"
                           step="0.01" 
                           placeholder="2.50" 
                           {...field} 
@@ -1072,6 +1082,7 @@ export default function ProductionReportDetailPage() {
                       <FormControl>
                         <Input 
                           type="number" 
+                          min="0"
                           step="0.01" 
                           placeholder="10.00" 
                           {...field} 

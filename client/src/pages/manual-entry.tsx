@@ -74,6 +74,7 @@ import { Badge } from "@/components/ui/badge";
 import type { Job, PanelRegister, WorkType } from "@shared/schema";
 import { isJobVisibleInDropdowns } from "@shared/job-phases";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { dateInputProps } from "@/lib/validation";
 
 interface LogRowWithTimes {
   id: string;
@@ -1322,6 +1323,7 @@ export default function ManualEntryPage() {
                       <FormControl>
                         <Input 
                           type="date" 
+                          {...dateInputProps}
                           {...field} 
                           onChange={(e) => handleDateChange(e.target.value)}
                           onKeyDown={handleDateKeyDown}

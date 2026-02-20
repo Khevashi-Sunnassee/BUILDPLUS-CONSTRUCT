@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MYOB_ROUTES } from "@shared/api-routes";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { dateInputProps } from "@/lib/validation";
 
 interface MyobStatus {
   connected: boolean;
@@ -751,6 +752,7 @@ function ProfitAndLossTab() {
               <Input
                 id="pnl-start"
                 type="date"
+                {...dateInputProps}
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 className="w-40"
@@ -762,6 +764,7 @@ function ProfitAndLossTab() {
               <Input
                 id="pnl-end"
                 type="date"
+                {...dateInputProps}
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 className="w-40"

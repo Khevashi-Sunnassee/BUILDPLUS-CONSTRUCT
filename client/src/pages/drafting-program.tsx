@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { DRAFTING_ROUTES, JOBS_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -761,6 +762,7 @@ export default function DraftingProgramPage() {
               <Input
                 id="proposedStart"
                 type="date"
+                {...dateInputProps}
                 value={proposedStartDate}
                 onChange={(e) => setProposedStartDate(e.target.value)}
                 min={selectedEntry?.draftingWindowStart ? format(new Date(selectedEntry.draftingWindowStart), "yyyy-MM-dd") : undefined}

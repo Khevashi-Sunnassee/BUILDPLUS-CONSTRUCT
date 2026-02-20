@@ -342,6 +342,8 @@ function ConditionEditor({
         return (
           <Input
             type="number"
+            min="0"
+            step="0.01"
             value={condition.values[0] || ""}
             onChange={(e) => onUpdate(index, { ...condition, values: e.target.value ? [e.target.value] : [] })}
             placeholder="Enter amount..."
@@ -658,6 +660,7 @@ function RuleFormDialog({
               value={priority}
               onChange={(e) => setPriority(parseInt(e.target.value) || 0)}
               min={0}
+              step="1"
               data-testid="input-rule-priority"
             />
           </div>

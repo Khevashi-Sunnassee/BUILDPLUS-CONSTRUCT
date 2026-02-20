@@ -20,6 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { CHECKLIST_ROUTES, ASSET_ROUTES } from "@shared/api-routes";
 import { normalizeSections } from "@/components/checklist/normalize-sections";
 import { calculateCompletionRate, getMissingRequiredFields, isFieldVisible } from "@/components/checklist/checklist-form";
@@ -668,6 +669,7 @@ function MobileFieldRenderer({ field, value, onChange, disabled, onAssetSelected
       return (
         <input
           type="date"
+          {...dateInputProps}
           value={(value as string) || ""}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
@@ -729,6 +731,7 @@ function MobileFieldRenderer({ field, value, onChange, disabled, onAssetSelected
             disabled={disabled}
             min={field.min ?? 0}
             max={field.max ?? 100}
+            step="0.01"
             className="w-full h-11 px-3 pr-8 rounded-xl bg-white/10 border border-white/10 text-white placeholder:text-white/30 text-sm focus:outline-none focus:border-blue-400/50 disabled:opacity-50"
             data-testid={`mobile-field-percentage-${field.id}`}
           />
@@ -1260,6 +1263,7 @@ function MobileMeasurementField({ field, value, onChange, disabled }: MobileFiel
     <div className="flex gap-2" data-testid={`mobile-field-measurement-${field.id}`}>
       <input
         type="number"
+        step="any"
         placeholder="Value"
         value={mv.amount ?? ""}
         onChange={(e) => onChange({ ...mv, amount: e.target.value ? Number(e.target.value) : null })}

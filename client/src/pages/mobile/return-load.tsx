@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { format } from "date-fns";
 import {
   ChevronLeft,
@@ -278,6 +279,7 @@ export default function MobileReturnLoadPage() {
               <FormRow label="Return Date">
                 <Input
                   type="date"
+                  {...dateInputProps}
                   value={returnDate}
                   onChange={(e) => setReturnDate(e.target.value)}
                   className={inputClass}

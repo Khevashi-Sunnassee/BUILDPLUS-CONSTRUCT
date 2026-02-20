@@ -1138,7 +1138,7 @@ export default function AdminChecklistTemplatesPage() {
                   <FormItem>
                     <FormLabel>Sort Order</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} data-testid="input-entity-type-sort-order" />
+                      <Input type="number" min="0" step="1" {...field} data-testid="input-entity-type-sort-order" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1401,6 +1401,8 @@ export default function AdminChecklistTemplatesPage() {
                     <FormControl>
                       <Input 
                         type="number" 
+                        min="0"
+                        step="1"
                         placeholder="e.g., 1" 
                         {...field} 
                         value={field.value || ""}

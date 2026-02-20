@@ -544,6 +544,9 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplier
                     <TableCell>
                       <Input
                         type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
                         value={split.percentage || ""}
                         onChange={(e) => updateSplit(i, "percentage", e.target.value)}
                         className="h-7 text-sm border-0 bg-transparent p-0 w-16 focus-visible:ring-1"
@@ -553,6 +556,8 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplier
                     <TableCell>
                       <Input
                         type="number"
+                        min="0"
+                        step="0.01"
                         value={split.amount}
                         onChange={(e) => updateSplit(i, "amount", e.target.value)}
                         className="h-7 text-sm border-0 bg-transparent p-0 w-24 text-right focus-visible:ring-1"

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { WEEKLY_REPORTS_ROUTES, JOBS_ROUTES, PRODUCTION_ROUTES, ADMIN_ROUTES, EOT_CLAIMS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -756,12 +757,13 @@ export default function WeeklyJobLogsPage() {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label>Report Date</Label>
-                <Input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} data-testid="input-report-date" />
+                <Input type="date" {...dateInputProps} value={reportDate} onChange={(e) => setReportDate(e.target.value)} data-testid="input-report-date" />
               </div>
               <div>
                 <Label>Week Start</Label>
                 <Input 
                   type="date" 
+                  {...dateInputProps}
                   value={weekStartDate} 
                   onChange={(e) => handleWeekStartChange(e.target.value)} 
                   data-testid="input-week-start"
@@ -774,6 +776,7 @@ export default function WeeklyJobLogsPage() {
                 <Label>Week End</Label>
                 <Input 
                   type="date" 
+                  {...dateInputProps}
                   value={weekEndDate} 
                   readOnly 
                   className="bg-muted"
@@ -1316,6 +1319,7 @@ export default function WeeklyJobLogsPage() {
                 <Input
                   type="number"
                   min="1"
+                  step="1"
                   value={eotRequestedDays}
                   onChange={(e) => setEotRequestedDays(e.target.value)}
                   placeholder="e.g. 14"
@@ -1326,6 +1330,7 @@ export default function WeeklyJobLogsPage() {
                 <Label>Current Completion Date</Label>
                 <Input
                   type="date"
+                  {...dateInputProps}
                   value={eotCurrentDate}
                   onChange={(e) => setEotCurrentDate(e.target.value)}
                   data-testid="input-eot-current-date"
@@ -1335,6 +1340,7 @@ export default function WeeklyJobLogsPage() {
                 <Label>Requested Completion Date</Label>
                 <Input
                   type="date"
+                  {...dateInputProps}
                   value={eotRequestedDate}
                   onChange={(e) => setEotRequestedDate(e.target.value)}
                   data-testid="input-eot-requested-date"

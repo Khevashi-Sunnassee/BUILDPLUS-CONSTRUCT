@@ -160,6 +160,7 @@ export function VisualComparisonDialog({ open, onOpenChange, selectedDocIds, doc
                 <Input
                   type="number"
                   min={1}
+                  step="1"
                   value={overlayPage + 1}
                   onChange={(e) => setOverlayPage(Math.max(0, parseInt(e.target.value || "1") - 1))}
                   className="w-20"

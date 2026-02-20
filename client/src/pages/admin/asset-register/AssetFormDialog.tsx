@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Loader2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { dateInputProps } from "@/lib/validation";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -140,7 +141,7 @@ export function AssetFormDialog({
                     <FormItem>
                       <FormLabel>Quantity</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-quantity" />
+                        <Input type="number" min="0" step="1" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-quantity" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -331,7 +332,7 @@ export function AssetFormDialog({
                     <FormItem>
                       <FormLabel>Purchase Price</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="input-asset-purchase-price" />
+                        <Input type="number" min="0" step="0.01" {...field} data-testid="input-asset-purchase-price" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -346,7 +347,7 @@ export function AssetFormDialog({
                     <FormItem>
                       <FormLabel>Purchase Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} data-testid="input-asset-purchase-date" />
+                        <Input type="date" {...dateInputProps} {...field} data-testid="input-asset-purchase-date" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -359,7 +360,7 @@ export function AssetFormDialog({
                     <FormItem>
                       <FormLabel>Warranty Expiry</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} data-testid="input-asset-warranty-expiry" />
+                        <Input type="date" {...dateInputProps} {...field} data-testid="input-asset-warranty-expiry" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -377,7 +378,7 @@ export function AssetFormDialog({
                     <FormItem>
                       <FormLabel>Current Value</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="input-asset-current-value" />
+                        <Input type="number" min="0" step="0.01" {...field} data-testid="input-asset-current-value" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -390,7 +391,7 @@ export function AssetFormDialog({
                     <FormItem>
                       <FormLabel>Useful Life (Years)</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-useful-life" />
+                        <Input type="number" min="0" step="1" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-useful-life" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -427,7 +428,7 @@ export function AssetFormDialog({
                     <FormItem>
                       <FormLabel>Depreciation Rate</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="input-asset-depreciation-rate" />
+                        <Input type="number" min="0" step="0.01" {...field} data-testid="input-asset-depreciation-rate" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -442,7 +443,7 @@ export function AssetFormDialog({
                     <FormItem>
                       <FormLabel>Accumulated Depreciation</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="input-asset-accumulated-depreciation" />
+                        <Input type="number" min="0" step="0.01" {...field} data-testid="input-asset-accumulated-depreciation" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -455,7 +456,7 @@ export function AssetFormDialog({
                     <FormItem>
                       <FormLabel>Depreciation This Period</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="input-asset-depreciation-this-period" />
+                        <Input type="number" min="0" step="0.01" {...field} data-testid="input-asset-depreciation-this-period" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -470,7 +471,7 @@ export function AssetFormDialog({
                     <FormItem>
                       <FormLabel>Book Value</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="input-asset-book-value" />
+                        <Input type="number" min="0" step="0.01" {...field} data-testid="input-asset-book-value" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -483,7 +484,7 @@ export function AssetFormDialog({
                     <FormItem>
                       <FormLabel>Years Depreciated</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-years-depreciated" />
+                        <Input type="number" min="0" step="1" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-years-depreciated" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

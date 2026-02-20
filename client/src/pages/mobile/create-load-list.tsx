@@ -3,6 +3,7 @@ import { Link, useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { LOGISTICS_ROUTES, PANELS_ROUTES, ADMIN_ROUTES, FACTORIES_ROUTES } from "@shared/api-routes";
 import { cn } from "@/lib/utils";
+import { dateInputProps } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -466,6 +467,7 @@ export default function MobileCreateLoadListPage() {
               <label className="text-xs text-white/60 mb-1.5 block">Scheduled Date</label>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
                 className="rounded-xl bg-white/5 border-white/10 text-white"

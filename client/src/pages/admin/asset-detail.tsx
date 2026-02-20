@@ -12,6 +12,7 @@ import {
   ASSET_FUNDING_METHODS,
 } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1087,6 +1088,8 @@ export default function AssetDetailPage() {
               <Label>Quantity</Label>
               <Input
                 type="number"
+                min="0"
+                step="1"
                 value={basicForm.quantity ?? ""}
                 onChange={(e) => setBasicForm({ ...basicForm, quantity: parseInt(e.target.value) || 0 })}
                 data-testid="input-edit-quantity"
@@ -1151,6 +1154,7 @@ export default function AssetDetailPage() {
               <Label>Purchase Price</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 value={financialForm.purchasePrice || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, purchasePrice: e.target.value })}
@@ -1161,6 +1165,7 @@ export default function AssetDetailPage() {
               <Label>Current Value</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 value={financialForm.currentValue || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, currentValue: e.target.value })}
@@ -1179,6 +1184,8 @@ export default function AssetDetailPage() {
               <Label>Depreciation Rate (%)</Label>
               <Input
                 type="number"
+                min="0"
+                max="100"
                 step="0.01"
                 value={financialForm.depreciationRate || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, depreciationRate: e.target.value })}
@@ -1189,6 +1196,7 @@ export default function AssetDetailPage() {
               <Label>Accumulated Depreciation</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 value={financialForm.accumulatedDepreciation || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, accumulatedDepreciation: e.target.value })}
@@ -1199,6 +1207,7 @@ export default function AssetDetailPage() {
               <Label>Depreciation This Period</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 value={financialForm.depreciationThisPeriod || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, depreciationThisPeriod: e.target.value })}
@@ -1209,6 +1218,7 @@ export default function AssetDetailPage() {
               <Label>Book Value</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 value={financialForm.bookValue || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, bookValue: e.target.value })}
@@ -1219,6 +1229,8 @@ export default function AssetDetailPage() {
               <Label>Years Depreciated</Label>
               <Input
                 type="number"
+                min="0"
+                step="1"
                 value={financialForm.yearsDepreciated || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, yearsDepreciated: parseInt(e.target.value) || "" })}
                 data-testid="input-edit-years-depreciated"
@@ -1228,6 +1240,8 @@ export default function AssetDetailPage() {
               <Label>Useful Life (Years)</Label>
               <Input
                 type="number"
+                min="0"
+                step="1"
                 value={financialForm.usefulLifeYears || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, usefulLifeYears: parseInt(e.target.value) || "" })}
                 data-testid="input-edit-useful-life"
@@ -1237,6 +1251,7 @@ export default function AssetDetailPage() {
               <Label>Purchase Date</Label>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={financialForm.purchaseDate || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, purchaseDate: e.target.value })}
                 data-testid="input-edit-purchase-date"
@@ -1254,6 +1269,7 @@ export default function AssetDetailPage() {
               <Label>Warranty Expiry</Label>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={financialForm.warrantyExpiry || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, warrantyExpiry: e.target.value })}
                 data-testid="input-edit-warranty-expiry"
@@ -1263,6 +1279,7 @@ export default function AssetDetailPage() {
               <Label>Lease Start Date</Label>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={financialForm.leaseStartDate || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, leaseStartDate: e.target.value })}
                 data-testid="input-edit-lease-start"
@@ -1272,6 +1289,7 @@ export default function AssetDetailPage() {
               <Label>Lease End Date</Label>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={financialForm.leaseEndDate || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, leaseEndDate: e.target.value })}
                 data-testid="input-edit-lease-end"
@@ -1281,6 +1299,7 @@ export default function AssetDetailPage() {
               <Label>Monthly Payment</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 value={financialForm.leaseMonthlyPayment || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, leaseMonthlyPayment: e.target.value })}
@@ -1291,6 +1310,7 @@ export default function AssetDetailPage() {
               <Label>Balloon Payment</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 value={financialForm.balloonPayment || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, balloonPayment: e.target.value })}
@@ -1301,6 +1321,8 @@ export default function AssetDetailPage() {
               <Label>Lease Term (months)</Label>
               <Input
                 type="number"
+                min="0"
+                step="1"
                 value={financialForm.leaseTerm || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, leaseTerm: parseInt(e.target.value) || "" })}
                 data-testid="input-edit-lease-term"
@@ -1318,6 +1340,7 @@ export default function AssetDetailPage() {
               <Label>Loan Amount</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 value={financialForm.loanAmount || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, loanAmount: e.target.value })}
@@ -1328,6 +1351,8 @@ export default function AssetDetailPage() {
               <Label>Interest Rate (%)</Label>
               <Input
                 type="number"
+                min="0"
+                max="100"
                 step="0.01"
                 value={financialForm.interestRate || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, interestRate: e.target.value })}
@@ -1338,6 +1363,8 @@ export default function AssetDetailPage() {
               <Label>Loan Term (months)</Label>
               <Input
                 type="number"
+                min="0"
+                step="1"
                 value={financialForm.loanTerm || ""}
                 onChange={(e) => setFinancialForm({ ...financialForm, loanTerm: parseInt(e.target.value) || "" })}
                 data-testid="input-edit-loan-term"
@@ -1442,6 +1469,7 @@ export default function AssetDetailPage() {
               <Label>Operating Hours</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.1"
                 value={technicalForm.operatingHours || ""}
                 onChange={(e) => setTechnicalForm({ ...technicalForm, operatingHours: e.target.value })}
@@ -1499,6 +1527,7 @@ export default function AssetDetailPage() {
               <Label>Premium (annual)</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 value={insuranceForm.insurancePremium || ""}
                 onChange={(e) => setInsuranceForm({ ...insuranceForm, insurancePremium: e.target.value })}
@@ -1509,6 +1538,7 @@ export default function AssetDetailPage() {
               <Label>Excess</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 value={insuranceForm.insuranceExcess || ""}
                 onChange={(e) => setInsuranceForm({ ...insuranceForm, insuranceExcess: e.target.value })}
@@ -1519,6 +1549,7 @@ export default function AssetDetailPage() {
               <Label>Start Date</Label>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={insuranceForm.insuranceStartDate || ""}
                 onChange={(e) => setInsuranceForm({ ...insuranceForm, insuranceStartDate: e.target.value })}
                 data-testid="input-edit-insurance-start"
@@ -1528,6 +1559,7 @@ export default function AssetDetailPage() {
               <Label>Expiry Date</Label>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={insuranceForm.insuranceExpiryDate || ""}
                 onChange={(e) => setInsuranceForm({ ...insuranceForm, insuranceExpiryDate: e.target.value })}
                 data-testid="input-edit-insurance-expiry"
@@ -1584,6 +1616,7 @@ export default function AssetDetailPage() {
               <Label>Date *</Label>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={maintenanceForm.maintenanceDate || ""}
                 onChange={(e) => setMaintenanceForm({ ...maintenanceForm, maintenanceDate: e.target.value })}
                 data-testid="input-maintenance-date"
@@ -1593,6 +1626,7 @@ export default function AssetDetailPage() {
               <Label>Cost</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 value={maintenanceForm.cost || ""}
                 onChange={(e) => setMaintenanceForm({ ...maintenanceForm, cost: e.target.value })}
@@ -1642,6 +1676,7 @@ export default function AssetDetailPage() {
               <Label>Transfer Date *</Label>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={transferForm.transferDate || ""}
                 onChange={(e) => setTransferForm({ ...transferForm, transferDate: e.target.value })}
                 data-testid="input-transfer-date"

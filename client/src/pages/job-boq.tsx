@@ -724,6 +724,8 @@ export default function JobBoqPage() {
               <Input
                 id="group-sort-order"
                 type="number"
+                min="0"
+                step="1"
                 value={groupSortOrder}
                 onChange={(e) => setGroupSortOrder(parseInt(e.target.value) || 0)}
                 className="w-24"
@@ -815,6 +817,7 @@ export default function JobBoqPage() {
                 <Input
                   id="item-quantity"
                   type="number"
+                  min="0"
                   step="0.0001"
                   value={itemQuantity}
                   onChange={(e) => setItemQuantity(e.target.value)}
@@ -842,6 +845,7 @@ export default function JobBoqPage() {
                 <Input
                   id="item-unit-price"
                   type="number"
+                  min="0"
                   step="0.01"
                   value={itemUnitPrice}
                   onChange={(e) => setItemUnitPrice(e.target.value)}

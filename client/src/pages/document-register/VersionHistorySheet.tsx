@@ -257,6 +257,7 @@ export function VersionHistorySheet({ open, onOpenChange, document: versionHisto
                   <Input
                     type="number"
                     min={1}
+                    step="1"
                     value={overlayPage + 1}
                     onChange={(e) => setOverlayPage(Math.max(0, parseInt(e.target.value || "1") - 1))}
                     data-testid="input-version-compare-page"

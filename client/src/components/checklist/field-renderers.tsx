@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { dateInputProps } from "@/lib/validation";
 import { ASSET_ROUTES } from "@shared/api-routes";
 import type { ChecklistField, ChecklistFieldOption } from "@shared/schema";
 
@@ -298,6 +299,7 @@ export function DateField({ field, value, onChange, disabled }: FieldRendererPro
   return (
     <Input
       type="date"
+      {...dateInputProps}
       value={(value as string) || ""}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
@@ -360,6 +362,7 @@ export function PercentageField({ field, value, onChange, disabled }: FieldRende
         disabled={disabled}
         min={field.min ?? 0}
         max={field.max ?? 100}
+        step="0.01"
         className="pr-8"
         data-testid={`field-percentage-${field.id}`}
       />

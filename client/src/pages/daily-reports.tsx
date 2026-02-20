@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { dateInputProps } from "@/lib/validation";
 import { format, subDays, startOfWeek, endOfWeek } from "date-fns";
 import {
   Calendar,
@@ -566,6 +567,7 @@ export default function DailyReportsPage() {
                     <Input
                       id="logDay"
                       type="date"
+                      {...dateInputProps}
                       value={newDayDate}
                       onChange={(e) => setNewDayDate(e.target.value)}
                       data-testid="input-new-day-date"

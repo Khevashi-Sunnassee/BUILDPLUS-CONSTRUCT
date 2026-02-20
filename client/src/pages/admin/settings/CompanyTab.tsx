@@ -293,6 +293,7 @@ export function CompanyTab({
                 type="number"
                 min={1}
                 max={10}
+                step="1"
                 value={jobNumberMinDigits}
                 onChange={(e) => setJobNumberMinDigits(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
                 data-testid="input-job-number-min-digits"
@@ -307,6 +308,7 @@ export function CompanyTab({
                 id="jobNumberNextSequence"
                 type="number"
                 min={1}
+                step="1"
                 value={jobNumberNextSequence}
                 onChange={(e) => setJobNumberNextSequence(Math.max(1, parseInt(e.target.value) || 1))}
                 data-testid="input-job-number-next-sequence"

@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { dateInputProps } from "@/lib/validation";
 import { ADMIN_ROUTES } from "@shared/api-routes";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -191,6 +192,7 @@ function SortableRow({
           <Input
             type="number"
             min={1}
+            step="1"
             defaultValue={entry.cycleDays}
             onBlur={(e) => {
               const val = parseInt(e.target.value) || 1;
@@ -300,6 +302,7 @@ function SortableRow({
                 <label className="text-xs text-muted-foreground mb-1 block">Manual Start Date</label>
                 <Input
                   type="date"
+                  {...dateInputProps}
                   value={entry.manualStartDate ? format(new Date(entry.manualStartDate), "yyyy-MM-dd") : ""}
                   onChange={(e) => onPatchEntry(entry.id, "manualStartDate", e.target.value || null)}
                   className="h-8 text-xs"
@@ -316,6 +319,7 @@ function SortableRow({
                 <label className="text-xs text-muted-foreground mb-1 block">Manual End Date</label>
                 <Input
                   type="date"
+                  {...dateInputProps}
                   value={entry.manualEndDate ? format(new Date(entry.manualEndDate), "yyyy-MM-dd") : ""}
                   onChange={(e) => onPatchEntry(entry.id, "manualEndDate", e.target.value || null)}
                   className="h-8 text-xs"

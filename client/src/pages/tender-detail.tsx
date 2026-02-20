@@ -1504,6 +1504,7 @@ export default function TenderDetailPage() {
                 <Label>Subtotal</Label>
                 <Input
                   type="number"
+                  min="0"
                   step="0.01"
                   value={subFormSubtotal}
                   onChange={(e) => setSubFormSubtotal(e.target.value)}
@@ -1515,6 +1516,7 @@ export default function TenderDetailPage() {
                 <Label>Tax</Label>
                 <Input
                   type="number"
+                  min="0"
                   step="0.01"
                   value={subFormTaxAmount}
                   onChange={(e) => setSubFormTaxAmount(e.target.value)}
@@ -1526,6 +1528,7 @@ export default function TenderDetailPage() {
                 <Label>Total</Label>
                 <Input
                   type="number"
+                  min="0"
                   step="0.01"
                   value={subFormTotalPrice}
                   onChange={(e) => setSubFormTotalPrice(e.target.value)}
@@ -1737,6 +1740,7 @@ export default function TenderDetailPage() {
                     type="number"
                     min={5}
                     max={500}
+                    step="1"
                     value={userSearchRadius}
                     onChange={(e) => {
                       const val = parseInt(e.target.value);

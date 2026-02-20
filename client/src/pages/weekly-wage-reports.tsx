@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import {
   Form,
   FormControl,
@@ -663,7 +664,7 @@ export default function WeeklyWageReportsPage() {
                     <FormItem>
                       <FormLabel>Week Start Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} data-testid="input-week-start" />
+                        <Input type="date" {...dateInputProps} {...field} data-testid="input-week-start" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -676,7 +677,7 @@ export default function WeeklyWageReportsPage() {
                     <FormItem>
                       <FormLabel>Week End Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} data-testid="input-week-end" />
+                        <Input type="date" {...dateInputProps} {...field} data-testid="input-week-end" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -837,7 +838,7 @@ export default function WeeklyWageReportsPage() {
                     <FormItem>
                       <FormLabel>Week Start Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} data-testid="edit-input-week-start" />
+                        <Input type="date" {...dateInputProps} {...field} data-testid="edit-input-week-start" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -850,7 +851,7 @@ export default function WeeklyWageReportsPage() {
                     <FormItem>
                       <FormLabel>Week End Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} data-testid="edit-input-week-end" />
+                        <Input type="date" {...dateInputProps} {...field} data-testid="edit-input-week-end" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

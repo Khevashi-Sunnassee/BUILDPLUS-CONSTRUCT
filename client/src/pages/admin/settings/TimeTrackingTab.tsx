@@ -85,6 +85,8 @@ export function TimeTrackingTab({ form, onSubmit, updateMutation }: TimeTracking
                     <FormControl>
                       <Input
                         type="number"
+                        min="1"
+                        step="1"
                         {...field}
                         onChange={(e) => field.onChange(parseInt(e.target.value))}
                         data-testid="input-capture-interval"
@@ -107,6 +109,8 @@ export function TimeTrackingTab({ form, onSubmit, updateMutation }: TimeTracking
                     <FormControl>
                       <Input
                         type="number"
+                        min="1"
+                        step="1"
                         {...field}
                         onChange={(e) => field.onChange(parseInt(e.target.value))}
                         data-testid="input-idle-threshold"

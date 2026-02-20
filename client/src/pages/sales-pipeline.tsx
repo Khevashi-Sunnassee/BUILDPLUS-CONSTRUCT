@@ -944,6 +944,7 @@ export default function SalesPipelinePage() {
                   type="number"
                   min="0"
                   max="100"
+                  step="0.01"
                   placeholder="0-100"
                   value={newOpp.probability}
                   onChange={(e) => setNewOpp((p) => ({ ...p, probability: e.target.value }))}

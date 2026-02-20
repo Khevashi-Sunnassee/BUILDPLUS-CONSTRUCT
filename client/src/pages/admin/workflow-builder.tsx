@@ -841,6 +841,8 @@ export default function WorkflowBuilderPage() {
                 <Label>Estimated Days</Label>
                 <Input
                   type="number"
+                  min="0"
+                  step="1"
                   value={formEstimatedDays}
                   onChange={(e) => setFormEstimatedDays(parseInt(e.target.value) || 14)}
                   data-testid="input-template-days"
@@ -983,6 +985,8 @@ export default function WorkflowBuilderPage() {
               <Label>Estimated Days (optional)</Label>
               <Input
                 type="number"
+                min="0"
+                step="1"
                 value={subtaskDays ?? ""}
                 onChange={(e) => setSubtaskDays(e.target.value ? parseInt(e.target.value) : undefined)}
                 placeholder="Days"

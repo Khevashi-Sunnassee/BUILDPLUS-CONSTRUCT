@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertTriangle, RefreshCw, Search, Layers, CalendarPlus, CalendarX, ChevronDown, ChevronRight } from "lucide-react";
 import { format, addDays, subDays } from "date-fns";
+import { dateInputProps } from "@/lib/validation";
 import type { ProductionSlotDialogsProps } from "./types";
 
 export function ProductionSlotDialogs({
@@ -265,6 +266,7 @@ export function ProductionSlotDialogs({
               <Label>New Production Due Date</Label>
               <Input 
                 type="date" 
+                {...dateInputProps}
                 value={adjustNewDate} 
                 onChange={(e) => setAdjustNewDate(e.target.value)}
                 data-testid="input-adjust-new-date"
@@ -500,6 +502,7 @@ export function ProductionSlotDialogs({
                                               <Label className="text-sm font-medium">Select Production Date</Label>
                                               <Input
                                                 type="date"
+                                                {...dateInputProps}
                                                 value={bookingDate}
                                                 onChange={(e) => setBookingDate(e.target.value)}
                                                 min={format(subDays(new Date(selectedSlot!.productionSlotDate), productionWindowDays), "yyyy-MM-dd")}

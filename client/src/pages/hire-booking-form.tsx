@@ -918,6 +918,7 @@ export default function HireBookingFormPage() {
                         <Input
                           {...field}
                           type="number"
+                          min="0"
                           step="0.01"
                           placeholder="0.00"
                           disabled={!canEdit}
@@ -963,6 +964,7 @@ export default function HireBookingFormPage() {
                         <Input
                           type="number"
                           min={1}
+                          step="1"
                           value={field.value}
                           onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
                           disabled={!canEdit}
@@ -1125,6 +1127,7 @@ export default function HireBookingFormPage() {
                                 {...field}
                                 value={field.value || ""}
                                 type="number"
+                                min="0"
                                 step="0.01"
                                 placeholder="0.00"
                                 disabled={!canEdit}
@@ -1169,6 +1172,7 @@ export default function HireBookingFormPage() {
                               {...field}
                               value={field.value || ""}
                               type="number"
+                              min="0"
                               step="0.01"
                               placeholder="0.00"
                               disabled={!canEdit}

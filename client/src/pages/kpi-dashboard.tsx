@@ -46,6 +46,7 @@ import {
 } from "recharts";
 import { REPORTS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { dateInputProps } from "@/lib/validation";
 
 interface ProductionDailyData {
   date: string;
@@ -542,6 +543,7 @@ export default function KPIDashboardPage() {
             <div className="flex items-center gap-2">
               <Input
                 type="date"
+                {...dateInputProps}
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
                 className="w-[140px]"
@@ -550,6 +552,7 @@ export default function KPIDashboardPage() {
               <span className="text-muted-foreground">to</span>
               <Input
                 type="date"
+                {...dateInputProps}
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
                 className="w-[140px]"

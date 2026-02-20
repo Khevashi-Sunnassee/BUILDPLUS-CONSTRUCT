@@ -1134,6 +1134,8 @@ export default function AdminFactoriesPage() {
                       <FormControl>
                         <Input
                           type="number"
+                          min="0"
+                          step="1"
                           {...field}
                           value={field.value ?? ""}
                           onChange={e => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
@@ -1154,6 +1156,8 @@ export default function AdminFactoriesPage() {
                       <FormControl>
                         <Input
                           type="number"
+                          min="0"
+                          step="1"
                           {...field}
                           value={field.value ?? ""}
                           onChange={e => field.onChange(e.target.value ? parseInt(e.target.value) : null)}

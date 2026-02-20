@@ -559,6 +559,7 @@ export default function JobBudgetPage() {
                 <Input
                   id="init-budget"
                   type="number"
+                  min="0"
                   step="0.01"
                   value={initEstimatedBudget}
                   onChange={(e) => setInitEstimatedBudget(e.target.value)}
@@ -571,6 +572,8 @@ export default function JobBudgetPage() {
                 <Input
                   id="init-profit"
                   type="number"
+                  min="0"
+                  max="100"
                   step="0.01"
                   value={initProfitTarget}
                   onChange={(e) => setInitProfitTarget(e.target.value)}
@@ -583,6 +586,7 @@ export default function JobBudgetPage() {
                 <Input
                   id="init-price"
                   type="number"
+                  min="0"
                   step="0.01"
                   value={initCustomerPrice}
                   onChange={(e) => setInitCustomerPrice(e.target.value)}
@@ -770,6 +774,7 @@ export default function JobBudgetPage() {
                                   {isEditing ? (
                                     <Input
                                       type="number"
+                                      min="0"
                                       step="0.01"
                                       value={editData.estimatedBudget}
                                       onChange={(e) => updateInlineField(line.id, "estimatedBudget", e.target.value)}
@@ -827,6 +832,7 @@ export default function JobBudgetPage() {
                                       onBlur={() => saveInlineEdit(line.id)}
                                       className="text-right font-mono h-8 w-full"
                                       data-testid={`input-inline-variations-${line.id}`}
+
                                     />
                                   ) : (
                                     <span className="font-mono text-sm cursor-pointer" onClick={(e) => { e.stopPropagation(); startInlineEdit(line); }} data-testid={`text-line-variations-${line.id}`}>
@@ -839,6 +845,7 @@ export default function JobBudgetPage() {
                                   {isEditing ? (
                                     <Input
                                       type="number"
+                                      min="0"
                                       step="0.01"
                                       value={editData.forecastCost}
                                       onChange={(e) => updateInlineField(line.id, "forecastCost", e.target.value)}
@@ -979,6 +986,7 @@ export default function JobBudgetPage() {
                 <Input
                   id="line-estimated"
                   type="number"
+                  min="0"
                   step="0.01"
                   value={lineEstimatedBudget}
                   onChange={(e) => setLineEstimatedBudget(e.target.value)}
@@ -1004,6 +1012,7 @@ export default function JobBudgetPage() {
               <Input
                 id="line-forecast"
                 type="number"
+                min="0"
                 step="0.01"
                 value={lineForecastCost}
                 onChange={(e) => setLineForecastCost(e.target.value)}
@@ -1061,6 +1070,7 @@ export default function JobBudgetPage() {
               <Input
                 id="edit-budget-total"
                 type="number"
+                min="0"
                 step="0.01"
                 value={editEstimatedBudget}
                 onChange={(e) => setEditEstimatedBudget(e.target.value)}
@@ -1074,6 +1084,8 @@ export default function JobBudgetPage() {
                 <Input
                   id="edit-profit-target"
                   type="number"
+                  min="0"
+                  max="100"
                   step="0.01"
                   value={editProfitTarget}
                   onChange={(e) => setEditProfitTarget(e.target.value)}
@@ -1086,6 +1098,7 @@ export default function JobBudgetPage() {
                 <Input
                   id="edit-customer-price"
                   type="number"
+                  min="0"
                   step="0.01"
                   value={editCustomerPrice}
                   onChange={(e) => setEditCustomerPrice(e.target.value)}

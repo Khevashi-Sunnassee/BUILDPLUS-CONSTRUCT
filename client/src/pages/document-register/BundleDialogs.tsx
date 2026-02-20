@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import {
   Form,
   FormControl,
@@ -232,7 +233,7 @@ export function CreateBundleDialog({
                 <FormItem>
                   <FormLabel>Expiration Date (Optional)</FormLabel>
                   <FormControl>
-                    <Input {...field} type="date" data-testid="input-bundle-expires" />
+                    <Input type="date" {...dateInputProps} {...field} data-testid="input-bundle-expires" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

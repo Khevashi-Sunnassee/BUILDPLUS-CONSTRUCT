@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { dateInputProps } from "@/lib/validation";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { CONTRACT_ROUTES, DOCUMENT_ROUTES, JOBS_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
 import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
@@ -191,11 +192,11 @@ function BooleanField({ label, value, onChange, testId }: { label: string; value
   );
 }
 
-function TextField({ label, value, onChange, testId, type = "text", placeholder }: { label: string; value: string; onChange: (v: string) => void; testId: string; type?: string; placeholder?: string }) {
+function TextField({ label, value, onChange, testId, type = "text", placeholder, ...rest }: { label: string; value: string; onChange: (v: string) => void; testId: string; type?: string; placeholder?: string; [key: string]: any }) {
   return (
     <div className="space-y-1">
       <Label className="text-sm">{label}</Label>
-      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId} placeholder={placeholder} />
+      <Input type={type} {...(type === "date" ? dateInputProps : {})} value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId} placeholder={placeholder} {...rest} />
     </div>
   );
 }
@@ -601,11 +602,11 @@ export default function ContractDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <TextField label="Original Contract Value" value={currentData.originalContractValue || ""} onChange={(v) => updateField("originalContractValue", v)} testId="input-original-value" type="number" placeholder="0.00" />
-                <TextField label="Revised Contract Value" value={currentData.revisedContractValue || ""} onChange={(v) => updateField("revisedContractValue", v)} testId="input-revised-value" type="number" placeholder="0.00" />
+                <TextField label="Original Contract Value" value={currentData.originalContractValue || ""} onChange={(v) => updateField("originalContractValue", v)} testId="input-original-value" type="number" placeholder="0.00" min="0" step="0.01" />
+                <TextField label="Revised Contract Value" value={currentData.revisedContractValue || ""} onChange={(v) => updateField("revisedContractValue", v)} testId="input-revised-value" type="number" placeholder="0.00" min="0" step="0.01" />
                 <TextField label="Unit Prices" value={currentData.unitPrices || ""} onChange={(v) => updateField("unitPrices", v)} testId="input-unit-prices" />
-                <TextField label="Retention Rate (%)" value={currentData.retentionPercentage || ""} onChange={(v) => updateField("retentionPercentage", v)} testId="input-retention-pct" type="number" placeholder="Default: 10%" />
-                <TextField label="Retention Cap (% of Contract)" value={currentData.retentionCap || ""} onChange={(v) => updateField("retentionCap", v)} testId="input-retention-cap" type="number" placeholder="Default: 5%" />
+                <TextField label="Retention Rate (%)" value={currentData.retentionPercentage || ""} onChange={(v) => updateField("retentionPercentage", v)} testId="input-retention-pct" type="number" placeholder="Default: 10%" min="0" max="100" step="0.01" />
+                <TextField label="Retention Cap (% of Contract)" value={currentData.retentionCap || ""} onChange={(v) => updateField("retentionCap", v)} testId="input-retention-cap" type="number" placeholder="Default: 5%" min="0" max="100" step="0.01" />
                 <TextField label="Payment Terms" value={currentData.paymentTerms || ""} onChange={(v) => updateField("paymentTerms", v)} testId="input-payment-terms" placeholder="e.g. Net 30" />
                 <TextField label="Billing Method" value={currentData.billingMethod || ""} onChange={(v) => updateField("billingMethod", v)} testId="input-billing-method" placeholder="Progress / Milestone / Delivery" />
                 <TextField label="Tax Responsibility" value={currentData.taxResponsibility || ""} onChange={(v) => updateField("taxResponsibility", v)} testId="input-tax-responsibility" />
@@ -669,7 +670,7 @@ export default function ContractDetailPage() {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <TextField label="Estimated Piece Count" value={String(currentData.estimatedPieceCount || "")} onChange={(v) => updateField("estimatedPieceCount", parseInt(v) || null)} testId="input-piece-count" type="number" />
+                <TextField label="Estimated Piece Count" value={String(currentData.estimatedPieceCount || "")} onChange={(v) => updateField("estimatedPieceCount", parseInt(v) || null)} testId="input-piece-count" type="number" min="0" step="1" />
                 <TextField label="Estimated Total Weight" value={currentData.estimatedTotalWeight || ""} onChange={(v) => updateField("estimatedTotalWeight", v)} testId="input-total-weight" />
                 <TextField label="Estimated Total Volume" value={currentData.estimatedTotalVolume || ""} onChange={(v) => updateField("estimatedTotalVolume", v)} testId="input-total-volume" />
                 <TextField label="Finish Requirements" value={currentData.finishRequirements || ""} onChange={(v) => updateField("finishRequirements", v)} testId="input-finish-req" />
@@ -692,7 +693,7 @@ export default function ContractDetailPage() {
                     Required Delivery Start
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">Synced with Job</Badge>
                   </Label>
-                  <Input type="date" value={formatDate(currentData.requiredDeliveryStartDate)} onChange={(e) => updateField("requiredDeliveryStartDate", e.target.value)} data-testid="input-delivery-start" />
+                  <Input type="date" {...dateInputProps} value={formatDate(currentData.requiredDeliveryStartDate)} onChange={(e) => updateField("requiredDeliveryStartDate", e.target.value)} data-testid="input-delivery-start" />
                 </div>
                 <TextField label="Required Delivery End" value={formatDate(currentData.requiredDeliveryEndDate)} onChange={(v) => updateField("requiredDeliveryEndDate", v)} testId="input-delivery-end" type="date" />
                 <TextField label="Production Start" value={formatDate(currentData.productionStartDate)} onChange={(v) => updateField("productionStartDate", v)} testId="input-production-start" type="date" />
@@ -721,7 +722,7 @@ export default function ContractDetailPage() {
                 <BooleanField label="Shop Drawing Required" value={currentData.shopDrawingRequired} onChange={(v) => updateField("shopDrawingRequired", v)} testId="switch-shop-drawing" />
                 <TextField label="Submittal Due Date" value={formatDate(currentData.submittalDueDate)} onChange={(v) => updateField("submittalDueDate", v)} testId="input-submittal-due" type="date" />
                 <TextField label="Submittal Approval Date" value={formatDate(currentData.submittalApprovalDate)} onChange={(v) => updateField("submittalApprovalDate", v)} testId="input-submittal-approval" type="date" />
-                <TextField label="Revision Count" value={String(currentData.revisionCount || "")} onChange={(v) => updateField("revisionCount", parseInt(v) || null)} testId="input-revision-count" type="number" />
+                <TextField label="Revision Count" value={String(currentData.revisionCount || "")} onChange={(v) => updateField("revisionCount", parseInt(v) || null)} testId="input-revision-count" type="number" min="0" step="1" />
                 <BooleanField label="Connection Design Included" value={currentData.connectionDesignIncluded} onChange={(v) => updateField("connectionDesignIncluded", v)} testId="switch-connection-design" />
                 <BooleanField label="Stamped Calculations Required" value={currentData.stampedCalculationsRequired} onChange={(v) => updateField("stampedCalculationsRequired", v)} testId="switch-stamped-calcs" />
               </div>
@@ -756,12 +757,12 @@ export default function ContractDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <TextField label="Approved CO Value" value={currentData.approvedChangeOrderValue || ""} onChange={(v) => updateField("approvedChangeOrderValue", v)} testId="input-approved-co-value" type="number" />
-                <TextField label="Pending CO Value" value={currentData.pendingChangeOrderValue || ""} onChange={(v) => updateField("pendingChangeOrderValue", v)} testId="input-pending-co-value" type="number" />
-                <TextField label="CO Count" value={String(currentData.changeOrderCount || "")} onChange={(v) => updateField("changeOrderCount", parseInt(v) || null)} testId="input-co-count" type="number" />
+                <TextField label="Approved CO Value" value={currentData.approvedChangeOrderValue || ""} onChange={(v) => updateField("approvedChangeOrderValue", v)} testId="input-approved-co-value" type="number" min="0" step="0.01" />
+                <TextField label="Pending CO Value" value={currentData.pendingChangeOrderValue || ""} onChange={(v) => updateField("pendingChangeOrderValue", v)} testId="input-pending-co-value" type="number" min="0" step="0.01" />
+                <TextField label="CO Count" value={String(currentData.changeOrderCount || "")} onChange={(v) => updateField("changeOrderCount", parseInt(v) || null)} testId="input-co-count" type="number" min="0" step="1" />
                 <TextField label="CO Reference Numbers" value={currentData.changeOrderReferenceNumbers || ""} onChange={(v) => updateField("changeOrderReferenceNumbers", v)} testId="input-co-refs" />
                 <TextField label="Change Reason Codes" value={currentData.changeReasonCodes || ""} onChange={(v) => updateField("changeReasonCodes", v)} testId="input-change-reasons" />
-                <TextField label="Time Impact (Days)" value={String(currentData.timeImpactDays || "")} onChange={(v) => updateField("timeImpactDays", parseInt(v) || null)} testId="input-time-impact" type="number" />
+                <TextField label="Time Impact (Days)" value={String(currentData.timeImpactDays || "")} onChange={(v) => updateField("timeImpactDays", parseInt(v) || null)} testId="input-time-impact" type="number" min="0" step="1" />
               </div>
             </CardContent>
           </Card>

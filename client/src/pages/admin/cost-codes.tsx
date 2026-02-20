@@ -729,6 +729,8 @@ export default function AdminCostCodesPage() {
                 <Input
                   id="cc-sort"
                   type="number"
+                  min="0"
+                  step="1"
                   value={formSortOrder}
                   onChange={(e) => setFormSortOrder(parseInt(e.target.value) || 0)}
                   className="w-24"
@@ -822,6 +824,8 @@ export default function AdminCostCodesPage() {
                 <Input
                   id="child-sort"
                   type="number"
+                  min="0"
+                  step="1"
                   value={formSortOrder}
                   onChange={(e) => setFormSortOrder(parseInt(e.target.value) || 0)}
                   className="w-24"

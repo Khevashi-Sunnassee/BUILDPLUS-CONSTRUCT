@@ -812,6 +812,7 @@ export default function ProgressClaimFormPage() {
                     type="number"
                     min={0}
                     max={100}
+                    step="0.01"
                     value={taxRate}
                     onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
                     data-testid="input-tax-rate"

@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { dateInputProps } from "@/lib/validation";
 import { useToast } from "@/hooks/use-toast";
 import { DRAFTING_INBOX_ROUTES } from "@shared/api-routes";
 import { useRoute, useLocation } from "wouter";
@@ -715,6 +716,7 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
           <div>
             <Input
               type="date"
+              {...dateInputProps}
               value={manualDueDate}
               onChange={(e) => { setManualDueDate(e.target.value); setManualAiReason(""); }}
               className="bg-white/10 border-white/20 text-white text-sm"

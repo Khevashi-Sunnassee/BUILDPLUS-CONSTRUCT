@@ -1085,7 +1085,7 @@ export default function TemplateEditorPage() {
                       <FormItem>
                         <FormLabel>Min</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} value={field.value ?? ""} />
+                          <Input type="number" step="any" {...field} value={field.value ?? ""} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -1097,7 +1097,7 @@ export default function TemplateEditorPage() {
                       <FormItem>
                         <FormLabel>Max</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} value={field.value ?? ""} />
+                          <Input type="number" step="any" {...field} value={field.value ?? ""} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -1109,7 +1109,7 @@ export default function TemplateEditorPage() {
                       <FormItem>
                         <FormLabel>Step</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} value={field.value ?? ""} />
+                          <Input type="number" min="0" step="any" {...field} value={field.value ?? ""} />
                         </FormControl>
                       </FormItem>
                     )}
