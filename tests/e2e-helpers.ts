@@ -55,7 +55,17 @@ export async function loginAdmin() {
   }
 }
 
-await loginAdmin();
+export async function ensureAdminLogin(): Promise<boolean> {
+  if (adminLoggedIn) return true;
+  try {
+    const healthRes = await fetch(`${BASE_URL}/api/health`, { signal: AbortSignal.timeout(3000) });
+    if (!healthRes.ok) return false;
+  } catch {
+    return false;
+  }
+  await loginAdmin();
+  return adminLoggedIn;
+}
 
 export async function loginUser() {
   const signupRes = await fetch(`${BASE_URL}/api/auth/register`, {

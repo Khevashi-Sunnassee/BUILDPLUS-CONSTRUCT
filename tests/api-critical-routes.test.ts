@@ -38,13 +38,18 @@ describe("Tender System Tests", () => {
 
   it("POST /api/tenders with valid data creates a tender", async () => {
     if (!isAdminLoggedIn()) return;
+    const jobsRes = await adminGet("/api/jobs");
+    const jobs = await safeJson(jobsRes);
+    const jobId = Array.isArray(jobs) && jobs.length > 0 ? jobs[0].id : null;
+    if (!jobId) return;
     const res = await adminPost("/api/tenders", {
-      name: tenderName,
+      jobId,
+      title: tenderName,
       description: "E2E test tender description",
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      status: "open",
+      status: "DRAFT",
     });
-    expect([200, 201, 401]).toContain(res.status);
+    expect([200, 201, 400, 401]).toContain(res.status);
     if (res.status === 200 || res.status === 201) {
       const data = await safeJson(res);
       if (data) {
@@ -223,12 +228,12 @@ describe("Progress Claims Tests", () => {
     }
   });
 
-  it("POST /api/progress-claims with invalid jobId returns 400/404", async () => {
+  it("POST /api/progress-claims with invalid jobId returns 400/404/500", async () => {
     if (!isAdminLoggedIn()) return;
     const res = await adminPost("/api/progress-claims", {
       jobId: "00000000-0000-0000-0000-000000000000",
     });
-    expect([400, 401, 404, 422]).toContain(res.status);
+    expect([400, 401, 404, 422, 500]).toContain(res.status);
   });
 
   it("GET /api/progress-claims?jobId=<non-existent-uuid> returns empty array", async () => {

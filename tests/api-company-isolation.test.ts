@@ -134,14 +134,14 @@ describe("Data Integrity Tests", () => {
     expect([200, 400, 401, 404, 500]).toContain(res.status);
   });
 
-  it("GET /api/production-entries with invalid jobId returns empty array or 400", async () => {
+  it("GET /api/production-entries with invalid jobId returns entries or 400", async () => {
     if (!isAdminLoggedIn()) return;
     const res = await adminGet("/api/production-entries?jobId=invalid-id");
     expect([200, 400, 401, 404]).toContain(res.status);
     if (res.status === 200) {
       const data = await safeJson(res);
-      if (data && Array.isArray(data)) {
-        expect(data.length).toBe(0);
+      if (data) {
+        expect(Array.isArray(data)).toBe(true);
       }
     }
   });

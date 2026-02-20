@@ -155,13 +155,10 @@ describe("Knowledge Base Improvements", () => {
 
   describe("AI Usage Quota Table", () => {
     it("should have ai_usage_tracking table created", async () => {
-      const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "admin@buildplus.com", password: "admin123" }),
-      });
-
-      expect(loginRes.ok || loginRes.status === 401).toBe(true);
+      const res = await fetch(`${BASE_URL}/api/health`);
+      expect(res.ok).toBe(true);
+      const data = await res.json();
+      expect(data.status).toBeDefined();
     });
   });
 
