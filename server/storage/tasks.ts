@@ -30,7 +30,14 @@ async function batchEnrichTasks(rawTasks: Task[]): Promise<TaskWithDetails[]> {
     .where(inArray(tasks.parentId, taskIds))
     .orderBy(asc(tasks.sortOrder));
 
-  const allIds = [...taskIds, ...subtasksResult.map(s => s.id)];
+  const subtaskIds = subtasksResult.map(s => s.id);
+  const subSubtasksResult = subtaskIds.length > 0
+    ? await db.select().from(tasks)
+        .where(inArray(tasks.parentId, subtaskIds))
+        .orderBy(asc(tasks.sortOrder))
+    : [];
+
+  const allIds = [...taskIds, ...subtaskIds, ...subSubtasksResult.map(s => s.id)];
 
   const [assigneesResult, updatesCountResult, filesCountResult] = await Promise.all([
     db.select()
@@ -66,7 +73,7 @@ async function batchEnrichTasks(rawTasks: Task[]): Promise<TaskWithDetails[]> {
 
   const allUserIds = new Set<string>();
   const allJobIds = new Set<string>();
-  for (const t of [...rawTasks, ...subtasksResult]) {
+  for (const t of [...rawTasks, ...subtasksResult, ...subSubtasksResult]) {
     if (t.createdById) allUserIds.add(t.createdById);
     if (t.jobId) allJobIds.add(t.jobId);
   }
@@ -86,6 +93,14 @@ async function batchEnrichTasks(rawTasks: Task[]): Promise<TaskWithDetails[]> {
   const jobsMap = new Map<string, Job>();
   for (const j of jobsResult) jobsMap.set(j.id, j);
 
+  const subSubtasksByParent = new Map<string, Task[]>();
+  for (const s of subSubtasksResult) {
+    if (s.parentId) {
+      if (!subSubtasksByParent.has(s.parentId)) subSubtasksByParent.set(s.parentId, []);
+      subSubtasksByParent.get(s.parentId)!.push(s);
+    }
+  }
+
   const subtasksByParent = new Map<string, Task[]>();
   for (const s of subtasksResult) {
     if (s.parentId) {
@@ -94,16 +109,24 @@ async function batchEnrichTasks(rawTasks: Task[]): Promise<TaskWithDetails[]> {
     }
   }
 
-  return rawTasks.map(task => {
-    const subs = (subtasksByParent.get(task.id) || []).map(subtask => ({
-      ...subtask,
-      assignees: assigneesByTask.get(subtask.id) || [],
+  function enrichTask(t: Task): TaskWithDetails {
+    return {
+      ...t,
+      assignees: assigneesByTask.get(t.id) || [],
       subtasks: [] as TaskWithDetails[],
-      updatesCount: updatesCountMap.get(subtask.id) || 0,
-      filesCount: filesCountMap.get(subtask.id) || 0,
-      createdBy: subtask.createdById ? usersMap.get(subtask.createdById) || null : null,
-      job: subtask.jobId ? jobsMap.get(subtask.jobId) || null : null,
-    }));
+      updatesCount: updatesCountMap.get(t.id) || 0,
+      filesCount: filesCountMap.get(t.id) || 0,
+      createdBy: t.createdById ? usersMap.get(t.createdById) || null : null,
+      job: t.jobId ? jobsMap.get(t.jobId) || null : null,
+    };
+  }
+
+  return rawTasks.map(task => {
+    const subs = (subtasksByParent.get(task.id) || []).map(subtask => {
+      const enriched = enrichTask(subtask);
+      enriched.subtasks = (subSubtasksByParent.get(subtask.id) || []).map(ss => enrichTask(ss));
+      return enriched;
+    });
 
     return {
       ...task,

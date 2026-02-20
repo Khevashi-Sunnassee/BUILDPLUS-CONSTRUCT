@@ -24,6 +24,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   Plus, Calendar as CalendarIcon, MessageSquare, Paperclip,
   GripVertical, Users, Bell, Eye, EyeOff, Loader2, MoreHorizontal, Trash2,
+  ChevronRight, ChevronDown,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -312,11 +313,20 @@ function ActivityTaskRow({
   const [localTitle, setLocalTitle] = useState(task.title);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssigneePopover, setShowAssigneePopover] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const subtaskInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLocalTitle(task.title);
   }, [task.title]);
+
+  useEffect(() => {
+    if (isExpanded && subtaskInputRef.current) {
+      setTimeout(() => subtaskInputRef.current?.focus(), 50);
+    }
+  }, [isExpanded]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: Partial<Task>) => {
@@ -356,6 +366,65 @@ function ActivityTaskRow({
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
   });
+
+  const createSubtaskMutation = useMutation({
+    mutationFn: async (title: string) => {
+      const res = await apiRequest("POST", TASKS_ROUTES.LIST, {
+        groupId: task.groupId,
+        parentId: task.id,
+        jobId: task.jobId || jobId,
+        jobActivityId: activityId,
+        title,
+        dueDate: activityEndDate ? new Date(activityEndDate).toISOString() : null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+      setNewSubtaskTitle("");
+      setTimeout(() => subtaskInputRef.current?.focus(), 50);
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+  });
+
+  const deleteSubtaskMutation = useMutation({
+    mutationFn: async (subtaskId: string) => {
+      return apiRequest("DELETE", TASKS_ROUTES.BY_ID(subtaskId));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+  });
+
+  const updateSubtaskMutation = useMutation({
+    mutationFn: async ({ subtaskId, data }: { subtaskId: string; data: Partial<Task> }) => {
+      return apiRequest("PATCH", TASKS_ROUTES.BY_ID(subtaskId), data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+  });
+
+  function handleCreateSubtask() {
+    const title = newSubtaskTitle.trim();
+    if (!title) return;
+    createSubtaskMutation.mutate(title);
+  }
+
+  const subtasks = task.subtasks || [];
+  const subtaskCount = subtasks.length;
+  const subtaskDoneCount = subtasks.filter(s => s.status === "DONE").length;
 
   const addAssigneeMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -454,7 +523,20 @@ function ActivityTaskRow({
           <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab opacity-0 group-hover:opacity-100" />
         </div>
 
-        <div className="flex items-center gap-2 py-1 px-2">
+        <div className="flex items-center gap-1 py-1 px-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex-shrink-0"
+            onClick={() => setIsExpanded(!isExpanded)}
+            data-testid={`btn-expand-task-${task.id}`}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+          </Button>
           <Checkbox
             checked={isDone}
             onCheckedChange={(checked) => {
@@ -477,6 +559,11 @@ function ActivityTaskRow({
             }}
             data-testid={`input-task-title-${task.id}`}
           />
+          {subtaskCount > 0 && !isExpanded && (
+            <span className="text-[10px] text-muted-foreground flex-shrink-0 ml-1">
+              {subtaskDoneCount}/{subtaskCount}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center justify-center">
@@ -758,6 +845,135 @@ function ActivityTaskRow({
         </DropdownMenu>
       </div>
 
+      {isExpanded && (
+        <div className="border-b border-border/30 bg-muted/30">
+          {subtasks.map(subtask => {
+            const subIsDone = subtask.status === "DONE";
+            const subIsOverdue = subtask.dueDate && !subIsDone && isBefore(startOfDay(new Date(subtask.dueDate)), startOfDay(new Date()));
+            return (
+              <div
+                key={subtask.id}
+                className={cn(
+                  "grid items-center border-b border-border/20 hover-elevate group/sub relative",
+                  subIsDone && "bg-green-50/50 dark:bg-green-950/20",
+                  subIsOverdue && "bg-red-50/30 dark:bg-red-950/10",
+                )}
+                style={{ gridTemplateColumns: GRID_TEMPLATE }}
+                data-testid={`subtask-row-${subtask.id}`}
+              >
+                <div />
+                <div className="flex items-center gap-2 py-1 pl-10 pr-2">
+                  <Checkbox
+                    checked={subIsDone}
+                    onCheckedChange={(checked) => {
+                      updateSubtaskMutation.mutate({
+                        subtaskId: subtask.id,
+                        data: { status: checked ? "DONE" : "NOT_STARTED" } as any,
+                      });
+                    }}
+                    className="h-3.5 w-3.5 flex-shrink-0"
+                    data-testid={`checkbox-subtask-${subtask.id}`}
+                  />
+                  <SubtaskTitleInput
+                    subtask={subtask}
+                    updateSubtaskMutation={updateSubtaskMutation}
+                    isDone={subIsDone}
+                  />
+                </div>
+                <div />
+                <div className="flex items-center justify-center">
+                  {(subtask.assignees?.length || 0) > 0 && (
+                    <div className="flex -space-x-1">
+                      {(subtask.assignees || []).slice(0, 2).map((a) => (
+                        <Avatar key={a.id} className="h-5 w-5 border border-background">
+                          <AvatarFallback className="text-[8px] bg-primary text-primary-foreground">
+                            {getInitials(a.user?.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-center">
+                  <Select
+                    value={subtask.status}
+                    onValueChange={(v) => updateSubtaskMutation.mutate({ subtaskId: subtask.id, data: { status: v } as any })}
+                  >
+                    <SelectTrigger className="h-6 border-0 text-[10px] justify-center" data-testid={`select-subtask-status-${subtask.id}`}>
+                      <div className={cn("inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-semibold text-white", STATUS_CONFIG[subtask.status as TaskStatus]?.bgClass || "bg-muted-foreground")}>
+                        {STATUS_CONFIG[subtask.status as TaskStatus]?.label || subtask.status}
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                        <SelectItem key={key} value={key}>
+                          <div className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", config.bgClass)}>
+                            {config.label}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div />
+                <div />
+                <div className="px-2 text-xs text-muted-foreground">
+                  {subtask.dueDate && (
+                    <span className={cn(subIsOverdue && "text-red-500")}>
+                      {format(new Date(subtask.dueDate), "dd/MM/yy")}
+                    </span>
+                  )}
+                </div>
+                <div />
+                <div />
+                <div className="flex items-center justify-center">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="opacity-0 group-hover/sub:opacity-100"
+                    onClick={() => deleteSubtaskMutation.mutate(subtask.id)}
+                    data-testid={`btn-delete-subtask-${subtask.id}`}
+                  >
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+
+          <div
+            className="grid items-center border-b border-dashed border-border/20"
+            style={{ gridTemplateColumns: GRID_TEMPLATE }}
+          >
+            <div />
+            <div className="flex items-center gap-2 py-1 pl-10 pr-2">
+              <Plus className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+              <Input
+                ref={subtaskInputRef}
+                placeholder="Add a subtask..."
+                className="h-6 text-xs border-0 shadow-none focus-visible:ring-0 bg-transparent"
+                value={newSubtaskTitle}
+                onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreateSubtask();
+                }}
+                disabled={createSubtaskMutation.isPending}
+                data-testid={`input-new-subtask-${task.id}`}
+              />
+            </div>
+            <div />
+            <div />
+            <div />
+            <div />
+            <div />
+            <div />
+            <div />
+            <div />
+            <div />
+          </div>
+        </div>
+      )}
+
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -778,5 +994,50 @@ function ActivityTaskRow({
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function SubtaskTitleInput({
+  subtask,
+  updateSubtaskMutation,
+  isDone,
+}: {
+  subtask: Task;
+  updateSubtaskMutation: { mutate: (args: { subtaskId: string; data: Partial<Task> }) => void };
+  isDone: boolean;
+}) {
+  const [localTitle, setLocalTitle] = useState(subtask.title);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLocalTitle(subtask.title);
+  }, [subtask.title]);
+
+  function handleBlur() {
+    if (localTitle.trim() && localTitle !== subtask.title) {
+      updateSubtaskMutation.mutate({
+        subtaskId: subtask.id,
+        data: { title: localTitle.trim() },
+      });
+    } else {
+      setLocalTitle(subtask.title);
+    }
+  }
+
+  return (
+    <Input
+      ref={inputRef}
+      className={cn(
+        "h-6 border-0 bg-transparent focus-visible:ring-1 text-xs flex-1 min-w-0",
+        isDone && "line-through text-muted-foreground",
+      )}
+      value={localTitle}
+      onChange={(e) => setLocalTitle(e.target.value)}
+      onBlur={handleBlur}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") inputRef.current?.blur();
+      }}
+      data-testid={`input-subtask-title-${subtask.id}`}
+    />
   );
 }
