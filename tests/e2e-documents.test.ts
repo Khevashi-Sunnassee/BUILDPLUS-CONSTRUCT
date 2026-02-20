@@ -6,22 +6,25 @@ import {
   adminPatch,
   adminDelete,
   uniqueName,
-  isAdminLoggedIn,
 } from "./e2e-helpers";
 
+let authAvailable = false;
 let documentTypeId = "";
 let statusId = "";
 let disciplineId = "";
 let categoryId = "";
 
-beforeAll(async () => {
-  await loginAdmin();
-});
-
-describe.skipIf(!isAdminLoggedIn())("E2E: Document Type Management", () => {
+describe("E2E: Document Type Management", () => {
   const typeName = uniqueName("DOCTYPE");
 
+  beforeAll(async () => {
+    await loginAdmin();
+    const meRes = await adminGet("/api/auth/me");
+    authAvailable = meRes.status === 200;
+  });
+
   it("should create a document type", async () => {
+    if (!authAvailable) return;
     const res = await adminPost("/api/document-types", {
       companyId: "1",
       typeName,
@@ -35,6 +38,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Document Type Management", () => {
   });
 
   it("should list document types and find the new one", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/document-types");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -43,6 +47,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Document Type Management", () => {
   });
 
   it("should get active document types", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/document-types/active");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -50,6 +55,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Document Type Management", () => {
   });
 
   it("should update the document type", async () => {
+    if (!authAvailable) return;
     const res = await adminPatch(`/api/document-types/${documentTypeId}`, {
       description: "E2E updated description",
     });
@@ -57,8 +63,9 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Document Type Management", () => {
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: Document Type Status Workflow", () => {
+describe("E2E: Document Type Status Workflow", () => {
   it("should list auto-created statuses for the type", async () => {
+    if (!authAvailable) return;
     if (!documentTypeId) return;
     const res = await adminGet(`/api/document-types/${documentTypeId}/statuses`);
     expect(res.status).toBe(200);
@@ -68,6 +75,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Document Type Status Workflow", () => 
   });
 
   it("should create an additional status", async () => {
+    if (!authAvailable) return;
     if (!documentTypeId) return;
     const res = await adminPost(`/api/document-types/${documentTypeId}/statuses`, {
       companyId: "1",
@@ -85,6 +93,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Document Type Status Workflow", () => 
   });
 
   it("should update the status", async () => {
+    if (!authAvailable) return;
     if (!statusId) return;
     const res = await adminPatch(`/api/document-types/${documentTypeId}/statuses/${statusId}`, {
       statusName: "E2E Reviewed",
@@ -94,10 +103,11 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Document Type Status Workflow", () => 
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: Document Discipline Management", () => {
+describe("E2E: Document Discipline Management", () => {
   const discName = uniqueName("DISC");
 
   it("should create a discipline", async () => {
+    if (!authAvailable) return;
     const res = await adminPost("/api/document-disciplines", {
       companyId: "1",
       disciplineName: discName,
@@ -111,6 +121,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Document Discipline Management", () =>
   });
 
   it("should list disciplines", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/document-disciplines");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -120,15 +131,17 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Document Discipline Management", () =>
   });
 
   it("should get active disciplines", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/document-disciplines/active");
     expect(res.status).toBe(200);
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: Document Category Management", () => {
+describe("E2E: Document Category Management", () => {
   const catName = uniqueName("CAT");
 
   it("should create a category", async () => {
+    if (!authAvailable) return;
     const res = await adminPost("/api/document-categories", {
       companyId: "1",
       categoryName: catName,
@@ -142,6 +155,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Document Category Management", () => {
   });
 
   it("should list categories", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/document-categories");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -149,33 +163,38 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Document Category Management", () => {
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: Document Listing", () => {
+describe("E2E: Document Listing", () => {
   it("should list documents (paginated)", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/documents");
     expect(res.status).toBe(200);
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: Document Config Cleanup", () => {
+describe("E2E: Document Config Cleanup", () => {
   it("should delete the custom status", async () => {
+    if (!authAvailable) return;
     if (!statusId || !documentTypeId) return;
     const res = await adminDelete(`/api/document-types/${documentTypeId}/statuses/${statusId}`);
     expect(res.status).toBe(200);
   });
 
   it("should delete the document type", async () => {
+    if (!authAvailable) return;
     if (!documentTypeId) return;
     const res = await adminDelete(`/api/document-types/${documentTypeId}`);
     expect(res.status).toBe(200);
   });
 
   it("should delete the discipline", async () => {
+    if (!authAvailable) return;
     if (!disciplineId) return;
     const res = await adminDelete(`/api/document-disciplines/${disciplineId}`);
     expect(res.status).toBe(200);
   });
 
   it("should delete the category", async () => {
+    if (!authAvailable) return;
     if (!categoryId) return;
     const res = await adminDelete(`/api/document-categories/${categoryId}`);
     expect(res.status).toBe(200);

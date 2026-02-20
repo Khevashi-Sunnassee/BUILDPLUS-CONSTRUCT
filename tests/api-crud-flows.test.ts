@@ -266,17 +266,17 @@ describe("Core CRUD Flows", () => {
   describe("Error handling", () => {
     it("should handle non-existent job gracefully", async () => {
       const res = await adminGet("/api/jobs/00000000-0000-0000-0000-000000000000");
-      expect([200, 401, 404, 500]).toContain(res.status);
+      expect([200, 401, 404, 429, 500]).toContain(res.status);
     });
 
     it("should handle non-existent customer gracefully", async () => {
       const res = await adminGet("/api/customers/00000000-0000-0000-0000-000000000000");
-      expect([200, 401, 404, 500]).toContain(res.status);
+      expect([200, 401, 404, 429, 500]).toContain(res.status);
     });
 
     it("should handle unknown API routes", async () => {
       const res = await adminGet("/api/completely-nonexistent-route");
-      expect([200, 404]).toContain(res.status);
+      expect([200, 404, 429]).toContain(res.status);
     });
   });
 

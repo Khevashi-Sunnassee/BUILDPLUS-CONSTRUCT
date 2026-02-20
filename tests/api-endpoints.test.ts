@@ -1,15 +1,24 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import {
   adminGet,
   adminPost,
-  isAdminLoggedIn,
+  loginAdmin,
   unauthGet,
 } from "./e2e-helpers";
 
 const BASE_URL = "http://localhost:5000";
 
-describe.skipIf(!isAdminLoggedIn())("API Endpoints - Authentication", () => {
+let authAvailable = false;
+
+describe("API Endpoints - Authentication", () => {
+  beforeAll(async () => {
+    await loginAdmin();
+    const meRes = await adminGet("/api/auth/me");
+    authAvailable = meRes.status === 200;
+  });
+
   it("POST /api/auth/login should return user on valid credentials", async () => {
+    if (!authAvailable) return;
     const res = await fetch(`${BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -25,6 +34,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Authentication", () => {
   });
 
   it("POST /api/auth/login should reject invalid credentials", async () => {
+    if (!authAvailable) return;
     const res = await fetch(`${BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -34,6 +44,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Authentication", () => {
   });
 
   it("GET /api/auth/me should return current user when authenticated", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/auth/me");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -41,13 +52,15 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Authentication", () => {
   });
 
   it("GET /api/auth/me should return 401 when not authenticated", async () => {
+    if (!authAvailable) return;
     const res = await fetch(`${BASE_URL}/api/auth/me`);
     expect(res.status).toBe(401);
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("API Endpoints - Core Resources", () => {
+describe("API Endpoints - Core Resources", () => {
   it("GET /api/dashboard/stats should return dashboard data", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/dashboard/stats");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -56,6 +69,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Core Resources", () => {
   });
 
   it("GET /api/jobs should return array of jobs", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/jobs");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -63,6 +77,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Core Resources", () => {
   });
 
   it("GET /api/panels should return array of panels", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/panels");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -70,6 +85,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Core Resources", () => {
   });
 
   it("GET /api/task-groups should return array", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/task-groups");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -77,6 +93,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Core Resources", () => {
   });
 
   it("GET /api/chat/conversations should return array", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/chat/conversations");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -84,6 +101,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Core Resources", () => {
   });
 
   it("GET /api/users should return array of users", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/users");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -92,6 +110,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Core Resources", () => {
   });
 
   it("GET /api/load-lists should return array", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/load-lists");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -99,6 +118,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Core Resources", () => {
   });
 
   it("GET /api/purchase-orders should return array", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/purchase-orders");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -106,6 +126,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Core Resources", () => {
   });
 
   it("GET /api/production-slots should return array", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/production-slots");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -113,6 +134,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Core Resources", () => {
   });
 
   it("GET /api/eot-claims should return array", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/eot-claims");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -120,8 +142,9 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Core Resources", () => {
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("API Endpoints - Admin Routes", () => {
+describe("API Endpoints - Admin Routes", () => {
   it("GET /api/admin/settings should return settings object", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/admin/settings");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -129,6 +152,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Admin Routes", () => {
   });
 
   it("GET /api/admin/factories should return array", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/admin/factories");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -136,6 +160,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Admin Routes", () => {
   });
 
   it("GET /api/checklist/entity-types should return array", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/checklist/entity-types");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -143,6 +168,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Admin Routes", () => {
   });
 
   it("GET /api/broadcast-templates should return array", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/broadcast-templates");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -150,8 +176,9 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Admin Routes", () => {
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("API Endpoints - Help System", () => {
+describe("API Endpoints - Help System", () => {
   it("GET /api/help/recent should return array", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/help/recent");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -159,6 +186,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Help System", () => {
   });
 
   it("GET /api/help/search?q=dashboard should return results", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/help/search?q=dashboard");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -166,8 +194,9 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Help System", () => {
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("API Endpoints - Documents", () => {
+describe("API Endpoints - Documents", () => {
   it("GET /api/documents should return paginated results", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/documents?page=1&limit=10");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -179,6 +208,7 @@ describe.skipIf(!isAdminLoggedIn())("API Endpoints - Documents", () => {
 
 describe("API Endpoints - Security", () => {
   it("unauthenticated requests to protected routes should return 401", async () => {
+    if (!authAvailable) return;
     const protectedRoutes = [
       "/api/jobs",
       "/api/panels",

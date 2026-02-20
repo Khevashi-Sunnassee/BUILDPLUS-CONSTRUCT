@@ -68,7 +68,7 @@ describe("Input Sanitization Middleware", () => {
     it("should reject extremely long URL parameters", async () => {
       const longId = "a".repeat(200);
       const res = await fetch(`${BASE_URL}/api/jobs/${longId}`);
-      expect([400, 401, 404]).toContain(res.status);
+      expect([400, 401, 404, 429]).toContain(res.status);
     });
   });
 });

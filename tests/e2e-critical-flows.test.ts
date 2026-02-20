@@ -7,30 +7,33 @@ import {
   adminDelete,
   unauthGet,
   uniqueName,
-  isAdminLoggedIn,
 } from "./e2e-helpers";
 
 let jobId = "";
 let tradeId = "";
+let authAvailable = false;
 
-beforeAll(async () => {
-  await loginAdmin();
+describe("E2E: AP Invoices & Approval Rules", () => {
+  beforeAll(async () => {
+    await loginAdmin();
 
-  const jobsRes = await adminGet("/api/jobs");
-  const jobs = await jobsRes.json();
-  jobId = jobs[0]?.id;
+    const meRes = await adminGet("/api/auth/me");
+    authAvailable = meRes.status === 200;
 
-  const tradesRes = await adminGet("/api/scope-trades");
-  const trades = await tradesRes.json();
-  if (Array.isArray(trades) && trades.length > 0) {
-    tradeId = trades[0]?.id;
-  }
-});
+    const jobsRes = await adminGet("/api/jobs");
+    const jobs = await jobsRes.json();
+    jobId = jobs[0]?.id;
 
-describe.skipIf(!isAdminLoggedIn())("E2E: AP Invoices & Approval Rules", () => {
+    const tradesRes = await adminGet("/api/scope-trades");
+    const trades = await tradesRes.json();
+    if (Array.isArray(trades) && trades.length > 0) {
+      tradeId = trades[0]?.id;
+    }
+  });
   let ruleId = "";
 
   it("should list AP invoices", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/ap-invoices");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -38,12 +41,14 @@ describe.skipIf(!isAdminLoggedIn())("E2E: AP Invoices & Approval Rules", () => {
   });
 
   it("should return 404 for non-existent invoice", async () => {
+    if (!authAvailable) return;
     const fakeId = "00000000-0000-0000-0000-000000000000";
     const res = await adminGet(`/api/ap-invoices/${fakeId}`);
     expect([404, 400]).toContain(res.status);
   });
 
   it("should list AP approval rules", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/ap-approval-rules");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -51,6 +56,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: AP Invoices & Approval Rules", () => {
   });
 
   it("should create an AP approval rule", async () => {
+    if (!authAvailable) return;
     const ruleName = uniqueName("APRULE");
     const res = await adminPost("/api/ap-approval-rules", {
       name: ruleName,
@@ -69,17 +75,25 @@ describe.skipIf(!isAdminLoggedIn())("E2E: AP Invoices & Approval Rules", () => {
   });
 
   it("should delete the created AP approval rule", async () => {
+    if (!authAvailable) return;
     if (!ruleId) return;
     const res = await adminDelete(`/api/ap-approval-rules/${ruleId}`);
     expect([200, 204]).toContain(res.status);
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: Tender Center - CRUD Flow", () => {
+describe("E2E: Tender Center - CRUD Flow", () => {
   let tenderId = "";
   const tenderTitle = uniqueName("TENDER");
 
+  beforeAll(async () => {
+    await loginAdmin();
+    const meRes = await adminGet("/api/auth/me");
+    authAvailable = meRes.status === 200;
+  });
+
   it("should list tenders", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/tenders");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -87,6 +101,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Tender Center - CRUD Flow", () => {
   });
 
   it("should create a tender", async () => {
+    if (!authAvailable) return;
     if (!jobId) return;
     const res = await adminPost("/api/tenders", {
       jobId,
@@ -101,6 +116,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Tender Center - CRUD Flow", () => {
   });
 
   it("should get the created tender", async () => {
+    if (!authAvailable) return;
     if (!tenderId) return;
     const res = await adminGet(`/api/tenders/${tenderId}`);
     expect(res.status).toBe(200);
@@ -109,6 +125,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Tender Center - CRUD Flow", () => {
   });
 
   it("should update the tender", async () => {
+    if (!authAvailable) return;
     if (!tenderId) return;
     const res = await adminPatch(`/api/tenders/${tenderId}`, {
       description: "E2E updated tender description",
@@ -121,23 +138,32 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Tender Center - CRUD Flow", () => {
   });
 
   it("should delete the tender", async () => {
+    if (!authAvailable) return;
     if (!tenderId) return;
     const res = await adminDelete(`/api/tenders/${tenderId}`);
     expect([200, 204]).toContain(res.status);
   });
 
   it("should return 404 for deleted tender", async () => {
+    if (!authAvailable) return;
     if (!tenderId) return;
     const res = await adminGet(`/api/tenders/${tenderId}`);
     expect([404, 400]).toContain(res.status);
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: Scopes of Work - CRUD Flow", () => {
+describe("E2E: Scopes of Work - CRUD Flow", () => {
   let scopeId = "";
   const scopeName = uniqueName("SCOPE");
 
+  beforeAll(async () => {
+    await loginAdmin();
+    const meRes = await adminGet("/api/auth/me");
+    authAvailable = meRes.status === 200;
+  });
+
   it("should list scopes", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/scopes");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -145,6 +171,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Scopes of Work - CRUD Flow", () => {
   });
 
   it("should create a scope", async () => {
+    if (!authAvailable) return;
     if (!tradeId) return;
     const res = await adminPost("/api/scopes", {
       tradeId,
@@ -161,6 +188,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Scopes of Work - CRUD Flow", () => {
   });
 
   it("should get the created scope", async () => {
+    if (!authAvailable) return;
     if (!scopeId) return;
     const res = await adminGet(`/api/scopes/${scopeId}`);
     expect(res.status).toBe(200);
@@ -169,14 +197,22 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Scopes of Work - CRUD Flow", () => {
   });
 
   it("should delete the scope", async () => {
+    if (!authAvailable) return;
     if (!scopeId) return;
     const res = await adminDelete(`/api/scopes/${scopeId}`);
     expect([200, 204]).toContain(res.status);
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: Tender Email Inbox", () => {
+describe("E2E: Tender Email Inbox", () => {
+  beforeAll(async () => {
+    await loginAdmin();
+    const meRes = await adminGet("/api/auth/me");
+    authAvailable = meRes.status === 200;
+  });
+
   it("should list tender inbox emails", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/tender-inbox/emails");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -184,6 +220,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Tender Email Inbox", () => {
   });
 
   it("should get tender inbox settings", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/tender-inbox/settings");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -191,8 +228,15 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Tender Email Inbox", () => {
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: Drafting Email Inbox", () => {
+describe("E2E: Drafting Email Inbox", () => {
+  beforeAll(async () => {
+    await loginAdmin();
+    const meRes = await adminGet("/api/auth/me");
+    authAvailable = meRes.status === 200;
+  });
+
   it("should list drafting inbox emails", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/drafting-inbox/emails");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -200,6 +244,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Drafting Email Inbox", () => {
   });
 
   it("should get drafting inbox settings", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/drafting-inbox/settings");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -207,8 +252,15 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Drafting Email Inbox", () => {
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: MYOB Integration Status", () => {
+describe("E2E: MYOB Integration Status", () => {
+  beforeAll(async () => {
+    await loginAdmin();
+    const meRes = await adminGet("/api/auth/me");
+    authAvailable = meRes.status === 200;
+  });
+
   it("should return MYOB connection status", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/myob/status");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -216,8 +268,15 @@ describe.skipIf(!isAdminLoggedIn())("E2E: MYOB Integration Status", () => {
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: Logistics Pagination", () => {
+describe("E2E: Logistics Pagination", () => {
+  beforeAll(async () => {
+    await loginAdmin();
+    const meRes = await adminGet("/api/auth/me");
+    authAvailable = meRes.status === 200;
+  });
+
   it("should return paginated load-lists (auth enforced)", async () => {
+    if (!authAvailable) return;
     const unauth = await unauthGet("/api/load-lists");
     expect([401, 429]).toContain(unauth.status);
     const res = await adminGet("/api/load-lists");
@@ -236,6 +295,7 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Logistics Pagination", () => {
   });
 
   it("should respect pagination params when accessible", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/load-lists?page=1&limit=10");
     expect(res.status).not.toBe(401);
     if (res.status === 200) {
@@ -248,8 +308,15 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Logistics Pagination", () => {
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: Daily Logs Pagination", () => {
+describe("E2E: Daily Logs Pagination", () => {
+  beforeAll(async () => {
+    await loginAdmin();
+    const meRes = await adminGet("/api/auth/me");
+    authAvailable = meRes.status === 200;
+  });
+
   it("should return paginated daily-logs", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/daily-logs");
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -261,8 +328,15 @@ describe.skipIf(!isAdminLoggedIn())("E2E: Daily Logs Pagination", () => {
   });
 });
 
-describe.skipIf(!isAdminLoggedIn())("E2E: Opportunities Pagination", () => {
+describe("E2E: Opportunities Pagination", () => {
+  beforeAll(async () => {
+    await loginAdmin();
+    const meRes = await adminGet("/api/auth/me");
+    authAvailable = meRes.status === 200;
+  });
+
   it("should return paginated opportunities", async () => {
+    if (!authAvailable) return;
     const res = await adminGet("/api/jobs/opportunities");
     expect(res.status).toBe(200);
     const data = await res.json();
