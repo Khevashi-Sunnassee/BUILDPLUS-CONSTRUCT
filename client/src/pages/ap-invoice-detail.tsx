@@ -1173,6 +1173,7 @@ export default function ApInvoiceDetailPage() {
   const [goToNext, setGoToNext] = useState(false);
   const [splits, setSplits] = useState<InvoiceSplit[]>([]);
   const [splitsInitialized, setSplitsInitialized] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"document" | "details">("document");
 
   const { data: invoice, isLoading } = useQuery<InvoiceDetail>({
     queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId || "")],
@@ -1429,7 +1430,6 @@ export default function ApInvoiceDetailPage() {
   }
 
   const invoiceTotal = parseFloat(String(invoice.totalInc || "0"));
-  const [mobileTab, setMobileTab] = useState<"document" | "details">("document");
 
   return (
     <div className="flex flex-col h-[calc(100vh-73px)]" data-testid="page-invoice-detail">
