@@ -17,6 +17,8 @@ import {
   File,
   FileVideo,
   FileAudio,
+  BookOpen,
+  BookX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +37,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -114,6 +117,7 @@ interface DocumentTableProps {
   onToggleSelectAll: (docs: DocumentWithDetails[]) => void;
   onOpenVersionHistory: (doc: DocumentWithDetails) => void;
   onOpenNewVersion: (doc: DocumentWithDetails) => void;
+  onAddToKnowledgeBase: (doc: DocumentWithDetails) => void;
 }
 
 export function DocumentTable({
@@ -123,6 +127,7 @@ export function DocumentTable({
   onToggleSelectAll,
   onOpenVersionHistory,
   onOpenNewVersion,
+  onAddToKnowledgeBase,
 }: DocumentTableProps) {
   const { toast } = useToast();
 
@@ -132,6 +137,19 @@ export function DocumentTable({
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Status updated" });
+      queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.LIST] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeFromKbMutation = useMutation({
+    mutationFn: async (docId: string) => {
+      return apiRequest("POST", DOCUMENT_ROUTES.REMOVE_FROM_KB(docId));
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Removed from Knowledge Base" });
       queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.LIST] });
     },
     onError: (error: Error) => {
@@ -155,14 +173,26 @@ export function DocumentTable({
           />
         </TableCell>
         <TableCell className="w-10">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div data-testid={`icon-filetype-${doc.id}`}>
-                <fileType.Icon className={`h-5 w-5 ${fileType.color}`} />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>{fileType.label}</TooltipContent>
-          </Tooltip>
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div data-testid={`icon-filetype-${doc.id}`}>
+                  <fileType.Icon className={`h-5 w-5 ${fileType.color}`} />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>{fileType.label}</TooltipContent>
+            </Tooltip>
+            {doc.kbDocumentId && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div data-testid={`icon-kb-${doc.id}`}>
+                    <BookOpen className="h-4 w-4 text-violet-500" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>In Knowledge Base</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </TableCell>
         <TableCell>
           <div className="flex flex-col">
@@ -291,13 +321,31 @@ export function DocumentTable({
                     </DropdownMenuItem>
                   </>
                 )}
+                <DropdownMenuSeparator />
+                {doc.kbDocumentId ? (
+                  <DropdownMenuItem
+                    onClick={() => removeFromKbMutation.mutate(doc.id)}
+                    data-testid={`button-remove-kb-${doc.id}`}
+                  >
+                    <BookX className="h-4 w-4 mr-2" />
+                    Remove from Knowledge Base
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => onAddToKnowledgeBase(doc)}
+                    data-testid={`button-add-kb-${doc.id}`}
+                  >
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Add to Knowledge Base
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </TableCell>
       </TableRow>
     );
-  }, [updateStatusMutation, selectedDocIds, onToggleDocSelection, onOpenVersionHistory, onOpenNewVersion]);
+  }, [updateStatusMutation, removeFromKbMutation, selectedDocIds, onToggleDocSelection, onOpenVersionHistory, onOpenNewVersion, onAddToKnowledgeBase]);
 
   const allIds = documents.map((d) => d.id);
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedDocIds.has(id));

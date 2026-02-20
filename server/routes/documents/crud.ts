@@ -3,10 +3,12 @@ import crypto from "crypto";
 import sharp from "sharp";
 import { storage, db } from "../../storage";
 import { eq, and } from "drizzle-orm";
-import { jobMembers, documents, insertDocumentSchema } from "@shared/schema";
+import { jobMembers, documents, insertDocumentSchema, kbDocuments, kbProjects, kbChunks } from "@shared/schema";
 import { requireAuth, requireRole } from "../middleware/auth.middleware";
 import { ObjectNotFoundError } from "../../replit_integrations/object_storage";
 import logger from "../../lib/logger";
+import { chunkText } from "../../services/kb-chunking.service";
+import { generateEmbeddingsBatch } from "../../services/kb-embedding.service";
 import {
   objectStorageService,
   upload,
@@ -526,6 +528,152 @@ router.patch("/api/documents/:id/status", requireRole("ADMIN", "MANAGER"), async
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document status");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document status" });
+  }
+});
+
+router.post("/api/documents/:id/add-to-kb", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.companyId as string;
+    const userId = req.session.userId!;
+    const { projectId } = req.body;
+
+    if (!projectId) return res.status(400).json({ error: "Knowledge Base project is required" });
+
+    const [project] = await db.select()
+      .from(kbProjects)
+      .where(and(eq(kbProjects.id, String(projectId)), eq(kbProjects.companyId, companyId)))
+      .limit(1);
+
+    if (!project) return res.status(404).json({ error: "Knowledge Base project not found" });
+
+    const doc = await storage.getDocument(String(req.params.id));
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+    if (doc.companyId !== companyId) return res.status(403).json({ error: "Access denied" });
+    if (doc.kbDocumentId) return res.status(400).json({ error: "Document is already in the Knowledge Base" });
+
+    let rawText = "";
+    const mime = (doc.mimeType || "").toLowerCase();
+    const isTextBased = mime.startsWith("text/") || mime === "application/json" || mime === "application/xml";
+
+    if (isTextBased) {
+      try {
+        const objectFile = await objectStorageService.getObjectEntityFile(doc.storageKey);
+        const stream = objectFile.createReadStream();
+        const chunks: Buffer[] = [];
+        await new Promise<void>((resolve, reject) => {
+          stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+          stream.on("end", () => resolve());
+          stream.on("error", reject);
+        });
+        rawText = Buffer.concat(chunks).toString("utf-8");
+      } catch (err) {
+        logger.warn({ err, docId: doc.id }, "Failed to read document file for KB");
+      }
+    }
+
+    if (!rawText && doc.description) {
+      rawText = doc.description;
+    }
+
+    if (!rawText) {
+      rawText = `Document: ${doc.title}\nType: ${doc.originalName}\nUploaded: ${doc.createdAt}`;
+      if (doc.description) rawText += `\nDescription: ${doc.description}`;
+    }
+
+    const [kbDoc] = await db.insert(kbDocuments).values({
+      companyId,
+      projectId: project.id,
+      title: doc.title,
+      sourceType: "TEXT",
+      rawText,
+      status: "UPLOADED",
+      createdById: userId,
+    }).returning();
+
+    await db.update(documents)
+      .set({ kbDocumentId: kbDoc.id, updatedAt: new Date() })
+      .where(eq(documents.id, String(req.params.id)));
+
+    res.status(201).json({ kbDocumentId: kbDoc.id, status: "PROCESSING" });
+
+    processKbDocumentAsync(kbDoc.id, rawText, doc.title, companyId, project.id).catch(err => {
+      logger.error({ err, docId: doc.id, kbDocId: kbDoc.id }, "[KB] Background processing failed for document register doc");
+    });
+  } catch (error) {
+    logger.error({ err: error }, "Error adding document to Knowledge Base");
+    res.status(500).json({ error: "Failed to add document to Knowledge Base" });
+  }
+});
+
+async function processKbDocumentAsync(
+  docId: string,
+  rawText: string,
+  title: string,
+  companyId: string,
+  projectId: string
+) {
+  try {
+    await db.delete(kbChunks).where(eq(kbChunks.documentId, docId));
+
+    const chunks = chunkText(rawText, title);
+    if (chunks.length === 0) {
+      await db.update(kbDocuments)
+        .set({ status: "FAILED", errorMessage: "No content to chunk", chunkCount: 0 })
+        .where(eq(kbDocuments.id, docId));
+      return;
+    }
+
+    const texts = chunks.map(c => c.content);
+    const embeddings = await generateEmbeddingsBatch(texts);
+
+    const chunkValues = chunks.map((chunk, i) => ({
+      companyId,
+      projectId,
+      documentId: docId,
+      chunkIndex: chunk.metadata.chunkIndex,
+      content: chunk.content,
+      tokenCount: chunk.tokenCount,
+      embedding: embeddings[i],
+      metadata: { section: chunk.metadata.section, headings: chunk.metadata.headings },
+    }));
+
+    for (let i = 0; i < chunkValues.length; i += 50) {
+      const batch = chunkValues.slice(i, i + 50);
+      await db.insert(kbChunks).values(batch as any);
+    }
+
+    await db.update(kbDocuments)
+      .set({ status: "READY", chunkCount: chunks.length, errorMessage: null })
+      .where(eq(kbDocuments.id, docId));
+
+    logger.info({ docId, chunkCount: chunks.length }, "[KB] Document register doc processed successfully");
+  } catch (error: any) {
+    logger.error({ err: error, docId }, "[KB] Document register doc processing failed");
+    await db.update(kbDocuments)
+      .set({ status: "FAILED", errorMessage: error.message || "Processing failed" })
+      .where(eq(kbDocuments.id, docId));
+  }
+}
+
+router.post("/api/documents/:id/remove-from-kb", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.companyId as string;
+    const doc = await storage.getDocument(String(req.params.id));
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+    if (doc.companyId !== companyId) return res.status(403).json({ error: "Access denied" });
+    if (!doc.kbDocumentId) return res.status(400).json({ error: "Document is not in the Knowledge Base" });
+
+    await db.delete(kbDocuments)
+      .where(and(eq(kbDocuments.id, doc.kbDocumentId), eq(kbDocuments.companyId, companyId)));
+
+    await db.update(documents)
+      .set({ kbDocumentId: null, updatedAt: new Date() })
+      .where(eq(documents.id, String(req.params.id)));
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ err: error }, "Error removing document from Knowledge Base");
+    res.status(500).json({ error: "Failed to remove from Knowledge Base" });
   }
 });
 

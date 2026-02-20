@@ -648,6 +648,10 @@ export const DOCUMENT_ROUTES = {
   DRAWING_PACKAGE_ANALYZE: '/api/documents/drawing-package/analyze',
   DRAWING_PACKAGE_REGISTER: '/api/documents/drawing-package/register',
 
+  // Knowledge Base integration
+  ADD_TO_KB: (id: string | number) => `/api/documents/${id}/add-to-kb`,
+  REMOVE_FROM_KB: (id: string | number) => `/api/documents/${id}/remove-from-kb`,
+
   // Public bundle access (no auth required)
   PUBLIC_BUNDLE: (qrCodeId: string) => `/api/public/bundles/${qrCodeId}`,
 } as const;

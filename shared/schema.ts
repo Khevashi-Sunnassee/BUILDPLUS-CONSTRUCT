@@ -2357,6 +2357,9 @@ export const documents = pgTable("documents", {
   
   // Confidential flag
   isConfidential: boolean("is_confidential").default(false),
+
+  // Knowledge Base link
+  kbDocumentId: varchar("kb_document_id", { length: 36 }),
   
   // Timestamps
   createdAt: timestamp("created_at").defaultNow().notNull(),

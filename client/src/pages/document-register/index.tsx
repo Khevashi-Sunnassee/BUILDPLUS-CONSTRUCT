@@ -53,6 +53,7 @@ import { BulkUploadDialog } from "./BulkUploadDialog";
 import { DrawingPackageDialog } from "./DrawingPackageDialog";
 import { DocumentTable } from "./DocumentTable";
 import { BundleGridView } from "./BundleGridView";
+import { AddToKnowledgeBaseDialog } from "./AddToKnowledgeBaseDialog";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function DocumentRegister() {
@@ -90,6 +91,7 @@ export default function DocumentRegister() {
   const [versionEmailDocs, setVersionEmailDocs] = useState<DocumentWithDetails[]>([]);
 
   const [isOverlayDialogOpen, setIsOverlayDialogOpen] = useState(false);
+  const [kbDialogDoc, setKbDialogDoc] = useState<DocumentWithDetails | null>(null);
 
   const buildQueryString = useCallback(() => {
     const params = new URLSearchParams();
@@ -626,6 +628,7 @@ export default function DocumentRegister() {
                                       setSelectedDocumentForVersion(doc);
                                       setIsVersionDialogOpen(true);
                                     }}
+                                    onAddToKnowledgeBase={(doc) => setKbDialogDoc(doc)}
                                   />
                                 )}
                               </div>
@@ -682,6 +685,7 @@ export default function DocumentRegister() {
                               setSelectedDocumentForVersion(doc);
                               setIsVersionDialogOpen(true);
                             }}
+                            onAddToKnowledgeBase={(doc) => setKbDialogDoc(doc)}
                           />
                         </div>
                       )}
@@ -706,6 +710,7 @@ export default function DocumentRegister() {
                   setSelectedDocumentForVersion(doc);
                   setIsVersionDialogOpen(true);
                 }}
+                onAddToKnowledgeBase={(doc) => setKbDialogDoc(doc)}
               />
               {renderPagination()}
             </>
@@ -791,6 +796,12 @@ export default function DocumentRegister() {
           documents={documents}
         />
       )}
+
+      <AddToKnowledgeBaseDialog
+        open={!!kbDialogDoc}
+        onOpenChange={(open) => { if (!open) setKbDialogDoc(null); }}
+        document={kbDialogDoc}
+      />
     </div>
   );
 }
