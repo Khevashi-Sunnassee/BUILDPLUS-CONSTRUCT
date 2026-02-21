@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useMutation } from "@tanstack/react-query";
 import {
   Download,
@@ -178,10 +179,23 @@ export function VisualComparisonDialog({ open, onOpenChange, selectedDocIds, doc
 
   const hasResults = !!overlayResult;
 
+  useEffect(() => {
+    const mainEl = document.getElementById("main-content");
+    if (hasResults && mainEl) {
+      mainEl.style.position = "relative";
+      mainEl.style.overflow = "hidden";
+      return () => {
+        mainEl.style.position = "";
+        mainEl.style.overflow = "";
+      };
+    }
+  }, [hasResults]);
+
   if (hasResults) {
-    return (
+    const mainEl = document.getElementById("main-content");
+    const resultsContent = (
       <div
-        className="fixed inset-0 z-50 bg-background flex flex-col"
+        className="absolute inset-0 z-30 bg-background flex flex-col"
         data-testid="fullscreen-comparison"
       >
         <div className="flex items-center gap-3 px-4 py-2 border-b bg-background shrink-0">
@@ -351,6 +365,11 @@ export function VisualComparisonDialog({ open, onOpenChange, selectedDocIds, doc
         </div>
       </div>
     );
+
+    if (mainEl) {
+      return createPortal(resultsContent, mainEl);
+    }
+    return resultsContent;
   }
 
   return (
