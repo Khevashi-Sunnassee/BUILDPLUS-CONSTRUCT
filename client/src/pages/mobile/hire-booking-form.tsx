@@ -54,10 +54,10 @@ interface Asset {
 }
 
 const inputClass =
-  "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/30 text-base focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors";
+  "w-full min-w-0 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/30 text-base focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors";
 
 const selectClass =
-  "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white text-base focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors appearance-none";
+  "w-full min-w-0 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white text-base focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors appearance-none";
 
 function FormField({
   label,
@@ -578,12 +578,12 @@ export default function MobileHireBookingForm() {
 
         <SectionHeader icon={<CalendarIcon className="h-4 w-4 text-blue-400" />} title="Dates & Rate" />
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-3">
           <FormField label="Start Date" required error={errors.hireStartDate}>
             <input
               type="date"
               {...dateInputProps}
-              className={inputClass}
+              className={`${inputClass} [color-scheme:dark] min-w-0`}
               value={form.hireStartDate}
               onChange={(e) => setForm(f => ({ ...f, hireStartDate: e.target.value }))}
               aria-required="true"
@@ -594,7 +594,7 @@ export default function MobileHireBookingForm() {
             <input
               type="date"
               {...dateInputProps}
-              className={inputClass}
+              className={`${inputClass} [color-scheme:dark] min-w-0`}
               value={form.hireEndDate}
               onChange={(e) => setForm(f => ({ ...f, hireEndDate: e.target.value }))}
               aria-required="true"
@@ -607,7 +607,7 @@ export default function MobileHireBookingForm() {
           <FormField label="Rate Type">
             <div className="relative">
               <select
-                className={selectClass}
+                className={`${selectClass} min-w-0`}
                 value={form.rateType}
                 onChange={(e) => setForm(f => ({ ...f, rateType: e.target.value as any }))}
                 data-testid="select-rate-type"
@@ -623,7 +623,7 @@ export default function MobileHireBookingForm() {
           <FormField label="Rate Amount" required error={errors.rateAmount}>
             <input
               type="number"
-              className={inputClass}
+              className={`${inputClass} min-w-0`}
               placeholder="0.00"
               value={form.rateAmount}
               onChange={(e) => setForm(f => ({ ...f, rateAmount: e.target.value }))}

@@ -462,7 +462,7 @@ export default function MobileCreateLoadListPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-3">
             <div>
               <label className="text-xs text-white/60 mb-1.5 block">Scheduled Date</label>
               <Input
@@ -470,7 +470,7 @@ export default function MobileCreateLoadListPage() {
                 {...dateInputProps}
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                className="rounded-xl bg-white/5 border-white/10 text-white"
+                className="rounded-xl bg-white/5 border-white/10 text-white [color-scheme:dark] min-w-0"
                 aria-required="true"
                 data-testid="input-scheduled-date"
               />
@@ -482,7 +482,7 @@ export default function MobileCreateLoadListPage() {
                 placeholder="DOC-001"
                 value={docketNumber}
                 onChange={(e) => setDocketNumber(e.target.value)}
-                className="rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20"
+                className="rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20 min-w-0"
                 data-testid="input-docket-number"
               />
             </div>

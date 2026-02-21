@@ -84,7 +84,7 @@ function FormRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-const inputClass = "rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20";
+const inputClass = "rounded-xl bg-white/5 border-white/10 text-white placeholder:text-white/20 min-w-0";
 
 export default function MobileRecordDeliveryPage() {
   const { toast } = useToast();
@@ -309,14 +309,14 @@ export default function MobileRecordDeliveryPage() {
                 </FormRow>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-3">
                 <FormRow label="Delivery Date">
                   <Input
                     type="date"
                     {...dateInputProps}
                     value={deliveryDate}
                     onChange={(e) => setDeliveryDate(e.target.value)}
-                    className={inputClass}
+                    className={`${inputClass} [color-scheme:dark] min-w-0`}
                     data-testid="input-delivery-date"
                   />
                 </FormRow>
@@ -328,7 +328,7 @@ export default function MobileRecordDeliveryPage() {
                     placeholder="0"
                     value={numberPanels}
                     onChange={(e) => setNumberPanels(e.target.value)}
-                    className={inputClass}
+                    className={`${inputClass} min-w-0`}
                     data-testid="input-number-panels"
                   />
                 </FormRow>
