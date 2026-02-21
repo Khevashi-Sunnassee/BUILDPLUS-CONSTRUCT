@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Save, Send, Check, X, Printer, Trash2 } from "lucide-react";
+import { Save, Send, Check, X, Printer, Trash2, RefreshCw } from "lucide-react";
 
 export interface ActionButtonsProps {
   canEdit: boolean;
@@ -13,6 +13,7 @@ export interface ActionButtonsProps {
   submitIsPending: boolean;
   approveIsPending: boolean;
   handleSave: () => void;
+  handleUpdate: () => void;
   handleSubmit: () => void;
   handleApprove: () => void;
   handlePrint: () => void;
@@ -32,15 +33,19 @@ export function ActionButtons({
   submitIsPending,
   approveIsPending,
   handleSave,
+  handleUpdate,
   handleSubmit,
   handleApprove,
   handlePrint,
   setShowRejectDialog,
   setShowDeleteDialog,
 }: ActionButtonsProps) {
+  const isDraft = !existingPOStatus || existingPOStatus === "DRAFT";
+  const isNonDraftEditable = existingPOStatus && existingPOStatus !== "DRAFT" && existingPOStatus !== "RECEIVED";
+
   return (
     <div className="flex flex-wrap gap-3 print:hidden">
-      {canEdit && (
+      {canEdit && isDraft && (
         <>
           <Button
             onClick={handleSave}
@@ -66,6 +71,17 @@ export function ActionButtons({
             {submitIsPending ? "Submitting..." : "Submit for Approval"}
           </Button>
         </>
+      )}
+
+      {canEdit && isNonDraftEditable && (
+        <Button
+          onClick={handleUpdate}
+          disabled={updateIsPending}
+          data-testid="button-update-po"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          {updateIsPending ? "Updating..." : "Update PO"}
+        </Button>
       )}
 
       {canApprove && (
@@ -97,7 +113,7 @@ export function ActionButtons({
         </Button>
       )}
 
-      {(canEdit && !isNew) && (
+      {(canEdit && !isNew && isDraft) && (
         <Button
           variant="destructive"
           onClick={() => setShowDeleteDialog(true)}

@@ -611,6 +611,11 @@ export default function PurchaseOrderFormPage() {
     }
   };
 
+  const handleUpdate = () => {
+    const formData = form.getValues();
+    updateMutation.mutate({ po: formData, items: lineItems });
+  };
+
   const handleSubmit = async () => {
     const formData = form.getValues();
     if (isNew) {
@@ -881,6 +886,7 @@ export default function PurchaseOrderFormPage() {
             submitIsPending={submitMutation.isPending}
             approveIsPending={approveMutation.isPending}
             handleSave={handleSave}
+            handleUpdate={handleUpdate}
             handleSubmit={handleSubmit}
             handleApprove={() => approveMutation.mutate()}
             handlePrint={handlePrint}

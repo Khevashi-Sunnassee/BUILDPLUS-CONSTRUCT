@@ -1249,7 +1249,7 @@ export default function PurchaseOrdersPage() {
                           </TooltipTrigger>
                           <TooltipContent>Print</TooltipContent>
                         </Tooltip>
-                        {po.status === "DRAFT" && (
+                        {po.status !== "RECEIVED" && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
