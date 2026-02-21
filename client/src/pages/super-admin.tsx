@@ -166,8 +166,13 @@ function SystemDefaultsManager({ companyId, companies }: { companyId: string; co
     },
     onSuccess: (data: any) => {
       const counts = data.clonedCounts || {};
-      const total = Object.values(counts).reduce((s: number, v: any) => s + (v || 0), 0);
-      toast({ title: `Cloned ${total} default records to target company` });
+      const skipped = data.skippedCounts || {};
+      const totalCloned = Object.values(counts).reduce((s: number, v: any) => s + (v || 0), 0);
+      const totalSkipped = Object.values(skipped).reduce((s: number, v: any) => s + (v || 0), 0);
+      const msg = totalSkipped > 0
+        ? `Cloned ${totalCloned} records, skipped ${totalSkipped} already existing`
+        : `Cloned ${totalCloned} default records to target company`;
+      toast({ title: msg });
     },
     onError: () => {
       toast({ title: "Failed to clone defaults", variant: "destructive" });
