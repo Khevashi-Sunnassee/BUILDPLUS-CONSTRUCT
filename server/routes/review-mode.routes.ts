@@ -1,12 +1,168 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import * as fs from "fs";
+import * as path from "path";
 import { requireSuperAdmin } from "./middleware/auth.middleware";
 import { reviewModeMethods } from "../storage/review-mode";
 import { generatePacket, packetToMarkdown, runReview, mergeTaskpacks, sanitizeContent } from "../services/review-engine";
 import { db } from "../db";
 import { reviewContextVersions } from "@shared/schema";
 import logger from "../lib/logger";
+
+interface DiscoveredPage {
+  targetType: "DESKTOP_PAGE" | "MOBILE_PAGE";
+  routePath: string;
+  pageTitle: string;
+  module: string;
+  frontendEntryFile: string;
+  componentName: string;
+}
+
+function discoverPagesFromAppTsx(): DiscoveredPage[] {
+  const appTsxPath = path.resolve(process.cwd(), "client/src/App.tsx");
+  if (!fs.existsSync(appTsxPath)) return [];
+  const content = fs.readFileSync(appTsxPath, "utf-8");
+
+  const componentFileMap = new Map<string, string>();
+
+  const lazyRegex = /const\s+(\w+)\s*=\s*lazyWithRetry\(\s*\(\)\s*=>\s*import\(\s*["']@\/pages\/([^"']+)["']\s*\)\s*\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = lazyRegex.exec(content)) !== null) {
+    componentFileMap.set(match[1], `client/src/pages/${match[2]}.tsx`);
+  }
+
+  const directImportRegex = /import\s+(\w+)\s+from\s+["']@\/pages\/([^"']+)["']/g;
+  while ((match = directImportRegex.exec(content)) !== null) {
+    componentFileMap.set(match[1], `client/src/pages/${match[2]}.tsx`);
+  }
+
+  const pages: DiscoveredPage[] = [];
+  const routeRegex = /<Route\s+path=["']([^"']+)["']/g;
+  const skipPaths = new Set(["/login", "/mobile/login", "/register/:token", "/bundle/:qrCodeId"]);
+
+  while ((match = routeRegex.exec(content)) !== null) {
+    const routePath = match[1];
+    if (skipPaths.has(routePath)) continue;
+
+    const afterRoute = content.substring(match.index, match.index + 600);
+
+    if (/<Redirect\s/.test(afterRoute.split("</Route>")[0] || afterRoute.slice(0, 300))) continue;
+
+    const closingIdx = afterRoute.indexOf("</Route>");
+    const routeBlock = closingIdx > 0 ? afterRoute.substring(0, closingIdx) : afterRoute.slice(0, 400);
+
+    const allTags = [...routeBlock.matchAll(/<([A-Z][A-Za-z0-9]+)[\s/>]/g)];
+    let componentName: string | null = null;
+    for (const tagMatch of allTags) {
+      const tag = tagMatch[1];
+      if (componentFileMap.has(tag)) {
+        componentName = tag;
+        break;
+      }
+    }
+    if (!componentName) continue;
+
+    let entryFile = componentFileMap.get(componentName)!;
+    if (!fs.existsSync(path.resolve(process.cwd(), entryFile))) {
+      const tsxAlt = entryFile.replace(/\.tsx$/, "/index.tsx");
+      if (fs.existsSync(path.resolve(process.cwd(), tsxAlt))) {
+        entryFile = tsxAlt;
+      }
+    }
+
+    const isMobile = routePath.startsWith("/mobile");
+    const targetType = isMobile ? "MOBILE_PAGE" : "DESKTOP_PAGE";
+
+    const title = componentName
+      .replace(/^Mobile/, "")
+      .replace(/Page$/, "")
+      .replace(/([A-Z])/g, " $1")
+      .trim();
+
+    const module = deriveModule(routePath);
+
+    pages.push({
+      targetType,
+      routePath,
+      pageTitle: title,
+      module,
+      frontendEntryFile: entryFile,
+      componentName,
+    });
+  }
+
+  const seen = new Set<string>();
+  return pages.filter(p => {
+    const key = `${p.targetType}::${p.routePath}::${p.componentName}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function deriveModule(routePath: string): string {
+  const cleanPath = routePath.replace(/^\/mobile/, "").replace(/^\//, "");
+  const segment = cleanPath.split("/")[0] || "dashboard";
+
+  const moduleMap: Record<string, string> = {
+    "dashboard": "Dashboard",
+    "daily-reports": "Daily Reports",
+    "manual-entry": "Time Management",
+    "reports": "Reports",
+    "downloads": "Reports",
+    "production-report": "Production",
+    "kpi-dashboard": "Analytics",
+    "logistics": "Logistics",
+    "weekly-wages": "Finance",
+    "weekly-job-logs": "Reports",
+    "production-slots": "Production",
+    "production-schedule": "Production",
+    "drafting-program": "Drafting",
+    "purchase-orders": "Procurement",
+    "capex-requests": "Finance",
+    "ap-invoices": "Finance",
+    "hire-bookings": "Hire Management",
+    "tenders": "Tenders",
+    "scopes": "Scope of Works",
+    "jobs": "Jobs",
+    "tasks": "Tasks",
+    "chat": "Communication",
+    "documents": "Documents",
+    "document-register": "Documents",
+    "photo-gallery": "Documents",
+    "panel": "Panels",
+    "panels": "Panels",
+    "manager": "Management",
+    "admin": "Admin",
+    "super-admin": "Super Admin",
+    "contracts": "Contracts",
+    "progress-claims": "Finance",
+    "sales-pipeline": "Sales",
+    "help": "Help",
+    "knowledge-base": "Knowledge Base",
+    "broadcast": "Communication",
+    "checklists": "Checklists",
+    "checklist-reports": "Checklists",
+    "mail-register": "Email",
+    "tender-emails": "Email",
+    "drafting-emails": "Email",
+    "myob-integration": "Integration",
+    "pm-call-logs": "PM Call Logs",
+    "procurement-reo": "Procurement",
+    "procurement": "Procurement",
+    "scan": "Mobile Tools",
+    "more": "Navigation",
+    "profile": "User",
+    "weekly-report": "Reports",
+    "email-processing": "Email",
+    "ap-approvals": "Finance",
+    "opportunities": "Sales",
+    "photo-capture": "Documents",
+  };
+
+  return moduleMap[segment] || segment.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
 
 const router = Router();
 
@@ -60,6 +216,43 @@ router.get("/api/super-admin/review-mode/targets", requireSuperAdmin, async (_re
   } catch (error: any) {
     logger.error({ error: error.message }, "Failed to fetch targets");
     res.status(500).json({ error: "Failed to fetch targets" });
+  }
+});
+
+router.get("/api/super-admin/review-mode/discover", requireSuperAdmin, async (_req: Request, res: Response) => {
+  try {
+    const discovered = discoverPagesFromAppTsx();
+    res.json(discovered);
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to discover pages");
+    res.status(500).json({ error: "Failed to discover pages" });
+  }
+});
+
+router.post("/api/super-admin/review-mode/targets/bulk", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const parsed = z.array(createTargetSchema).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+
+    const existingTargets = await reviewModeMethods.getTargets();
+    const existingKeys = new Set(existingTargets.map(t => `${t.targetType}::${t.routePath}`));
+
+    const created = [];
+    let skipped = 0;
+    for (const target of parsed.data) {
+      const key = `${target.targetType}::${target.routePath}`;
+      if (existingKeys.has(key)) {
+        skipped++;
+        continue;
+      }
+      existingKeys.add(key);
+      const t = await reviewModeMethods.createTarget(target);
+      created.push(t);
+    }
+    res.json({ created, skipped });
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to bulk create targets");
+    res.status(500).json({ error: "Failed to bulk create targets" });
   }
 });
 

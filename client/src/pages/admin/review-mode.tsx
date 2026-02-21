@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Eye, Plus, Play, Loader2, FileText, GitCompare, ListChecks,
-  CheckCircle2, XCircle, Clock, AlertTriangle, ChevronLeft, Copy, RefreshCw
+  CheckCircle2, XCircle, Clock, AlertTriangle, ChevronLeft, Copy, RefreshCw,
+  Search, Monitor, Smartphone, Check
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,15 @@ interface PacketDetail extends ReviewPacket {
   runs: ReviewRun[];
   taskpacks: ReviewTaskpack[];
   target: ReviewTarget;
+}
+
+interface DiscoveredPage {
+  targetType: string;
+  routePath: string;
+  pageTitle: string;
+  module: string;
+  frontendEntryFile: string;
+  componentName: string;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -233,6 +243,10 @@ function NewReviewWizard({ onComplete }: { onComplete: () => void }) {
     frontendEntryFile: "",
   });
   const [createNewTarget, setCreateNewTarget] = useState(false);
+  const [showDiscover, setShowDiscover] = useState(false);
+  const [discoverFilter, setDiscoverFilter] = useState("");
+  const [discoverTypeFilter, setDiscoverTypeFilter] = useState<string>("ALL");
+  const [selectedDiscovered, setSelectedDiscovered] = useState<Set<string>>(new Set());
   const [purpose, setPurpose] = useState("");
   const [roles, setRoles] = useState("");
   const [flows, setFlows] = useState("");
@@ -244,6 +258,25 @@ function NewReviewWizard({ onComplete }: { onComplete: () => void }) {
 
   const { data: targets = [] } = useQuery<ReviewTarget[]>({
     queryKey: [`${API_BASE}/targets`],
+  });
+
+  const { data: discoveredPages = [], isLoading: isDiscovering, refetch: refetchDiscover } = useQuery<DiscoveredPage[]>({
+    queryKey: [`${API_BASE}/discover`],
+    enabled: showDiscover,
+  });
+
+  const existingTargetKeys = new Set(targets.map(t => `${t.targetType}::${t.routePath}`));
+
+  const filteredDiscovered = discoveredPages.filter(p => {
+    if (existingTargetKeys.has(`${p.targetType}::${p.routePath}`)) return false;
+    if (discoverTypeFilter !== "ALL" && p.targetType !== discoverTypeFilter) return false;
+    if (discoverFilter) {
+      const q = discoverFilter.toLowerCase();
+      return p.pageTitle.toLowerCase().includes(q) ||
+        p.routePath.toLowerCase().includes(q) ||
+        p.module.toLowerCase().includes(q);
+    }
+    return true;
   });
 
   const createTargetMutation = useMutation({
@@ -258,6 +291,54 @@ function NewReviewWizard({ onComplete }: { onComplete: () => void }) {
       setStep(2);
     },
   });
+
+  const bulkImportMutation = useMutation({
+    mutationFn: async (pages: Array<{ targetType: string; routePath: string; pageTitle: string; module: string; frontendEntryFile: string }>) => {
+      const res = await apiRequest(`${API_BASE}/targets/bulk`, { method: "POST", body: JSON.stringify(pages), headers: { "Content-Type": "application/json" } });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/targets`] });
+      const created = data.created?.length || 0;
+      const skipped = data.skipped || 0;
+      toast({ title: `${created} pages imported${skipped > 0 ? `, ${skipped} already existed` : ""}` });
+      setSelectedDiscovered(new Set());
+      setShowDiscover(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to import pages", variant: "destructive" });
+    },
+  });
+
+  const pageKey = (p: DiscoveredPage) => `${p.targetType}::${p.routePath}`;
+
+  const handleBulkImport = () => {
+    const selectedKeys = selectedDiscovered;
+    const pages = discoveredPages
+      .filter(p => selectedKeys.has(pageKey(p)))
+      .map(({ componentName, ...rest }) => rest);
+    bulkImportMutation.mutate(pages);
+  };
+
+  const toggleDiscoveredPage = (p: DiscoveredPage) => {
+    const key = pageKey(p);
+    setSelectedDiscovered(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const selectAllFiltered = () => {
+    setSelectedDiscovered(prev => {
+      const next = new Set(prev);
+      filteredDiscovered.forEach(p => next.add(pageKey(p)));
+      return next;
+    });
+  };
+
+  const deselectAll = () => setSelectedDiscovered(new Set());
 
   const generatePacketMutation = useMutation({
     mutationFn: (data: any) =>
@@ -286,7 +367,110 @@ function NewReviewWizard({ onComplete }: { onComplete: () => void }) {
         {step === 1 && (
           <div className="space-y-4">
             <h3 className="font-semibold">Step 1: Select or Create Target</h3>
-            {!createNewTarget ? (
+
+            {showDiscover ? (
+              <div className="space-y-4 border rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium flex items-center gap-2">
+                    <Search className="h-4 w-4" />
+                    Discovered Pages ({filteredDiscovered.length} available)
+                  </h4>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => refetchDiscover()} data-testid="button-refresh-discover">
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setShowDiscover(false)} data-testid="button-close-discover">
+                      Close
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Filter by name, route, or module..."
+                    value={discoverFilter}
+                    onChange={(e) => setDiscoverFilter(e.target.value)}
+                    className="flex-1"
+                    data-testid="input-discover-filter"
+                  />
+                  <Select value={discoverTypeFilter} onValueChange={setDiscoverTypeFilter}>
+                    <SelectTrigger className="w-[160px]" data-testid="select-discover-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">All Types</SelectItem>
+                      <SelectItem value="DESKTOP_PAGE">Desktop</SelectItem>
+                      <SelectItem value="MOBILE_PAGE">Mobile</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedDiscovered.size > 0 && (
+                  <div className="flex items-center justify-between bg-muted/50 p-2 rounded-md">
+                    <span className="text-sm font-medium">{selectedDiscovered.size} pages selected</span>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="ghost" onClick={deselectAll} data-testid="button-deselect-all">
+                        Clear
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleBulkImport}
+                        disabled={bulkImportMutation.isPending}
+                        data-testid="button-bulk-import"
+                      >
+                        {bulkImportMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
+                        Import Selected as Targets
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {isDiscovering ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    <span className="text-muted-foreground">Scanning codebase...</span>
+                  </div>
+                ) : filteredDiscovered.length === 0 ? (
+                  <p className="text-muted-foreground text-sm py-4 text-center">
+                    {discoveredPages.length === 0 ? "No pages discovered." : "All discovered pages are already imported as targets, or no pages match your filter."}
+                  </p>
+                ) : (
+                  <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                    <div className="flex justify-end mb-1">
+                      <Button size="sm" variant="ghost" onClick={selectAllFiltered} data-testid="button-select-all-filtered">
+                        Select All ({filteredDiscovered.length})
+                      </Button>
+                    </div>
+                    {filteredDiscovered.map((p) => (
+                      <div
+                        key={pageKey(p)}
+                        className={`flex items-center gap-3 p-2 rounded-md border cursor-pointer transition-colors ${
+                          selectedDiscovered.has(pageKey(p)) ? "bg-primary/10 border-primary/30" : "hover:bg-muted/50"
+                        }`}
+                        onClick={() => toggleDiscoveredPage(p)}
+                        data-testid={`discover-page-${p.routePath}`}
+                      >
+                        <div className={`flex items-center justify-center h-5 w-5 rounded border ${
+                          selectedDiscovered.has(pageKey(p)) ? "bg-primary border-primary" : "border-muted-foreground/30"
+                        }`}>
+                          {selectedDiscovered.has(pageKey(p)) && <Check className="h-3 w-3 text-primary-foreground" />}
+                        </div>
+                        {p.targetType === "MOBILE_PAGE" ? (
+                          <Smartphone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        ) : (
+                          <Monitor className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">{p.pageTitle}</div>
+                          <div className="text-xs text-muted-foreground truncate">{p.routePath}</div>
+                        </div>
+                        <Badge variant="outline" className="text-xs flex-shrink-0">{p.module}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : !createNewTarget ? (
               <div className="space-y-3">
                 {targets.length > 0 && (
                   <div>
@@ -305,7 +489,7 @@ function NewReviewWizard({ onComplete }: { onComplete: () => void }) {
                     </Select>
                   </div>
                 )}
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button
                     onClick={() => setStep(2)}
                     disabled={!targetId}
@@ -315,10 +499,17 @@ function NewReviewWizard({ onComplete }: { onComplete: () => void }) {
                   </Button>
                   <Button
                     variant="outline"
+                    onClick={() => { setShowDiscover(true); }}
+                    data-testid="button-discover-pages"
+                  >
+                    <Search className="h-4 w-4 mr-1" /> Discover Pages
+                  </Button>
+                  <Button
+                    variant="outline"
                     onClick={() => setCreateNewTarget(true)}
                     data-testid="button-create-new-target"
                   >
-                    <Plus className="h-4 w-4 mr-1" /> Create New Target
+                    <Plus className="h-4 w-4 mr-1" /> Manual Entry
                   </Button>
                 </div>
               </div>
