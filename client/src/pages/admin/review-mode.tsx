@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Eye, Plus, Play, Loader2, FileText, GitCompare, ListChecks,
   CheckCircle2, XCircle, Clock, AlertTriangle, ChevronLeft, Copy, RefreshCw,
-  Search, Monitor, Smartphone, Check
+  Search, Monitor, Smartphone, Check, Star, BarChart3
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,9 @@ interface ReviewTarget {
   pageTitle: string;
   module: string;
   frontendEntryFile: string;
+  latestScore: number | null;
+  latestScoreBreakdown: any;
+  lastReviewedAt: string | null;
   createdAt: string;
 }
 
@@ -39,6 +42,8 @@ interface ReviewPacket {
   purpose: string;
   roles: string[];
   riskFocus: string[];
+  score: number | null;
+  scoreBreakdown: any;
   createdAt: string;
 }
 
@@ -117,6 +122,96 @@ function SeverityBadge({ severity }: { severity: string }) {
   );
 }
 
+function StarRating({ score, size = "md" }: { score: number | null; size?: "sm" | "md" | "lg" }) {
+  if (score === null || score === undefined) return <span className="text-muted-foreground text-xs">Not scored</span>;
+  const sizeClass = size === "sm" ? "h-3 w-3" : size === "lg" ? "h-6 w-6" : "h-4 w-4";
+  return (
+    <div className="flex items-center gap-0.5" data-testid={`star-rating-${score}`}>
+      {[1, 2, 3, 4, 5].map((s) => (
+        <Star
+          key={s}
+          className={`${sizeClass} ${s <= score ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"}`}
+        />
+      ))}
+      <span className={`ml-1 font-semibold ${size === "sm" ? "text-xs" : "text-sm"}`}>{score}/5</span>
+    </div>
+  );
+}
+
+function ScoreBreakdownCard({ breakdown }: { breakdown: any }) {
+  if (!breakdown) return null;
+  const dimensions = [
+    { key: "functionality", label: "Functionality" },
+    { key: "uiUx", label: "UI/UX" },
+    { key: "security", label: "Security" },
+    { key: "performance", label: "Performance" },
+    { key: "codeQuality", label: "Code Quality" },
+    { key: "dataIntegrity", label: "Data Integrity" },
+    { key: "errorHandling", label: "Error Handling" },
+    { key: "accessibility", label: "Accessibility" },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="score-breakdown">
+      {dimensions.map(({ key, label }) => {
+        const val = breakdown[key] ?? 0;
+        const color = val >= 4 ? "text-green-600" : val >= 3 ? "text-yellow-600" : "text-red-600";
+        return (
+          <div key={key} className="flex flex-col items-center p-2 border rounded-lg">
+            <span className="text-xs text-muted-foreground">{label}</span>
+            <div className="flex items-center gap-1 mt-1">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <Star key={s} className={`h-3 w-3 ${s <= val ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/20"}`} />
+              ))}
+            </div>
+            <span className={`text-sm font-bold ${color}`}>{val}/5</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PageElementsView({ elements }: { elements: any }) {
+  if (!elements) return null;
+  const sections = [
+    { key: "buttons", label: "Buttons" },
+    { key: "forms", label: "Forms" },
+    { key: "grids", label: "Grids/Tables" },
+    { key: "dataSources", label: "Data Sources" },
+    { key: "navigation", label: "Navigation" },
+    { key: "modals", label: "Modals/Dialogs" },
+  ];
+
+  return (
+    <div className="space-y-4" data-testid="page-elements-inventory">
+      {sections.map(({ key, label }) => {
+        const items = elements[key];
+        if (!items || items.length === 0) return null;
+        return (
+          <div key={key}>
+            <h4 className="font-medium text-sm mb-2">{label} ({items.length})</h4>
+            <div className="space-y-1">
+              {items.map((item: any, i: number) => (
+                <div key={i} className="flex items-center gap-2 text-sm p-1.5 rounded border">
+                  <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${
+                    item.status === "OK" ? "bg-green-500" : item.status === "ISSUE" ? "bg-red-500" : "bg-yellow-500"
+                  }`} />
+                  <span className="font-medium min-w-0 truncate">{item.name || item.endpoint || item.element}</span>
+                  <Badge variant={item.status === "OK" ? "default" : item.status === "ISSUE" ? "destructive" : "secondary"} className="text-xs flex-shrink-0">
+                    {item.status}
+                  </Badge>
+                  {item.notes && <span className="text-muted-foreground text-xs truncate">{item.notes}</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ContextManager() {
   const { toast } = useToast();
   const [newName, setNewName] = useState("");
@@ -129,7 +224,7 @@ function ContextManager() {
 
   const createMutation = useMutation({
     mutationFn: (data: { name: string; contentMd: string }) =>
-      apiRequest(`${API_BASE}/contexts`, { method: "POST", body: JSON.stringify(data), headers: { "Content-Type": "application/json" } }),
+      apiRequest("POST", `${API_BASE}/contexts`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`${API_BASE}/contexts`] });
       toast({ title: "Context version created" });
@@ -141,7 +236,7 @@ function ContextManager() {
 
   const activateMutation = useMutation({
     mutationFn: (id: string) =>
-      apiRequest(`${API_BASE}/contexts/${id}/activate`, { method: "POST" }),
+      apiRequest("POST", `${API_BASE}/contexts/${id}/activate`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`${API_BASE}/contexts`] });
       toast({ title: "Context version activated" });
@@ -281,7 +376,7 @@ function NewReviewWizard({ onComplete }: { onComplete: () => void }) {
 
   const createTargetMutation = useMutation({
     mutationFn: (data: typeof newTarget) =>
-      apiRequest(`${API_BASE}/targets`, { method: "POST", body: JSON.stringify(data), headers: { "Content-Type": "application/json" } }),
+      apiRequest("POST", `${API_BASE}/targets`, data),
     onSuccess: async (res: any) => {
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: [`${API_BASE}/targets`] });
@@ -294,7 +389,7 @@ function NewReviewWizard({ onComplete }: { onComplete: () => void }) {
 
   const bulkImportMutation = useMutation({
     mutationFn: async (pages: Array<{ targetType: string; routePath: string; pageTitle: string; module: string; frontendEntryFile: string }>) => {
-      const res = await apiRequest(`${API_BASE}/targets/bulk`, { method: "POST", body: JSON.stringify(pages), headers: { "Content-Type": "application/json" } });
+      const res = await apiRequest("POST", `${API_BASE}/targets/bulk`, pages);
       return res.json();
     },
     onSuccess: (data: any) => {
@@ -342,7 +437,7 @@ function NewReviewWizard({ onComplete }: { onComplete: () => void }) {
 
   const generatePacketMutation = useMutation({
     mutationFn: (data: any) =>
-      apiRequest(`${API_BASE}/packets/generate`, { method: "POST", body: JSON.stringify(data), headers: { "Content-Type": "application/json" } }),
+      apiRequest("POST", `${API_BASE}/packets/generate`, data),
     onSuccess: async (res: any) => {
       const data = await res.json();
       setGeneratedPacket(data);
@@ -766,9 +861,34 @@ function ReviewRunView({ run }: { run: ReviewRun }) {
     );
   }
 
+  const score = run.responseJson?.score;
+
   return (
     <div className="space-y-4">
-      {summary && (
+      {score && (
+        <Card>
+          <CardContent className="pt-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <StarRating score={score.overall} />
+                <span className="text-sm text-muted-foreground">
+                  {run.modelName} | {((run.durationMs || 0) / 1000).toFixed(1)}s
+                </span>
+              </div>
+              {summary && (
+                <Badge variant={summary.overallHealth === "GOOD" ? "default" : summary.overallHealth === "MIXED" ? "secondary" : "destructive"}>
+                  {summary.overallHealth}
+                </Badge>
+              )}
+            </div>
+            {score.breakdown && <ScoreBreakdownCard breakdown={score.breakdown} />}
+            {score.rationale && (
+              <p className="text-sm text-muted-foreground italic">{score.rationale}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+      {summary && !score && (
         <Card>
           <CardContent className="pt-4">
             <div className="flex items-center gap-3">
@@ -888,7 +1008,7 @@ function PacketDetail({ packetId, onBack }: { packetId: string; onBack: () => vo
   const { data: packet, isLoading, refetch } = useQuery<PacketDetail>({
     queryKey: [`${API_BASE}/packets`, packetId],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/packets/${packetId}`);
+      const res = await fetch(`${API_BASE}/packets/${packetId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
@@ -901,7 +1021,7 @@ function PacketDetail({ packetId, onBack }: { packetId: string; onBack: () => vo
 
   const runReviewMutation = useMutation({
     mutationFn: (reviewer: string) =>
-      apiRequest(`${API_BASE}/runs`, { method: "POST", body: JSON.stringify({ packetId, reviewer }), headers: { "Content-Type": "application/json" } }),
+      apiRequest("POST", `${API_BASE}/runs`, { packetId, reviewer }),
     onSuccess: () => {
       refetch();
       toast({ title: "Review started" });
@@ -913,10 +1033,25 @@ function PacketDetail({ packetId, onBack }: { packetId: string; onBack: () => vo
 
   const mergeMutation = useMutation({
     mutationFn: () =>
-      apiRequest(`${API_BASE}/taskpacks/merge`, { method: "POST", body: JSON.stringify({ packetId }), headers: { "Content-Type": "application/json" } }),
+      apiRequest("POST", `${API_BASE}/taskpacks/merge`, { packetId }),
     onSuccess: () => {
       refetch();
       toast({ title: "Task pack merged" });
+    },
+  });
+
+  const scoreMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `${API_BASE}/packets/${packetId}/score`);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      refetch();
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/targets`] });
+      toast({ title: `Page scored: ${data.score}/5 stars` });
+    },
+    onError: () => {
+      toast({ title: "Failed to calculate score", variant: "destructive" });
     },
   });
 
@@ -927,21 +1062,28 @@ function PacketDetail({ packetId, onBack }: { packetId: string; onBack: () => vo
   const hasSuccessRuns = packet.runs?.some((r) => r.status === "SUCCESS");
   const latestTaskpack = packet.taskpacks?.[0];
   const anyPending = packet.runs?.some((r) => r.status === "PENDING");
+  const pageElementsA = (runA?.responseJson as any)?.pageElements;
+  const pageElementsB = (runB?.responseJson as any)?.pageElements;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="sm" onClick={onBack} data-testid="button-back-to-list">
           <ChevronLeft className="h-4 w-4 mr-1" /> Back
         </Button>
         <h2 className="text-lg font-semibold">{packet.target?.pageTitle || "Review Packet"}</h2>
         <StatusBadge status={packet.status} />
+        {packet.score !== null && packet.score !== undefined && <StarRating score={packet.score} />}
         {anyPending && (
           <Button variant="ghost" size="sm" onClick={() => refetch()} data-testid="button-refresh-status">
             <RefreshCw className="h-4 w-4 mr-1" /> Refresh
           </Button>
         )}
       </div>
+
+      {packet.scoreBreakdown && (
+        <ScoreBreakdownCard breakdown={packet.scoreBreakdown} />
+      )}
 
       <div className="flex flex-wrap gap-2">
         <Button
@@ -963,8 +1105,8 @@ function PacketDetail({ packetId, onBack }: { packetId: string; onBack: () => vo
         <Button
           onClick={async () => {
             try {
-              await apiRequest(`${API_BASE}/runs`, { method: "POST", body: JSON.stringify({ packetId, reviewer: "REPLIT_CLAUDE" }), headers: { "Content-Type": "application/json" } });
-              await apiRequest(`${API_BASE}/runs`, { method: "POST", body: JSON.stringify({ packetId, reviewer: "OPENAI" }), headers: { "Content-Type": "application/json" } });
+              await apiRequest("POST", `${API_BASE}/runs`, { packetId, reviewer: "REPLIT_CLAUDE" });
+              await apiRequest("POST", `${API_BASE}/runs`, { packetId, reviewer: "OPENAI" });
               refetch();
               toast({ title: "Both reviews started" });
             } catch {
@@ -979,22 +1121,37 @@ function PacketDetail({ packetId, onBack }: { packetId: string; onBack: () => vo
           <Play className="h-4 w-4 mr-1" /> Run Both Reviews
         </Button>
         {hasSuccessRuns && (
-          <Button
-            onClick={() => mergeMutation.mutate()}
-            disabled={mergeMutation.isPending}
-            size="sm"
-            variant="outline"
-            data-testid="button-merge-taskpack"
-          >
-            <ListChecks className="h-4 w-4 mr-1" /> Generate Task Pack
-          </Button>
+          <>
+            <Button
+              onClick={() => mergeMutation.mutate()}
+              disabled={mergeMutation.isPending}
+              size="sm"
+              variant="outline"
+              data-testid="button-merge-taskpack"
+            >
+              <ListChecks className="h-4 w-4 mr-1" /> Generate Task Pack
+            </Button>
+            <Button
+              onClick={() => scoreMutation.mutate()}
+              disabled={scoreMutation.isPending}
+              size="sm"
+              variant="outline"
+              data-testid="button-calculate-score"
+            >
+              {scoreMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Star className="h-4 w-4 mr-1" />}
+              Calculate Score
+            </Button>
+          </>
         )}
       </div>
 
-      <Tabs defaultValue="packet">
-        <TabsList data-testid="tabs-packet-detail">
-          <TabsTrigger value="packet" data-testid="tab-packet">
-            <FileText className="h-4 w-4 mr-1" /> Packet
+      <Tabs defaultValue="score">
+        <TabsList data-testid="tabs-packet-detail" className="flex-wrap h-auto">
+          <TabsTrigger value="score" data-testid="tab-score">
+            <Star className="h-4 w-4 mr-1" /> Score
+          </TabsTrigger>
+          <TabsTrigger value="elements" data-testid="tab-elements">
+            <BarChart3 className="h-4 w-4 mr-1" /> Elements
           </TabsTrigger>
           <TabsTrigger value="replit-claude" data-testid="tab-replit-claude">
             <Eye className="h-4 w-4 mr-1" /> Replit/Claude
@@ -1003,12 +1160,88 @@ function PacketDetail({ packetId, onBack }: { packetId: string; onBack: () => vo
             <Eye className="h-4 w-4 mr-1" /> OpenAI
           </TabsTrigger>
           <TabsTrigger value="diff" data-testid="tab-diff">
-            <GitCompare className="h-4 w-4 mr-1" /> Diff & Merge
+            <GitCompare className="h-4 w-4 mr-1" /> Diff
           </TabsTrigger>
           <TabsTrigger value="taskpack" data-testid="tab-taskpack">
             <ListChecks className="h-4 w-4 mr-1" /> Task Pack
           </TabsTrigger>
+          <TabsTrigger value="packet" data-testid="tab-packet">
+            <FileText className="h-4 w-4 mr-1" /> Packet
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="score" className="space-y-4">
+          {packet.score !== null && packet.score !== undefined ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3">
+                  <Star className="h-5 w-5 text-yellow-400" />
+                  Page Score
+                </CardTitle>
+                <CardDescription>Averaged from both AI reviewers across 8 dimensions</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-center py-4">
+                  <StarRating score={packet.score} size="lg" />
+                </div>
+                <ScoreBreakdownCard breakdown={packet.scoreBreakdown} />
+              </CardContent>
+            </Card>
+          ) : hasSuccessRuns ? (
+            <Card>
+              <CardContent className="pt-6 text-center space-y-4">
+                <p className="text-muted-foreground">Reviews completed. Click "Calculate Score" to generate the page score from both reviewers.</p>
+                <Button
+                  onClick={() => scoreMutation.mutate()}
+                  disabled={scoreMutation.isPending}
+                  data-testid="button-calculate-score-tab"
+                >
+                  {scoreMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Star className="h-4 w-4 mr-1" />}
+                  Calculate Score
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <p className="text-muted-foreground">Run at least one review to generate a score.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="elements" className="space-y-4">
+          {pageElementsA || pageElementsB ? (
+            <div className="grid md:grid-cols-2 gap-4">
+              {pageElementsA && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Replit/Claude - Element Review</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <PageElementsView elements={pageElementsA} />
+                  </CardContent>
+                </Card>
+              )}
+              {pageElementsB && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">OpenAI - Element Review</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <PageElementsView elements={pageElementsB} />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="pt-6 text-center">
+                <p className="text-muted-foreground">Run reviews to see element-by-element analysis of buttons, forms, grids, data sources, and more.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
 
         <TabsContent value="packet" className="space-y-4">
           <Card>
@@ -1134,8 +1367,46 @@ export default function ReviewModePage() {
     );
   }
 
+  const scoredTargets = targets.filter(t => t.latestScore !== null && t.latestScore !== undefined);
+  const avgScore = scoredTargets.length > 0
+    ? Math.round((scoredTargets.reduce((sum, t) => sum + (t.latestScore || 0), 0) / scoredTargets.length) * 10) / 10
+    : null;
+
   return (
     <div className="space-y-6">
+      {scoredTargets.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-yellow-400" />
+              Score Dashboard
+            </CardTitle>
+            <CardDescription>
+              {scoredTargets.length} of {targets.length} pages scored | Average: {avgScore}/5
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[300px] overflow-y-auto">
+              {targets
+                .sort((a, b) => (a.latestScore || 0) - (b.latestScore || 0))
+                .map(t => (
+                  <div key={t.id} className="flex items-center justify-between p-2 border rounded text-sm" data-testid={`target-score-${t.id}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      {t.targetType === "MOBILE_PAGE" ? (
+                        <Smartphone className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      ) : (
+                        <Monitor className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      )}
+                      <span className="truncate">{t.pageTitle}</span>
+                    </div>
+                    <StarRating score={t.latestScore} size="sm" />
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <ContextManager />
 
       <Card>
@@ -1143,7 +1414,7 @@ export default function ReviewModePage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Review Packets</CardTitle>
-              <CardDescription>Page-by-page code reviews with dual AI opinions</CardDescription>
+              <CardDescription>Page-by-page code reviews with dual AI opinions and scoring</CardDescription>
             </div>
             <Button onClick={() => setView("new")} data-testid="button-new-review">
               <Plus className="h-4 w-4 mr-1" /> New Review
@@ -1178,11 +1449,9 @@ export default function ReviewModePage() {
                         {targetMap[p.targetId]?.routePath} | {targetMap[p.targetId]?.module}
                       </div>
                     </div>
+                    {p.score !== null && p.score !== undefined && <StarRating score={p.score} size="sm" />}
                   </div>
                   <div className="flex items-center gap-3">
-                    {p.purpose && (
-                      <span className="text-xs text-muted-foreground max-w-[200px] truncate">{p.purpose}</span>
-                    )}
                     <span className="text-xs text-muted-foreground">
                       {new Date(p.createdAt).toLocaleDateString()}
                     </span>

@@ -478,6 +478,57 @@ router.post("/api/super-admin/review-mode/taskpacks/merge", requireSuperAdmin, a
   }
 });
 
+router.post("/api/super-admin/review-mode/packets/:id/score", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const packetId = req.params.id;
+    const packet = await reviewModeMethods.getPacket(packetId);
+    if (!packet) return res.status(404).json({ error: "Packet not found" });
+
+    const runs = await reviewModeMethods.getRunsForPacket(packetId);
+    const successRuns = runs.filter(r => r.status === "SUCCESS");
+
+    if (successRuns.length === 0) return res.status(400).json({ error: "No successful reviews to score from" });
+
+    const scores: any[] = [];
+    for (const run of successRuns) {
+      const json = run.responseJson as any;
+      if (json?.score) scores.push(json.score);
+    }
+
+    if (scores.length === 0) return res.status(400).json({ error: "No scores found in review results" });
+
+    const avgBreakdown: Record<string, number> = {};
+    const breakdownKeys = ["functionality", "uiUx", "security", "performance", "codeQuality", "dataIntegrity", "errorHandling", "accessibility"];
+
+    for (const key of breakdownKeys) {
+      const vals = scores.map(s => s.breakdown?.[key]).filter((v: any) => typeof v === "number");
+      avgBreakdown[key] = vals.length > 0 ? Math.round(vals.reduce((a: number, b: number) => a + b, 0) / vals.length) : 3;
+    }
+
+    const overallScore = Math.round(
+      Object.values(avgBreakdown).reduce((a, b) => a + b, 0) / breakdownKeys.length
+    );
+
+    const scoreBreakdown = { ...avgBreakdown, reviewerScores: scores };
+
+    await reviewModeMethods.updatePacket(packetId, {
+      score: overallScore,
+      scoreBreakdown,
+    });
+
+    await reviewModeMethods.updateTarget(packet.targetId, {
+      latestScore: overallScore,
+      latestScoreBreakdown: scoreBreakdown,
+      lastReviewedAt: new Date(),
+    });
+
+    res.json({ score: overallScore, breakdown: scoreBreakdown });
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to calculate score");
+    res.status(500).json({ error: "Failed to calculate score" });
+  }
+});
+
 router.get("/api/super-admin/review-mode/taskpacks", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const packetId = req.query.packetId as string;

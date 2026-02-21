@@ -5717,6 +5717,9 @@ export const reviewTargets = pgTable("review_targets", {
   pageTitle: text("page_title").notNull(),
   module: text("module").notNull(),
   frontendEntryFile: text("frontend_entry_file").notNull(),
+  latestScore: integer("latest_score"),
+  latestScoreBreakdown: jsonb("latest_score_breakdown"),
+  lastReviewedAt: timestamp("last_reviewed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   routePathIdx: index("review_targets_route_path_idx").on(table.routePath),
@@ -5740,6 +5743,8 @@ export const reviewPackets = pgTable("review_packets", {
   keyUserFlows: text("key_user_flows").array(),
   knownIssues: text("known_issues").array(),
   riskFocus: text("risk_focus").array(),
+  score: integer("score"),
+  scoreBreakdown: jsonb("score_breakdown"),
 }, (table) => ({
   targetIdIdx: index("review_packets_target_id_idx").on(table.targetId),
   statusIdx: index("review_packets_status_idx").on(table.status),

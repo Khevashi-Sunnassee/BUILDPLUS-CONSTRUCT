@@ -49,6 +49,11 @@ export const reviewModeMethods = {
     return result;
   },
 
+  async updateTarget(id: string, data: Partial<InsertReviewTarget>) {
+    const [result] = await db.update(reviewTargets).set(data).where(eq(reviewTargets.id, id)).returning();
+    return result;
+  },
+
   async getPackets() {
     return db.select().from(reviewPackets).orderBy(desc(reviewPackets.createdAt)).limit(200);
   },

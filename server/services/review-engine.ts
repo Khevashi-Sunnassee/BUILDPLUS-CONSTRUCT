@@ -370,7 +370,29 @@ export function packetToMarkdown(packet: ReviewPacketData): string {
 }
 
 const REVIEW_OUTPUT_SCHEMA = `{
+  "score": {
+    "overall": 1-5,
+    "breakdown": {
+      "functionality": 1-5,
+      "uiUx": 1-5,
+      "security": 1-5,
+      "performance": 1-5,
+      "codeQuality": 1-5,
+      "dataIntegrity": 1-5,
+      "errorHandling": 1-5,
+      "accessibility": 1-5
+    },
+    "rationale": "Brief explanation of score"
+  },
   "summary": { "overallHealth": "GOOD|MIXED|RISKY", "topRisks": ["..."], "quickWins": ["..."] },
+  "pageElements": {
+    "buttons": [{ "name": "...", "status": "OK|ISSUE|MISSING", "notes": "..." }],
+    "forms": [{ "name": "...", "status": "OK|ISSUE|MISSING", "notes": "..." }],
+    "grids": [{ "name": "...", "status": "OK|ISSUE|MISSING", "notes": "..." }],
+    "dataSources": [{ "endpoint": "...", "status": "OK|ISSUE|MISSING", "notes": "..." }],
+    "navigation": [{ "element": "...", "status": "OK|ISSUE|MISSING", "notes": "..." }],
+    "modals": [{ "name": "...", "status": "OK|ISSUE|MISSING", "notes": "..." }]
+  },
   "findings": [
     {
       "severity": "P0|P1|P2|P3",
@@ -389,8 +411,8 @@ const REVIEW_OUTPUT_SCHEMA = `{
 
 function buildPrompt(contextMd: string, packetMd: string, riskFocus: string[], reviewer: string): string {
   const reviewerInstruction = reviewer === "REPLIT_CLAUDE"
-    ? "You are Reviewer A (Replit/Claude perspective). Focus on architecture patterns, code organization, and enterprise scalability. Be thorough and critical."
-    : "You are Reviewer B (OpenAI perspective). Focus on security vulnerabilities, data integrity, and production readiness. Be thorough and practical.";
+    ? "You are Reviewer A (Replit/Claude perspective). You are a senior full-stack architect. Focus on architecture patterns, code organization, enterprise scalability, and UX completeness. Your reviews take precedence for code changes. Be thorough and critical."
+    : "You are Reviewer B (OpenAI perspective). You are a security-focused code auditor. Focus on security vulnerabilities, data integrity, production readiness, and edge cases. Be thorough and practical.";
 
   return `${reviewerInstruction}
 
@@ -403,8 +425,36 @@ ${packetMd}
 ## Risk Focus Areas
 ${riskFocus.length > 0 ? riskFocus.map(r => `- ${r}`).join("\n") : "- General comprehensive review"}
 
-## Instructions
-Review the above page/module across ALL of these categories:
+## Instructions - THOROUGH PAGE-BY-PAGE REVIEW
+
+You must perform an exhaustive element-by-element review of this page. This is not a cursory glance - you must investigate EVERY interactive and visual element on the page.
+
+### 1. PAGE ELEMENTS INVENTORY
+Identify and review EVERY element on the page:
+- **Buttons**: Every button - does it work? Does it have proper loading states? Disabled states? Hover effects? Correct action?
+- **Forms**: Every form field - validation? Required indicators? Error messages? Default values? Placeholder text?
+- **Grids/Tables**: Every data grid - pagination? Sorting? Filtering? Empty states? Loading skeletons? Column alignment?
+- **Data Sources**: Every API call - correct endpoint? Error handling? Loading states? Stale data handling? Cache invalidation?
+- **Navigation**: Every link, tab, breadcrumb - correct routes? Active states? Back navigation? Deep linking?
+- **Modals/Dialogs**: Every modal - close behavior? Form reset? Escape key? Overlay click? Proper z-index?
+- **Dropdowns/Selects**: Every select - default value? Options loading? Empty options handling?
+- **Toast/Notifications**: Success, error, and info messages - appropriate messaging? Timing?
+
+### 2. SCORE THE PAGE (1-5 Stars)
+Rate the page across 8 dimensions (1 = critically broken, 3 = acceptable, 5 = excellent):
+- **Functionality**: Does everything work as intended? All CRUD operations? All workflows complete?
+- **UI/UX**: Visual consistency? Responsive design? Loading states? Empty states? Error states?
+- **Security**: Auth/RBAC enforcement? Input sanitization? XSS/CSRF protection? Data exposure?
+- **Performance**: Query efficiency? Bundle size? Rendering performance? Caching? Pagination?
+- **Code Quality**: Clean code? DRY? Proper separation? Maintainable? Well-organized?
+- **Data Integrity**: Validation? Constraints? Transaction safety? Orphan prevention?
+- **Error Handling**: Graceful failures? User-friendly messages? Recovery paths? Logging?
+- **Accessibility**: Keyboard navigation? Screen reader support? Color contrast? Focus management?
+
+The overall score is the AVERAGE of all 8 dimensions, rounded to nearest integer.
+
+### 3. FINDINGS
+Review across ALL categories:
 - SECURITY: Auth bypasses, injection, XSS, CSRF, secret exposure
 - MULTI_TENANCY: Company isolation, cross-tenant data leaks
 - RBAC: Role enforcement on frontend and backend
@@ -419,13 +469,13 @@ For each finding provide:
 - severity (P0 = critical/blocking, P1 = important, P2 = moderate, P3 = nice-to-have)
 - category
 - title (concise)
-- detail_md (detailed explanation)
+- detail_md (detailed explanation with specific line references where possible)
 - impactedFiles (file paths)
 - impactedEndpoints (API endpoints)
-- suggestedFix_md (concrete fix with code snippets where helpful)
+- suggestedFix_md (concrete fix with code snippets)
 - acceptanceCriteria_md (how to verify the fix)
 
-If recommending a major refactor, propose an incremental plan and flag it.
+Be very specific. Reference actual code patterns, variable names, and component names from the packet. If recommending a major refactor, propose an incremental plan.
 
 Return ONLY valid JSON matching this schema:
 ${REVIEW_OUTPUT_SCHEMA}`;
