@@ -167,7 +167,11 @@ export default function TasksPage() {
       }
       return true;
     }),
-  }));
+  })).filter((group) => {
+    const hasActiveFilter = taskTypeFilter !== "all" || jobFilter !== "all" || statusFilter !== "all" || dueDateFilter !== "all" || !showCompleted;
+    if (hasActiveFilter && group.tasks.length === 0) return false;
+    return true;
+  });
 
   const toggleTaskSelected = useCallback((taskId: string) => {
     setSelectedTaskIds((prev) => {
