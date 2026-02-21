@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/collapsible";
 import {
   Plus, Pencil, Trash2, Loader2, ChevronDown, ChevronRight,
-  ClipboardList, Layers, Hash, DollarSign, Package,
+  ClipboardList, Layers, DollarSign, Package, Download, TrendingUp, BarChart3,
 } from "lucide-react";
 import type { BoqGroup, BoqItem, CostCode, Job } from "@shared/schema";
 
@@ -47,10 +47,66 @@ interface BoqItemWithCostCode extends BoqItem {
 interface BoqSummary {
   totalItems: number;
   totalValue: string;
-  breakdown: { costCodeId: string; costCode: string; costCodeName: string; itemCount: number; subtotal: string }[];
+  totalWithMarkup: string;
+  breakdown: { costCodeId: string; costCode: string; costCodeName: string; itemCount: number; subtotal: string; subtotalWithMarkup: string }[];
+  groupSummaries: { groupId: string; groupName: string; itemCount: number; subtotal: string; subtotalWithMarkup: string }[];
 }
 
 const UNITS = ["EA", "SQM", "M3", "LM", "M2", "M", "HR", "DAY", "TONNE", "KG", "LOT"] as const;
+
+function ItemRow({ item, onEdit, onDelete }: { item: BoqItemWithCostCode; onEdit: (item: BoqItemWithCostCode) => void; onDelete: (item: BoqItemWithCostCode) => void }) {
+  return (
+    <TableRow data-testid={`row-item-${item.id}`}>
+      <TableCell data-testid={`text-item-desc-${item.id}`}>{item.description}</TableCell>
+      <TableCell className="font-mono text-sm" data-testid={`text-item-cc-${item.id}`}>
+        {item.costCode.code}
+        {item.childCostCode && (
+          <span className="text-muted-foreground" data-testid={`text-item-child-cc-${item.id}`}> / {item.childCostCode.code}</span>
+        )}
+      </TableCell>
+      <TableCell className="text-right font-mono" data-testid={`text-item-qty-${item.id}`}>{item.quantity}</TableCell>
+      <TableCell className="text-muted-foreground" data-testid={`text-item-unit-${item.id}`}>{item.unit}</TableCell>
+      <TableCell className="text-right font-mono" data-testid={`text-item-price-${item.id}`}>{formatCurrency(item.unitPrice)}</TableCell>
+      <TableCell className="text-right font-mono" data-testid={`text-item-markup-${item.id}`}>
+        {parseFloat(item.markupPercent || "0") > 0 ? `${item.markupPercent}%` : "-"}
+      </TableCell>
+      <TableCell className="text-right font-mono font-medium" data-testid={`text-item-total-${item.id}`}>{formatCurrency(item.lineTotal)}</TableCell>
+      <TableCell className="text-right font-mono font-medium" data-testid={`text-item-total-markup-${item.id}`}>
+        {parseFloat(item.markupPercent || "0") > 0 ? formatCurrency(item.lineTotalWithMarkup) : "-"}
+      </TableCell>
+      <TableCell className="hidden lg:table-cell text-muted-foreground text-sm max-w-xs truncate">{item.notes || "-"}</TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Button size="icon" variant="ghost" onClick={() => onEdit(item)} data-testid={`button-edit-item-${item.id}`}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => onDelete(item)} data-testid={`button-delete-item-${item.id}`}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function ItemTableHeader() {
+  return (
+    <TableHeader>
+      <TableRow>
+        <TableHead>Description</TableHead>
+        <TableHead className="w-24">Cost Code</TableHead>
+        <TableHead className="text-right w-16">Qty</TableHead>
+        <TableHead className="w-14">Unit</TableHead>
+        <TableHead className="text-right w-24">Unit Price</TableHead>
+        <TableHead className="text-right w-20">Markup %</TableHead>
+        <TableHead className="text-right w-24">Line Total</TableHead>
+        <TableHead className="text-right w-28">Total + Markup</TableHead>
+        <TableHead className="hidden lg:table-cell">Notes</TableHead>
+        <TableHead className="w-20 text-right">Actions</TableHead>
+      </TableRow>
+    </TableHeader>
+  );
+}
 
 export default function JobBoqPage() {
   const { toast } = useToast();
@@ -59,6 +115,7 @@ export default function JobBoqPage() {
 
   const [costCodeFilter, setCostCodeFilter] = useState("ALL");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   const [groupDialogOpen, setGroupDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<BoqGroupWithCostCode | null>(null);
@@ -82,6 +139,7 @@ export default function JobBoqPage() {
   const [itemQuantity, setItemQuantity] = useState("");
   const [itemUnit, setItemUnit] = useState("EA");
   const [itemUnitPrice, setItemUnitPrice] = useState("");
+  const [itemMarkupPercent, setItemMarkupPercent] = useState("");
   const [itemNotes, setItemNotes] = useState("");
 
   const itemLineTotal = useMemo(() => {
@@ -89,6 +147,12 @@ export default function JobBoqPage() {
     const price = parseFloat(itemUnitPrice) || 0;
     return (qty * price).toFixed(2);
   }, [itemQuantity, itemUnitPrice]);
+
+  const itemLineTotalWithMarkup = useMemo(() => {
+    const total = parseFloat(itemLineTotal) || 0;
+    const markup = parseFloat(itemMarkupPercent) || 0;
+    return (total * (1 + markup / 100)).toFixed(2);
+  }, [itemLineTotal, itemMarkupPercent]);
 
   const { data: job, isLoading: loadingJob } = useQuery<Job>({
     queryKey: ["/api/jobs", jobId],
@@ -134,7 +198,7 @@ export default function JobBoqPage() {
     enabled: !!jobId,
   });
 
-  const { data: costCodes = [] } = useQuery<CostCode[]>({
+  const { data: costCodesData = [] } = useQuery<CostCode[]>({
     queryKey: ["/api/cost-codes"],
   });
 
@@ -142,7 +206,7 @@ export default function JobBoqPage() {
     queryKey: ["/api/cost-codes-with-children"],
   });
 
-  const activeCostCodes = useMemo(() => costCodes.filter((cc) => cc.isActive), [costCodes]);
+  const activeCostCodes = useMemo(() => costCodesData.filter((cc) => cc.isActive), [costCodesData]);
 
   const filteredGroupChildCodes = useMemo(() => {
     if (!groupCostCodeId) return [];
@@ -169,11 +233,11 @@ export default function JobBoqPage() {
     return map;
   }, [allItems]);
 
-  function invalidateBoqQueries() {
+  const invalidateBoqQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "boq", "groups"] });
     queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "boq", "items"] });
     queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "boq", "summary"] });
-  }
+  }, [jobId]);
 
   const createGroupMutation = useMutation({
     mutationFn: async (data: { name: string; costCodeId: string; childCostCodeId?: string; description?: string; sortOrder?: number }) => {
@@ -218,7 +282,7 @@ export default function JobBoqPage() {
   });
 
   const createItemMutation = useMutation({
-    mutationFn: async (data: { description: string; costCodeId: string; childCostCodeId?: string; groupId?: string | null; quantity?: string; unit?: string; unitPrice?: string; lineTotal?: string; notes?: string }) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       return apiRequest("POST", `/api/jobs/${jobId}/boq/items`, data);
     },
     onSuccess: () => {
@@ -232,7 +296,7 @@ export default function JobBoqPage() {
   });
 
   const updateItemMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; description?: string; costCodeId?: string; childCostCodeId?: string; groupId?: string | null; quantity?: string; unit?: string; unitPrice?: string; lineTotal?: string; notes?: string }) => {
+    mutationFn: async ({ id, ...data }: { id: string } & Record<string, unknown>) => {
       return apiRequest("PATCH", `/api/jobs/${jobId}/boq/items/${id}`, data);
     },
     onSuccess: () => {
@@ -259,14 +323,14 @@ export default function JobBoqPage() {
     },
   });
 
-  function toggleGroup(groupId: string) {
+  const toggleGroup = useCallback((groupId: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(groupId)) next.delete(groupId);
       else next.add(groupId);
       return next;
     });
-  }
+  }, []);
 
   function openCreateGroup() {
     setEditingGroup(null);
@@ -322,6 +386,7 @@ export default function JobBoqPage() {
     setItemQuantity("");
     setItemUnit("EA");
     setItemUnitPrice("");
+    setItemMarkupPercent("");
     setItemNotes("");
     setItemDialogOpen(true);
   }
@@ -336,6 +401,7 @@ export default function JobBoqPage() {
     setItemQuantity(item.quantity || "");
     setItemUnit(item.unit);
     setItemUnitPrice(item.unitPrice || "");
+    setItemMarkupPercent(item.markupPercent || "");
     setItemNotes(item.notes || "");
     setItemDialogOpen(true);
   }
@@ -359,7 +425,7 @@ export default function JobBoqPage() {
       quantity: itemQuantity || "0",
       unit: itemUnit,
       unitPrice: itemUnitPrice || "0",
-      lineTotal: itemLineTotal,
+      markupPercent: itemMarkupPercent || "0",
       notes: itemNotes.trim() || undefined,
     };
     if (editingItem) {
@@ -369,10 +435,40 @@ export default function JobBoqPage() {
     }
   }
 
+  const [exporting, setExporting] = useState(false);
+  async function handleExportBoq() {
+    if (!jobId) return;
+    setExporting(true);
+    try {
+      const response = await fetch(`/api/jobs/${jobId}/boq/export`, { credentials: "include" });
+      if (!response.ok) throw new Error("Export failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `BOQ_${job?.jobNumber || "export"}_${new Date().toISOString().split("T")[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "BOQ exported successfully" });
+    } catch (error: any) {
+      toast({ title: "Export failed", description: error.message, variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const isGroupFormPending = createGroupMutation.isPending || updateGroupMutation.isPending;
   const isItemFormPending = createItemMutation.isPending || updateItemMutation.isPending;
 
   const displayItems = useMemo(() => groups.length > 0 ? ungroupedItems : allItems, [groups.length, ungroupedItems, allItems]);
+
+  const markupAmount = useMemo(() => {
+    const total = parseFloat(summary?.totalValue || "0");
+    const totalMarkup = parseFloat(summary?.totalWithMarkup || "0");
+    return totalMarkup - total;
+  }, [summary]);
 
   if (!jobId) {
     return (
@@ -408,6 +504,10 @@ export default function JobBoqPage() {
           )}
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={handleExportBoq} disabled={exporting || allItems.length === 0} data-testid="button-export-boq">
+            {exporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+            Export BOQ
+          </Button>
           <Button variant="outline" onClick={openCreateGroup} data-testid="button-add-group">
             <Layers className="h-4 w-4 mr-2" />
             Add Group
@@ -436,42 +536,106 @@ export default function JobBoqPage() {
       </div>
 
       {loadingSummary ? (
-        <div className="grid grid-cols-2 gap-4">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-24 w-full" />)}
         </div>
       ) : summary && (
-        <div className="grid grid-cols-2 gap-4">
-          <Card data-testid="card-total-items">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Items</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-items">
-                {summary.totalItems}
-              </div>
-            </CardContent>
-          </Card>
-          <Card data-testid="card-total-value">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Value</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-value">
-                {formatCurrency(summary.totalValue)}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card data-testid="card-total-items">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Items</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-items">
+                  {summary.totalItems}
+                </div>
+              </CardContent>
+            </Card>
+            <Card data-testid="card-total-value">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Base Total</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-value">
+                  {formatCurrency(summary.totalValue)}
+                </div>
+              </CardContent>
+            </Card>
+            <Card data-testid="card-total-with-markup">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total (incl. Markup)</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-total-with-markup">
+                  {formatCurrency(summary.totalWithMarkup)}
+                </div>
+                {markupAmount > 0 && (
+                  <p className="text-xs text-green-600 mt-1" data-testid="text-markup-diff">
+                    +{formatCurrency(markupAmount.toFixed(2))} markup
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+            <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => setShowBreakdown(!showBreakdown)} data-testid="card-breakdown-toggle">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Cost Code Breakdown</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-breakdown-count">
+                  {summary.breakdown.length} codes
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Click to {showBreakdown ? "hide" : "show"}</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {showBreakdown && summary.breakdown.length > 0 && (
+            <Card data-testid="card-cost-code-breakdown">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Cost Code Breakdown
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="border rounded-md overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Cost Code</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead className="text-right">Items</TableHead>
+                        <TableHead className="text-right">Base Subtotal</TableHead>
+                        <TableHead className="text-right">Subtotal + Markup</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {summary.breakdown.map((b) => (
+                        <TableRow key={b.costCodeId} data-testid={`row-breakdown-${b.costCodeId}`}>
+                          <TableCell className="font-mono">{b.costCode}</TableCell>
+                          <TableCell>{b.costCodeName}</TableCell>
+                          <TableCell className="text-right">{b.itemCount}</TableCell>
+                          <TableCell className="text-right font-mono">{formatCurrency(b.subtotal)}</TableCell>
+                          <TableCell className="text-right font-mono font-medium">{formatCurrency(b.subtotalWithMarkup)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
 
       {loadingGroups ? (
         <div className="space-y-3">
-          {[1, 2].map((i) => (
-            <Skeleton key={i} className="h-20 w-full" />
-          ))}
+          {[1, 2].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
         </div>
       ) : groups.length > 0 && (
         <div className="space-y-3">
@@ -482,6 +646,7 @@ export default function JobBoqPage() {
           {groups.map((group) => {
             const isExpanded = expandedGroups.has(group.id);
             const groupItems = groupedItemsMap.get(group.id) || [];
+            const groupSummary = summary?.groupSummaries?.find((gs) => gs.groupId === group.id);
             return (
               <Card key={group.id} data-testid={`card-group-${group.id}`}>
                 <Collapsible open={isExpanded} onOpenChange={() => toggleGroup(group.id)}>
@@ -505,6 +670,14 @@ export default function JobBoqPage() {
                             <span className="text-xs text-muted-foreground">
                               {groupItems.length} item{groupItems.length !== 1 ? "s" : ""}
                             </span>
+                            {groupSummary && parseFloat(groupSummary.subtotal) > 0 && (
+                              <Badge variant="default" className="text-xs" data-testid={`badge-group-subtotal-${group.id}`}>
+                                {formatCurrency(groupSummary.subtotal)}
+                                {parseFloat(groupSummary.subtotalWithMarkup) > parseFloat(groupSummary.subtotal) && (
+                                  <span className="ml-1 opacity-75">({formatCurrency(groupSummary.subtotalWithMarkup)} w/ markup)</span>
+                                )}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </button>
@@ -535,44 +708,10 @@ export default function JobBoqPage() {
                       ) : (
                         <div className="border rounded-md overflow-auto">
                           <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Description</TableHead>
-                                <TableHead className="w-24">Cost Code</TableHead>
-                                <TableHead className="text-right w-20">Qty</TableHead>
-                                <TableHead className="w-16">Unit</TableHead>
-                                <TableHead className="text-right w-28">Unit Price</TableHead>
-                                <TableHead className="text-right w-28">Line Total</TableHead>
-                                <TableHead className="hidden lg:table-cell">Notes</TableHead>
-                                <TableHead className="w-24 text-right">Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
+                            <ItemTableHeader />
                             <TableBody>
                               {groupItems.map((item) => (
-                                <TableRow key={item.id} data-testid={`row-group-item-${item.id}`}>
-                                  <TableCell data-testid={`text-item-desc-${item.id}`}>{item.description}</TableCell>
-                                  <TableCell className="font-mono text-sm" data-testid={`text-item-cc-${item.id}`}>
-                                    {item.costCode.code}
-                                    {item.childCostCode && (
-                                      <span className="text-muted-foreground" data-testid={`text-item-child-cc-${item.id}`}> / {item.childCostCode.code}</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono" data-testid={`text-item-qty-${item.id}`}>{item.quantity}</TableCell>
-                                  <TableCell className="text-muted-foreground" data-testid={`text-item-unit-${item.id}`}>{item.unit}</TableCell>
-                                  <TableCell className="text-right font-mono" data-testid={`text-item-price-${item.id}`}>{formatCurrency(item.unitPrice)}</TableCell>
-                                  <TableCell className="text-right font-mono font-medium" data-testid={`text-item-total-${item.id}`}>{formatCurrency(item.lineTotal)}</TableCell>
-                                  <TableCell className="hidden lg:table-cell text-muted-foreground text-sm max-w-xs truncate">{item.notes || "-"}</TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex items-center justify-end gap-1">
-                                      <Button size="icon" variant="ghost" onClick={() => openEditItem(item)} data-testid={`button-edit-item-${item.id}`}>
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                      <Button size="icon" variant="ghost" onClick={() => setDeleteItemConfirm(item)} data-testid={`button-delete-item-${item.id}`}>
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
+                                <ItemRow key={item.id} item={item} onEdit={openEditItem} onDelete={setDeleteItemConfirm} />
                               ))}
                             </TableBody>
                           </Table>
@@ -597,9 +736,7 @@ export default function JobBoqPage() {
         <CardContent className="p-0">
           {loadingItems ? (
             <div className="p-4 space-y-2">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
           ) : displayItems.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground" data-testid="text-empty-items">
@@ -608,44 +745,10 @@ export default function JobBoqPage() {
           ) : (
             <div className="border rounded-md overflow-auto">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="w-24">Cost Code</TableHead>
-                    <TableHead className="text-right w-20">Qty</TableHead>
-                    <TableHead className="w-16">Unit</TableHead>
-                    <TableHead className="text-right w-28">Unit Price</TableHead>
-                    <TableHead className="text-right w-28">Line Total</TableHead>
-                    <TableHead className="hidden lg:table-cell">Notes</TableHead>
-                    <TableHead className="w-24 text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <ItemTableHeader />
                 <TableBody>
                   {displayItems.map((item) => (
-                    <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
-                      <TableCell data-testid={`text-item-desc-${item.id}`}>{item.description}</TableCell>
-                      <TableCell className="font-mono text-sm" data-testid={`text-item-cc-${item.id}`}>
-                        {item.costCode.code}
-                        {item.childCostCode && (
-                          <span className="text-muted-foreground" data-testid={`text-item-child-cc-${item.id}`}> / {item.childCostCode.code}</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-mono" data-testid={`text-item-qty-${item.id}`}>{item.quantity}</TableCell>
-                      <TableCell className="text-muted-foreground" data-testid={`text-item-unit-${item.id}`}>{item.unit}</TableCell>
-                      <TableCell className="text-right font-mono" data-testid={`text-item-price-${item.id}`}>{formatCurrency(item.unitPrice)}</TableCell>
-                      <TableCell className="text-right font-mono font-medium" data-testid={`text-item-total-${item.id}`}>{formatCurrency(item.lineTotal)}</TableCell>
-                      <TableCell className="hidden lg:table-cell text-muted-foreground text-sm max-w-xs truncate">{item.notes || "-"}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => openEditItem(item)} data-testid={`button-edit-item-${item.id}`}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => setDeleteItemConfirm(item)} data-testid={`button-delete-item-${item.id}`}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <ItemRow key={item.id} item={item} onEdit={openEditItem} onDelete={setDeleteItemConfirm} />
                   ))}
                 </TableBody>
               </Table>
@@ -665,13 +768,7 @@ export default function JobBoqPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="group-name">Name</Label>
-              <Input
-                id="group-name"
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="Group name..."
-                data-testid="input-group-name"
-              />
+              <Input id="group-name" value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Group name..." data-testid="input-group-name" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="group-cost-code">Cost Code</Label>
@@ -708,27 +805,11 @@ export default function JobBoqPage() {
             )}
             <div className="space-y-2">
               <Label htmlFor="group-description">Description</Label>
-              <Textarea
-                id="group-description"
-                value={groupDescription}
-                onChange={(e) => setGroupDescription(e.target.value)}
-                placeholder="Optional description..."
-                className="resize-none"
-                data-testid="input-group-description"
-              />
+              <Textarea id="group-description" value={groupDescription} onChange={(e) => setGroupDescription(e.target.value)} placeholder="Optional description..." className="resize-none" data-testid="input-group-description" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="group-sort-order">Sort Order</Label>
-              <Input
-                id="group-sort-order"
-                type="number"
-                min="0"
-                step="1"
-                value={groupSortOrder}
-                onChange={(e) => setGroupSortOrder(parseInt(e.target.value) || 0)}
-                className="w-24"
-                data-testid="input-group-sort-order"
-              />
+              <Input id="group-sort-order" type="number" min="0" step="1" value={groupSortOrder} onChange={(e) => setGroupSortOrder(parseInt(e.target.value) || 0)} className="w-24" data-testid="input-group-sort-order" />
             </div>
           </div>
           <DialogFooter>
@@ -746,19 +827,13 @@ export default function JobBoqPage() {
           <DialogHeader>
             <DialogTitle>{editingItem ? "Edit Item" : "Add Item"}</DialogTitle>
             <DialogDescription>
-              {editingItem ? "Update the BOQ item details below." : "Add a new BOQ item."}
+              {editingItem ? "Update the BOQ item details below." : "Add a new BOQ item with measurements and markup."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="item-description">Description</Label>
-              <Input
-                id="item-description"
-                value={itemDescription}
-                onChange={(e) => setItemDescription(e.target.value)}
-                placeholder="Item description..."
-                data-testid="input-item-description"
-              />
+              <Input id="item-description" value={itemDescription} onChange={(e) => setItemDescription(e.target.value)} placeholder="Item description..." data-testid="input-item-description" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="item-cost-code">Cost Code</Label>
@@ -812,16 +887,7 @@ export default function JobBoqPage() {
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="item-quantity">Quantity</Label>
-                <Input
-                  id="item-quantity"
-                  type="number"
-                  min="0"
-                  step="0.0001"
-                  value={itemQuantity}
-                  onChange={(e) => setItemQuantity(e.target.value)}
-                  placeholder="0"
-                  data-testid="input-item-quantity"
-                />
+                <Input id="item-quantity" type="number" min="0" step="0.0001" value={itemQuantity} onChange={(e) => setItemQuantity(e.target.value)} placeholder="0" data-testid="input-item-quantity" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="item-unit">Unit</Label>
@@ -840,34 +906,37 @@ export default function JobBoqPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="item-unit-price">Unit Price</Label>
-                <Input
-                  id="item-unit-price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={itemUnitPrice}
-                  onChange={(e) => setItemUnitPrice(e.target.value)}
-                  placeholder="0.00"
-                  data-testid="input-item-unit-price"
-                />
+                <Input id="item-unit-price" type="number" min="0" step="0.01" value={itemUnitPrice} onChange={(e) => setItemUnitPrice(e.target.value)} placeholder="0.00" data-testid="input-item-unit-price" />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Label className="text-muted-foreground">Line Total:</Label>
-              <span className="font-mono font-medium" data-testid="text-item-line-total-calc">
-                {formatCurrency(itemLineTotal)}
-              </span>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="item-markup">Markup %</Label>
+                <Input id="item-markup" type="number" min="0" step="0.5" value={itemMarkupPercent} onChange={(e) => setItemMarkupPercent(e.target.value)} placeholder="0" data-testid="input-item-markup" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Calculated Totals</Label>
+                <div className="space-y-1 pt-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Line Total:</span>
+                    <span className="font-mono font-medium text-sm" data-testid="text-item-line-total-calc">
+                      {formatCurrency(itemLineTotal)}
+                    </span>
+                  </div>
+                  {parseFloat(itemMarkupPercent) > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">With Markup:</span>
+                      <span className="font-mono font-medium text-sm text-green-600" data-testid="text-item-line-total-markup-calc">
+                        {formatCurrency(itemLineTotalWithMarkup)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="item-notes">Notes</Label>
-              <Textarea
-                id="item-notes"
-                value={itemNotes}
-                onChange={(e) => setItemNotes(e.target.value)}
-                placeholder="Optional notes..."
-                className="resize-none"
-                data-testid="input-item-notes"
-              />
+              <Textarea id="item-notes" value={itemNotes} onChange={(e) => setItemNotes(e.target.value)} placeholder="Optional notes..." className="resize-none" data-testid="input-item-notes" />
             </div>
           </div>
           <DialogFooter>
@@ -890,10 +959,7 @@ export default function JobBoqPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-delete-group">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteGroupConfirm && deleteGroupMutation.mutate(deleteGroupConfirm.id)}
-              data-testid="button-confirm-delete-group"
-            >
+            <AlertDialogAction onClick={() => deleteGroupConfirm && deleteGroupMutation.mutate(deleteGroupConfirm.id)} data-testid="button-confirm-delete-group">
               {deleteGroupMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Delete
             </AlertDialogAction>
@@ -911,10 +977,7 @@ export default function JobBoqPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-delete-item">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteItemConfirm && deleteItemMutation.mutate(deleteItemConfirm.id)}
-              data-testid="button-confirm-delete-item"
-            >
+            <AlertDialogAction onClick={() => deleteItemConfirm && deleteItemMutation.mutate(deleteItemConfirm.id)} data-testid="button-confirm-delete-item">
               {deleteItemMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Delete
             </AlertDialogAction>

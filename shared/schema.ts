@@ -4572,7 +4572,7 @@ export const boqGroups = pgTable("boq_groups", {
   companyIdx: index("boq_groups_company_idx").on(table.companyId),
 }));
 
-// BOQ Items with quantity, unit, pricing
+// BOQ Items with quantity, unit, pricing, and markup
 export const boqItems = pgTable("boq_items", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
@@ -4587,7 +4587,9 @@ export const boqItems = pgTable("boq_items", {
   quantity: decimal("quantity", { precision: 14, scale: 4 }).default("0"),
   unit: boqUnitEnum("unit").default("EA").notNull(),
   unitPrice: decimal("unit_price", { precision: 14, scale: 2 }).default("0"),
+  markupPercent: decimal("markup_percent", { precision: 5, scale: 2 }).default("0"),
   lineTotal: decimal("line_total", { precision: 14, scale: 2 }).default("0"),
+  lineTotalWithMarkup: decimal("line_total_with_markup", { precision: 14, scale: 2 }).default("0"),
   notes: text("notes"),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
