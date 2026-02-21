@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Building2, BookOpen, Shield, Database } from "lucide-react";
+import { Building2, BookOpen, Shield, Database, Monitor } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +8,56 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import AdminCompaniesPage from "./admin/companies";
 import AdminHelpPage from "./admin/help";
 import DataManagementPage from "./admin/data-management";
+import AdminDevicesPage from "./admin/devices";
 
 interface Company {
   id: string;
   name: string;
+}
+
+function CompanySelector({ selectedCompanyId, onCompanyChange, companies }: {
+  selectedCompanyId: string;
+  onCompanyChange: (id: string) => void;
+  companies: Company[];
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Building2 className="h-5 w-5" />
+          Select Company
+        </CardTitle>
+        <CardDescription>
+          Choose a company to view and manage its resources
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Select value={selectedCompanyId} onValueChange={onCompanyChange}>
+          <SelectTrigger className="w-full max-w-md" data-testid="select-company">
+            <SelectValue placeholder="Select a company..." />
+          </SelectTrigger>
+          <SelectContent>
+            {companies.map((company) => (
+              <SelectItem key={company.id} value={company.id} data-testid={`option-company-${company.id}`}>
+                {company.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CompanyRequiredPlaceholder({ icon: Icon, message }: { icon: any; message: string }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <Icon className="h-10 w-10 mb-3" />
+        <p className="text-sm">{message}</p>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function SuperAdminPage() {
@@ -46,6 +92,10 @@ export default function SuperAdminPage() {
             <BookOpen className="h-4 w-4 mr-1.5" />
             Help Management
           </TabsTrigger>
+          <TabsTrigger value="devices" data-testid="tab-super-devices">
+            <Monitor className="h-4 w-4 mr-1.5" />
+            Devices
+          </TabsTrigger>
           <TabsTrigger value="data-management" data-testid="tab-super-data-management">
             <Database className="h-4 w-4 mr-1.5" />
             Data Management
@@ -60,42 +110,29 @@ export default function SuperAdminPage() {
           <AdminHelpPage embedded={true} />
         </TabsContent>
 
-        <TabsContent value="data-management" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Select Company
-              </CardTitle>
-              <CardDescription>
-                Choose a company to view and manage its data records
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-                <SelectTrigger className="w-full max-w-md" data-testid="select-company-data-mgmt">
-                  <SelectValue placeholder="Select a company..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id} data-testid={`option-company-${company.id}`}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
+        <TabsContent value="devices" className="space-y-6">
+          <CompanySelector
+            selectedCompanyId={selectedCompanyId}
+            onCompanyChange={setSelectedCompanyId}
+            companies={companies}
+          />
           {selectedCompanyId ? (
-            <DataManagementPage embedded={true} companyId={selectedCompanyId} key={selectedCompanyId} />
+            <AdminDevicesPage embedded={true} companyId={selectedCompanyId} key={`devices-${selectedCompanyId}`} />
           ) : (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <Database className="h-10 w-10 mb-3" />
-                <p className="text-sm">Select a company above to manage its data</p>
-              </CardContent>
-            </Card>
+            <CompanyRequiredPlaceholder icon={Monitor} message="Select a company above to manage its devices" />
+          )}
+        </TabsContent>
+
+        <TabsContent value="data-management" className="space-y-6">
+          <CompanySelector
+            selectedCompanyId={selectedCompanyId}
+            onCompanyChange={setSelectedCompanyId}
+            companies={companies}
+          />
+          {selectedCompanyId ? (
+            <DataManagementPage embedded={true} companyId={selectedCompanyId} key={`data-${selectedCompanyId}`} />
+          ) : (
+            <CompanyRequiredPlaceholder icon={Database} message="Select a company above to manage its data" />
           )}
         </TabsContent>
       </Tabs>

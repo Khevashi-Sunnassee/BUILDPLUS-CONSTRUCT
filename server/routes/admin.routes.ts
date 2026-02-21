@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { storage, db } from "../storage";
-import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import { requireAuth, requireRole, requireRoleOrSuperAdmin } from "./middleware/auth.middleware";
 import { 
   insertWorkTypeSchema, insertDeviceSchema,
   users, jobs, productionSlots, panelRegister, panelAuditLogs, draftingProgram, dailyLogs, logRows, timerSessions, timerEvents, productionEntries, 
@@ -31,14 +31,14 @@ import logger from "../lib/logger";
 const router = Router();
 
 // Device Management Routes
-router.get("/api/admin/devices", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/devices", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   const companyId = req.companyId;
   if (!companyId) return res.status(400).json({ error: "Company context required" });
   const filtered = await storage.getAllDevices(companyId);
   res.json(filtered);
 });
 
-router.post("/api/admin/devices", requireRole("ADMIN"), async (req, res) => {
+router.post("/api/admin/devices", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   const { userId, deviceName } = req.body;
   const companyId = req.companyId;
   if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -46,7 +46,7 @@ router.post("/api/admin/devices", requireRole("ADMIN"), async (req, res) => {
   res.json({ deviceId: device.id, deviceKey });
 });
 
-router.patch("/api/admin/devices/:id", requireRole("ADMIN"), async (req, res) => {
+router.patch("/api/admin/devices/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   const companyId = req.companyId;
   const existing = await storage.getDevice(req.params.id as string);
   if (!existing || existing.companyId !== companyId) {
@@ -60,7 +60,7 @@ router.patch("/api/admin/devices/:id", requireRole("ADMIN"), async (req, res) =>
   res.json(device);
 });
 
-router.delete("/api/admin/devices/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/admin/devices/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   const companyId = req.companyId;
   const existing = await storage.getDevice(req.params.id as string);
   if (!existing || existing.companyId !== companyId) {

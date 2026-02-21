@@ -152,7 +152,6 @@ const adminNavItems = [
   { title: "Document Config", url: "/admin/document-config", icon: FileText },
   { title: "Checklist Templates", url: "/admin/checklist-templates", icon: ClipboardList },
   { title: "Items", url: "/admin/items", icon: Package },
-  { title: "Devices", url: "/admin/devices", icon: Monitor },
   { title: "Users", url: "/admin/users", icon: Users },
   { title: "Job Types & Workflows", url: "/admin/job-types", icon: Workflow },
   { title: "Cost Codes", url: "/admin/cost-codes", icon: Hash },

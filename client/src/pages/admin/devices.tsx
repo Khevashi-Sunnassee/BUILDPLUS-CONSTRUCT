@@ -82,7 +82,7 @@ const deviceSchema = z.object({
 
 type DeviceFormData = z.infer<typeof deviceSchema>;
 
-export default function AdminDevicesPage() {
+export default function AdminDevicesPage({ embedded = false, companyId }: { embedded?: boolean; companyId?: string } = {}) {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [keyDialogOpen, setKeyDialogOpen] = useState(false);
@@ -91,12 +91,14 @@ export default function AdminDevicesPage() {
   const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const companyIdParam = companyId ? `?companyId=${companyId}` : "";
+
   const { data: devices, isLoading } = useQuery<DeviceWithUser[]>({
-    queryKey: [ADMIN_ROUTES.DEVICES],
+    queryKey: companyId ? [ADMIN_ROUTES.DEVICES, { companyId }] : [ADMIN_ROUTES.DEVICES],
   });
 
   const { data: users } = useQuery<UserType[]>({
-    queryKey: [ADMIN_ROUTES.USERS],
+    queryKey: companyId ? [ADMIN_ROUTES.USERS, { companyId }] : [ADMIN_ROUTES.USERS],
   });
 
   const form = useForm<DeviceFormData>({
@@ -107,13 +109,15 @@ export default function AdminDevicesPage() {
     },
   });
 
+  const devicesQueryKey = companyId ? [ADMIN_ROUTES.DEVICES, { companyId }] : [ADMIN_ROUTES.DEVICES];
+
   const createDeviceMutation = useMutation({
     mutationFn: async (data: DeviceFormData) => {
-      const res = await apiRequest("POST", ADMIN_ROUTES.DEVICES, data);
+      const res = await apiRequest("POST", `${ADMIN_ROUTES.DEVICES}${companyIdParam}`, data);
       return res;
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.DEVICES] });
+      queryClient.invalidateQueries({ queryKey: devicesQueryKey });
       setDialogOpen(false);
       form.reset();
       if (data.deviceKey) {
@@ -128,10 +132,10 @@ export default function AdminDevicesPage() {
 
   const toggleDeviceMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      return apiRequest("PATCH", ADMIN_ROUTES.DEVICE_BY_ID(id), { isActive });
+      return apiRequest("PATCH", `${ADMIN_ROUTES.DEVICE_BY_ID(id)}${companyIdParam}`, { isActive });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.DEVICES] });
+      queryClient.invalidateQueries({ queryKey: devicesQueryKey });
       toast({ title: "Device status updated" });
     },
     onError: () => {
@@ -141,10 +145,10 @@ export default function AdminDevicesPage() {
 
   const deleteDeviceMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", ADMIN_ROUTES.DEVICE_BY_ID(id), {});
+      return apiRequest("DELETE", `${ADMIN_ROUTES.DEVICE_BY_ID(id)}${companyIdParam}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.DEVICES] });
+      queryClient.invalidateQueries({ queryKey: devicesQueryKey });
       toast({ title: "Device deleted" });
       setDeleteDialogOpen(false);
       setDeletingDeviceId(null);
@@ -177,26 +181,43 @@ export default function AdminDevicesPage() {
 
   return (
     <div className="space-y-6" role="main" aria-label="Device Management">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-devices-title">
-            Device Management
-          </h1>
-            <PageHelpButton pageHelpKey="page.admin.devices" />
+      {!embedded && (
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-devices-title">
+              Device Management
+            </h1>
+              <PageHelpButton pageHelpKey="page.admin.devices" />
+            </div>
+            <p className="text-muted-foreground">
+              Provision and manage Windows Agent devices
+            </p>
           </div>
-          <p className="text-muted-foreground">
-            Provision and manage Windows Agent devices
-          </p>
+          <Button onClick={() => setDialogOpen(true)} data-testid="button-add-device">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Device
+          </Button>
         </div>
-        <Button onClick={() => setDialogOpen(true)} data-testid="button-add-device">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Device
-        </Button>
-      </div>
+      )}
 
       <Card>
-        <CardContent className="pt-6">
+        {embedded && (
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Monitor className="h-5 w-5" />
+                Devices
+              </CardTitle>
+              <CardDescription>Provision and manage Windows Agent devices</CardDescription>
+            </div>
+            <Button onClick={() => setDialogOpen(true)} data-testid="button-add-device-embedded">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Device
+            </Button>
+          </CardHeader>
+        )}
+        <CardContent className={embedded ? "" : "pt-6"}>
           {devices && devices.length > 0 ? (
             <div className="rounded-md border">
               <Table>

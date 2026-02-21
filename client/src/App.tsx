@@ -51,7 +51,6 @@ const DailyReportDetailPage = lazyWithRetry(() => import("@/pages/daily-report-d
 const ManagerReviewPage = lazyWithRetry(() => import("@/pages/manager-review"));
 const ReportsPage = lazyWithRetry(() => import("@/pages/reports"));
 const AdminSettingsPage = lazyWithRetry(() => import("@/pages/admin/settings"));
-const AdminDevicesPage = lazyWithRetry(() => import("@/pages/admin/devices"));
 const AdminUsersPage = lazyWithRetry(() => import("@/pages/admin/users"));
 const AdminJobsPage = lazyWithRetry(() => import("@/pages/admin/jobs"));
 const AdminPanelsPage = lazyWithRetry(() => import("@/pages/admin/panels"));
@@ -707,11 +706,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/devices">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
-          <AuthenticatedLayout>
-            <AdminDevicesPage />
-          </AuthenticatedLayout>
-        </ProtectedRoute>
+        <Redirect to="/super-admin" />
       </Route>
 
       <Route path="/admin/users">

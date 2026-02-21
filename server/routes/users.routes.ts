@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { eq, and, lte, notInArray } from "drizzle-orm";
 import { storage, db } from "../storage";
-import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import { requireAuth, requireRole, requireRoleOrSuperAdmin } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import { tasks, taskAssignees, taskGroups, jobs, permissionTypes, FUNCTION_KEYS } from "@shared/schema";
 import type { FunctionKey, PermissionLevel } from "@shared/schema";
@@ -112,7 +112,7 @@ router.get("/api/my-permissions", requireAuth, async (req, res) => {
 });
 
 // Admin: Get all users
-router.get("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/users", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   const users = await storage.getAllUsers(req.companyId);
   res.json(users.map(u => ({ ...u, passwordHash: undefined })));
 });
