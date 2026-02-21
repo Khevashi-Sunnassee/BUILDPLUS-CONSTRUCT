@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
+import { useCtrlScrollZoom } from "@/hooks/use-ctrl-scroll-zoom";
 import { AP_INVOICE_ROUTES } from "@shared/api-routes";
 import { useRoute, useLocation } from "wouter";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -754,6 +755,8 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
   const numPages = thumbnailData?.totalPages || 0;
   const currentPageData = thumbnailData?.pages?.find(p => p.pageNumber === currentPage);
   const isImage = doc?.mimeType?.startsWith("image/");
+
+  useCtrlScrollZoom({ containerRef, zoom, setZoom, minZoom: 0.5, maxZoom: 5, step: 0.25 });
 
   const handleDownload = useCallback(() => {
     if (!doc) return;

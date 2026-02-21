@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useCtrlScrollZoom } from "@/hooks/use-ctrl-scroll-zoom";
 import { TENDER_INBOX_ROUTES } from "@shared/api-routes";
 import { useRoute, useLocation } from "wouter";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -99,6 +100,8 @@ function PdfViewer({ email }: { email: TenderEmailDetail }) {
   const numPages = thumbnailData?.totalPages || 0;
   const currentPageData = thumbnailData?.pages?.find(p => p.pageNumber === currentPage);
   const isImage = doc?.mimeType?.startsWith("image/");
+
+  useCtrlScrollZoom({ containerRef, zoom, setZoom, minZoom: 0.5, maxZoom: 5, step: 0.25 });
 
   const handleDownload = useCallback(() => {
     if (!doc) return;

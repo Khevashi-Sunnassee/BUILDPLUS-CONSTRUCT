@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { useAuth } from "@/lib/auth";
@@ -20,6 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { useCtrlScrollZoom } from "@/hooks/use-ctrl-scroll-zoom";
 import { 
   ChevronDown, ChevronRight, Briefcase, Search, FileText, 
   Cpu, CheckCircle2, XCircle, Clock, ShoppingCart, Loader2, Plus,
@@ -78,6 +79,7 @@ function ReoScheduleBuilderDialog({
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [pdfZoom, setPdfZoom] = useState(100);
+  const pdfContainerRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<string>("details");
   const [showPoDialog, setShowPoDialog] = useState(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
@@ -162,6 +164,16 @@ function ReoScheduleBuilderDialog({
   }, []);
   const hasPdf = !!(effectivePanel?.productionPdfUrl);
 
+  useCtrlScrollZoom({
+    containerRef: pdfContainerRef,
+    zoom: pdfZoom,
+    setZoom: (fn) => setPdfZoom((prev) => fn(prev)),
+    minZoom: 50,
+    maxZoom: 200,
+    step: 25,
+    enabled: hasPdf && !pdfLoading,
+  });
+
   const approvedItems = currentSchedule?.items?.filter(i => i.status === "APPROVED") || [];
   const pendingItems = currentSchedule?.items?.filter(i => i.status === "PENDING") || [];
 
@@ -221,7 +233,7 @@ function ReoScheduleBuilderDialog({
                 </Button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto p-4">
+            <div ref={pdfContainerRef} className="flex-1 overflow-auto p-4">
               {!hasPdf ? (
                 <div className="h-full flex items-center justify-center text-center">
                   <div className="space-y-3">
