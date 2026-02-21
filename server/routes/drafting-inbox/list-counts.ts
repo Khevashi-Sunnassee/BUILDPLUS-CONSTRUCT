@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/auth.middleware";
 import logger from "../../lib/logger";
 import { db } from "../../db";
-import { eq, and, desc, asc, ilike, or, count } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, count, gte, sql } from "drizzle-orm";
 import { draftingInboundEmails, jobs } from "@shared/schema";
 
 const router = Router();
@@ -136,6 +136,62 @@ router.get("/api/drafting-inbox/counts", requireAuth, async (req: Request, res: 
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting inbox counts");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch counts" });
+  }
+});
+
+router.get("/api/drafting-inbox/trends", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const days = Math.min(parseInt(req.query.days as string) || 30, 90);
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const rows = await db
+      .select({
+        date: sql<string>`DATE(${draftingInboundEmails.createdAt})`.as("date"),
+        status: draftingInboundEmails.status,
+        count: count(),
+      })
+      .from(draftingInboundEmails)
+      .where(and(
+        eq(draftingInboundEmails.companyId, companyId),
+        gte(draftingInboundEmails.createdAt, startDate),
+      ))
+      .groupBy(sql`DATE(${draftingInboundEmails.createdAt})`, draftingInboundEmails.status)
+      .orderBy(sql`DATE(${draftingInboundEmails.createdAt})`);
+
+    const trendMap: Record<string, Record<string, number>> = {};
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
+      const key = d.toISOString().split("T")[0];
+      trendMap[key] = { received: 0, processing: 0, processed: 0, matched: 0, allocated: 0, total: 0 };
+    }
+
+    for (const row of rows) {
+      const dateKey = typeof row.date === "string" ? row.date : new Date(row.date).toISOString().split("T")[0];
+      const statusKey = row.status.toLowerCase();
+      if (trendMap[dateKey]) {
+        if (statusKey in trendMap[dateKey] && statusKey !== "total") {
+          trendMap[dateKey][statusKey] = row.count;
+        }
+        trendMap[dateKey].total += row.count;
+      }
+    }
+
+    const sortedDates = Object.keys(trendMap).sort();
+    const trends = sortedDates.map((date) => ({
+      date,
+      ...trendMap[date],
+    }));
+
+    res.json({ trends, days });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching drafting inbox trends");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch trends" });
   }
 });
 

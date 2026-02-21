@@ -8,14 +8,17 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Search, Upload, Trash2, MoreHorizontal, FileText, Loader2, Eye, Settings, Mail, Copy, Check, RefreshCw, Inbox } from "lucide-react";
+import { Search, Upload, Trash2, MoreHorizontal, FileText, Loader2, Eye, Settings, Mail, Copy, Check, RefreshCw, Inbox, AlertTriangle, CheckCircle2, Clock, BarChart3, ChevronDown, ChevronUp } from "lucide-react";
 import { SortIcon } from "@/components/ui/sort-icon";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 interface DraftingEmail {
   id: string;
@@ -45,16 +48,17 @@ interface DraftingEmailListResponse {
 }
 
 interface StatusCounts {
-  RECEIVED: number;
-  PROCESSING: number;
-  PROCESSED: number;
-  MATCHED: number;
-  ALLOCATED: number;
-  DUPLICATE: number;
-  IRRELEVANT: number;
-  ARCHIVED: number;
-  FAILED: number;
+  received: number;
+  processing: number;
+  processed: number;
+  matched: number;
+  allocated: number;
+  duplicate: number;
+  irrelevant: number;
+  archived: number;
+  failed: number;
   all: number;
+  [key: string]: number;
 }
 
 const STATUS_TABS = [
@@ -343,6 +347,175 @@ function DraftingInboxSettingsDialog({ open, onOpenChange }: { open: boolean; on
   );
 }
 
+interface TrendData {
+  date: string;
+  received: number;
+  processing: number;
+  processed: number;
+  matched: number;
+  allocated: number;
+  total: number;
+}
+
+function StatsCards({ counts }: { counts: StatusCounts | undefined }) {
+  if (!counts) return null;
+
+  const needsAction = (counts.received || 0) + (counts.processing || 0) + (counts.processed || 0);
+  const processedNotMatched = counts.processed || 0;
+  const matchedNotAllocated = counts.matched || 0;
+  const allocated = counts.allocated || 0;
+
+  const cards = [
+    {
+      label: "Needs Action",
+      value: needsAction,
+      description: "Received + Processing + Processed",
+      icon: AlertTriangle,
+      color: needsAction > 0 ? "text-red-500" : "text-muted-foreground",
+      bgColor: needsAction > 0 ? "bg-red-500/10" : "bg-muted/50",
+    },
+    {
+      label: "Processed (Unmatched)",
+      value: processedNotMatched,
+      description: "Processed but not yet matched to a job",
+      icon: Clock,
+      color: processedNotMatched > 0 ? "text-amber-500" : "text-muted-foreground",
+      bgColor: processedNotMatched > 0 ? "bg-amber-500/10" : "bg-muted/50",
+    },
+    {
+      label: "Matched (Unallocated)",
+      value: matchedNotAllocated,
+      description: "Matched to job but not yet allocated",
+      icon: FileText,
+      color: matchedNotAllocated > 0 ? "text-blue-500" : "text-muted-foreground",
+      bgColor: matchedNotAllocated > 0 ? "bg-blue-500/10" : "bg-muted/50",
+    },
+    {
+      label: "Allocated",
+      value: allocated,
+      description: "Fully allocated and actioned",
+      icon: CheckCircle2,
+      color: "text-green-500",
+      bgColor: "bg-green-500/10",
+    },
+    {
+      label: "Total Received",
+      value: counts.all || 0,
+      description: "All emails across all statuses",
+      icon: Mail,
+      color: "text-foreground",
+      bgColor: "bg-muted/50",
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-3" data-testid="drafting-stats-cards">
+      {cards.map((card) => (
+        <Card key={card.label} className={`${card.bgColor} border`} data-testid={`stat-card-${card.label.toLowerCase().replace(/\s+/g, "-")}`}>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <card.icon className={`h-4 w-4 ${card.color}`} />
+              <span className="text-xs text-muted-foreground font-medium truncate">{card.label}</span>
+            </div>
+            <div className={`text-2xl font-bold ${card.color}`}>{card.value}</div>
+            <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{card.description}</p>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+const TREND_COLORS: Record<string, string> = {
+  received: "#94a3b8",
+  processed: "#818cf8",
+  matched: "#22c55e",
+  allocated: "#14b8a6",
+};
+
+function TrendChart({ embedded }: { embedded?: boolean }) {
+  const [days, setDays] = useState("30");
+  const [expanded, setExpanded] = useState(false);
+
+  const { data: trendData } = useQuery<{ trends: TrendData[]; days: number }>({
+    queryKey: [DRAFTING_INBOX_ROUTES.TRENDS, { days }],
+    queryFn: async () => {
+      const res = await fetch(`${DRAFTING_INBOX_ROUTES.TRENDS}?days=${days}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch trends");
+      return res.json();
+    },
+  });
+
+  if (!trendData?.trends?.length) return null;
+
+  const chartData = trendData.trends.map((t) => ({
+    ...t,
+    date: new Date(t.date).toLocaleDateString("en-AU", { day: "2-digit", month: "short" }),
+  }));
+
+  return (
+    <div data-testid="drafting-trend-chart">
+      <button
+        type="button"
+        className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors mb-2"
+        onClick={() => setExpanded(!expanded)}
+        data-testid="btn-toggle-trend-chart"
+      >
+        <BarChart3 className="h-4 w-4" />
+        Email Trends
+        {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+      </button>
+      {expanded && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold">Email Volume by Status</h3>
+              <Select value={days} onValueChange={setDays}>
+                <SelectTrigger className="w-[120px] h-8 text-xs" data-testid="select-trend-days">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="14">Last 14 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="60">Last 60 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10 }}
+                  className="text-muted-foreground"
+                  interval={Math.max(0, Math.floor(chartData.length / 8))}
+                />
+                <YAxis tick={{ fontSize: 10 }} className="text-muted-foreground" allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    color: "hsl(var(--popover-foreground))",
+                  }}
+                />
+                <Legend iconSize={10} wrapperStyle={{ fontSize: "11px" }} />
+                <Area type="monotone" dataKey="received" stackId="1" stroke={TREND_COLORS.received} fill={TREND_COLORS.received} fillOpacity={0.3} name="Received" />
+                <Area type="monotone" dataKey="processed" stackId="1" stroke={TREND_COLORS.processed} fill={TREND_COLORS.processed} fillOpacity={0.3} name="Processed" />
+                <Area type="monotone" dataKey="matched" stackId="1" stroke={TREND_COLORS.matched} fill={TREND_COLORS.matched} fillOpacity={0.3} name="Matched" />
+                <Area type="monotone" dataKey="allocated" stackId="1" stroke={TREND_COLORS.allocated} fill={TREND_COLORS.allocated} fillOpacity={0.3} name="Allocated" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function LoadingSkeleton() {
   return (
     <div className="space-y-4 p-6">
@@ -463,7 +636,7 @@ export default function DraftingEmailsPage({ embedded = false }: { embedded?: bo
 
   const getCount = (key: string): number => {
     if (!statusCounts) return 0;
-    return (statusCounts as any)[key] || 0;
+    return statusCounts[key.toLowerCase()] || statusCounts[key] || 0;
   };
 
   if (isLoading) return <LoadingSkeleton />;
@@ -492,6 +665,10 @@ export default function DraftingEmailsPage({ embedded = false }: { embedded?: bo
             </Button>
           </div>
         </div>
+
+        <StatsCards counts={statusCounts} />
+
+        <TrendChart embedded={embedded} />
 
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

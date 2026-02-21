@@ -1042,6 +1042,7 @@ export const DRAFTING_INBOX_ROUTES = {
   PAGE_THUMBNAILS: (id: string | number) => `/api/drafting-inbox/emails/${id}/page-thumbnails`,
   EMAIL_BODY: (id: string | number) => `/api/drafting-inbox/emails/${id}/body`,
   COUNTS: '/api/drafting-inbox/counts',
+  TRENDS: '/api/drafting-inbox/trends',
   EMAIL_TASKS: (id: string | number) => `/api/drafting-inbox/emails/${id}/tasks`,
   CREATE_TASK: (id: string | number) => `/api/drafting-inbox/emails/${id}/tasks`,
   SUGGEST_DUE_DATE: (id: string | number) => `/api/drafting-inbox/emails/${id}/suggest-due-date`,
