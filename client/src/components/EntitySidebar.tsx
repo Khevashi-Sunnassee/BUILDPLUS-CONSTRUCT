@@ -330,10 +330,7 @@ export function EntitySidebar({
       <SheetContent className={`${sheetWidth} p-0 flex flex-col`}>
         <SheetHeader className="p-4 border-b">
           <div className="flex items-center justify-between gap-2">
-            <SheetTitle className="text-lg truncate">{entityName}</SheetTitle>
-            <Button variant="ghost" size="icon" onClick={onClose} data-testid={`btn-close-${testIdPrefix}-sidebar`}>
-              <X className="h-4 w-4" />
-            </Button>
+            <SheetTitle className="text-lg truncate pr-6">{entityName}</SheetTitle>
           </div>
           <div className="flex gap-2 mt-2">
             <Button
