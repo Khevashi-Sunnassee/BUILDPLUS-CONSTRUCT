@@ -5497,12 +5497,15 @@ export const kbDocStatusEnum = pgEnum("kb_doc_status", ["UPLOADED", "PROCESSING"
 export const kbSourceTypeEnum = pgEnum("kb_source_type", ["UPLOAD", "URL", "TEXT"]);
 export const kbMessageRoleEnum = pgEnum("kb_message_role", ["USER", "ASSISTANT", "SYSTEM"]);
 export const kbAnswerModeEnum = pgEnum("kb_answer_mode", ["KB_ONLY", "HYBRID"]);
+export const kbMemberRoleEnum = pgEnum("kb_member_role", ["OWNER", "EDITOR", "VIEWER"]);
+export const kbInviteStatusEnum = pgEnum("kb_invite_status", ["INVITED", "ACCEPTED", "DECLINED"]);
 
 export const kbProjects = pgTable("kb_projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").notNull().references(() => companies.id),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
+  instructions: text("instructions"),
   createdById: varchar("created_by_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -5577,6 +5580,34 @@ export const kbMessages = pgTable("kb_messages", {
   roleIdx: index("kb_messages_role_idx").on(table.role),
 }));
 
+export const kbProjectMembers = pgTable("kb_project_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => kbProjects.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: kbMemberRoleEnum("role").notNull().default("VIEWER"),
+  status: kbInviteStatusEnum("status").notNull().default("INVITED"),
+  invitedById: varchar("invited_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  projectIdx: index("kb_project_members_project_idx").on(table.projectId),
+  userIdx: index("kb_project_members_user_idx").on(table.userId),
+  uniqueMember: uniqueIndex("kb_project_members_unique_idx").on(table.projectId, table.userId),
+}));
+
+export const kbConversationMembers = pgTable("kb_conversation_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => kbConversations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: kbMemberRoleEnum("role").notNull().default("VIEWER"),
+  status: kbInviteStatusEnum("status").notNull().default("INVITED"),
+  invitedById: varchar("invited_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  conversationIdx: index("kb_convo_members_convo_idx").on(table.conversationId),
+  userIdx: index("kb_convo_members_user_idx").on(table.userId),
+  uniqueMember: uniqueIndex("kb_convo_members_unique_idx").on(table.conversationId, table.userId),
+}));
+
 export const aiUsageTracking = pgTable("ai_usage_tracking", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").notNull().references(() => companies.id),
@@ -5611,3 +5642,11 @@ export type KbConversation = typeof kbConversations.$inferSelect;
 export const insertKbMessageSchema = createInsertSchema(kbMessages).omit({ id: true, createdAt: true });
 export type InsertKbMessage = z.infer<typeof insertKbMessageSchema>;
 export type KbMessage = typeof kbMessages.$inferSelect;
+
+export const insertKbProjectMemberSchema = createInsertSchema(kbProjectMembers).omit({ id: true, createdAt: true });
+export type InsertKbProjectMember = z.infer<typeof insertKbProjectMemberSchema>;
+export type KbProjectMember = typeof kbProjectMembers.$inferSelect;
+
+export const insertKbConversationMemberSchema = createInsertSchema(kbConversationMembers).omit({ id: true, createdAt: true });
+export type InsertKbConversationMember = z.infer<typeof insertKbConversationMemberSchema>;
+export type KbConversationMember = typeof kbConversationMembers.$inferSelect;

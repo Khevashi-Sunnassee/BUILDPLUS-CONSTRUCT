@@ -5,11 +5,15 @@ import {
   Trash2,
   Loader2,
   Settings2,
-  Search,
+  Users,
+  Mail,
+  Check,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Select,
@@ -21,7 +25,7 @@ import {
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import type { KbProject, KbConversation } from "./types";
+import type { KbProject, KbConversation, KbInvitation } from "./types";
 
 interface KbSidebarProps {
   projects: KbProject[];
@@ -50,6 +54,45 @@ export function KbSidebar({
   onShowProjects,
   newChatPending,
 }: KbSidebarProps) {
+  const { toast } = useToast();
+
+  const { data: invitations = [] } = useQuery<KbInvitation[]>({
+    queryKey: ["/api/kb/invitations"],
+    queryFn: async () => {
+      const res = await fetch("/api/kb/invitations", { credentials: "include" });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return [
+        ...(data.projectInvites || []),
+        ...(data.conversationInvites || []),
+      ];
+    },
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: async (inv: KbInvitation) => {
+      await apiRequest("POST", `/api/kb/invitations/${inv.id}/accept`, { type: inv.type });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/kb/invitations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kb/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/kb/conversations"] });
+      toast({ title: "Invitation accepted" });
+    },
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: async (inv: KbInvitation) => {
+      await apiRequest("POST", `/api/kb/invitations/${inv.id}/decline`, { type: inv.type });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/kb/invitations"] });
+      toast({ title: "Invitation declined" });
+    },
+  });
+
+  const pendingInvites = invitations.filter(inv => inv.status === "INVITED");
+
   return (
     <div className="flex flex-col h-full border-r bg-sidebar" data-testid="kb-sidebar">
       <div className="p-3 flex items-center justify-between gap-2 border-b">
@@ -86,6 +129,51 @@ export function KbSidebar({
           </SelectContent>
         </Select>
       </div>
+
+      {pendingInvites.length > 0 && (
+        <div className="px-2 pb-2">
+          <div className="flex items-center gap-1.5 px-2 mb-1">
+            <Mail className="h-3 w-3 text-primary" />
+            <span className="text-[10px] font-semibold uppercase text-muted-foreground">Invitations</span>
+            <Badge variant="destructive" className="text-[9px] h-4 px-1 ml-auto">{pendingInvites.length}</Badge>
+          </div>
+          {pendingInvites.map(inv => (
+            <div key={inv.id} className="rounded-md border p-2 mb-1 bg-muted/30" data-testid={`invitation-${inv.id}`}>
+              <p className="text-xs font-medium truncate">
+                {inv.type === "project" ? inv.projectName : inv.conversationTitle}
+              </p>
+              <p className="text-[10px] text-muted-foreground mb-1.5">
+                {inv.type === "project" ? "Project" : "Conversation"} - {inv.role}
+              </p>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="h-6 text-[10px] flex-1"
+                  onClick={() => acceptMutation.mutate(inv)}
+                  disabled={acceptMutation.isPending}
+                  data-testid={`btn-accept-invite-${inv.id}`}
+                >
+                  <Check className="h-3 w-3 mr-1" />
+                  Accept
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 text-[10px] flex-1"
+                  onClick={() => declineMutation.mutate(inv)}
+                  disabled={declineMutation.isPending}
+                  data-testid={`btn-decline-invite-${inv.id}`}
+                >
+                  <X className="h-3 w-3 mr-1" />
+                  Decline
+                </Button>
+              </div>
+            </div>
+          ))}
+          <Separator className="mt-2" />
+        </div>
+      )}
 
       <ScrollArea className="flex-1">
         <div className="p-2 space-y-1">

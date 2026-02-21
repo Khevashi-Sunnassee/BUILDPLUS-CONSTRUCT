@@ -110,11 +110,14 @@ export function buildRAGContext(chunks: RetrievedChunk[], mode: "KB_ONLY" | "HYB
   return contextParts.join("\n\n---\n\n");
 }
 
-export function buildSystemPrompt(mode: "KB_ONLY" | "HYBRID", context: string, projectName?: string): string {
+export function buildSystemPrompt(mode: "KB_ONLY" | "HYBRID", context: string, projectName?: string, projectInstructions?: string): string {
   const kbName = projectName || "Knowledge Base";
+  const instructionsBlock = projectInstructions
+    ? `\n\nPROJECT INSTRUCTIONS (follow these carefully):\n${projectInstructions}\n`
+    : "";
 
   if (mode === "KB_ONLY") {
-    return `You are a helpful AI assistant that answers questions ONLY based on the provided knowledge base context from "${kbName}".
+    return `You are a helpful AI assistant that answers questions ONLY based on the provided knowledge base context from "${kbName}".${instructionsBlock}
 
 IMPORTANT RULES:
 - Only answer based on the provided context below
@@ -128,7 +131,7 @@ ${context}`;
   }
 
   if (context) {
-    return `You are a helpful AI assistant. You have access to a knowledge base called "${kbName}" and your general knowledge.
+    return `You are a helpful AI assistant. You have access to a knowledge base called "${kbName}" and your general knowledge.${instructionsBlock}
 
 When answering questions:
 - First check the provided knowledge base context for relevant information
@@ -141,7 +144,7 @@ KNOWLEDGE BASE CONTEXT:
 ${context}`;
   }
 
-  return `You are a helpful AI assistant. You have access to a knowledge base called "${kbName}" but no relevant documents were found for this query. Answer using your general knowledge and let the user know that no specific documents matched their question.`;
+  return `You are a helpful AI assistant. You have access to a knowledge base called "${kbName}" but no relevant documents were found for this query.${instructionsBlock} Answer using your general knowledge and let the user know that no specific documents matched their question.`;
 }
 
 export async function getConversationHistory(
@@ -159,4 +162,51 @@ export async function getConversationHistory(
     role: m.role.toLowerCase() as "user" | "assistant" | "system",
     content: m.content,
   }));
+}
+
+export async function getProjectThreadContext(
+  projectId: string,
+  excludeConversationId: string,
+  maxThreads: number = 5,
+  maxMessagesPerThread: number = 4
+): Promise<string> {
+  try {
+    const otherConvos = await db
+      .select({ id: kbConversations.id, title: kbConversations.title })
+      .from(kbConversations)
+      .where(and(
+        eq(kbConversations.projectId, projectId),
+        sql`${kbConversations.id} != ${excludeConversationId}`
+      ))
+      .orderBy(desc(kbConversations.updatedAt))
+      .limit(maxThreads);
+
+    if (otherConvos.length === 0) return "";
+
+    const threadSummaries: string[] = [];
+    for (const convo of otherConvos) {
+      const recentMessages = await db
+        .select({ role: kbMessages.role, content: kbMessages.content })
+        .from(kbMessages)
+        .where(eq(kbMessages.conversationId, convo.id))
+        .orderBy(desc(kbMessages.createdAt))
+        .limit(maxMessagesPerThread);
+
+      if (recentMessages.length === 0) continue;
+
+      const msgSummary = recentMessages.reverse().map(m => {
+        const truncated = m.content.length > 300 ? m.content.slice(0, 300) + "..." : m.content;
+        return `  ${m.role}: ${truncated}`;
+      }).join("\n");
+
+      threadSummaries.push(`Thread "${convo.title}":\n${msgSummary}`);
+    }
+
+    if (threadSummaries.length === 0) return "";
+
+    return `PROJECT THREAD CONTEXT (other conversations in this project that may provide relevant context):\n\n${threadSummaries.join("\n\n")}`;
+  } catch (error) {
+    logger.warn({ err: error, projectId }, "[KB] Failed to get project thread context");
+    return "";
+  }
 }

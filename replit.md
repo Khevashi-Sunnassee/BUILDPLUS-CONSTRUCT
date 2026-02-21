@@ -20,7 +20,7 @@ The system employs a client-server architecture. The frontend is a React applica
 **Technical Implementations & Features:**
 - **Core Management:** Time management, configurable approval workflows, reporting, analytics, and administrative functions.
 - **Job & Panel Lifecycle:** Comprehensive CRUD operations, panel registration, production approvals, detailed panel field management, and audit logging for 14-stage panel and 5-phase job lifecycles.
-- **AI Integration:** OpenAI for PDF analysis, AI-powered visual comparisons, and a Knowledge Base utilizing RAG (pgvector semantic search, OpenAI embeddings) with usage quotas.
+- **AI Integration:** OpenAI for PDF analysis, AI-powered visual comparisons, and a Knowledge Base utilizing RAG (pgvector semantic search, OpenAI embeddings) with usage quotas. KB supports ChatGPT Projects-style collaboration with shared projects, multiple threads per project, member invitations (OWNER/EDITOR/VIEWER roles), cross-thread context sharing, and project-wide AI instructions.
 - **Financial & Logistics:** Configurable rates, cost analysis, production tracking, load list generation, and delivery recording.
 - **Scheduling:** Drafting and procurement scheduling linked to production slots for multi-factory operations; enhanced job program scheduling with pour labels and drag-and-drop functionality.
 - **Communication:** Teams-style chat supporting DMs, groups, channels, @mentions, notifications, and file attachments.

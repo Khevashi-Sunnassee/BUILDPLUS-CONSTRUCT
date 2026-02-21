@@ -2,6 +2,8 @@ export interface KbProject {
   id: string;
   name: string;
   description: string | null;
+  instructions: string | null;
+  createdById: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -20,6 +22,7 @@ export interface KbConversation {
   id: string;
   projectId: string | null;
   title: string;
+  createdById: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -41,3 +44,36 @@ export interface KbSource {
 }
 
 export type AnswerMode = "KB_ONLY" | "HYBRID";
+
+export interface KbMember {
+  id: string;
+  userId: string;
+  role: "OWNER" | "EDITOR" | "VIEWER";
+  status: "INVITED" | "ACCEPTED" | "DECLINED";
+  createdAt: string;
+  userName: string;
+  userEmail: string;
+}
+
+export interface KbCompanyUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface KbProjectDetail extends KbProject {
+  documents: KbDocument[];
+  members: KbMember[];
+  userRole: string;
+}
+
+export interface KbInvitation {
+  id: string;
+  type: "project" | "conversation";
+  entityId: string;
+  role: string;
+  status: string;
+  createdAt: string;
+  projectName?: string;
+  conversationTitle?: string;
+}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Send,
   Bot,
@@ -11,18 +11,37 @@ import {
   FileText,
   ToggleLeft,
   ToggleRight,
+  Share2,
+  UserPlus,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { queryClient, getCsrfToken } from "@/lib/queryClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { renderMarkdown } from "./KbMarkdown";
-import type { KbMessage, KbConversation, KbSource, AnswerMode } from "./types";
+import type { KbMessage, KbConversation, KbSource, AnswerMode, KbCompanyUser } from "./types";
 
 interface KbChatProps {
   selectedConvoId: string | null;
@@ -43,8 +62,42 @@ export function KbChat({
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingSources, setStreamingSources] = useState<KbSource[]>([]);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareUserSearch, setShareUserSearch] = useState("");
+  const [shareSelectedUserIds, setShareSelectedUserIds] = useState<string[]>([]);
+  const [shareRole, setShareRole] = useState<string>("EDITOR");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const { data: companyUsers = [] } = useQuery<KbCompanyUser[]>({
+    queryKey: ["/api/kb/company-users"],
+    enabled: showShareDialog,
+  });
+
+  const shareConvoMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedConvoId || shareSelectedUserIds.length === 0) return;
+      const res = await apiRequest("POST", `/api/kb/conversations/${selectedConvoId}/members`, {
+        userIds: shareSelectedUserIds,
+        role: shareRole,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setShowShareDialog(false);
+      setShareSelectedUserIds([]);
+      setShareUserSearch("");
+      toast({ title: `Shared with ${data?.added || 0} user(s)` });
+    },
+    onError: () => toast({ title: "Failed to share conversation", variant: "destructive" }),
+  });
+
+  const filteredShareUsers = companyUsers.filter(u => {
+    if (shareSelectedUserIds.includes(u.id)) return false;
+    if (!shareUserSearch) return true;
+    const q = shareUserSearch.toLowerCase();
+    return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
 
   const { data: messages = [] } = useQuery<KbMessage[]>({
     queryKey: ["/api/kb/conversations", selectedConvoId, "messages"],
@@ -191,34 +244,52 @@ export function KbChat({
           </span>
         </div>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={answerMode === "KB_ONLY" ? "default" : "outline"}
-              size="sm"
-              onClick={toggleMode}
-              className="gap-1.5 text-xs shrink-0"
-              data-testid="btn-toggle-mode"
-            >
-              {answerMode === "KB_ONLY" ? (
-                <>
-                  <BookOpen className="h-3.5 w-3.5" />
-                  KB Only
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-3.5 w-3.5" />
-                  AI + KB
-                </>
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            {answerMode === "KB_ONLY"
-              ? "Answers only from Knowledge Base documents. Click to enable general AI knowledge."
-              : "Uses both Knowledge Base and general AI knowledge. Click to restrict to KB only."}
-          </TooltipContent>
-        </Tooltip>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {selectedConvoId && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  onClick={() => setShowShareDialog(true)}
+                  data-testid="btn-share-convo"
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Share this conversation</TooltipContent>
+            </Tooltip>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={answerMode === "KB_ONLY" ? "default" : "outline"}
+                size="sm"
+                onClick={toggleMode}
+                className="gap-1.5 text-xs"
+                data-testid="btn-toggle-mode"
+              >
+                {answerMode === "KB_ONLY" ? (
+                  <>
+                    <BookOpen className="h-3.5 w-3.5" />
+                    KB Only
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-3.5 w-3.5" />
+                    AI + KB
+                  </>
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {answerMode === "KB_ONLY"
+                ? "Answers only from Knowledge Base documents. Click to enable general AI knowledge."
+                : "Uses both Knowledge Base and general AI knowledge. Click to restrict to KB only."}
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       <ScrollArea className="flex-1">
@@ -364,6 +435,95 @@ export function KbChat({
           </p>
         </div>
       </div>
+
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Conversation</DialogTitle>
+            <DialogDescription>
+              Invite team members to view or contribute to this conversation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Role</label>
+              <Select value={shareRole} onValueChange={setShareRole}>
+                <SelectTrigger data-testid="select-share-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EDITOR">Editor - can send messages</SelectItem>
+                  <SelectItem value="VIEWER">Viewer - read only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Search Users</label>
+              <Input
+                value={shareUserSearch}
+                onChange={(e) => setShareUserSearch(e.target.value)}
+                placeholder="Search by name or email..."
+                data-testid="input-share-search-users"
+              />
+            </div>
+            {shareSelectedUserIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {shareSelectedUserIds.map(uid => {
+                  const user = companyUsers.find(u => u.id === uid);
+                  return (
+                    <Badge key={uid} variant="secondary" className="gap-1 pr-1">
+                      {user?.name || uid}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-4 w-4 rounded-full"
+                        onClick={() => setShareSelectedUserIds(ids => ids.filter(id => id !== uid))}
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </Button>
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
+            <ScrollArea className="h-40 border rounded-md">
+              <div className="p-2 space-y-1">
+                {filteredShareUsers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No users available</p>
+                ) : (
+                  filteredShareUsers.slice(0, 50).map(user => (
+                    <div
+                      key={user.id}
+                      className="flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer"
+                      onClick={() => setShareSelectedUserIds(ids => [...ids, user.id])}
+                      data-testid={`share-user-option-${user.id}`}
+                    >
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-[10px]">{user.name?.charAt(0)?.toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm truncate">{user.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowShareDialog(false)}>Cancel</Button>
+            <Button
+              onClick={() => shareConvoMutation.mutate()}
+              disabled={shareSelectedUserIds.length === 0 || shareConvoMutation.isPending}
+              data-testid="btn-confirm-share"
+            >
+              {shareConvoMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Share
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -4,12 +4,13 @@ import multer from "multer";
 import { db } from "../db";
 import {
   kbProjects, kbDocuments, kbChunks, kbConversations, kbMessages, aiUsageTracking,
+  kbProjectMembers, kbConversationMembers, users,
 } from "@shared/schema";
-import { eq, and, desc, sql, count } from "drizzle-orm";
+import { eq, and, desc, sql, count, or, inArray } from "drizzle-orm";
 import { requireAuth } from "./middleware/auth.middleware";
 import { chunkText } from "../services/kb-chunking.service";
 import { generateEmbeddingsBatch, generateEmbedding } from "../services/kb-embedding.service";
-import { searchKnowledgeBase, buildRAGContext, buildSystemPrompt, getConversationHistory } from "../services/kb-retrieval.service";
+import { searchKnowledgeBase, buildRAGContext, buildSystemPrompt, getConversationHistory, getProjectThreadContext } from "../services/kb-retrieval.service";
 import { searchHelpEntries, buildHelpContext } from "../seed-kb-help";
 import { openAIBreaker } from "../lib/circuit-breaker";
 import logger from "../lib/logger";
@@ -26,15 +27,61 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+async function getProjectAccess(userId: string, projectId: string, companyId?: string): Promise<{ hasAccess: boolean; role: string | null; isCreator: boolean }> {
+  const conditions = [eq(kbProjects.id, projectId)];
+  if (companyId) conditions.push(eq(kbProjects.companyId, companyId));
+  const [project] = await db.select({ createdById: kbProjects.createdById, companyId: kbProjects.companyId })
+    .from(kbProjects).where(and(...conditions)).limit(1);
+  if (!project) return { hasAccess: false, role: null, isCreator: false };
+  const isCreator = project.createdById === userId;
+  if (isCreator) return { hasAccess: true, role: "OWNER", isCreator: true };
+  const [membership] = await db.select({ role: kbProjectMembers.role, status: kbProjectMembers.status })
+    .from(kbProjectMembers)
+    .where(and(eq(kbProjectMembers.projectId, projectId), eq(kbProjectMembers.userId, userId)))
+    .limit(1);
+  if (membership && membership.status === "ACCEPTED") return { hasAccess: true, role: membership.role, isCreator: false };
+  return { hasAccess: false, role: null, isCreator: false };
+}
+
+async function getConversationAccess(userId: string, conversationId: string, companyId?: string): Promise<{ hasAccess: boolean; role: string | null; isCreator: boolean }> {
+  const [convo] = await db.select({ createdById: kbConversations.createdById, projectId: kbConversations.projectId, companyId: kbConversations.companyId })
+    .from(kbConversations).where(and(eq(kbConversations.id, conversationId), companyId ? eq(kbConversations.companyId, companyId) : undefined)).limit(1);
+  if (!convo) return { hasAccess: false, role: null, isCreator: false };
+  const isCreator = convo.createdById === userId;
+  if (isCreator) return { hasAccess: true, role: "OWNER", isCreator: true };
+  const [membership] = await db.select({ role: kbConversationMembers.role, status: kbConversationMembers.status })
+    .from(kbConversationMembers)
+    .where(and(eq(kbConversationMembers.conversationId, conversationId), eq(kbConversationMembers.userId, userId)))
+    .limit(1);
+  if (membership && membership.status === "ACCEPTED") return { hasAccess: true, role: membership.role, isCreator: false };
+  if (convo.projectId) {
+    const projectAccess = await getProjectAccess(userId, convo.projectId, companyId);
+    if (projectAccess.hasAccess) return { hasAccess: true, role: projectAccess.role, isCreator: false };
+  }
+  return { hasAccess: false, role: null, isCreator: false };
+}
+
 router.get("/api/kb/projects", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId;
-    if (!companyId) return res.status(403).json({ error: "Company context required" });
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Company context required" });
+
+    const memberProjectIds = await db.select({ projectId: kbProjectMembers.projectId })
+      .from(kbProjectMembers)
+      .where(and(eq(kbProjectMembers.userId, String(userId)), eq(kbProjectMembers.status, "ACCEPTED")));
+
+    const memberIds = memberProjectIds.map(m => m.projectId);
 
     const projects = await db
       .select()
       .from(kbProjects)
-      .where(eq(kbProjects.companyId, String(companyId)))
+      .where(and(
+        eq(kbProjects.companyId, String(companyId)),
+        memberIds.length > 0
+          ? or(eq(kbProjects.createdById, String(userId)), inArray(kbProjects.id, memberIds))
+          : eq(kbProjects.createdById, String(userId))
+      ))
       .orderBy(desc(kbProjects.updatedAt))
       .limit(100);
 
@@ -51,15 +98,24 @@ router.post("/api/kb/projects", requireAuth, async (req: Request, res: Response)
     const userId = req.session.userId;
     if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
 
-    const { name, description } = req.body;
+    const { name, description, instructions } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: "Project name is required" });
 
     const [project] = await db.insert(kbProjects).values({
       companyId: String(companyId),
       name: name.trim(),
       description: description?.trim() || null,
+      instructions: instructions?.trim() || null,
       createdById: String(userId),
     }).returning();
+
+    await db.insert(kbProjectMembers).values({
+      projectId: project.id,
+      userId: String(userId),
+      role: "OWNER",
+      status: "ACCEPTED",
+      invitedById: String(userId),
+    });
 
     res.status(201).json(project);
   } catch (error) {
@@ -71,7 +127,11 @@ router.post("/api/kb/projects", requireAuth, async (req: Request, res: Response)
 router.get("/api/kb/projects/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId;
-    if (!companyId) return res.status(403).json({ error: "Company context required" });
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Company context required" });
+
+    const access = await getProjectAccess(String(userId), String(req.params.id), String(companyId));
+    if (!access.hasAccess) return res.status(403).json({ error: "Access denied" });
 
     const [project] = await db
       .select()
@@ -87,7 +147,22 @@ router.get("/api/kb/projects/:id", requireAuth, async (req: Request, res: Respon
       .orderBy(desc(kbDocuments.createdAt))
       .limit(200);
 
-    res.json({ ...project, documents: docs });
+    const members = await db
+      .select({
+        id: kbProjectMembers.id,
+        userId: kbProjectMembers.userId,
+        role: kbProjectMembers.role,
+        status: kbProjectMembers.status,
+        createdAt: kbProjectMembers.createdAt,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(kbProjectMembers)
+      .innerJoin(users, eq(kbProjectMembers.userId, users.id))
+      .where(eq(kbProjectMembers.projectId, project.id))
+      .orderBy(kbProjectMembers.createdAt);
+
+    res.json({ ...project, documents: docs, members, userRole: access.role });
   } catch (error) {
     logger.error({ err: error }, "[KB] Failed to fetch project");
     res.status(500).json({ error: "Failed to fetch project" });
@@ -97,12 +172,17 @@ router.get("/api/kb/projects/:id", requireAuth, async (req: Request, res: Respon
 router.patch("/api/kb/projects/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId;
-    if (!companyId) return res.status(403).json({ error: "Company context required" });
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Company context required" });
 
-    const { name, description } = req.body;
+    const access = await getProjectAccess(String(userId), String(req.params.id), String(companyId));
+    if (!access.hasAccess || access.role === "VIEWER") return res.status(403).json({ error: "Edit access required" });
+
+    const { name, description, instructions } = req.body;
     const updates: any = { updatedAt: new Date() };
     if (name?.trim()) updates.name = name.trim();
     if (description !== undefined) updates.description = description?.trim() || null;
+    if (instructions !== undefined) updates.instructions = instructions?.trim() || null;
 
     const [updated] = await db.update(kbProjects)
       .set(updates)
@@ -120,7 +200,11 @@ router.patch("/api/kb/projects/:id", requireAuth, async (req: Request, res: Resp
 router.delete("/api/kb/projects/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId;
-    if (!companyId) return res.status(403).json({ error: "Company context required" });
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Company context required" });
+
+    const access = await getProjectAccess(String(userId), String(req.params.id), String(companyId));
+    if (!access.hasAccess || !access.isCreator) return res.status(403).json({ error: "Only the project owner can delete it" });
 
     await db.delete(kbProjects)
       .where(and(eq(kbProjects.id, String(req.params.id)), eq(kbProjects.companyId, String(companyId))));
@@ -348,20 +432,35 @@ router.get("/api/kb/conversations", requireAuth, async (req: Request, res: Respo
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
     const offset = (page - 1) * limit;
 
-    const conditions = [
+    const sharedConvoIds = await db.select({ conversationId: kbConversationMembers.conversationId })
+      .from(kbConversationMembers)
+      .where(and(eq(kbConversationMembers.userId, String(userId)), eq(kbConversationMembers.status, "ACCEPTED")));
+
+    const sharedProjectIds = await db.select({ projectId: kbProjectMembers.projectId })
+      .from(kbProjectMembers)
+      .where(and(eq(kbProjectMembers.userId, String(userId)), eq(kbProjectMembers.status, "ACCEPTED")));
+
+    const convoMemberIds = sharedConvoIds.map(c => c.conversationId);
+    const projectMemberIds = sharedProjectIds.map(p => p.projectId);
+
+    const accessConditions = [eq(kbConversations.createdById, String(userId))];
+    if (convoMemberIds.length > 0) accessConditions.push(inArray(kbConversations.id, convoMemberIds));
+    if (projectMemberIds.length > 0) accessConditions.push(inArray(kbConversations.projectId, projectMemberIds));
+
+    const baseConditions = [
       eq(kbConversations.companyId, String(companyId)),
-      eq(kbConversations.createdById, String(userId)),
+      or(...accessConditions)!,
     ];
-    if (projectId) conditions.push(eq(kbConversations.projectId, String(projectId)));
+    if (projectId) baseConditions.push(eq(kbConversations.projectId, String(projectId)));
 
     const [totalResult] = await db.select({ count: count() })
       .from(kbConversations)
-      .where(and(...conditions));
+      .where(and(...baseConditions));
 
     const convos = await db
       .select()
       .from(kbConversations)
-      .where(and(...conditions))
+      .where(and(...baseConditions))
       .orderBy(desc(kbConversations.updatedAt))
       .limit(limit)
       .offset(offset);
@@ -443,13 +542,8 @@ router.get("/api/kb/conversations/:id/messages", requireAuth, async (req: Reques
     const userId = req.session.userId;
     if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
 
-    const [convo] = await db.select({ id: kbConversations.id, createdById: kbConversations.createdById })
-      .from(kbConversations)
-      .where(and(eq(kbConversations.id, String(req.params.id)), eq(kbConversations.companyId, String(companyId))))
-      .limit(1);
-
-    if (!convo) return res.status(404).json({ error: "Conversation not found" });
-    if (convo.createdById !== userId) return res.status(403).json({ error: "Access denied" });
+    const access = await getConversationAccess(String(userId), String(req.params.id), String(companyId));
+    if (!access.hasAccess) return res.status(403).json({ error: "Access denied" });
 
     const messages = await db
       .select()
@@ -480,12 +574,15 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
 
     const answerMode = mode === "HYBRID" ? "HYBRID" : "KB_ONLY";
 
+    const access = await getConversationAccess(String(userId), String(req.params.id), String(companyId));
+    if (!access.hasAccess) return res.status(403).json({ error: "Access denied" });
+    if (access.role === "VIEWER") return res.status(403).json({ error: "Viewer access does not allow sending messages" });
+
     const [convo] = await db.select()
       .from(kbConversations)
       .where(and(eq(kbConversations.id, String(req.params.id)), eq(kbConversations.companyId, String(companyId))));
 
     if (!convo) return res.status(404).json({ error: "Conversation not found" });
-    if (convo.createdById !== userId) return res.status(403).json({ error: "Access denied" });
 
     const today = new Date().toISOString().slice(0, 10);
     const [usage] = await db.select()
@@ -522,15 +619,19 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
     const helpContext = buildHelpContext(helpResults);
 
     let projectName: string | undefined;
+    let projectInstructions: string | undefined;
+    let threadContext = "";
     if (convo.projectId) {
-      const [proj] = await db.select({ name: kbProjects.name })
+      const [proj] = await db.select({ name: kbProjects.name, instructions: kbProjects.instructions })
         .from(kbProjects)
         .where(eq(kbProjects.id, convo.projectId));
       projectName = proj?.name;
+      projectInstructions = proj?.instructions || undefined;
+      threadContext = await getProjectThreadContext(convo.projectId, convo.id);
     }
 
-    const fullContext = [context, helpContext].filter(Boolean).join("\n\n---\n\n");
-    const systemPrompt = buildSystemPrompt(answerMode, fullContext, projectName);
+    const fullContext = [context, helpContext, threadContext].filter(Boolean).join("\n\n---\n\n");
+    const systemPrompt = buildSystemPrompt(answerMode, fullContext, projectName, projectInstructions);
     const history = await getConversationHistory(convo.id, 16);
 
     const chatMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
@@ -618,6 +719,334 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
     if (!res.headersSent) {
       res.status(500).json({ error: "Failed to send message" });
     }
+  }
+});
+
+// ============ PROJECT MEMBER MANAGEMENT ============
+
+router.get("/api/kb/projects/:projectId/members", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId;
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
+
+    const access = await getProjectAccess(String(userId), String(req.params.projectId), String(companyId));
+    if (!access.hasAccess) return res.status(403).json({ error: "Access denied" });
+
+    const members = await db
+      .select({
+        id: kbProjectMembers.id,
+        userId: kbProjectMembers.userId,
+        role: kbProjectMembers.role,
+        status: kbProjectMembers.status,
+        createdAt: kbProjectMembers.createdAt,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(kbProjectMembers)
+      .innerJoin(users, eq(kbProjectMembers.userId, users.id))
+      .where(eq(kbProjectMembers.projectId, String(req.params.projectId)))
+      .orderBy(kbProjectMembers.createdAt);
+
+    res.json(members);
+  } catch (error) {
+    logger.error({ err: error }, "[KB] Failed to fetch project members");
+    res.status(500).json({ error: "Failed to fetch members" });
+  }
+});
+
+router.post("/api/kb/projects/:projectId/members", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId;
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
+
+    const access = await getProjectAccess(String(userId), String(req.params.projectId), String(companyId));
+    if (!access.hasAccess || access.role === "VIEWER") return res.status(403).json({ error: "Edit access required to invite members" });
+
+    const { userIds, role } = req.body;
+    if (!userIds?.length) return res.status(400).json({ error: "User IDs are required" });
+    const memberRole = ["EDITOR", "VIEWER"].includes(role) ? role : "VIEWER";
+
+    const added = [];
+    for (const inviteeId of userIds) {
+      try {
+        const [member] = await db.insert(kbProjectMembers).values({
+          projectId: String(req.params.projectId),
+          userId: String(inviteeId),
+          role: memberRole,
+          status: "ACCEPTED",
+          invitedById: String(userId),
+        }).onConflictDoNothing().returning();
+        if (member) added.push(member);
+      } catch (e) {
+        logger.warn({ err: e, inviteeId }, "[KB] Failed to add project member");
+      }
+    }
+
+    res.status(201).json({ added: added.length });
+  } catch (error) {
+    logger.error({ err: error }, "[KB] Failed to add project members");
+    res.status(500).json({ error: "Failed to add members" });
+  }
+});
+
+router.patch("/api/kb/projects/:projectId/members/:memberId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId;
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
+
+    const access = await getProjectAccess(String(userId), String(req.params.projectId), String(companyId));
+    if (!access.hasAccess || (access.role !== "OWNER" && !access.isCreator)) return res.status(403).json({ error: "Owner access required" });
+
+    const { role } = req.body;
+    if (!["EDITOR", "VIEWER"].includes(role)) return res.status(400).json({ error: "Invalid role" });
+
+    const [updated] = await db.update(kbProjectMembers)
+      .set({ role })
+      .where(and(
+        eq(kbProjectMembers.id, String(req.params.memberId)),
+        eq(kbProjectMembers.projectId, String(req.params.projectId))
+      ))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Member not found" });
+    res.json(updated);
+  } catch (error) {
+    logger.error({ err: error }, "[KB] Failed to update member role");
+    res.status(500).json({ error: "Failed to update member" });
+  }
+});
+
+router.delete("/api/kb/projects/:projectId/members/:memberId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId;
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
+
+    const access = await getProjectAccess(String(userId), String(req.params.projectId), String(companyId));
+    if (!access.hasAccess || (access.role !== "OWNER" && !access.isCreator)) return res.status(403).json({ error: "Owner access required" });
+
+    await db.delete(kbProjectMembers)
+      .where(and(
+        eq(kbProjectMembers.id, String(req.params.memberId)),
+        eq(kbProjectMembers.projectId, String(req.params.projectId))
+      ));
+
+    res.status(204).send();
+  } catch (error) {
+    logger.error({ err: error }, "[KB] Failed to remove project member");
+    res.status(500).json({ error: "Failed to remove member" });
+  }
+});
+
+// ============ CONVERSATION MEMBER MANAGEMENT ============
+
+router.get("/api/kb/conversations/:convoId/members", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId;
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
+
+    const access = await getConversationAccess(String(userId), String(req.params.convoId), String(companyId));
+    if (!access.hasAccess) return res.status(403).json({ error: "Access denied" });
+
+    const members = await db
+      .select({
+        id: kbConversationMembers.id,
+        userId: kbConversationMembers.userId,
+        role: kbConversationMembers.role,
+        status: kbConversationMembers.status,
+        createdAt: kbConversationMembers.createdAt,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(kbConversationMembers)
+      .innerJoin(users, eq(kbConversationMembers.userId, users.id))
+      .where(eq(kbConversationMembers.conversationId, String(req.params.convoId)))
+      .orderBy(kbConversationMembers.createdAt);
+
+    res.json(members);
+  } catch (error) {
+    logger.error({ err: error }, "[KB] Failed to fetch conversation members");
+    res.status(500).json({ error: "Failed to fetch members" });
+  }
+});
+
+router.post("/api/kb/conversations/:convoId/members", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId;
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
+
+    const access = await getConversationAccess(String(userId), String(req.params.convoId), String(companyId));
+    if (!access.hasAccess || access.role === "VIEWER") return res.status(403).json({ error: "Edit access required" });
+
+    const { userIds, role } = req.body;
+    if (!userIds?.length) return res.status(400).json({ error: "User IDs are required" });
+    const memberRole = ["EDITOR", "VIEWER"].includes(role) ? role : "VIEWER";
+
+    const added = [];
+    for (const inviteeId of userIds) {
+      try {
+        const [member] = await db.insert(kbConversationMembers).values({
+          conversationId: String(req.params.convoId),
+          userId: String(inviteeId),
+          role: memberRole,
+          status: "ACCEPTED",
+          invitedById: String(userId),
+        }).onConflictDoNothing().returning();
+        if (member) added.push(member);
+      } catch (e) {
+        logger.warn({ err: e, inviteeId }, "[KB] Failed to add conversation member");
+      }
+    }
+
+    res.status(201).json({ added: added.length });
+  } catch (error) {
+    logger.error({ err: error }, "[KB] Failed to add conversation members");
+    res.status(500).json({ error: "Failed to add members" });
+  }
+});
+
+router.delete("/api/kb/conversations/:convoId/members/:memberId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId;
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
+
+    const access = await getConversationAccess(String(userId), String(req.params.convoId), String(companyId));
+    if (!access.hasAccess || (access.role !== "OWNER" && !access.isCreator)) return res.status(403).json({ error: "Owner access required" });
+
+    await db.delete(kbConversationMembers)
+      .where(and(
+        eq(kbConversationMembers.id, String(req.params.memberId)),
+        eq(kbConversationMembers.conversationId, String(req.params.convoId))
+      ));
+
+    res.status(204).send();
+  } catch (error) {
+    logger.error({ err: error }, "[KB] Failed to remove conversation member");
+    res.status(500).json({ error: "Failed to remove member" });
+  }
+});
+
+// ============ PENDING INVITATIONS ============
+
+router.get("/api/kb/invitations", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) return res.status(403).json({ error: "Auth required" });
+
+    const projectInvites = await db
+      .select({
+        id: kbProjectMembers.id,
+        type: sql<string>`'project'`,
+        entityId: kbProjectMembers.projectId,
+        role: kbProjectMembers.role,
+        status: kbProjectMembers.status,
+        createdAt: kbProjectMembers.createdAt,
+        projectName: kbProjects.name,
+      })
+      .from(kbProjectMembers)
+      .innerJoin(kbProjects, eq(kbProjectMembers.projectId, kbProjects.id))
+      .where(and(eq(kbProjectMembers.userId, String(userId)), eq(kbProjectMembers.status, "INVITED")));
+
+    const convoInvites = await db
+      .select({
+        id: kbConversationMembers.id,
+        type: sql<string>`'conversation'`,
+        entityId: kbConversationMembers.conversationId,
+        role: kbConversationMembers.role,
+        status: kbConversationMembers.status,
+        createdAt: kbConversationMembers.createdAt,
+        conversationTitle: kbConversations.title,
+      })
+      .from(kbConversationMembers)
+      .innerJoin(kbConversations, eq(kbConversationMembers.conversationId, kbConversations.id))
+      .where(and(eq(kbConversationMembers.userId, String(userId)), eq(kbConversationMembers.status, "INVITED")));
+
+    res.json({ projectInvites, conversationInvites: convoInvites });
+  } catch (error) {
+    logger.error({ err: error }, "[KB] Failed to fetch invitations");
+    res.status(500).json({ error: "Failed to fetch invitations" });
+  }
+});
+
+router.post("/api/kb/invitations/:id/accept", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) return res.status(403).json({ error: "Auth required" });
+    const { type } = req.body;
+
+    if (type === "project") {
+      const [updated] = await db.update(kbProjectMembers)
+        .set({ status: "ACCEPTED" })
+        .where(and(eq(kbProjectMembers.id, String(req.params.id)), eq(kbProjectMembers.userId, String(userId))))
+        .returning();
+      if (!updated) return res.status(404).json({ error: "Invitation not found" });
+    } else {
+      const [updated] = await db.update(kbConversationMembers)
+        .set({ status: "ACCEPTED" })
+        .where(and(eq(kbConversationMembers.id, String(req.params.id)), eq(kbConversationMembers.userId, String(userId))))
+        .returning();
+      if (!updated) return res.status(404).json({ error: "Invitation not found" });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ err: error }, "[KB] Failed to accept invitation");
+    res.status(500).json({ error: "Failed to accept invitation" });
+  }
+});
+
+router.post("/api/kb/invitations/:id/decline", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) return res.status(403).json({ error: "Auth required" });
+    const { type } = req.body;
+
+    if (type === "project") {
+      await db.update(kbProjectMembers)
+        .set({ status: "DECLINED" })
+        .where(and(eq(kbProjectMembers.id, String(req.params.id)), eq(kbProjectMembers.userId, String(userId))));
+    } else {
+      await db.update(kbConversationMembers)
+        .set({ status: "DECLINED" })
+        .where(and(eq(kbConversationMembers.id, String(req.params.id)), eq(kbConversationMembers.userId, String(userId))));
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ err: error }, "[KB] Failed to decline invitation");
+    res.status(500).json({ error: "Failed to decline invitation" });
+  }
+});
+
+// ============ COMPANY USERS FOR INVITING ============
+
+router.get("/api/kb/company-users", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId;
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
+
+    const companyUsers = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+      })
+      .from(users)
+      .where(and(eq(users.companyId, String(companyId)), eq(users.isActive, true)))
+      .orderBy(users.name)
+      .limit(200);
+
+    res.json(companyUsers.filter(u => u.id !== String(userId)));
+  } catch (error) {
+    logger.error({ err: error }, "[KB] Failed to fetch company users");
+    res.status(500).json({ error: "Failed to fetch users" });
   }
 });
 
