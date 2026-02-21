@@ -372,7 +372,7 @@ export default function DraftingEmailsPage({ embedded = false }: { embedded?: bo
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState("PROCESSED");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [inboxSettingsOpen, setInboxSettingsOpen] = useState(false);
   const [page, setPage] = useState(1);
