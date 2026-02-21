@@ -1,6 +1,6 @@
 import { Router } from "express";
 import {
-  db, requireRole, eq, count, and, desc, asc,
+  db, requireRoleOrSuperAdmin, eq, count, and, desc, asc,
   activityTemplates, activityTemplateSubtasks,
   jobActivities, jobActivityAssignees, jobActivityUpdates, jobActivityFiles,
   activityStages, activityConsultants,
@@ -9,7 +9,7 @@ import {
 
 const router = Router();
 
-router.get("/api/admin/data-management/activity-templates", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/data-management/activity-templates", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -39,7 +39,7 @@ router.get("/api/admin/data-management/activity-templates", requireRole("ADMIN")
   }
 });
 
-router.delete("/api/admin/data-management/activity-templates/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/admin/data-management/activity-templates/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -56,7 +56,7 @@ router.delete("/api/admin/data-management/activity-templates/:id", requireRole("
   }
 });
 
-router.get("/api/admin/data-management/job-activities", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/data-management/job-activities", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -88,7 +88,7 @@ router.get("/api/admin/data-management/job-activities", requireRole("ADMIN"), as
   }
 });
 
-router.delete("/api/admin/data-management/job-activities/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/admin/data-management/job-activities/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -108,7 +108,7 @@ router.delete("/api/admin/data-management/job-activities/:id", requireRole("ADMI
   }
 });
 
-router.get("/api/admin/data-management/activity-stages", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/data-management/activity-stages", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -130,7 +130,7 @@ router.get("/api/admin/data-management/activity-stages", requireRole("ADMIN"), a
   }
 });
 
-router.delete("/api/admin/data-management/activity-stages/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/admin/data-management/activity-stages/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -156,7 +156,7 @@ router.delete("/api/admin/data-management/activity-stages/:id", requireRole("ADM
   }
 });
 
-router.get("/api/admin/data-management/activity-consultants", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/data-management/activity-consultants", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -177,7 +177,7 @@ router.get("/api/admin/data-management/activity-consultants", requireRole("ADMIN
   }
 });
 
-router.delete("/api/admin/data-management/activity-consultants/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/admin/data-management/activity-consultants/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import {
-  db, requireRole, eq, count, and, desc, asc, inArray,
+  db, requireRoleOrSuperAdmin, eq, count, and, desc, asc, inArray,
   costCodes, childCostCodes, costCodeDefaults, jobCostCodes,
   tenders, tenderPackages, tenderSubmissions,
   tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks,
@@ -12,7 +12,7 @@ import {
 
 const router = Router();
 
-router.get("/api/admin/data-management/cost-codes", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/data-management/cost-codes", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -35,7 +35,7 @@ router.get("/api/admin/data-management/cost-codes", requireRole("ADMIN"), async 
   }
 });
 
-router.delete("/api/admin/data-management/cost-codes/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/admin/data-management/cost-codes/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -52,7 +52,7 @@ router.delete("/api/admin/data-management/cost-codes/:id", requireRole("ADMIN"),
   }
 });
 
-router.get("/api/admin/data-management/child-cost-codes", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/data-management/child-cost-codes", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -78,7 +78,7 @@ router.get("/api/admin/data-management/child-cost-codes", requireRole("ADMIN"), 
   }
 });
 
-router.delete("/api/admin/data-management/child-cost-codes/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/admin/data-management/child-cost-codes/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -118,7 +118,7 @@ router.delete("/api/admin/data-management/child-cost-codes/:id", requireRole("AD
   }
 });
 
-router.get("/api/admin/data-management/tenders", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/data-management/tenders", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -143,7 +143,7 @@ router.get("/api/admin/data-management/tenders", requireRole("ADMIN"), async (re
   }
 });
 
-router.delete("/api/admin/data-management/tenders/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/admin/data-management/tenders/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -171,7 +171,7 @@ router.delete("/api/admin/data-management/tenders/:id", requireRole("ADMIN"), as
   }
 });
 
-router.get("/api/admin/data-management/budgets", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/data-management/budgets", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -195,7 +195,7 @@ router.get("/api/admin/data-management/budgets", requireRole("ADMIN"), async (re
   }
 });
 
-router.delete("/api/admin/data-management/budgets/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/admin/data-management/budgets/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -215,7 +215,7 @@ router.delete("/api/admin/data-management/budgets/:id", requireRole("ADMIN"), as
   }
 });
 
-router.get("/api/admin/data-management/boq-groups", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/data-management/boq-groups", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -241,7 +241,7 @@ router.get("/api/admin/data-management/boq-groups", requireRole("ADMIN"), async 
   }
 });
 
-router.delete("/api/admin/data-management/boq-groups/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/admin/data-management/boq-groups/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -256,7 +256,7 @@ router.delete("/api/admin/data-management/boq-groups/:id", requireRole("ADMIN"),
   }
 });
 
-router.get("/api/admin/data-management/ap-invoices", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/data-management/ap-invoices", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -282,7 +282,7 @@ router.get("/api/admin/data-management/ap-invoices", requireRole("ADMIN"), async
   }
 });
 
-router.delete("/api/admin/data-management/ap-invoices/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/admin/data-management/ap-invoices/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });

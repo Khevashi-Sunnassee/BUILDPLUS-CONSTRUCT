@@ -1,6 +1,6 @@
 import { Router } from "express";
 import {
-  db, requireRole, eq, count, and, sql, inArray, notInArray,
+  db, requireRoleOrSuperAdmin, eq, count, and, sql, inArray, notInArray,
   items, itemCategories, assets, progressClaims, progressClaimItems,
   broadcastTemplates, broadcastMessages, documents, documentBundleItems,
   contracts, deliveryRecords, loadLists, loadListPanels,
@@ -81,7 +81,7 @@ async function getProtectedLoadListIds(companyId: string): Promise<string[]> {
   return llWithDeliveries.map(r => r.id);
 }
 
-router.delete("/api/admin/data-management/:entityType/bulk-delete", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/admin/data-management/:entityType/bulk-delete", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });

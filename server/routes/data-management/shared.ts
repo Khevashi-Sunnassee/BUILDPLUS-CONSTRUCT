@@ -1,5 +1,5 @@
 export { db } from "../../storage";
-export { requireRole } from "../middleware/auth.middleware";
+export { requireRole, requireRoleOrSuperAdmin } from "../middleware/auth.middleware";
 export { eq, count, and, sql, desc, asc, inArray, notInArray } from "drizzle-orm";
 export {
   items,

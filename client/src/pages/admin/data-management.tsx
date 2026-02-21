@@ -355,13 +355,15 @@ function EntityTable({
   config,
   searchQuery,
   onDeleteClick,
+  companyId,
 }: {
   config: EntityTabConfig;
   searchQuery: string;
   onDeleteClick: (target: DeleteTarget) => void;
+  companyId?: string;
 }) {
   const { data, isLoading } = useQuery<any[]>({
-    queryKey: [config.queryKey],
+    queryKey: companyId ? [config.queryKey, { companyId }] : [config.queryKey],
   });
 
   const filtered = useMemo(() => {
@@ -431,7 +433,7 @@ function EntityTable({
                       id: row.id,
                       name: config.getRowName(row),
                       entityType: config.entityType,
-                      apiPath: `/api/admin/data-management/${config.entityType}/${row.id}`,
+                      apiPath: `/api/admin/data-management/${config.entityType}/${row.id}${companyId ? `?companyId=${companyId}` : ""}`,
                       queryKey: config.queryKey,
                     })
                   }
@@ -448,13 +450,19 @@ function EntityTable({
   );
 }
 
-export default function DataManagementPage() {
+export default function DataManagementPage({ embedded = false, companyId }: { embedded?: boolean; companyId?: string } = {}) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("suppliers");
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState<string | null>(null);
   const [bulkDeleteResult, setBulkDeleteResult] = useState<BulkDeleteResult | null>(null);
+
+  const companyIdParam = companyId ? `?companyId=${companyId}` : "";
+
+  const getQueryKeyForTab = (queryKey: string) => {
+    return companyId ? [queryKey, { companyId }] : [queryKey];
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async ({ apiPath }: { apiPath: string }) => {
@@ -463,7 +471,7 @@ export default function DataManagementPage() {
     onSuccess: () => {
       toast({ title: "Deleted", description: "Record deleted successfully." });
       if (deleteTarget) {
-        queryClient.invalidateQueries({ queryKey: [deleteTarget.queryKey] });
+        queryClient.invalidateQueries({ queryKey: getQueryKeyForTab(deleteTarget.queryKey) });
       }
       setDeleteTarget(null);
     },
@@ -479,7 +487,7 @@ export default function DataManagementPage() {
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async ({ entityType }: { entityType: string }) => {
-      const res = await apiRequest("DELETE", `/api/admin/data-management/${entityType}/bulk-delete`);
+      const res = await apiRequest("DELETE", `/api/admin/data-management/${entityType}/bulk-delete${companyIdParam}`);
       return await res.json() as BulkDeleteResult;
     },
     onSuccess: (data: BulkDeleteResult) => {
@@ -487,7 +495,7 @@ export default function DataManagementPage() {
       setBulkDeleteResult(data);
       const activeConfig = ENTITY_TABS.find((t) => t.key === activeTab);
       if (activeConfig) {
-        queryClient.invalidateQueries({ queryKey: [activeConfig.queryKey] });
+        queryClient.invalidateQueries({ queryKey: getQueryKeyForTab(activeConfig.queryKey) });
       }
     },
     onError: (error: any) => {
@@ -503,18 +511,20 @@ export default function DataManagementPage() {
   const activeConfig = ENTITY_TABS.find((t) => t.key === activeTab);
 
   return (
-    <div className="p-6 space-y-6" role="main" aria-label="Data Management">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Data Management</h1>
-            <PageHelpButton pageHelpKey="data_management" />
+    <div className={embedded ? "space-y-6" : "p-6 space-y-6"} role="main" aria-label="Data Management">
+      {!embedded && (
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold" data-testid="text-page-title">Data Management</h1>
+              <PageHelpButton pageHelpKey="data_management" />
+            </div>
+            <p className="text-sm text-muted-foreground mt-1" data-testid="text-page-description">
+              Delete individual records or bulk-delete all records. Records with dependencies will be skipped during bulk delete.
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground mt-1" data-testid="text-page-description">
-            Delete individual records or bulk-delete all records. Records with dependencies will be skipped during bulk delete.
-          </p>
         </div>
-      </div>
+      )}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
@@ -575,6 +585,7 @@ export default function DataManagementPage() {
                   config={tab}
                   searchQuery={searchQuery}
                   onDeleteClick={setDeleteTarget}
+                  companyId={companyId}
                 />
               </TabsContent>
             ))}

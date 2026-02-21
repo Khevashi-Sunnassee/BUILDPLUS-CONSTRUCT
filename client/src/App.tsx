@@ -97,7 +97,6 @@ const AssetRegisterPage = lazyWithRetry(() => import("@/pages/admin/asset-regist
 const AssetDetailPage = lazyWithRetry(() => import("@/pages/admin/asset-detail"));
 const AssetRepairFormPage = lazyWithRetry(() => import("@/pages/admin/asset-repair-form"));
 const TemplateEditorPage = lazyWithRetry(() => import("@/pages/admin/template-editor"));
-const DataManagementPage = lazyWithRetry(() => import("@/pages/admin/data-management"));
 const ChecklistsPage = lazyWithRetry(() => import("@/pages/checklists"));
 const ChecklistFillPage = lazyWithRetry(() => import("@/pages/checklist-fill"));
 const ChecklistReportsPage = lazyWithRetry(() => import("@/pages/checklist-reports"));
@@ -869,11 +868,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/data-management">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
-          <AuthenticatedLayout>
-            <DataManagementPage />
-          </AuthenticatedLayout>
-        </ProtectedRoute>
+        <Redirect to="/super-admin" />
       </Route>
 
       <Route path="/admin/item-categories">

@@ -156,7 +156,6 @@ const adminNavItems = [
   { title: "Users", url: "/admin/users", icon: Users },
   { title: "Job Types & Workflows", url: "/admin/job-types", icon: Workflow },
   { title: "Cost Codes", url: "/admin/cost-codes", icon: Hash },
-  { title: "Data Management", url: "/admin/data-management", icon: Database },
   { title: "Email Templates", url: "/admin/email-templates", icon: MailPlus },
 ];
 
