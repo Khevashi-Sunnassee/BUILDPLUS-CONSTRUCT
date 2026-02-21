@@ -5,6 +5,8 @@ import { db } from "../db";
 import { companies } from "@shared/schema";
 import { storage } from "../storage";
 import { requireAuth, requireRole, requireSuperAdmin } from "./middleware/auth.middleware";
+import { cloneSystemDefaultsToCompany } from "./system-defaults.routes";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -12,6 +14,7 @@ const companySchema = z.object({
   name: z.string().min(1, "Company name is required"),
   code: z.string().min(1, "Company code is required").max(10),
   isActive: z.boolean().optional().default(true),
+  cloneDefaultsFromCompanyId: z.string().optional(),
 });
 
 const inboxEmailsSchema = z.object({
@@ -92,7 +95,18 @@ router.post("/api/admin/companies", requireSuperAdmin, async (req, res) => {
       code: data.code.toUpperCase(),
       isActive: data.isActive,
     });
-    res.status(201).json(company);
+
+    let cloneResult = null;
+    if (data.cloneDefaultsFromCompanyId) {
+      try {
+        const userId = (req as any).session?.userId;
+        cloneResult = await cloneSystemDefaultsToCompany(data.cloneDefaultsFromCompanyId, company.id, userId);
+      } catch (cloneError: any) {
+        logger.error({ err: cloneError }, "Failed to clone defaults to new company");
+      }
+    }
+
+    res.status(201).json({ ...company, cloneResult });
   } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", issues: error.issues });
