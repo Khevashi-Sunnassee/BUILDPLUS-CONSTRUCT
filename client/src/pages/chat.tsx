@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { QueryErrorState } from "@/components/query-error-state";
@@ -621,15 +621,15 @@ export default function ChatPage() {
     messageInputRef.current?.focus();
   };
 
-  const filteredMentionUsers = users.filter(u => {
+  const filteredMentionUsers = useMemo(() => users.filter(u => {
     const query = mentionQuery.toLowerCase();
     return (
       u.name?.toLowerCase().includes(query) ||
       u.email.toLowerCase().includes(query)
     );
-  }).slice(0, 5);
+  }).slice(0, 5), [users, mentionQuery]);
 
-  const filteredConversations = conversations.filter(c => {
+  const filteredConversations = useMemo(() => conversations.filter(c => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -637,9 +637,9 @@ export default function ChatPage() {
       c.job?.jobNumber?.toLowerCase().includes(query) ||
       c.panel?.panelMark?.toLowerCase().includes(query)
     );
-  });
+  }), [conversations, searchQuery]);
 
-  const getConversationDisplayName = (conv: Conversation) => {
+  const getConversationDisplayName = useCallback((conv: Conversation) => {
     if (conv.name) return conv.name;
     if (conv.jobId && conv.job) return `Job: ${conv.job.jobNumber}`;
     if (conv.panelId && conv.panel) return `Panel: ${conv.panel.panelMark}`;
@@ -648,7 +648,7 @@ export default function ChatPage() {
       return otherMembers.map(m => m.user?.name || m.user?.email).join(", ");
     }
     return "Conversation";
-  };
+  }, []);
 
   const getConversationIcon = (conv: Conversation) => {
     if (conv.jobId) return <Briefcase className="h-4 w-4" />;

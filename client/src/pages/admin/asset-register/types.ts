@@ -2,16 +2,8 @@ import { z } from "zod";
 import type { Asset, Department } from "@shared/schema";
 import type { UseFormReturn } from "react-hook-form";
 import type { UseMutationResult } from "@tanstack/react-query";
-
-export const formatCurrency = (value: string | number | null | undefined) => {
-  if (value === null || value === undefined) return "-";
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  if (isNaN(num)) return "-";
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-  }).format(num);
-};
+import { formatCurrencyCompact as formatCurrency } from "@/lib/format";
+export { formatCurrency };
 
 export const formatDate = (value: string | null | undefined) => {
   if (!value) return "-";

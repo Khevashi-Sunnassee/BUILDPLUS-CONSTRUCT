@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { formatCurrency } from "@/lib/format";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -421,14 +422,6 @@ export default function ProductionReportDetailPage() {
     
     return { walls, columns, cubeBases, cubeRings, landingWalls, other };
   }, [entries]);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("en-AU", {
-      style: "currency",
-      currency: "AUD",
-      minimumFractionDigits: 2,
-    }).format(value);
-  };
 
   const formatDateDisplay = (dateStr: string) => {
     try {

@@ -70,16 +70,7 @@ import {
   RefreshCw,
   Wrench,
 } from "lucide-react";
-
-const formatCurrency = (value: string | number | null | undefined) => {
-  if (value === null || value === undefined) return "-";
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  if (isNaN(num)) return "-";
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-  }).format(num);
-};
+import { formatCurrencyCompact as formatCurrency } from "@/lib/format";
 
 const displayValue = (val: string | number | null | undefined) => {
   if (val === null || val === undefined || val === "") return "-";

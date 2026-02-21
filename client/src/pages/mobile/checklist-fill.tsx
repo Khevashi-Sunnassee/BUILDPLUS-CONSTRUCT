@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import {
@@ -155,7 +155,7 @@ export default function MobileChecklistFillPage() {
     setHasChanges(true);
   };
 
-  const sections: ChecklistSection[] = template ? normalizeSections(template.sections) : [];
+  const sections: ChecklistSection[] = useMemo(() => template ? normalizeSections(template.sections) : [], [template]);
 
   const handleAssetSelected = useCallback((asset: SimpleAsset, sourceFieldId?: string) => {
     const updates: Record<string, unknown> = {};
@@ -204,7 +204,7 @@ export default function MobileChecklistFillPage() {
   const isLoading = instanceLoading || templateLoading;
   const isCompleted = instance?.status === "completed" || instance?.status === "signed_off";
 
-  const { completedCount, totalRequired, progress } = (() => {
+  const { completedCount, totalRequired, progress } = useMemo(() => {
     let completed = 0;
     let total = 0;
     sections.forEach(section => {
@@ -219,7 +219,7 @@ export default function MobileChecklistFillPage() {
       });
     });
     return { completedCount: completed, totalRequired: total, progress: total > 0 ? (completed / total) * 100 : 100 };
-  })();
+  }, [sections, responses]);
 
   if (isLoading) {
     return (
@@ -477,9 +477,9 @@ function MobileAssetSelectorField({ field, value, onChange, disabled, onAssetSel
     queryKey: [ASSET_ROUTES.LIST_SIMPLE],
   });
 
-  const selectedAsset = assets.find(a => a.id === value);
+  const selectedAsset = useMemo(() => assets.find(a => a.id === value), [assets, value]);
   const q = searchQuery.toLowerCase().trim();
-  const filteredAssets = q
+  const filteredAssets = useMemo(() => q
     ? assets.filter(a =>
         a.name.toLowerCase().includes(q) ||
         a.assetTag.toLowerCase().includes(q) ||
@@ -488,7 +488,7 @@ function MobileAssetSelectorField({ field, value, onChange, disabled, onAssetSel
         (a.manufacturer || "").toLowerCase().includes(q) ||
         (a.model || "").toLowerCase().includes(q)
       )
-    : assets;
+    : assets, [assets, q]);
 
   if (selectedAsset && !showSearch) {
     return (

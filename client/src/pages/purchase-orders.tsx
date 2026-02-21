@@ -9,6 +9,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.mjs",
   import.meta.url,
 ).toString();
+import { formatCurrency } from "@/lib/format";
 import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -820,18 +821,6 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
       </DialogContent>
     </Dialog>
   );
-}
-
-function formatCurrency(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) return "$0.00";
-  const numValue = typeof value === "string" ? parseFloat(value) : value;
-  if (isNaN(numValue)) return "$0.00";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(numValue);
 }
 
 export default function PurchaseOrdersPage() {

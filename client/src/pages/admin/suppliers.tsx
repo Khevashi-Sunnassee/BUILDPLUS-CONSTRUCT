@@ -17,9 +17,6 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCw,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
   Search,
   X,
   Tag,
@@ -82,6 +79,7 @@ import {
 import type { Supplier } from "@shared/schema";
 import { PROCUREMENT_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { SortIcon } from "@/components/ui/sort-icon";
 
 interface CostCode {
   id: string;
@@ -166,10 +164,6 @@ export default function AdminSuppliersPage() {
     }
   }, [sortColumn]);
 
-  const SortIcon = useCallback(({ column }: { column: string }) => {
-    if (sortColumn !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
-    return sortDirection === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
-  }, [sortColumn, sortDirection]);
 
   const { data: suppliersRaw, isLoading, isError, error, refetch } = useQuery<Supplier[]>({
     queryKey: [PROCUREMENT_ROUTES.SUPPLIERS],
@@ -574,25 +568,25 @@ export default function AdminSuppliersPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")} data-testid="sort-supplier-name">
-                    <span className="flex items-center">Name<SortIcon column="name" /></span>
+                    <span className="flex items-center">Name<SortIcon column="name" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("keyContact")} data-testid="sort-supplier-contact">
-                    <span className="flex items-center">Key Contact<SortIcon column="keyContact" /></span>
+                    <span className="flex items-center">Key Contact<SortIcon column="keyContact" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("email")} data-testid="sort-supplier-email">
-                    <span className="flex items-center">Email<SortIcon column="email" /></span>
+                    <span className="flex items-center">Email<SortIcon column="email" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("phone")} data-testid="sort-supplier-phone">
-                    <span className="flex items-center">Phone<SortIcon column="phone" /></span>
+                    <span className="flex items-center">Phone<SortIcon column="phone" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("costCode")} data-testid="sort-supplier-cost-code">
-                    <span className="flex items-center">Cost Code<SortIcon column="costCode" /></span>
+                    <span className="flex items-center">Cost Code<SortIcon column="costCode" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("type")} data-testid="sort-supplier-type">
-                    <span className="flex items-center">Type<SortIcon column="type" /></span>
+                    <span className="flex items-center">Type<SortIcon column="type" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")} data-testid="sort-supplier-status">
-                    <span className="flex items-center">Status<SortIcon column="status" /></span>
+                    <span className="flex items-center">Status<SortIcon column="status" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>

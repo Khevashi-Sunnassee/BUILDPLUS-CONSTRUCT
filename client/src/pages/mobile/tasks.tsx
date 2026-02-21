@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { dateInputProps } from "@/lib/validation";
@@ -290,16 +290,16 @@ export default function MobileTasksPage() {
     }
   }, [groups]);
 
-  const totalTasks = groups.reduce((sum, g) => sum + (g.tasks?.length || 0), 0);
-  const activeTasks = groups.reduce((sum, g) => sum + (g.tasks?.filter(t => t.status !== "DONE").length || 0), 0);
+  const totalTasks = useMemo(() => groups.reduce((sum, g) => sum + (g.tasks?.length || 0), 0), [groups]);
+  const activeTasks = useMemo(() => groups.reduce((sum, g) => sum + (g.tasks?.filter(t => t.status !== "DONE").length || 0), 0), [groups]);
 
-  const selectedJob = jobs.find(j => j.id === selectedJobId);
-  const filteredJobs = jobSearchQuery
+  const selectedJob = useMemo(() => jobs.find(j => j.id === selectedJobId), [jobs, selectedJobId]);
+  const filteredJobs = useMemo(() => jobSearchQuery
     ? jobs.filter(j =>
         (j.name || "").toLowerCase().includes(jobSearchQuery.toLowerCase()) ||
         (j.jobNumber || "").toLowerCase().includes(jobSearchQuery.toLowerCase())
       )
-    : jobs;
+    : jobs, [jobs, jobSearchQuery]);
 
   return (
     <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Tasks">
@@ -1087,9 +1087,9 @@ function ActivityTasksView({
   }
 
   const q = searchQuery.toLowerCase().trim();
-  const filteredActivities = q
+  const filteredActivities = useMemo(() => q
     ? activities.filter(a => a.name.toLowerCase().includes(q) || (a.category || "").toLowerCase().includes(q))
-    : activities;
+    : activities, [activities, q]);
 
   if (filteredActivities.length === 0) {
     return (
@@ -1148,8 +1148,8 @@ function ActivitySection({
     enabled: !isCollapsed,
   });
 
-  const visibleTasks = hideDone ? tasks.filter(t => t.status !== "DONE") : tasks;
-  const activeCount = tasks.filter(t => t.status !== "DONE").length;
+  const visibleTasks = useMemo(() => hideDone ? tasks.filter(t => t.status !== "DONE") : tasks, [tasks, hideDone]);
+  const activeCount = useMemo(() => tasks.filter(t => t.status !== "DONE").length, [tasks]);
   const statusBg = activityStatusColors[activity.status] || "bg-white/10";
 
   return (

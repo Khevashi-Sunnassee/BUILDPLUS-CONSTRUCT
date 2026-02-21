@@ -16,6 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MYOB_ROUTES } from "@shared/api-routes";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { dateInputProps } from "@/lib/validation";
+import { formatCurrencyAccounting as formatCurrency } from "@/lib/format";
 
 interface MyobStatus {
   connected: boolean;
@@ -643,12 +644,6 @@ function ProfitAndLossTab() {
     const dates = getPresetDates(preset);
     setStartDate(dates.start);
     setEndDate(dates.end);
-  };
-
-  const formatCurrency = (val: number) => {
-    const abs = Math.abs(val);
-    const formatted = abs.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    return val < 0 ? `($${formatted})` : `$${formatted}`;
   };
 
   const renderAccountSection = (title: string, sectionAccounts: PnlAccount[], total: number, icon: React.ReactNode, variant: "income" | "expense" | "neutral") => {

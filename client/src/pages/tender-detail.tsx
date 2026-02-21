@@ -3,6 +3,7 @@ import { useRoute, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/format";
 import { EntitySidebar } from "@/components/EntitySidebar";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -165,11 +166,6 @@ interface ScopeOption {
   name: string;
   status: string;
   trade: { id: string; name: string } | null;
-}
-
-function formatCurrency(value: string | null | undefined): string {
-  const num = parseFloat(value || "0");
-  return `$${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function TenderStatusBadge({ status }: { status: string }) {

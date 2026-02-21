@@ -16,6 +16,7 @@ import {
 import {
   Trash2, Send, X, Plus, Lock, Unlock, ClipboardList,
 } from "lucide-react";
+import { formatCurrency } from "@/lib/format";
 
 interface BudgetLineInfo {
   id: string;
@@ -38,12 +39,6 @@ interface DetailItem {
 }
 
 const UNIT_OPTIONS = ["EA", "SQM", "M3", "LM", "M2", "M", "HR", "DAY", "TONNE", "KG", "LOT"];
-
-function formatCurrency(val: string | number): string {
-  const n = typeof val === "string" ? parseFloat(val) : val;
-  if (isNaN(n)) return "$0.00";
-  return n.toLocaleString("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2 });
-}
 
 export function BudgetLineSidebar({
   line,

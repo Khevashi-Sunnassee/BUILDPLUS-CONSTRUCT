@@ -2,6 +2,7 @@ import { useState, useMemo, Fragment, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,16 +58,6 @@ interface BudgetSummary {
   customerPrice: string;
   profitTargetPercent: string;
   profitMargin: string;
-}
-
-function formatCurrency(value: string | number | null | undefined): string {
-  const num = typeof value === "number" ? value : parseFloat(value || "0");
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(num);
 }
 
 export default function JobBudgetPage() {
@@ -410,6 +401,17 @@ export default function JobBudgetPage() {
 
   const isLineFormPending = createLineMutation.isPending || updateLineMutation.isPending;
   const budgetExists = budgetData !== null && budgetData !== undefined;
+
+  const sidebarLineData = useMemo(() => {
+    if (!sidebarLine) return null;
+    return {
+      id: sidebarLine.id,
+      costCode: sidebarLine.costCode,
+      childCostCode: sidebarLine.childCostCode,
+      estimateLocked: sidebarLine.estimateLocked ?? false,
+      estimatedBudget: sidebarLine.estimatedBudget ?? "0",
+    };
+  }, [sidebarLine]);
 
   if (!jobId) {
     return (
@@ -1153,13 +1155,7 @@ export default function JobBudgetPage() {
 
       {jobId && (
         <BudgetLineSidebar
-          line={sidebarLine ? {
-            id: sidebarLine.id,
-            costCode: sidebarLine.costCode,
-            childCostCode: sidebarLine.childCostCode,
-            estimateLocked: sidebarLine.estimateLocked ?? false,
-            estimatedBudget: sidebarLine.estimatedBudget ?? "0",
-          } : null}
+          line={sidebarLineData}
           jobId={jobId}
           onClose={() => setSidebarLine(null)}
           onBudgetUpdated={() => {

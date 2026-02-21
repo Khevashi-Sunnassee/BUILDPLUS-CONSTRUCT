@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { PageHelpButton } from "@/components/help/page-help-button";
@@ -519,6 +519,8 @@ export default function TemplateEditorPage() {
   const removeOption = (index: number) => {
     setEditingFieldOptions((prev) => prev.filter((_, i) => i !== index));
   };
+
+  const allFieldsFlat = useMemo(() => sections.flatMap((s) => (s.items || []).map((f) => ({ ...f, sectionName: s.name }))), [sections]);
 
   const fieldTypeRequiresOptions = (type: string) => {
     return ["radio_button", "dropdown", "checkbox", "condition_option"].includes(type);
@@ -1133,15 +1135,13 @@ export default function TemplateEditorPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">None</SelectItem>
-                        {sections.flatMap((s) =>
-                          (s.items || [])
-                            .filter((f) => f.id !== editingField?.id)
-                            .map((f) => (
-                              <SelectItem key={f.id} value={f.id}>
-                                {s.name} / {f.name}
-                              </SelectItem>
-                            ))
-                        )}
+                        {allFieldsFlat
+                          .filter((f) => f.id !== editingField?.id)
+                          .map((f) => (
+                            <SelectItem key={f.id} value={f.id}>
+                              {f.sectionName} / {f.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1215,9 +1215,9 @@ export default function TemplateEditorPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none__">Any Asset Selector</SelectItem>
-                            {sections.flatMap(s => s.items.filter(f => f.type === "asset_selector" && f.id !== editingField?.id).map(f => (
+                            {allFieldsFlat.filter(f => f.type === "asset_selector" && f.id !== editingField?.id).map(f => (
                               <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                            )))}
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>

@@ -74,21 +74,25 @@ export default function MobileChecklistsPage() {
 
   const { data: entityTypes = [], isLoading: typesLoading } = useQuery<EntityType[]>({
     queryKey: [CHECKLIST_ROUTES.ENTITY_TYPES],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery<ChecklistTemplate[]>({
     queryKey: [CHECKLIST_ROUTES.TEMPLATES],
     enabled: viewState !== "modules",
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: instances = [], isLoading: instancesLoading } = useQuery<ChecklistInstance[]>({
     queryKey: [CHECKLIST_ROUTES.INSTANCES],
     enabled: viewState === "instances",
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
     enabled: showNewInstanceSheet,
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const createInstanceMutation = useMutation({

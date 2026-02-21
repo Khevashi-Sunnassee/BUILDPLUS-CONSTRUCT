@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,11 +51,6 @@ interface BoqSummary {
 }
 
 const UNITS = ["EA", "SQM", "M3", "LM", "M2", "M", "HR", "DAY", "TONNE", "KG", "LOT"] as const;
-
-function formatCurrency(val: string | number | null | undefined) {
-  const num = typeof val === "string" ? parseFloat(val) : (val ?? 0);
-  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(num);
-}
 
 export default function JobBoqPage() {
   const { toast } = useToast();
@@ -376,6 +372,8 @@ export default function JobBoqPage() {
   const isGroupFormPending = createGroupMutation.isPending || updateGroupMutation.isPending;
   const isItemFormPending = createItemMutation.isPending || updateItemMutation.isPending;
 
+  const displayItems = useMemo(() => groups.length > 0 ? ungroupedItems : allItems, [groups.length, ungroupedItems, allItems]);
+
   if (!jobId) {
     return (
       <div className="p-6">
@@ -603,7 +601,7 @@ export default function JobBoqPage() {
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : (groups.length > 0 ? ungroupedItems : allItems).length === 0 ? (
+          ) : displayItems.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground" data-testid="text-empty-items">
               No items found. Add your first BOQ item to get started.
             </div>
@@ -623,7 +621,7 @@ export default function JobBoqPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(groups.length > 0 ? ungroupedItems : allItems).map((item) => (
+                  {displayItems.map((item) => (
                     <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
                       <TableCell data-testid={`text-item-desc-${item.id}`}>{item.description}</TableCell>
                       <TableCell className="font-mono text-sm" data-testid={`text-item-cc-${item.id}`}>

@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, Loader2, Eye, Settings, Mail, Copy, Check, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, LinkIcon, Inbox } from "lucide-react";
+import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, Loader2, Eye, Settings, Mail, Copy, Check, RefreshCw, LinkIcon, Inbox } from "lucide-react";
+import { SortIcon } from "@/components/ui/sort-icon";
 
 interface TenderEmail {
   id: string;
@@ -414,12 +415,6 @@ export default function TenderEmailsPage({ embedded = false }: { embedded?: bool
     setPage(1);
   }, [sortBy]);
 
-  const SortIcon = ({ column }: { column: string }) => {
-    if (sortBy !== column) return <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground" />;
-    return sortOrder === "asc"
-      ? <ArrowUp className="h-3 w-3 ml-1" />
-      : <ArrowDown className="h-3 w-3 ml-1" />;
-  };
 
   const getCount = (key: string): number => {
     if (!statusCounts) return 0;
@@ -511,12 +506,12 @@ export default function TenderEmailsPage({ embedded = false }: { embedded?: bool
                   <TableRow>
                     <TableHead>
                       <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("subject")} data-testid="sort-tender-subject">
-                        Subject <SortIcon column="subject" />
+                        Subject <SortIcon column="subject" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead>
                       <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("fromAddress")} data-testid="sort-tender-from">
-                        From <SortIcon column="fromAddress" />
+                        From <SortIcon column="fromAddress" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead>Supplier</TableHead>
@@ -524,7 +519,7 @@ export default function TenderEmailsPage({ embedded = false }: { embedded?: bool
                     <TableHead className="text-center">Files</TableHead>
                     <TableHead>
                       <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("createdAt")} data-testid="sort-tender-date">
-                        Received <SortIcon column="createdAt" />
+                        Received <SortIcon column="createdAt" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead>Status</TableHead>

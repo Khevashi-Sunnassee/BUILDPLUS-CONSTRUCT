@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -71,6 +71,7 @@ export default function MobilePurchaseOrdersPage() {
 
   const { data: purchaseOrders = [], isLoading } = useQuery<PurchaseOrder[]>({
     queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: poDetails, isLoading: detailsLoading } = useQuery<PurchaseOrder>({
@@ -105,9 +106,9 @@ export default function MobilePurchaseOrdersPage() {
     },
   });
 
-  const pendingPOs = purchaseOrders.filter(po => po.status === "PENDING");
-  const activePOs = purchaseOrders.filter(po => ["DRAFT", "APPROVED", "ORDERED"].includes(po.status));
-  const completedPOs = purchaseOrders.filter(po => po.status === "RECEIVED").slice(0, 5);
+  const pendingPOs = useMemo(() => purchaseOrders.filter(po => po.status === "PENDING"), [purchaseOrders]);
+  const activePOs = useMemo(() => purchaseOrders.filter(po => ["DRAFT", "APPROVED", "ORDERED"].includes(po.status)), [purchaseOrders]);
+  const completedPOs = useMemo(() => purchaseOrders.filter(po => po.status === "RECEIVED").slice(0, 5), [purchaseOrders]);
 
   const formatCurrency = (amount: string | number | null) => {
     if (amount === null) return "-";

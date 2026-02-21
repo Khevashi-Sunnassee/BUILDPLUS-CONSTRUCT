@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -197,7 +197,7 @@ export default function DailyReportsPage() {
   const [allocatedStatusFilter, setAllocatedStatusFilter] = useState<string>("all");
   const [collapsedPanelTypes, setCollapsedPanelTypes] = useState<Set<string>>(new Set());
 
-  const togglePanelTypeGroup = (panelType: string) => {
+  const togglePanelTypeGroup = useCallback((panelType: string) => {
     setCollapsedPanelTypes(prev => {
       const next = new Set(prev);
       if (next.has(panelType)) {
@@ -207,7 +207,7 @@ export default function DailyReportsPage() {
       }
       return next;
     });
-  };
+  }, []);
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
@@ -498,9 +498,8 @@ export default function DailyReportsPage() {
     }
   };
 
-  // Check if there's a timesheet for today
-  const today = format(new Date(), "yyyy-MM-dd");
-  const hasTodayTimesheet = logs?.some(log => log.logDay === today);
+  const today = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const hasTodayTimesheet = useMemo(() => logs?.some(log => log.logDay === today), [logs, today]);
 
   return (
     <div className="space-y-6" role="main" aria-label="Daily Reports">

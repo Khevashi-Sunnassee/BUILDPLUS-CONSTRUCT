@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -250,9 +250,11 @@ export default function MobileNewOpportunity() {
     createOpportunity.mutate(data);
   };
 
-  const filteredCustomers = customers.filter((c) =>
+  const filteredCustomers = useMemo(() => customers.filter((c) =>
     c.name.toLowerCase().includes(customerSearch.toLowerCase())
-  );
+  ), [customers, customerSearch]);
+
+  const activeJobTypes = useMemo(() => jobTypes.filter(jt => jt.isActive).sort((a, b) => a.sortOrder - b.sortOrder), [jobTypes]);
 
   return (
     <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile New Opportunity">
@@ -314,7 +316,7 @@ export default function MobileNewOpportunity() {
               data-testid="select-job-type"
             >
               <option value="" className="bg-[#0D1117]">Select job type...</option>
-              {jobTypes.filter(jt => jt.isActive).sort((a, b) => a.sortOrder - b.sortOrder).map((jt) => (
+              {activeJobTypes.map((jt) => (
                 <option key={jt.id} value={jt.id} className="bg-[#0D1117]">
                   {jt.name}
                 </option>

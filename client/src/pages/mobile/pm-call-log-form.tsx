@@ -139,7 +139,7 @@ export default function MobilePmCallLogFormPage() {
     enabled: !!selectedJobId,
   });
 
-  const hasProgramme = allLevels && allLevels.length > 0;
+  const hasProgramme = useMemo(() => allLevels && allLevels.length > 0, [allLevels]);
 
   const selectedJob = useMemo(
     () => jobs?.find((j) => j.id === selectedJobId),
@@ -232,9 +232,9 @@ export default function MobilePmCallLogFormPage() {
     });
   };
 
-  const hasLateItems = levelStatuses.some(
+  const hasLateItems = useMemo(() => levelStatuses.some(
     (l) => l.status === "LATE" && l.daysLate > 0
-  );
+  ), [levelStatuses]);
 
   const createMutation = useMutation({
     mutationFn: async () => {

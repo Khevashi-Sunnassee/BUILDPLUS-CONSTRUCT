@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -78,7 +78,7 @@ export default function WeeklyJobLogsPage() {
   const configuredWeekStartDay = globalSettings?.weekStartDay ?? 1;
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-  const calculateWeekBoundaries = (dateStr: string) => {
+  const calculateWeekBoundaries = useCallback((dateStr: string) => {
     if (!dateStr) return { weekStart: "", weekEnd: "" };
     const date = parseISO(dateStr);
     const currentDay = getDay(date);
@@ -89,7 +89,7 @@ export default function WeeklyJobLogsPage() {
       weekStart: format(weekStart, "yyyy-MM-dd"),
       weekEnd: format(weekEnd, "yyyy-MM-dd"),
     };
-  };
+  }, [configuredWeekStartDay]);
 
   useEffect(() => {
     if (reportDate && showForm) {
@@ -119,7 +119,7 @@ export default function WeeklyJobLogsPage() {
     });
   };
 
-  const reportsByUser = isManagerOrAdmin ? allReports.reduce((acc, report) => {
+  const reportsByUser = useMemo(() => isManagerOrAdmin ? allReports.reduce((acc, report) => {
     const pmId = report.projectManagerId;
     if (!acc[pmId]) {
       acc[pmId] = {
@@ -129,7 +129,7 @@ export default function WeeklyJobLogsPage() {
     }
     acc[pmId].reports.push(report);
     return acc;
-  }, {} as Record<string, { user: User; reports: WeeklyJobReportWithDetails[] }>) : {};
+  }, {} as Record<string, { user: User; reports: WeeklyJobReportWithDetails[] }>) : {}, [isManagerOrAdmin, allReports]);
 
   // Expand all user groups by default when data loads
   useEffect(() => {
@@ -150,17 +150,25 @@ export default function WeeklyJobLogsPage() {
     queryKey: [PRODUCTION_ROUTES.SLOTS],
   });
 
-  const getProductionSlotDate = (jobId: string, level: string | null): string | null => {
-    if (!level) return null;
-    const slot = productionSlots.find(s => s.jobId === jobId && s.level === level);
-    return slot ? format(new Date(slot.productionSlotDate), "dd/MM/yyyy") : null;
-  };
+  const productionSlotIndex = useMemo(() => {
+    const index = new Map<string, typeof productionSlots[number]>();
+    for (const slot of productionSlots) {
+      index.set(`${slot.jobId}:${slot.level}`, slot);
+    }
+    return index;
+  }, [productionSlots]);
 
-  const getProductionSlotRawDate = (jobId: string, level: string | null): Date | null => {
+  const getProductionSlotDate = useCallback((jobId: string, level: string | null): string | null => {
     if (!level) return null;
-    const slot = productionSlots.find(s => s.jobId === jobId && s.level === level);
+    const slot = productionSlotIndex.get(`${jobId}:${level}`);
+    return slot ? format(new Date(slot.productionSlotDate), "dd/MM/yyyy") : null;
+  }, [productionSlotIndex]);
+
+  const getProductionSlotRawDate = useCallback((jobId: string, level: string | null): Date | null => {
+    if (!level) return null;
+    const slot = productionSlotIndex.get(`${jobId}:${level}`);
     return slot ? new Date(slot.productionSlotDate) : null;
-  };
+  }, [productionSlotIndex]);
 
   const isWithinWarningWindow = (targetDate: Date, productionDate: Date | null): boolean => {
     if (!productionDate) return false;
@@ -174,8 +182,7 @@ export default function WeeklyJobLogsPage() {
     return base;
   };
   
-  // Filter to only active jobs
-  const activeJobs = allJobs.filter((job) => job.status === "ACTIVE");
+  const activeJobs = useMemo(() => allJobs.filter((job) => job.status === "ACTIVE"), [allJobs]);
 
   const createReportMutation = useMutation({
     mutationFn: async (data: { reportDate: string; weekStartDate: string; weekEndDate: string; notes: string; schedules: ScheduleItem[] }) => {

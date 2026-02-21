@@ -18,9 +18,6 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   AlertCircle,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -79,6 +76,7 @@ import {
 import type { Employee, EmployeeLicence } from "@shared/schema";
 import { EMPLOYEE_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { SortIcon } from "@/components/ui/sort-icon";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const employeeSchema = z.object({
@@ -185,10 +183,6 @@ export default function AdminEmployeesPage() {
     }
   }, [sortColumn]);
 
-  const SortIcon = useCallback(({ column }: { column: string }) => {
-    if (sortColumn !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
-    return sortDirection === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
-  }, [sortColumn, sortDirection]);
 
   const { data: employeesList, isLoading, isError, error, refetch } = useQuery<Employee[]>({
     queryKey: [EMPLOYEE_ROUTES.LIST],
@@ -455,21 +449,21 @@ export default function AdminEmployeesPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("employeeNumber")} data-testid="sort-employee-number">
-                    <span className="flex items-center">Employee Number<SortIcon column="employeeNumber" /></span>
+                    <span className="flex items-center">Employee Number<SortIcon column="employeeNumber" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("lastName")} data-testid="sort-employee-name">
-                    <span className="flex items-center">Name<SortIcon column="lastName" /></span>
+                    <span className="flex items-center">Name<SortIcon column="lastName" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("email")} data-testid="sort-employee-email">
-                    <span className="flex items-center">Email<SortIcon column="email" /></span>
+                    <span className="flex items-center">Email<SortIcon column="email" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("phone")} data-testid="sort-employee-phone">
-                    <span className="flex items-center">Phone<SortIcon column="phone" /></span>
+                    <span className="flex items-center">Phone<SortIcon column="phone" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead>Licences / Tickets</TableHead>
                   <TableHead>Role Tags</TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")} data-testid="sort-employee-status">
-                    <span className="flex items-center">Status<SortIcon column="status" /></span>
+                    <span className="flex items-center">Status<SortIcon column="status" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>

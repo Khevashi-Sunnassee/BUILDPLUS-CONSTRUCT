@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -148,7 +148,7 @@ export default function AdminFactoriesPage({ embedded = false }: { embedded?: bo
     queryKey: [ADMIN_ROUTES.SETTINGS],
   });
 
-  const globalWorkDays = (globalSettings?.productionWorkDays as boolean[]) || [false, true, true, true, true, true, false];
+  const globalWorkDays = useMemo(() => (globalSettings?.productionWorkDays as boolean[]) || [false, true, true, true, true, true, false], [globalSettings?.productionWorkDays]);
 
   const form = useForm<FactoryFormData>({
     resolver: zodResolver(factorySchema),
@@ -411,13 +411,13 @@ export default function AdminFactoriesPage({ embedded = false }: { embedded?: bo
     }
   };
 
-  const factoriesWithCoords = factories?.filter(f => f.latitude && f.longitude) || [];
-  const mapCenter: [number, number] = factoriesWithCoords.length > 0
+  const factoriesWithCoords = useMemo(() => factories?.filter(f => f.latitude && f.longitude) || [], [factories]);
+  const mapCenter: [number, number] = useMemo(() => factoriesWithCoords.length > 0
     ? [
         factoriesWithCoords.reduce((sum, f) => sum + parseFloat(String(f.latitude)), 0) / factoriesWithCoords.length,
         factoriesWithCoords.reduce((sum, f) => sum + parseFloat(String(f.longitude)), 0) / factoriesWithCoords.length,
       ]
-    : [-37.8136, 144.9631];
+    : [-37.8136, 144.9631], [factoriesWithCoords]);
 
   if (isLoading) {
     return (

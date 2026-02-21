@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { formatCurrency } from "@/lib/format";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, startOfWeek, endOfWeek, parseISO, addWeeks, subWeeks } from "date-fns";
@@ -198,11 +199,6 @@ function formatDateDDMMYYYY(dateStr: string): string {
   }
 }
 
-function formatCurrency(value: string | number): string {
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  return `$${num.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 export default function WeeklyWageReportsPage() {
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -353,7 +349,7 @@ export default function WeeklyWageReportsPage() {
     setAnalysisDialogOpen(true);
   };
 
-  const calculateTotalWages = (report: WeeklyWageReport): number => {
+  const calculateTotalWages = useCallback((report: WeeklyWageReport): number => {
     return (
       parseFloat(report.productionWages || "0") +
       parseFloat(report.officeWages || "0") +
@@ -362,11 +358,11 @@ export default function WeeklyWageReportsPage() {
       parseFloat(report.draftingWages || "0") +
       parseFloat(report.civilWages || "0")
     );
-  };
+  }, []);
 
-  const filteredReports = reports?.filter((r) => 
+  const filteredReports = useMemo(() => reports?.filter((r) => 
     factoryFilter === "all" || r.factory === factoryFilter
-  ) || [];
+  ) || [], [reports, factoryFilter]);
 
   const goToPreviousWeek = () => {
     setSelectedWeekStart(subWeeks(selectedWeekStart, 1));

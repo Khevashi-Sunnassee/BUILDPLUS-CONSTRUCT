@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import type { CapexRequest, User, Job, Supplier, Asset } from "@shared/schema";
+import { formatCurrency } from "@/lib/format";
 
 interface CapexRequestWithDetails extends CapexRequest {
   requestedBy: User;
@@ -38,11 +39,6 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   WITHDRAWN: { label: "Withdrawn", color: "bg-slate-500/20 text-slate-400 border-slate-500/30" },
 };
 
-function formatCurrency(val: string | number | null | undefined): string {
-  const n = parseFloat(String(val || "0"));
-  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(n);
-}
-
 export default function MobileCapexRequestsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -52,6 +48,7 @@ export default function MobileCapexRequestsPage() {
 
   const { data: requests = [], isLoading } = useQuery<CapexRequestWithDetails[]>({
     queryKey: ["/api/capex-requests"],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const openCapexId = params?.id;

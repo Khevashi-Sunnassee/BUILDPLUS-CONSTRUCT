@@ -14,7 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Search, Upload, Trash2, MoreHorizontal, FileText, Loader2, Eye, Settings, Mail, Copy, Check, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, Inbox } from "lucide-react";
+import { Search, Upload, Trash2, MoreHorizontal, FileText, Loader2, Eye, Settings, Mail, Copy, Check, RefreshCw, Inbox } from "lucide-react";
+import { SortIcon } from "@/components/ui/sort-icon";
 
 interface DraftingEmail {
   id: string;
@@ -459,12 +460,6 @@ export default function DraftingEmailsPage({ embedded = false }: { embedded?: bo
     setPage(1);
   }, [sortBy]);
 
-  const SortIcon = ({ column }: { column: string }) => {
-    if (sortBy !== column) return <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground" />;
-    return sortOrder === "asc"
-      ? <ArrowUp className="h-3 w-3 ml-1" />
-      : <ArrowDown className="h-3 w-3 ml-1" />;
-  };
 
   const getCount = (key: string): number => {
     if (!statusCounts) return 0;
@@ -556,34 +551,34 @@ export default function DraftingEmailsPage({ embedded = false }: { embedded?: bo
                   <TableRow>
                     <TableHead>
                       <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("fromAddress")} data-testid="sort-drafting-from">
-                        From <SortIcon column="fromAddress" />
+                        From <SortIcon column="fromAddress" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead>
                       <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("subject")} data-testid="sort-drafting-subject">
-                        Subject <SortIcon column="subject" />
+                        Subject <SortIcon column="subject" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead>
                       <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("status")} data-testid="sort-drafting-status">
-                        Status <SortIcon column="status" />
+                        Status <SortIcon column="status" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead>
                       <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("requestType")} data-testid="sort-drafting-type">
-                        Type <SortIcon column="requestType" />
+                        Type <SortIcon column="requestType" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead>
                       <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("impactArea")} data-testid="sort-drafting-impact">
-                        Impact <SortIcon column="impactArea" />
+                        Impact <SortIcon column="impactArea" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead>Job</TableHead>
                     <TableHead className="text-center">Attachments</TableHead>
                     <TableHead>
                       <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("createdAt")} data-testid="sort-drafting-date">
-                        Received <SortIcon column="createdAt" />
+                        Received <SortIcon column="createdAt" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead className="w-10">Actions</TableHead>

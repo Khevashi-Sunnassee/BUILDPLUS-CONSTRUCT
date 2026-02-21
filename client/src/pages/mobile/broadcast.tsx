@@ -79,10 +79,12 @@ export default function MobileBroadcastPage() {
 
   const { data: templates = [], isLoading: templatesLoading } = useQuery<BroadcastTemplate[]>({
     queryKey: [BROADCAST_ROUTES.TEMPLATES],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: broadcasts = [], isLoading: historyLoading } = useQuery<BroadcastMessageWithDetails[]>({
     queryKey: [BROADCAST_ROUTES.MESSAGES],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const activeTemplates = templates.filter((t) => t.isActive);

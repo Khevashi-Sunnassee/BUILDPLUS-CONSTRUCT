@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -64,6 +64,7 @@ import {
 import type { PanelTypeConfig } from "@shared/schema";
 import { ADMIN_ROUTES, PANEL_TYPES_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { formatCurrencyCompact as formatCurrency } from "@/lib/format";
 
 const panelTypeSchema = z.object({
   code: z.string().min(1, "Code is required").toUpperCase(),
@@ -110,8 +111,7 @@ export default function AdminPanelTypesPage() {
     queryKey: [ADMIN_ROUTES.PANEL_TYPES_COST_SUMMARIES],
   });
 
-  // Helper to check if margin matches breakup
-  const getMarginStatus = (type: PanelTypeConfig) => {
+  const getMarginStatus = useMemo(() => (type: PanelTypeConfig) => {
     const panelMargin = parseFloat(type.sellRatePerM2 || "0") > 0 && parseFloat(type.totalRatePerM2 || "0") > 0
       ? (((parseFloat(type.sellRatePerM2!) - parseFloat(type.totalRatePerM2!)) / parseFloat(type.sellRatePerM2!)) * 100)
       : null;
@@ -124,7 +124,7 @@ export default function AdminPanelTypesPage() {
     // Allow 0.5% tolerance for rounding differences
     const matches = Math.abs(panelMargin - breakupSummary.profitMargin) < 0.5;
     return { hasBreakup: true, matches, panelMargin, breakupMargin: breakupSummary.profitMargin };
-  };
+  }, [costSummaries]);
 
   const { data: currentCostComponents, refetch: refetchCostComponents } = useQuery<CostComponent[]>({
     queryKey: [PANEL_TYPES_ROUTES.LIST, costBreakupType?.id, "cost-components"],
@@ -337,15 +337,14 @@ export default function AdminPanelTypesPage() {
 
   const handleSaveCostComponents = () => {
     if (!costBreakupType) return;
-    const total = costComponents.reduce((sum, c) => sum + (parseFloat(c.percentageOfRevenue) || 0), 0);
-    if (total > 100) {
+    if (totalPercentage > 100) {
       toast({ title: "Total percentage cannot exceed 100%", variant: "destructive" });
       return;
     }
     saveCostComponentsMutation.mutate({ panelTypeId: costBreakupType.id, components: costComponents });
   };
 
-  const totalPercentage = costComponents.reduce((sum, c) => sum + (parseFloat(c.percentageOfRevenue) || 0), 0);
+  const totalPercentage = useMemo(() => costComponents.reduce((sum, c) => sum + (parseFloat(c.percentageOfRevenue) || 0), 0), [costComponents]);
 
   const handleOpenCreate = () => {
     setEditingType(null);
@@ -412,12 +411,6 @@ export default function AdminPanelTypesPage() {
     } else {
       createMutation.mutate(data);
     }
-  };
-
-  const formatCurrency = (value: string | null | undefined) => {
-    if (!value) return "-";
-    const num = parseFloat(value);
-    return isNaN(num) ? "-" : `$${num.toFixed(2)}`;
   };
 
   if (isLoading) {

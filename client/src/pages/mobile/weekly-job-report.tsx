@@ -48,6 +48,7 @@ export default function MobileWeeklyJobReportPage() {
 
   const { data: myReports = [], isLoading: myLoading } = useQuery<WeeklyJobReport[]>({
     queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_MY],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const isManager = user?.role === "ADMIN" || user?.role === "MANAGER";
@@ -55,6 +56,7 @@ export default function MobileWeeklyJobReportPage() {
   const { data: pendingReports = [], isLoading: pendingLoading } = useQuery<WeeklyJobReport[]>({
     queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_PENDING],
     enabled: isManager,
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const submitMutation = useMutation({

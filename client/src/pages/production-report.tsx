@@ -227,8 +227,7 @@ export default function ProductionReportPage() {
   const reportLogo = brandingSettings?.logoBase64 || null;
   const companyName = brandingSettings?.companyName || "BuildPlus Ai";
 
-  const filteredReports = reports?.filter((report) => {
-    // Filter by factory (supports both factoryId and legacy factory text)
+  const filteredReports = useMemo(() => reports?.filter((report) => {
     if (factoryFilter !== "all") {
       const matchesFactoryId = report.factoryId === factoryFilter;
       const matchesFactoryText = report.factory === factoryFilter;
@@ -236,13 +235,12 @@ export default function ProductionReportPage() {
         return false;
       }
     }
-    // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return report.date.includes(query);
     }
     return true;
-  });
+  }), [reports, factoryFilter, searchQuery]);
 
   const getNextAvailableDate = () => {
     if (!reports || reports.length === 0) {

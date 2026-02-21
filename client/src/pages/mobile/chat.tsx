@@ -169,20 +169,24 @@ export default function MobileChatPage() {
   const { data: conversations = [], isLoading } = useQuery<Conversation[]>({
     queryKey: [CHAT_ROUTES.CONVERSATIONS],
     refetchInterval: 10000,
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: allUsers = [] } = useQuery<User[]>({
     queryKey: [USER_ROUTES.LIST],
     enabled: showNewConversation || showManageMembers,
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
     enabled: showNewConversation,
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: topics = [] } = useQuery<ChatTopic[]>({
     queryKey: [CHAT_ROUTES.TOPICS],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const filteredUsers = allUsers.filter(u => {
@@ -260,6 +264,7 @@ export default function MobileChatPage() {
     queryKey: [CHAT_ROUTES.MESSAGES(selectedConversationId || "")],
     enabled: !!selectedConversationId,
     refetchInterval: 5000,
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const sendMessageMutation = useMutation({

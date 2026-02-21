@@ -1,5 +1,7 @@
 import { z } from "zod";
 import type { PurchaseOrder, PurchaseOrderItem, User, PurchaseOrderAttachment } from "@shared/schema";
+import { formatCurrency } from "@/lib/format";
+export { formatCurrency };
 
 export interface AttachmentWithUser extends PurchaseOrderAttachment {
   uploadedBy?: User | null;
@@ -43,15 +45,6 @@ export const formSchema = z.object({
 });
 
 export type FormValues = z.infer<typeof formSchema>;
-
-export const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-};
 
 export const formatFileSize = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;

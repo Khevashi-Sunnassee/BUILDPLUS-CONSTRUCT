@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { formatCurrencyCompact } from "@/lib/format";
 import { JOBS_ROUTES, PROCUREMENT_ROUTES, PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -107,18 +108,6 @@ interface StatusHistoryEntry {
   note: string | null;
   changedByName: string | null;
   createdAt: string;
-}
-
-function formatCurrency(value: string | null) {
-  if (!value) return "-";
-  const num = parseFloat(value);
-  if (isNaN(num)) return "-";
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(num);
 }
 
 function formatDate(dateStr: string | null) {
@@ -253,7 +242,7 @@ export default function SalesPipelinePage() {
     },
   });
 
-  const filtered = opportunities.filter((opp) => {
+  const filtered = useMemo(() => opportunities.filter((opp) => {
     const matchSearch =
       !searchTerm ||
       opp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -262,34 +251,41 @@ export default function SalesPipelinePage() {
       (opp.jobNumber || "").toLowerCase().includes(searchTerm.toLowerCase());
     const matchStage = stageFilter === "ALL" || opp.salesStage === stageFilter;
     return matchSearch && matchStage;
-  });
+  }), [opportunities, searchTerm, stageFilter]);
 
-  const totalValue = opportunities.reduce(
+  const totalValue = useMemo(() => opportunities.reduce(
     (sum, o) => sum + (o.estimatedValue ? parseFloat(o.estimatedValue) : 0),
     0
-  );
-  const weightedValue = opportunities.reduce(
+  ), [opportunities]);
+
+  const weightedValue = useMemo(() => opportunities.reduce(
     (sum, o) =>
       sum +
       (o.estimatedValue ? parseFloat(o.estimatedValue) : 0) *
         ((o.probability || 0) / 100),
     0
-  );
-  const activeCount = opportunities.filter(
+  ), [opportunities]);
+
+  const activeCount = useMemo(() => opportunities.filter(
     (o) => o.salesStage !== "LOST" && !["LOST", "CANCELLED"].includes(o.status)
-  ).length;
-  const avgProbability =
+  ).length, [opportunities]);
+
+  const avgProbability = useMemo(() =>
     opportunities.length > 0
       ? Math.round(
           opportunities.reduce((sum, o) => sum + (o.probability || 0), 0) /
             opportunities.length
         )
-      : 0;
+      : 0
+  , [opportunities]);
 
-  const stageCounts: Record<string, number> = {};
-  SALES_STAGES.forEach((s) => {
-    stageCounts[s] = opportunities.filter((o) => o.salesStage === s).length;
-  });
+  const stageCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    SALES_STAGES.forEach((s) => {
+      counts[s] = opportunities.filter((o) => o.salesStage === s).length;
+    });
+    return counts;
+  }, [opportunities]);
 
   if (isError) {
     return (
@@ -318,7 +314,7 @@ export default function SalesPipelinePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-pipeline" aria-live="polite">
-              {formatCurrency(totalValue.toString())}
+              {formatCurrencyCompact(totalValue.toString())}
             </div>
             <p className="text-xs text-muted-foreground mt-1">{opportunities.length} opportunities</p>
           </CardContent>
@@ -330,7 +326,7 @@ export default function SalesPipelinePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-weighted-value" aria-live="polite">
-              {formatCurrency(weightedValue.toString())}
+              {formatCurrencyCompact(weightedValue.toString())}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Adjusted by probability</p>
           </CardContent>
@@ -495,7 +491,7 @@ export default function SalesPipelinePage() {
                         </span>
                       </td>
                       <td className="p-3 text-right">
-                        <span className="font-medium text-sm">{formatCurrency(opp.estimatedValue)}</span>
+                        <span className="font-medium text-sm">{formatCurrencyCompact(opp.estimatedValue)}</span>
                       </td>
                       <td className="p-3 text-center">
                         {opp.probability != null ? (
@@ -663,7 +659,7 @@ export default function SalesPipelinePage() {
                     </div>
                     <div>
                       <div className="text-xs text-muted-foreground mb-1">Estimated Value</div>
-                      <div className="text-sm font-medium">{formatCurrency(selectedOpp.estimatedValue)}</div>
+                      <div className="text-sm font-medium">{formatCurrencyCompact(selectedOpp.estimatedValue)}</div>
                     </div>
                     <div>
                       <div className="text-xs text-muted-foreground mb-1">Probability</div>

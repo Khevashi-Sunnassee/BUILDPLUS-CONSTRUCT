@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { AP_INVOICE_ROUTES } from "@shared/api-routes";
 import { useRoute, useLocation } from "wouter";
@@ -117,12 +118,6 @@ interface ApprovalPathResponse {
 function formatDate(date: string | null | undefined): string {
   if (!date) return "";
   return new Date(date).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
-}
-
-function formatCurrency(amount: string | number | null | undefined): string {
-  const n = parseFloat(String(amount || "0"));
-  if (isNaN(n)) return "$0.00";
-  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(n);
 }
 
 function getRiskLevel(score: number | null): { label: string; color: string; bgColor: string; icon: typeof Shield } {

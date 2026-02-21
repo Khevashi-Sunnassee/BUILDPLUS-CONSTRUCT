@@ -101,16 +101,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CHECKLIST_ROUTES } from "@shared/api-routes";
 import type { ChecklistInstance, ChecklistTemplate, ChecklistWorkOrder } from "@shared/schema";
 import { Save, Send, CheckCircle, ClipboardList } from "lucide-react";
-
-const formatCurrency = (value: string | number | null | undefined) => {
-  if (value === null || value === undefined) return "-";
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  if (isNaN(num)) return "-";
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-  }).format(num);
-};
+import { formatCurrencyCompact as formatCurrency } from "@/lib/format";
 
 const formatDate = (value: string | null | undefined) => {
   if (!value) return "-";

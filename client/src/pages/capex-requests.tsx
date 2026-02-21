@@ -25,6 +25,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ASSET_CATEGORIES, CAPEX_PURCHASE_REASONS } from "@shared/schema";
 import type { CapexRequest, User, Job, Department, Supplier, Asset } from "@shared/schema";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { formatCurrency } from "@/lib/format";
 
 interface CapexRequestWithDetails extends CapexRequest {
   requestedBy: User;
@@ -57,11 +58,6 @@ const STATUS_BADGE: Record<string, { variant: "secondary" | "default" | "destruc
   REJECTED: { variant: "destructive" },
   WITHDRAWN: { variant: "outline" },
 };
-
-function formatCurrency(val: string | number | null | undefined): string {
-  const n = parseFloat(String(val || "0"));
-  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
-}
 
 function StatusBadge({ status }: { status: string }) {
   const config = STATUS_BADGE[status] || STATUS_BADGE.DRAFT;

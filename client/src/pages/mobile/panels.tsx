@@ -40,6 +40,7 @@ export default function MobilePanelsPage() {
 
   const { data: panels = [], isLoading } = useQuery<Panel[]>({
     queryKey: [PANELS_ROUTES.LIST],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const inProgressPanels = panels.filter(p => p.status === "IN_PROGRESS");

@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
+import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { AP_INVOICE_ROUTES, AP_INBOX_ROUTES } from "@shared/api-routes";
 import { Link, useLocation } from "wouter";
@@ -18,7 +19,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Filter, Loader2, Eye, Send, Settings, Mail, Copy, Check, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Filter, Loader2, Eye, Send, Settings, Mail, Copy, Check, RefreshCw } from "lucide-react";
+import { SortIcon } from "@/components/ui/sort-icon";
 
 interface ApInvoice {
   id: string;
@@ -96,12 +98,6 @@ const STATUS_BADGE_CONFIG: Record<string, { variant: "secondary" | "default" | "
 function formatDate(date: string | null | undefined): string {
   if (!date) return "—";
   return new Date(date).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
-}
-
-function formatCurrency(amount: string | number | null | undefined): string {
-  const n = parseFloat(String(amount || "0"));
-  if (isNaN(n)) return "—";
-  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(n);
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -525,12 +521,6 @@ export default function ApInvoicesPage() {
     setPage(1);
   }, [sortBy]);
 
-  const SortIcon = ({ column }: { column: string }) => {
-    if (sortBy !== column) return <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground" />;
-    return sortOrder === "asc"
-      ? <ArrowUp className="h-3 w-3 ml-1" />
-      : <ArrowDown className="h-3 w-3 ml-1" />;
-  };
 
   const getCount = (key: string): number => {
     if (!statusCounts) return 0;
@@ -728,23 +718,23 @@ export default function ApInvoicesPage() {
                     <TableHead>Invoice Number</TableHead>
                     <TableHead>
                       <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("supplier")} data-testid="sort-supplier">
-                        Supplier <SortIcon column="supplier" />
+                        Supplier <SortIcon column="supplier" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead>
                       <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("uploadedAt")} data-testid="sort-uploaded">
-                        Uploaded <SortIcon column="uploadedAt" />
+                        Uploaded <SortIcon column="uploadedAt" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead>
                       <button type="button" className="flex items-center hover:text-foreground" onClick={() => handleSort("invoiceDate")} data-testid="sort-invoice-date">
-                        Invoice Date <SortIcon column="invoiceDate" />
+                        Invoice Date <SortIcon column="invoiceDate" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead className="text-right">
                       <button type="button" className="flex items-center ml-auto hover:text-foreground" onClick={() => handleSort("totalInc")} data-testid="sort-total">
-                        Invoice Total <SortIcon column="totalInc" />
+                        Invoice Total <SortIcon column="totalInc" sortColumn={sortBy || ""} sortDirection={sortOrder} />
                       </button>
                     </TableHead>
                     <TableHead>Assignee</TableHead>

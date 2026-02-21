@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
+import { formatCurrency } from "@/lib/format";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,10 +112,6 @@ interface ClaimItemFromServer {
   percentComplete: string;
   lineTotal: string;
   lifecycleStatus: number;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(value);
 }
 
 const statusBadgeVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
