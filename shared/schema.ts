@@ -5685,3 +5685,101 @@ export const numberSequences = pgTable("number_sequences", {
 }, (table) => ({
   entityScopeIdx: uniqueIndex("number_sequences_entity_scope_idx").on(table.entityType, table.scopeId),
 }));
+
+// ============================================================================
+// Review Mode (Super Admin)
+// ============================================================================
+
+export const reviewTargetTypeEnum = pgEnum("review_target_type", ["DESKTOP_PAGE", "MOBILE_PAGE"]);
+export const reviewPacketStatusEnum = pgEnum("review_packet_status", ["DRAFT", "GENERATED", "FAILED"]);
+export const reviewRunStatusEnum = pgEnum("review_run_status", ["PENDING", "SUCCESS", "FAILED"]);
+export const reviewerTypeEnum = pgEnum("reviewer_type", ["REPLIT_CLAUDE", "OPENAI"]);
+
+export const reviewContextVersions = pgTable("review_context_versions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  contentMd: text("content_md").notNull(),
+  createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  isActive: boolean("is_active").notNull().default(false),
+}, (table) => ({
+  activeIdx: uniqueIndex("review_context_versions_active_idx").on(table.isActive),
+}));
+
+export const insertReviewContextVersionSchema = createInsertSchema(reviewContextVersions).omit({ id: true, createdAt: true });
+export type InsertReviewContextVersion = z.infer<typeof insertReviewContextVersionSchema>;
+export type ReviewContextVersion = typeof reviewContextVersions.$inferSelect;
+
+export const reviewTargets = pgTable("review_targets", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  targetType: reviewTargetTypeEnum("target_type").notNull(),
+  routePath: text("route_path").notNull(),
+  pageTitle: text("page_title").notNull(),
+  module: text("module").notNull(),
+  frontendEntryFile: text("frontend_entry_file").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  routePathIdx: index("review_targets_route_path_idx").on(table.routePath),
+}));
+
+export const insertReviewTargetSchema = createInsertSchema(reviewTargets).omit({ id: true, createdAt: true });
+export type InsertReviewTarget = z.infer<typeof insertReviewTargetSchema>;
+export type ReviewTarget = typeof reviewTargets.$inferSelect;
+
+export const reviewPackets = pgTable("review_packets", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  targetId: text("target_id").notNull().references(() => reviewTargets.id, { onDelete: "cascade" }),
+  contextVersionId: text("context_version_id").notNull().references(() => reviewContextVersions.id, { onDelete: "cascade" }),
+  packetJson: jsonb("packet_json"),
+  packetMd: text("packet_md"),
+  createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  status: reviewPacketStatusEnum("status").notNull().default("DRAFT"),
+  purpose: text("purpose"),
+  roles: text("roles").array(),
+  keyUserFlows: text("key_user_flows").array(),
+  knownIssues: text("known_issues").array(),
+  riskFocus: text("risk_focus").array(),
+}, (table) => ({
+  targetIdIdx: index("review_packets_target_id_idx").on(table.targetId),
+  statusIdx: index("review_packets_status_idx").on(table.status),
+}));
+
+export const insertReviewPacketSchema = createInsertSchema(reviewPackets).omit({ id: true, createdAt: true });
+export type InsertReviewPacket = z.infer<typeof insertReviewPacketSchema>;
+export type ReviewPacket = typeof reviewPackets.$inferSelect;
+
+export const reviewRuns = pgTable("review_runs", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  packetId: text("packet_id").notNull().references(() => reviewPackets.id, { onDelete: "cascade" }),
+  reviewer: reviewerTypeEnum("reviewer").notNull(),
+  modelName: text("model_name"),
+  promptMd: text("prompt_md"),
+  responseMd: text("response_md"),
+  responseJson: jsonb("response_json"),
+  status: reviewRunStatusEnum("status").notNull().default("PENDING"),
+  durationMs: integer("duration_ms"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  packetIdIdx: index("review_runs_packet_id_idx").on(table.packetId),
+  reviewerIdx: index("review_runs_reviewer_idx").on(table.reviewer),
+}));
+
+export const insertReviewRunSchema = createInsertSchema(reviewRuns).omit({ id: true, createdAt: true });
+export type InsertReviewRun = z.infer<typeof insertReviewRunSchema>;
+export type ReviewRun = typeof reviewRuns.$inferSelect;
+
+export const reviewTaskpacks = pgTable("review_taskpacks", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  packetId: text("packet_id").notNull().references(() => reviewPackets.id, { onDelete: "cascade" }),
+  mergedTasksMd: text("merged_tasks_md"),
+  mergedTasksJson: jsonb("merged_tasks_json"),
+  createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  packetIdIdx: index("review_taskpacks_packet_id_idx").on(table.packetId),
+}));
+
+export const insertReviewTaskpackSchema = createInsertSchema(reviewTaskpacks).omit({ id: true, createdAt: true });
+export type InsertReviewTaskpack = z.infer<typeof insertReviewTaskpackSchema>;
+export type ReviewTaskpack = typeof reviewTaskpacks.$inferSelect;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Building2, BookOpen, Shield, Database, Monitor, Settings2, Star, StarOff, Loader2 } from "lucide-react";
+import { Building2, BookOpen, Shield, Database, Monitor, Settings2, Star, StarOff, Loader2, FileSearch } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,7 @@ import AdminCompaniesPage from "./admin/companies";
 import AdminHelpPage from "./admin/help";
 import DataManagementPage from "./admin/data-management";
 import AdminDevicesPage from "./admin/devices";
+import ReviewModePage from "./admin/review-mode";
 
 interface Company {
   id: string;
@@ -456,6 +457,10 @@ export default function SuperAdminPage() {
             <Database className="h-4 w-4 mr-1.5" />
             Data Management
           </TabsTrigger>
+          <TabsTrigger value="review-mode" data-testid="tab-super-review-mode">
+            <FileSearch className="h-4 w-4 mr-1.5" />
+            Review Mode
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="companies" className="space-y-6">
@@ -507,6 +512,10 @@ export default function SuperAdminPage() {
           ) : (
             <CompanyRequiredPlaceholder icon={Database} message="Select a company above to manage its data" />
           )}
+        </TabsContent>
+
+        <TabsContent value="review-mode" className="space-y-6">
+          <ReviewModePage />
         </TabsContent>
       </Tabs>
     </div>
