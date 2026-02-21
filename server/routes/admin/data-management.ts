@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { storage, db } from "../storage";
-import { requireAuth, requireRole, requireRoleOrSuperAdmin } from "./middleware/auth.middleware";
+import { db } from "../../storage";
+import { requireRole } from "../middleware/auth.middleware";
+import { sendSuccess, sendBadRequest, sendServerError } from "../../lib/api-response";
 import { 
-  insertWorkTypeSchema, insertDeviceSchema,
   users, jobs, productionSlots, panelRegister, panelAuditLogs, draftingProgram, dailyLogs, logRows, timerSessions, timerEvents, productionEntries, 
   weeklyWageReports, weeklyJobReports, weeklyJobReportSchedules,
   loadLists, loadListPanels, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments, 
@@ -26,114 +26,10 @@ import {
   apInvoices, apInvoiceDocuments, apInvoiceSplits, apInvoiceComments, apInvoiceApprovals, apInboundEmails, myobExportLogs,
 } from "@shared/schema";
 import { sql, isNotNull, eq, and, inArray } from "drizzle-orm";
-import logger from "../lib/logger";
+import logger from "../../lib/logger";
 
 const router = Router();
 
-// Device Management Routes
-router.get("/api/admin/devices", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
-  const companyId = req.companyId;
-  if (!companyId) return res.status(400).json({ error: "Company context required" });
-  const filtered = await storage.getAllDevices(companyId);
-  res.json(filtered);
-});
-
-router.post("/api/admin/devices", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
-  const { userId, deviceName } = req.body;
-  const companyId = req.companyId;
-  if (!companyId) return res.status(400).json({ error: "Company context required" });
-  const { device, deviceKey } = await storage.createDevice({ userId, deviceName, os: "Windows", companyId });
-  res.json({ deviceId: device.id, deviceKey });
-});
-
-router.patch("/api/admin/devices/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
-  const companyId = req.companyId;
-  const existing = await storage.getDevice(req.params.id as string);
-  if (!existing || existing.companyId !== companyId) {
-    return res.status(404).json({ error: "Device not found" });
-  }
-  const parsed = insertDeviceSchema.partial().safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
-  }
-  const device = await storage.updateDevice(req.params.id as string, parsed.data as Record<string, unknown>);
-  res.json(device);
-});
-
-router.delete("/api/admin/devices/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
-  const companyId = req.companyId;
-  const existing = await storage.getDevice(req.params.id as string);
-  if (!existing || existing.companyId !== companyId) {
-    return res.status(404).json({ error: "Device not found" });
-  }
-  await storage.deleteDevice(req.params.id as string);
-  res.json({ ok: true });
-});
-
-// Work Types Routes
-router.get("/api/work-types", requireAuth, async (req, res) => {
-  const companyId = req.companyId;
-  if (!companyId) return res.status(400).json({ error: "Company context required" });
-  const types = await storage.getActiveWorkTypes(companyId);
-  res.json(types);
-});
-
-router.get("/api/admin/work-types", requireRole("ADMIN"), async (req, res) => {
-  const companyId = req.companyId;
-  if (!companyId) return res.status(400).json({ error: "Company context required" });
-  const types = await storage.getAllWorkTypes(companyId);
-  res.json(types);
-});
-
-router.post("/api/admin/work-types", requireRole("ADMIN"), async (req, res) => {
-  try {
-    const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const parsed = insertWorkTypeSchema.safeParse({ ...req.body, companyId });
-    if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid work type data", issues: parsed.error.issues });
-    }
-    const workType = await storage.createWorkType(parsed.data);
-    res.json(workType);
-  } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create work type" });
-  }
-});
-
-router.put("/api/admin/work-types/:id", requireRole("ADMIN"), async (req, res) => {
-  try {
-    const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const existing = await storage.getWorkType(parseInt(req.params.id as string));
-    if (!existing || existing.companyId !== companyId) {
-      return res.status(404).json({ error: "Work type not found" });
-    }
-    const parsed = insertWorkTypeSchema.partial().safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid work type data", issues: parsed.error.issues });
-    }
-    const workType = await storage.updateWorkType(parseInt(req.params.id as string), parsed.data);
-    if (!workType) {
-      return res.status(404).json({ error: "Work type not found" });
-    }
-    res.json(workType);
-  } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update work type" });
-  }
-});
-
-router.delete("/api/admin/work-types/:id", requireRole("ADMIN"), async (req, res) => {
-  const companyId = req.companyId;
-  if (!companyId) return res.status(400).json({ error: "Company context required" });
-  const existing = await storage.getWorkType(parseInt(req.params.id as string));
-  if (!existing || existing.companyId !== companyId) {
-    return res.status(404).json({ error: "Work type not found" });
-  }
-  await storage.deleteWorkType(parseInt(req.params.id as string));
-  res.json({ ok: true });
-});
-
-// Data Deletion Routes
 const dataDeletionCategories = [
   "panels",
   "production_slots",
@@ -165,7 +61,7 @@ type DeletionCategory = typeof dataDeletionCategories[number];
 router.get("/api/admin/data-deletion/counts", requireRole("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
     const counts: Record<string, number> = {};
     
     const [panelCount] = await db.select({ count: sql<number>`count(*)` }).from(panelRegister).innerJoin(jobs, eq(panelRegister.jobId, jobs.id)).where(eq(jobs.companyId, companyId));
@@ -238,10 +134,10 @@ router.get("/api/admin/data-deletion/counts", requireRole("ADMIN"), async (req, 
     const [apInvoiceCount] = await db.select({ count: sql<number>`count(*)` }).from(apInvoices).where(eq(apInvoices.companyId, companyId));
     counts.ap_invoices = Number(apInvoiceCount.count);
     
-    res.json(counts);
+    sendSuccess(res, counts);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching data counts");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch data counts" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch data counts");
   }
 });
 
@@ -250,11 +146,11 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     const { categories } = req.body as { categories: DeletionCategory[] };
     
     if (!categories || !Array.isArray(categories) || categories.length === 0) {
-      return res.status(400).json({ error: "No categories selected" });
+      return sendBadRequest(res, "No categories selected");
     }
     
     const cid = req.companyId;
-    if (!cid) return res.status(400).json({ error: "Company context required" });
+    if (!cid) return sendBadRequest(res, "Company context required");
     const errors: string[] = [];
     const warnings: string[] = [];
     
@@ -531,14 +427,14 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
       }
     }
     
-    res.json({ 
+    sendSuccess(res, { 
       valid: errors.length === 0,
       errors,
       warnings
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error validating deletion");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to validate deletion" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to validate deletion");
   }
 });
 
@@ -547,7 +443,7 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
     const { categories } = req.body as { categories: DeletionCategory[] };
     
     if (!categories || !Array.isArray(categories) || categories.length === 0) {
-      return res.status(400).json({ error: "No categories selected" });
+      return sendBadRequest(res, "No categories selected");
     }
     
     const selected = new Set(categories);
@@ -556,14 +452,14 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
     if (selected.has("documents") && !selected.has("contracts")) {
       const [contractDocRef] = await db.select({ count: sql<number>`count(*)` }).from(contracts).where(and(eq(contracts.companyId, delCompanyId!), isNotNull(contracts.aiSourceDocumentId)));
       if (Number(contractDocRef.count) > 0) {
-        return res.status(400).json({ error: "Cannot delete Documents while Contracts reference them. Select Contracts for deletion first." });
+        return sendBadRequest(res, "Cannot delete Documents while Contracts reference them. Select Contracts for deletion first.");
       }
     }
 
     const deletedCounts: Record<string, number> = {};
 
     if (!delCompanyId) {
-      return res.status(400).json({ error: "Company context required" });
+      return sendBadRequest(res, "Company context required");
     }
 
     await db.transaction(async (tx) => {
@@ -915,14 +811,14 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
       }
     });
     
-    res.json({ 
+    sendSuccess(res, { 
       success: true,
       deleted: deletedCounts
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error performing deletion");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete data" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to delete data");
   }
 });
 
-export const adminRouter = router;
+export default router;

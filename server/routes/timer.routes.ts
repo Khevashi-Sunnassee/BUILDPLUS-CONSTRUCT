@@ -8,6 +8,20 @@ import logger from "../lib/logger";
 import { logPanelChange } from "../services/panel-audit.service";
 import { z } from "zod";
 
+/**
+ * Timer state machine: RUNNING → PAUSED → RUNNING → … → COMPLETED | CANCELLED
+ * Valid transitions:
+ *   START  → RUNNING (only if no active/paused session exists for user)
+ *   PAUSE  → PAUSED  (only from RUNNING; snapshots elapsed time into totalElapsedMs)
+ *   RESUME → RUNNING (only from PAUSED; resets startedAt, preserves totalElapsedMs)
+ *   STOP   → COMPLETED (from RUNNING or PAUSED; creates a logRow time entry)
+ *   CANCEL → CANCELLED (from RUNNING or PAUSED; discards without creating a log)
+ *
+ * Time accumulation: totalElapsedMs stores cumulative work time across pause/resume
+ * cycles. On resume, startedAt resets to "now" so the next pause/stop can compute
+ * the delta (now - startedAt) and add it to totalElapsedMs. Idle time (breaks) is
+ * calculated as wall-clock duration minus totalElapsedMs on stop.
+ */
 const timerStartSchema = z.object({
   jobId: z.string().nullable().optional(),
   panelRegisterId: z.string().nullable().optional(),
@@ -415,15 +429,20 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
     const now = new Date();
     let totalElapsed = session.totalElapsedMs;
 
-    // If still running, add the time since last start
+    /**
+     * If RUNNING, the current segment (startedAt→now) hasn't been captured yet.
+     * If PAUSED, totalElapsedMs already includes all work time up to the last pause.
+     */
     if (session.status === "RUNNING") {
       totalElapsed += now.getTime() - session.startedAt.getTime();
     }
 
     const durationMinutes = Math.round(totalElapsed / 60000);
 
-    // Get or create daily log for today (Melbourne timezone)
-    // Simple approach: use the current date in Melbourne timezone
+    /**
+     * Daily logs are bucketed by Melbourne (AEDT) date, not UTC, so a session
+     * stopped at 11pm UTC still lands on the correct Australian business day.
+     */
     const melbourneOffset = 11 * 60 * 60 * 1000; // AEDT offset
     const melbourneNow = new Date(now.getTime() + melbourneOffset);
     const logDay = format(melbourneNow, "yyyy-MM-dd");
@@ -450,11 +469,13 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
         .returning();
     }
 
-    // Use the original session creation time as start (createdAt never changes, unlike startedAt which resets on resume)
+    /**
+     * startAt/endAt on the logRow represent the wall-clock span of the session.
+     * createdAt is used (not startedAt) because startedAt resets on each resume.
+     * endAt uses pausedAt when stopped from PAUSED, since that's when work actually ceased.
+     * idleMin = (endAt - startAt) - totalElapsed, capturing break/pause gaps.
+     */
     const sessionStartTime = session.createdAt;
-
-    // End time: if stopped from PAUSED, use the last pause time (when work actually ended);
-    // if stopped from RUNNING, use now (work ends at this moment)
     const sessionEndTime = session.status === "PAUSED" && session.pausedAt ? session.pausedAt : now;
 
     // Get panel mark and drawing code from panel register if panelRegisterId is provided
@@ -539,8 +560,12 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
   }
 });
 
-// Cancel stale (non-today) RUNNING or PAUSED timer sessions for the current user
-// This is called when the timer screen is opened to ensure a fresh start
+/**
+ * Auto-cancels abandoned timer sessions from previous days (Melbourne timezone).
+ * Called when the timer UI loads to prevent stale RUNNING/PAUSED sessions from
+ * blocking new timers. Today's sessions are preserved. Each cancelled session
+ * gets a CANCEL event logged with its computed elapsed time.
+ */
 router.post("/api/timer-sessions/cancel-stale", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;

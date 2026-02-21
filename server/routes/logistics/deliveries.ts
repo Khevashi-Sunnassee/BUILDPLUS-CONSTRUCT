@@ -1,341 +1,14 @@
 import { Router } from "express";
-import { storage } from "../storage";
-import { requireAuth, requireRole } from "./middleware/auth.middleware";
-import { requirePermission } from "./middleware/permissions.middleware";
-import { emailService } from "../services/email.service";
-import { buildBrandedEmail } from "../lib/email-template";
-import { logPanelChange, advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../services/panel-audit.service";
-import { PANEL_LIFECYCLE_STATUS, insertTrailerTypeSchema, insertZoneSchema, insertLoadListSchema, insertDeliveryRecordSchema, loadLists, loadListPanels, jobs, trailerTypes, deliveryRecords, loadReturns, panelRegister, users } from "@shared/schema";
+import { storage } from "../../storage";
+import { requireAuth } from "../middleware/auth.middleware";
+import { advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../../services/panel-audit.service";
+import { emailService } from "../../services/email.service";
+import { buildBrandedEmail } from "../../lib/email-template";
+import { sendSuccess, sendBadRequest, sendNotFound, sendForbidden, sendServerError, sendError } from "../../lib/api-response";
+import { PANEL_LIFECYCLE_STATUS, insertDeliveryRecordSchema } from "@shared/schema";
 import type { JobPhase } from "@shared/job-phases";
-import { db } from "../db";
-import { eq, and, asc, desc, sql, count, inArray } from "drizzle-orm";
 
 const router = Router();
-
-// =============== TRAILER TYPES ===============
-
-router.get("/api/trailer-types", requireAuth, async (req, res) => {
-  const trailerTypes = await storage.getActiveTrailerTypes(req.companyId);
-  res.json(trailerTypes);
-});
-
-router.get("/api/admin/trailer-types", requireRole("ADMIN"), async (req, res) => {
-  const trailerTypes = await storage.getAllTrailerTypes(req.companyId);
-  res.json(trailerTypes);
-});
-
-router.post("/api/admin/trailer-types", requireRole("ADMIN"), async (req, res) => {
-  if (req.companyId) req.body.companyId = req.companyId;
-  const trailerType = await storage.createTrailerType(req.body);
-  res.json(trailerType);
-});
-
-router.put("/api/admin/trailer-types/:id", requireRole("ADMIN"), async (req, res) => {
-  const existing = await storage.getTrailerType(req.params.id as string);
-  if (!existing) return res.status(404).json({ error: "Trailer type not found" });
-  if (req.companyId && existing.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
-  const parsed = insertTrailerTypeSchema.partial().safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
-  }
-  const trailerType = await storage.updateTrailerType(req.params.id as string, parsed.data);
-  res.json(trailerType);
-});
-
-router.delete("/api/admin/trailer-types/:id", requireRole("ADMIN"), async (req, res) => {
-  const existing = await storage.getTrailerType(req.params.id as string);
-  if (!existing) return res.status(404).json({ error: "Trailer type not found" });
-  if (req.companyId && existing.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
-  await storage.deleteTrailerType(req.params.id as string);
-  res.json({ success: true });
-});
-
-// =============== ZONES ===============
-
-router.get("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
-  const zones = await storage.getAllZones(req.companyId as string);
-  res.json(zones);
-});
-
-router.get("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => {
-  const zone = await storage.getZone(req.params.id as string);
-  if (!zone) return res.status(404).json({ error: "Zone not found" });
-  if (req.companyId && zone.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
-  res.json(zone);
-});
-
-router.post("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
-  try {
-    const companyId = req.companyId as string;
-    req.body.companyId = companyId;
-    const existing = await storage.getZoneByCode(req.body.code, companyId);
-    if (existing) {
-      return res.status(400).json({ error: "Zone with this code already exists" });
-    }
-    const zone = await storage.createZone(req.body);
-    res.json(zone);
-  } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create zone" });
-  }
-});
-
-router.put("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => {
-  const existingZone = await storage.getZone(req.params.id as string);
-  if (!existingZone) return res.status(404).json({ error: "Zone not found" });
-  if (req.companyId && existingZone.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
-  const parsed = insertZoneSchema.partial().safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
-  }
-  const zone = await storage.updateZone(req.params.id as string, parsed.data);
-  res.json(zone);
-});
-
-router.delete("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => {
-  const existingZone = await storage.getZone(req.params.id as string);
-  if (!existingZone) return res.status(404).json({ error: "Zone not found" });
-  if (req.companyId && existingZone.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
-  await storage.deleteZone(req.params.id as string);
-  res.json({ success: true });
-});
-
-// =============== LOAD LISTS ===============
-
-router.get("/api/load-lists", requireAuth, requirePermission("logistics"), async (req, res) => {
-  try {
-    const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
-
-    const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const queryLimit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
-    const offset = (page - 1) * queryLimit;
-    const statusFilter = req.query.status as string | undefined;
-    const jobIdFilter = req.query.jobId as string | undefined;
-
-    const conditions = [eq(jobs.companyId, companyId)];
-    if (statusFilter) conditions.push(eq(loadLists.status, statusFilter as any));
-    if (jobIdFilter) conditions.push(eq(loadLists.jobId, jobIdFilter));
-
-    const [{ total }] = await db
-      .select({ total: count() })
-      .from(loadLists)
-      .innerJoin(jobs, eq(loadLists.jobId, jobs.id))
-      .where(and(...conditions));
-
-    const results = await db
-      .select({
-        id: loadLists.id,
-        jobId: loadLists.jobId,
-        loadNumber: loadLists.loadNumber,
-        loadDate: loadLists.loadDate,
-        loadTime: loadLists.loadTime,
-        trailerTypeId: loadLists.trailerTypeId,
-        factory: loadLists.factory,
-        factoryId: loadLists.factoryId,
-        uhf: loadLists.uhf,
-        status: loadLists.status,
-        notes: loadLists.notes,
-        createdById: loadLists.createdById,
-        createdAt: loadLists.createdAt,
-        updatedAt: loadLists.updatedAt,
-        jobNumber: jobs.jobNumber,
-        jobName: jobs.name,
-        jobCode: jobs.code,
-      })
-      .from(loadLists)
-      .innerJoin(jobs, eq(loadLists.jobId, jobs.id))
-      .where(and(...conditions))
-      .orderBy(desc(loadLists.createdAt))
-      .limit(queryLimit)
-      .offset(offset);
-
-    const loadListIds = results.map(r => r.id);
-
-    if (loadListIds.length === 0) {
-      return res.json({
-        data: [],
-        pagination: { page, limit: queryLimit, total, totalPages: Math.ceil(total / queryLimit) },
-      });
-    }
-
-    const [allPanelRows, allDeliveryRows, allLoadReturnRows] = await Promise.all([
-      db.select()
-        .from(loadListPanels)
-        .innerJoin(panelRegister, eq(loadListPanels.panelId, panelRegister.id))
-        .where(inArray(loadListPanels.loadListId, loadListIds))
-        .orderBy(asc(loadListPanels.sequence))
-        .limit(1000),
-      db.select().from(deliveryRecords)
-        .where(inArray(deliveryRecords.loadListId, loadListIds))
-        .limit(1000),
-      db.select().from(loadReturns)
-        .where(inArray(loadReturns.loadListId, loadListIds))
-        .limit(1000),
-    ]);
-
-    const panelsByLoadList = new Map<string, typeof allPanelRows>();
-    for (const row of allPanelRows) {
-      const arr = panelsByLoadList.get(row.load_list_panels.loadListId) || [];
-      arr.push(row);
-      panelsByLoadList.set(row.load_list_panels.loadListId, arr);
-    }
-
-    const deliveryByLoadList = new Map(allDeliveryRows.map(d => [d.loadListId, d]));
-    const returnByLoadList = new Map(allLoadReturnRows.map(r => [r.loadListId, r]));
-
-    const trailerTypeIds = [...new Set(results.filter(r => r.trailerTypeId).map(r => r.trailerTypeId!))];
-    const allTrailerTypes = trailerTypeIds.length > 0
-      ? await db.select().from(trailerTypes).where(inArray(trailerTypes.id, trailerTypeIds))
-      : [];
-    const trailerTypeMap = new Map(allTrailerTypes.map(t => [t.id, t]));
-
-    const createdByIds = [...new Set(results.filter(r => r.createdById).map(r => r.createdById!))];
-    const allCreatedBy = createdByIds.length > 0
-      ? await db.select({ id: users.id, name: users.name, email: users.email })
-          .from(users).where(inArray(users.id, createdByIds))
-      : [];
-    const createdByMap = new Map(allCreatedBy.map(u => [u.id, u]));
-
-    const enriched = results.map(r => {
-      const panelRows = panelsByLoadList.get(r.id) || [];
-      return {
-        ...r,
-        job: { id: r.jobId, jobNumber: r.jobNumber, name: r.jobName, code: r.jobCode },
-        trailerType: r.trailerTypeId ? trailerTypeMap.get(r.trailerTypeId) || null : null,
-        panels: panelRows.map(p => ({ ...p.load_list_panels, panel: p.panel_register })),
-        deliveryRecord: deliveryByLoadList.get(r.id) || null,
-        loadReturn: returnByLoadList.get(r.id) || null,
-        createdBy: r.createdById ? createdByMap.get(r.createdById) || null : null,
-        panelCount: panelRows.length,
-      };
-    });
-
-    res.json({
-      data: enriched,
-      pagination: { page, limit: queryLimit, total, totalPages: Math.ceil(total / queryLimit) },
-    });
-  } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch load lists" });
-  }
-});
-
-router.get("/api/load-lists/:id", requireAuth, requirePermission("logistics"), async (req, res) => {
-  const loadList = await storage.getLoadList(req.params.id as string);
-  if (!loadList) return res.status(404).json({ error: "Load list not found" });
-  if (req.companyId && loadList.jobId) {
-    const job = await storage.getJob(loadList.jobId);
-    if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
-  }
-  res.json(loadList);
-});
-
-router.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
-  try {
-    const { panelIds, docketNumber, scheduledDate, ...data } = req.body;
-    
-    const [{ existingCount }] = await db
-      .select({ existingCount: count() })
-      .from(loadLists)
-      .innerJoin(jobs, eq(loadLists.jobId, jobs.id))
-      .where(eq(jobs.companyId, req.companyId!));
-    const loadNumber = `LL-${String(existingCount + 1).padStart(4, '0')}`;
-    
-    const date = scheduledDate ? new Date(scheduledDate) : new Date();
-    const loadDate = date.toISOString().split('T')[0];
-    const loadTime = date.toTimeString().split(' ')[0].substring(0, 5);
-    
-    if (data.jobId && req.companyId) {
-      const job = await storage.getJob(data.jobId);
-      if (!job || job.companyId !== req.companyId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-    }
-
-    if (panelIds && panelIds.length > 0) {
-      for (const pId of panelIds) {
-        const panelCheck = await storage.getPanelById(pId);
-        if (!panelCheck) {
-          return res.status(404).json({ error: `Panel ${pId} not found` });
-        }
-        if (panelCheck.lifecycleStatus < PANEL_LIFECYCLE_STATUS.PRODUCED) {
-          return res.status(400).json({ error: `Panel ${panelCheck.panelMark} must be produced before it can be added to a load list.` });
-        }
-      }
-    }
-
-    const loadList = await storage.createLoadList({
-      ...data,
-      loadNumber,
-      loadDate,
-      loadTime,
-      createdById: req.session.userId!,
-    }, panelIds || []);
-    if (panelIds && panelIds.length > 0) {
-      for (const panelId of panelIds) {
-        await advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.ON_LOAD_LIST, "Added to load list", req.session.userId, { loadListId: loadList.id });
-      }
-    }
-    res.json(loadList);
-  } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create load list" });
-  }
-});
-
-router.put("/api/load-lists/:id", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
-  const companyId = req.session.companyId;
-  const existing = await storage.getLoadList(req.params.id as string);
-  if (!existing || (existing as unknown as Record<string, unknown>).companyId !== companyId) {
-    return res.status(404).json({ error: "Load list not found" });
-  }
-  const parsed = insertLoadListSchema.partial().safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
-  }
-  const loadList = await storage.updateLoadList(req.params.id as string, parsed.data);
-  res.json(loadList);
-});
-
-router.delete("/api/load-lists/:id", requireRole("ADMIN", "MANAGER"), requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
-  const companyId = req.session.companyId;
-  const existing = await storage.getLoadList(req.params.id as string);
-  if (!existing || (existing as unknown as Record<string, unknown>).companyId !== companyId) {
-    return res.status(404).json({ error: "Load list not found" });
-  }
-  await storage.deleteLoadList(req.params.id as string);
-  res.json({ success: true });
-});
-
-router.post("/api/load-lists/:id/panels", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
-  const loadList = await storage.getLoadList(req.params.id as string);
-  if (!loadList) return res.status(404).json({ error: "Load list not found" });
-  if (req.companyId && loadList.jobId) {
-    const job = await storage.getJob(loadList.jobId);
-    if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
-  }
-  const { panelId, sequence } = req.body;
-  const panelRecord = await storage.getPanelById(panelId);
-  if (!panelRecord) {
-    return res.status(404).json({ error: "Panel not found" });
-  }
-  if (panelRecord.lifecycleStatus < PANEL_LIFECYCLE_STATUS.PRODUCED) {
-    return res.status(400).json({ error: "Panel must be produced before it can be added to a load list. Current lifecycle status does not meet the minimum requirement." });
-  }
-  const panel = await storage.addPanelToLoadList(req.params.id as string, panelId, sequence);
-  await advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.ON_LOAD_LIST, "Added to load list", req.session.userId, { loadListId: req.params.id });
-  res.json(panel);
-});
-
-router.delete("/api/load-lists/:id/panels/:panelId", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
-  const loadList = await storage.getLoadList(req.params.id as string);
-  if (!loadList) return res.status(404).json({ error: "Load list not found" });
-  if (req.companyId && loadList.jobId) {
-    const job = await storage.getJob(loadList.jobId);
-    if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
-  }
-  await storage.removePanelFromLoadList(req.params.id as string, req.params.panelId as string);
-  logPanelChange(req.params.panelId as string, "Removed from load list", req.session.userId, { changedFields: { loadListId: req.params.id } });
-  res.json({ success: true });
-});
 
 // =============== DELIVERY RECORDS ===============
 
@@ -344,11 +17,11 @@ router.get("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
     const loadList = await storage.getLoadList(req.params.id as string);
     if (loadList?.jobId) {
       const job = await storage.getJob(loadList.jobId);
-      if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
+      if (!job || job.companyId !== req.companyId) return sendForbidden(res);
     }
   }
   const record = await storage.getDeliveryRecord(req.params.id as string);
-  res.json(record || null);
+  sendSuccess(res, record || null);
 });
 
 router.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
@@ -356,7 +29,7 @@ router.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
     const loadListForPhaseCheck = await storage.getLoadList(req.params.id as string);
     if (req.companyId && loadListForPhaseCheck?.jobId) {
       const jobCheck = await storage.getJob(loadListForPhaseCheck.jobId);
-      if (!jobCheck || jobCheck.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
+      if (!jobCheck || jobCheck.companyId !== req.companyId) return sendForbidden(res);
     }
     if (loadListForPhaseCheck?.jobId) {
       const { jobHasCapability } = await import("@shared/job-phases");
@@ -365,7 +38,7 @@ router.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
         const { intToPhase } = await import("@shared/job-phases");
         const phase = (typeof job.jobPhase === 'number' ? intToPhase(job.jobPhase) : (job.jobPhase || "CONTRACTED")) as string;
         if (!jobHasCapability(phase as JobPhase, "DELIVER_PANELS")) {
-          return res.status(403).json({ error: `Cannot record deliveries while job is in "${phase}" phase` });
+          return sendForbidden(res, `Cannot record deliveries while job is in "${phase}" phase`);
         }
       }
     }
@@ -380,28 +53,28 @@ router.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
         advancePanelLifecycleIfLower(lp.panel.id, PANEL_LIFECYCLE_STATUS.SHIPPED, "Delivered to site", req.session.userId, { loadListId: req.params.id });
       }
     }
-    res.json(record);
+    sendSuccess(res, record);
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create delivery record" });
+    sendBadRequest(res, error instanceof Error ? error.message : "Failed to create delivery record");
   }
 });
 
 router.put("/api/delivery-records/:id", requireAuth, async (req, res) => {
   const record = await storage.getDeliveryRecordById(req.params.id as string);
   if (!record) {
-    return res.status(404).json({ error: "Delivery record not found" });
+    return sendNotFound(res, "Delivery record not found");
   }
   const loadList = await storage.getLoadList(record.loadListId);
   const companyId = req.session.companyId;
   if (!loadList || (loadList as unknown as Record<string, unknown>).companyId !== companyId) {
-    return res.status(404).json({ error: "Delivery record not found" });
+    return sendNotFound(res, "Delivery record not found");
   }
   const parsed = insertDeliveryRecordSchema.partial().safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    return sendBadRequest(res, "Validation failed");
   }
   const updated = await storage.updateDeliveryRecord(req.params.id as string, parsed.data);
-  res.json(updated);
+  sendSuccess(res, updated);
 });
 
 // =============== LOAD RETURNS ===============
@@ -412,42 +85,42 @@ router.get("/api/load-lists/:id/return", requireAuth, async (req, res) => {
       const loadList = await storage.getLoadList(req.params.id as string);
       if (loadList?.jobId) {
         const job = await storage.getJob(loadList.jobId);
-        if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
+        if (!job || job.companyId !== req.companyId) return sendForbidden(res);
       }
     }
     const loadReturn = await storage.getLoadReturn(req.params.id as string);
-    res.json(loadReturn || null);
+    sendSuccess(res, loadReturn || null);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get load return" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to get load return");
   }
 });
 
 router.post("/api/load-lists/:id/return", requireAuth, async (req, res) => {
   try {
     const loadList = await storage.getLoadList(req.params.id as string);
-    if (!loadList) return res.status(404).json({ error: "Load list not found" });
+    if (!loadList) return sendNotFound(res, "Load list not found");
     if (req.companyId && loadList.jobId) {
       const job = await storage.getJob(loadList.jobId);
-      if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
+      if (!job || job.companyId !== req.companyId) return sendForbidden(res);
     }
 
     const existingReturn = await storage.getLoadReturn(req.params.id as string);
     if (existingReturn) {
-      return res.status(400).json({ error: "A return record already exists for this load list" });
+      return sendBadRequest(res, "A return record already exists for this load list");
     }
 
     const { panelIds, ...returnData } = req.body;
 
     if (!returnData.returnReason) {
-      return res.status(400).json({ error: "Return reason is required" });
+      return sendBadRequest(res, "Return reason is required");
     }
 
     if (!returnData.returnType || !["FULL", "PARTIAL"].includes(returnData.returnType)) {
-      return res.status(400).json({ error: "Return type must be FULL or PARTIAL" });
+      return sendBadRequest(res, "Return type must be FULL or PARTIAL");
     }
 
     if (returnData.returnType === "PARTIAL" && (!panelIds || panelIds.length === 0)) {
-      return res.status(400).json({ error: "At least one panel must be selected for partial return" });
+      return sendBadRequest(res, "At least one panel must be selected for partial return");
     }
 
     const selectedPanelIds = returnData.returnType === "FULL"
@@ -464,16 +137,18 @@ router.post("/api/load-lists/:id/return", requireAuth, async (req, res) => {
       updatePanelLifecycleStatus(panelId, PANEL_LIFECYCLE_STATUS.RETURNED, "Panel returned from site", req.session.userId, { returnType: returnData.returnType, returnReason: returnData.returnReason });
     }
 
-    res.json(loadReturn);
+    sendSuccess(res, loadReturn);
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create load return" });
+    sendBadRequest(res, error instanceof Error ? error.message : "Failed to create load return");
   }
 });
+
+// =============== TEST EMAIL ROUTES ===============
 
 router.post("/api/test-gmail", requireAuth, async (req, res) => {
   try {
     const { to } = req.body;
-    if (!to) return res.status(400).json({ error: "Recipient email required" });
+    if (!to) return sendBadRequest(res, "Recipient email required");
     const companyId = req.session?.companyId || req.companyId;
     const htmlBody = await buildBrandedEmail({
       title: "Test Email",
@@ -486,22 +161,22 @@ router.post("/api/test-gmail", requireAuth, async (req, res) => {
       "Test Email from BuildPlus Ai System",
       htmlBody
     );
-    res.json(result);
+    sendSuccess(res, result);
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: error instanceof Error ? error.message : String(error) });
+    sendServerError(res, error instanceof Error ? error.message : String(error));
   }
 });
 
 router.post("/api/test-all-emails", requireAuth, async (req, res) => {
   try {
     const { to } = req.body;
-    if (!to) return res.status(400).json({ error: "Recipient email required" });
+    if (!to) return sendBadRequest(res, "Recipient email required");
     const companyId = req.session?.companyId || req.companyId;
     const senderName = req.session?.name || "Admin User";
     const timestamp = new Date().toLocaleString("en-AU", { timeZone: "Australia/Brisbane" });
 
     if (!emailService.isConfigured()) {
-      return res.status(503).json({ error: "Email service is not configured" });
+      return sendError(res, 503, "Email service is not configured");
     }
 
     const results: Array<{ emailType: string; success: boolean; error?: string }> = [];
@@ -902,7 +577,7 @@ router.post("/api/test-all-emails", requireAuth, async (req, res) => {
     const successCount = results.filter(r => r.success).length;
     const failCount = results.filter(r => !r.success).length;
 
-    res.json({
+    sendSuccess(res, {
       totalSent: successCount,
       totalFailed: failCount,
       totalEmails: results.length,
@@ -910,8 +585,8 @@ router.post("/api/test-all-emails", requireAuth, async (req, res) => {
       results,
     });
   } catch (error: unknown) {
-    res.status(500).json({ success: false, error: error instanceof Error ? error.message : String(error) });
+    sendServerError(res, error instanceof Error ? error.message : String(error));
   }
 });
 
-export const logisticsRouter = router;
+export default router;

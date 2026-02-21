@@ -12,6 +12,7 @@ import {
 import { assignApprovalPathToInvoice } from "../../lib/ap-approval-assign";
 import { requireUUID, safeJsonParse } from "../../lib/api-utils";
 import type { SharedDeps } from "./shared";
+import { sendSuccess, sendBadRequest, sendNotFound, sendServerError } from "../../lib/api-response";
 
 export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void {
   const { db, objectStorageService, logActivity } = deps;
@@ -19,7 +20,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
   router.get("/api/ap-invoices/:id/document", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.companyId;
-      if (!companyId) return res.status(400).json({ error: "Company context required" });
+      if (!companyId) return sendBadRequest(res, "Company context required");
       const id = requireUUID(req, res, "id");
       if (!id) return;
 
@@ -29,7 +30,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
         .limit(1);
 
-      if (!existing) return res.status(404).json({ error: "Invoice not found" });
+      if (!existing) return sendNotFound(res, "Invoice not found");
 
       const [doc] = await db
         .select()
@@ -38,9 +39,9 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         .orderBy(desc(apInvoiceDocuments.createdAt))
         .limit(1);
 
-      if (!doc) return res.status(404).json({ error: "Document not found" });
+      if (!doc) return sendNotFound(res, "Document not found");
 
-      res.json({
+      sendSuccess(res, {
         storageKey: doc.storageKey,
         fileName: doc.fileName,
         mimeType: doc.mimeType,
@@ -48,14 +49,14 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP invoice document");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document" });
+      sendServerError(res, error instanceof Error ? error.message : "Failed to fetch document");
     }
   });
 
   router.get("/api/ap-invoices/:id/comments", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.companyId;
-      if (!companyId) return res.status(400).json({ error: "Company context required" });
+      if (!companyId) return sendBadRequest(res, "Company context required");
       const id = requireUUID(req, res, "id");
       if (!id) return;
 
@@ -65,7 +66,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
         .limit(1);
 
-      if (!existing) return res.status(404).json({ error: "Invoice not found" });
+      if (!existing) return sendNotFound(res, "Invoice not found");
 
       const comments = await db
         .select({
@@ -83,17 +84,17 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         .orderBy(asc(apInvoiceComments.createdAt))
         .limit(1000);
 
-      res.json(comments);
+      sendSuccess(res, comments);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP invoice comments");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch comments" });
+      sendServerError(res, error instanceof Error ? error.message : "Failed to fetch comments");
     }
   });
 
   router.post("/api/ap-invoices/:id/comments", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.companyId;
-      if (!companyId) return res.status(400).json({ error: "Company context required" });
+      if (!companyId) return sendBadRequest(res, "Company context required");
       const userId = req.session.userId!;
       const id = requireUUID(req, res, "id");
       if (!id) return;
@@ -106,7 +107,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
         .limit(1);
 
-      if (!existing) return res.status(404).json({ error: "Invoice not found" });
+      if (!existing) return sendNotFound(res, "Invoice not found");
 
       const [comment] = await db
         .insert(apInvoiceComments)
@@ -119,17 +120,17 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
 
       await logActivity(id, "comment_added", "Comment added", userId);
 
-      res.json(comment);
+      sendSuccess(res, comment);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error adding AP invoice comment");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to add comment" });
+      sendServerError(res, error instanceof Error ? error.message : "Failed to add comment");
     }
   });
 
   router.get("/api/ap-invoices/:id/activity", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.companyId;
-      if (!companyId) return res.status(400).json({ error: "Company context required" });
+      if (!companyId) return sendBadRequest(res, "Company context required");
       const id = requireUUID(req, res, "id");
       if (!id) return;
 
@@ -139,7 +140,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
         .limit(1);
 
-      if (!existing) return res.status(404).json({ error: "Invoice not found" });
+      if (!existing) return sendNotFound(res, "Invoice not found");
 
       const activity = await db
         .select({
@@ -159,17 +160,17 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         .orderBy(desc(apInvoiceActivity.createdAt))
         .limit(1000);
 
-      res.json(activity);
+      sendSuccess(res, activity);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP invoice activity");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity" });
+      sendServerError(res, error instanceof Error ? error.message : "Failed to fetch activity");
     }
   });
 
   router.get("/api/ap-invoices/:id/approval-path", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.companyId;
-      if (!companyId) return res.status(400).json({ error: "Company context required" });
+      if (!companyId) return sendBadRequest(res, "Company context required");
       const id = requireUUID(req, res, "id");
       if (!id) return;
 
@@ -179,7 +180,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId)))
         .limit(1);
 
-      if (!existing) return res.status(404).json({ error: "Invoice not found" });
+      if (!existing) return sendNotFound(res, "Invoice not found");
 
       const approvals = await db
         .select({
@@ -269,17 +270,17 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         ruleConditionsResolved: a.ruleId ? (resolvedConditionLabels[a.ruleId] || a.ruleConditions) : null,
       }));
 
-      res.json({ steps, totalSteps, completedSteps, currentStepIndex });
+      sendSuccess(res, { steps, totalSteps, completedSteps, currentStepIndex });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP invoice approval path");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch approval path" });
+      sendServerError(res, error instanceof Error ? error.message : "Failed to fetch approval path");
     }
   });
 
   router.post("/api/ap-invoices/:id/export/myob", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.companyId;
-      if (!companyId) return res.status(400).json({ error: "Company context required" });
+      if (!companyId) return sendBadRequest(res, "Company context required");
       const userId = req.session.userId!;
       const id = requireUUID(req, res, "id");
       if (!id) return;
@@ -287,8 +288,8 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       const [invoice] = await db.select().from(apInvoices)
         .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId))).limit(1);
 
-      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
-      if (invoice.status !== "APPROVED") return res.status(400).json({ error: "Only approved invoices can be exported to MYOB" });
+      if (!invoice) return sendNotFound(res, "Invoice not found");
+      if (invoice.status !== "APPROVED") return sendBadRequest(res, "Only approved invoices can be exported to MYOB");
 
       const splits = await db.select().from(apInvoiceSplits)
         .where(eq(apInvoiceSplits.invoiceId, id))
@@ -304,7 +305,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       const { createMyobClient, getConnectionStatus } = await import("../../myob");
       const connectionStatus = await getConnectionStatus(companyId);
       if (!connectionStatus.connected) {
-        return res.status(400).json({ error: "MYOB not connected. Please connect your MYOB account first." });
+        return sendBadRequest(res, "MYOB not connected. Please connect your MYOB account first.");
       }
 
       const myob = createMyobClient(companyId);
@@ -355,7 +356,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
 
         await logActivity(id, "exported", "Invoice exported to MYOB", userId, { myobResult: result });
 
-        res.json({ success: true, myobResult: result });
+        sendSuccess(res, { success: true, myobResult: result });
       } catch (myobError: any) {
         await db.update(apInvoices)
           .set({ status: "FAILED_EXPORT", updatedAt: new Date() })
@@ -374,28 +375,28 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
 
         await logActivity(id, "export_failed", `MYOB export failed: ${myobError.message}`, userId);
 
-        res.status(500).json({ error: `MYOB export failed: ${myobError.message}` });
+        sendServerError(res, `MYOB export failed: ${myobError.message}`);
       }
     } catch (error: unknown) {
       logger.error({ err: error }, "Error exporting AP invoice to MYOB");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to export to MYOB" });
+      sendServerError(res, error instanceof Error ? error.message : "Failed to export to MYOB");
     }
   });
 
   router.get("/api/ap-invoices/:id/document-view", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.companyId;
-      if (!companyId) return res.status(400).json({ error: "Company context required" });
+      if (!companyId) return sendBadRequest(res, "Company context required");
       const id = requireUUID(req, res, "id");
       if (!id) return;
 
       const [invoice] = await db.select().from(apInvoices)
         .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId))).limit(1);
-      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+      if (!invoice) return sendNotFound(res, "Invoice not found");
 
       const docs = await db.select().from(apInvoiceDocuments)
         .where(eq(apInvoiceDocuments.invoiceId, id)).limit(200);
-      if (!docs.length) return res.status(404).json({ error: "No document found" });
+      if (!docs.length) return sendNotFound(res, "No document found");
 
       const doc = docs[0];
       try {
@@ -409,33 +410,33 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         const stream = file.createReadStream();
         stream.on("error", (err: any) => {
           logger.error({ err }, "Stream error serving AP invoice document");
-          if (!res.headersSent) res.status(500).json({ error: "Error streaming file" });
+          if (!res.headersSent) sendServerError(res, "Error streaming file");
         });
         stream.pipe(res);
       } catch (storageErr: any) {
         logger.error({ err: storageErr }, "Error retrieving AP invoice document from storage");
-        res.status(404).json({ error: "Document file not found in storage" });
+        sendNotFound(res, "Document file not found in storage");
       }
     } catch (error: unknown) {
       logger.error({ err: error }, "Error serving AP invoice document");
-      res.status(500).json({ error: "Failed to serve document" });
+      sendServerError(res, "Failed to serve document");
     }
   });
 
   router.get("/api/ap-invoices/:id/page-thumbnails", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.companyId;
-      if (!companyId) return res.status(400).json({ error: "Company context required" });
+      if (!companyId) return sendBadRequest(res, "Company context required");
       const id = requireUUID(req, res, "id");
       if (!id) return;
 
       const [invoice] = await db.select().from(apInvoices)
         .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId))).limit(1);
-      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+      if (!invoice) return sendNotFound(res, "Invoice not found");
 
       const docs = await db.select().from(apInvoiceDocuments)
         .where(eq(apInvoiceDocuments.invoiceId, id)).limit(200);
-      if (!docs.length) return res.status(404).json({ error: "No document found" });
+      if (!docs.length) return sendNotFound(res, "No document found");
 
       const doc = docs[0];
 
@@ -502,7 +503,7 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
 
           const parseResult = safeJsonParse(result);
           const parsed = parseResult.success ? parseResult.data : { error: "Failed to parse extraction result", raw: result.slice(0, 500) };
-          res.json(parsed);
+          sendSuccess(res, parsed);
         } finally {
           try {
             const fs2 = await import("fs");
@@ -511,7 +512,7 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
         }
       } else if (doc.mimeType?.startsWith("image/")) {
         const thumbnail = buffer.toString("base64");
-        res.json({
+        sendSuccess(res, {
           totalPages: 1,
           pages: [{
             pageNumber: 1,
@@ -521,29 +522,29 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
           }],
         });
       } else {
-        res.status(400).json({ error: "Unsupported document type" });
+        sendBadRequest(res, "Unsupported document type");
       }
     } catch (error: unknown) {
       logger.error({ err: error }, "Error generating page thumbnails");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate thumbnails" });
+      sendServerError(res, error instanceof Error ? error.message : "Failed to generate thumbnails");
     }
   });
 
   router.post("/api/ap-invoices/:id/extract", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = req.companyId;
-      if (!companyId) return res.status(400).json({ error: "Company context required" });
+      if (!companyId) return sendBadRequest(res, "Company context required");
       const userId = req.session.userId!;
       const id = requireUUID(req, res, "id");
       if (!id) return;
 
       const [invoice] = await db.select().from(apInvoices)
         .where(and(eq(apInvoices.id, id), eq(apInvoices.companyId, companyId))).limit(1);
-      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+      if (!invoice) return sendNotFound(res, "Invoice not found");
 
       const docs = await db.select().from(apInvoiceDocuments)
         .where(eq(apInvoiceDocuments.invoiceId, id)).limit(200);
-      if (!docs.length) return res.status(400).json({ error: "No document to extract from" });
+      if (!docs.length) return sendBadRequest(res, "No document to extract from");
 
       const doc = docs[0];
 
@@ -565,11 +566,11 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
         imageBuffers = prepared.imageBuffers;
 
         if (imageBuffers.length === 0) {
-          return res.status(500).json({ error: "Failed to convert document to images for extraction" });
+          return sendServerError(res, "Failed to convert document to images for extraction");
         }
       } catch (err: any) {
         logger.error({ err }, "Error reading document for extraction");
-        return res.status(500).json({ error: "Cannot read document file" });
+        return sendServerError(res, "Cannot read document file");
       }
 
       const OpenAI = (await import("openai")).default;
@@ -611,7 +612,7 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
         rawData = JSON.parse(responseText);
       } catch {
         logger.error("Failed to parse extraction response as JSON");
-        return res.status(500).json({ error: "Extraction produced invalid response" });
+        return sendServerError(res, "Extraction produced invalid response");
       }
 
       const data = parseExtractedData(rawData);
@@ -680,7 +681,7 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
         logger.warn({ err: approvalErr, invoiceId: id }, "Failed to assign approval path after extraction (non-fatal)");
       }
 
-      res.json({
+      sendSuccess(res, {
         success: true,
         extractedData: data,
         fieldsStored: fieldRecords.length,
@@ -689,7 +690,7 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
       });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error extracting AP invoice fields");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Extraction failed" });
+      sendServerError(res, error instanceof Error ? error.message : "Extraction failed");
     }
   });
 }

@@ -15,12 +15,18 @@ import {
 } from "@shared/schema";
 import { getResendApiKey } from "../services/email.service";
 import { requireUUID, safeJsonParse } from "../lib/api-utils";
+import { sendSuccess, sendBadRequest, sendNotFound, sendServerError } from "../lib/api-response";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+/**
+ * Records an audit trail entry for a tender inbound email lifecycle event.
+ * Every state change (upload, extraction, matching) is logged with an actor
+ * and optional metadata so the full processing history can be reconstructed.
+ */
 async function logTenderEmailActivity(
   inboundEmailId: string,
   activityType: string,
@@ -40,7 +46,7 @@ async function logTenderEmailActivity(
 router.get("/api/tender-inbox/settings", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
 
     const [settings] = await db.select().from(tenderInboxSettings)
       .where(eq(tenderInboxSettings.companyId, companyId)).limit(1);
@@ -50,7 +56,7 @@ router.get("/api/tender-inbox/settings", requireAuth, async (req: Request, res: 
     const centralEmail = company?.tenderInboxEmail || null;
 
     if (!settings) {
-      return res.json({
+      return sendSuccess(res, {
         companyId,
         isEnabled: false,
         inboundEmailAddress: centralEmail,
@@ -59,17 +65,17 @@ router.get("/api/tender-inbox/settings", requireAuth, async (req: Request, res: 
       });
     }
 
-    res.json({ ...settings, inboundEmailAddress: centralEmail || settings.inboundEmailAddress });
+    sendSuccess(res, { ...settings, inboundEmailAddress: centralEmail || settings.inboundEmailAddress });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender inbox settings");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch tender inbox settings" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch tender inbox settings");
   }
 });
 
 router.put("/api/tender-inbox/settings", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
 
     const { inboundEmailAddress: _ignored, ...body } = z.object({
       isEnabled: z.boolean().optional(),
@@ -93,17 +99,17 @@ router.put("/api/tender-inbox/settings", requireAuth, async (req: Request, res: 
         .returning();
     }
 
-    res.json(settings);
+    sendSuccess(res, settings);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating tender inbox settings");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update tender inbox settings" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to update tender inbox settings");
   }
 });
 
 router.get("/api/tender-inbox/emails", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
 
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
     const offset = parseInt(req.query.offset as string) || 0;
@@ -162,7 +168,7 @@ router.get("/api/tender-inbox/emails", requireAuth, async (req: Request, res: Re
         .where(whereClause),
     ]);
 
-    res.json({
+    sendSuccess(res, {
       emails: emailRows,
       total: countResult[0]?.total || 0,
       limit,
@@ -170,14 +176,14 @@ router.get("/api/tender-inbox/emails", requireAuth, async (req: Request, res: Re
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender inbound emails");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch tender inbound emails" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch tender inbound emails");
   }
 });
 
 router.get("/api/tender-inbox/counts", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
 
     const statusCounts = await db
       .select({
@@ -206,17 +212,17 @@ router.get("/api/tender-inbox/counts", requireAuth, async (req: Request, res: Re
       counts.all += row.count;
     }
 
-    res.json(counts);
+    sendSuccess(res, counts);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender inbox counts");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch counts" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch counts");
   }
 });
 
 router.get("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
     const id = requireUUID(req, res, "id");
     if (!id) return;
 
@@ -224,7 +230,7 @@ router.get("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, res
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId)))
       .limit(1);
 
-    if (!email) return res.status(404).json({ error: "Tender email not found" });
+    if (!email) return sendNotFound(res, "Tender email not found");
 
     const [
       documents,
@@ -248,7 +254,7 @@ router.get("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, res
         : Promise.resolve(null),
     ]);
 
-    res.json({
+    sendSuccess(res, {
       ...email,
       documents,
       extractedFields,
@@ -258,7 +264,7 @@ router.get("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, res
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender email detail");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch tender email" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch tender email");
   }
 });
 
@@ -266,10 +272,10 @@ router.post("/api/tender-inbox/upload", requireAuth, upload.array("files", 20), 
   try {
     const companyId = req.companyId;
     const userId = req.session.userId;
-    if (!companyId || !userId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId || !userId) return sendBadRequest(res, "Company context required");
 
     const files = req.files as Express.Multer.File[];
-    if (!files || files.length === 0) return res.status(400).json({ error: "At least one file is required" });
+    if (!files || files.length === 0) return sendBadRequest(res, "At least one file is required");
 
     const [settings] = await db.select().from(tenderInboxSettings)
       .where(eq(tenderInboxSettings.companyId, companyId)).limit(1);
@@ -319,27 +325,27 @@ router.post("/api/tender-inbox/upload", requireAuth, upload.array("files", 20), 
       createdEmails.push(updated || emailRecord);
     }
 
-    res.json(createdEmails.length === 1 ? createdEmails[0] : { emails: createdEmails, count: createdEmails.length });
+    sendSuccess(res, createdEmails.length === 1 ? createdEmails[0] : { emails: createdEmails, count: createdEmails.length });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading tender email document");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload document" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to upload document");
   }
 });
 
 router.get("/api/tender-inbox/emails/:id/document-view", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
     const id = requireUUID(req, res, "id");
     if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
-    if (!email) return res.status(404).json({ error: "Tender email not found" });
+    if (!email) return sendNotFound(res, "Tender email not found");
 
     const docs = await db.select().from(tenderEmailDocuments)
       .where(eq(tenderEmailDocuments.inboundEmailId, id)).limit(200);
-    if (!docs.length) return res.status(404).json({ error: "No document found" });
+    if (!docs.length) return sendNotFound(res, "No document found");
 
     const doc = docs[0];
     try {
@@ -353,55 +359,62 @@ router.get("/api/tender-inbox/emails/:id/document-view", requireAuth, async (req
       const stream = file.createReadStream();
       stream.on("error", (err: any) => {
         logger.error({ err }, "Stream error serving tender email document");
-        if (!res.headersSent) res.status(500).json({ error: "Error streaming file" });
+        if (!res.headersSent) sendServerError(res, "Error streaming file");
       });
       stream.pipe(res);
     } catch (storageErr: any) {
       logger.error({ err: storageErr }, "Error retrieving tender email document from storage");
-      res.status(404).json({ error: "Document file not found in storage" });
+      sendNotFound(res, "Document file not found in storage");
     }
   } catch (error: unknown) {
     logger.error({ err: error }, "Error serving tender email document");
-    res.status(500).json({ error: "Failed to serve document" });
+    sendServerError(res, "Failed to serve document");
   }
 });
 
 router.get("/api/tender-inbox/emails/:id/extracted-fields", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
     const id = requireUUID(req, res, "id");
     if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
-    if (!email) return res.status(404).json({ error: "Tender email not found" });
+    if (!email) return sendNotFound(res, "Tender email not found");
 
     const fields = await db.select().from(tenderEmailExtractedFields)
       .where(eq(tenderEmailExtractedFields.inboundEmailId, id)).limit(200);
 
-    res.json(fields);
+    sendSuccess(res, fields);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender email extracted fields");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch extracted fields" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch extracted fields");
   }
 });
 
+/**
+ * Triggers AI/OCR extraction on a tender email's attached document.
+ * Flow: sets status to PROCESSING → downloads the document from object storage
+ * into memory → delegates to extractTenderEmailInline which runs OCR/AI parsing
+ * to populate tenderEmailExtractedFields (subtotal, tax, total, cover note, etc.).
+ * Extraction failures are logged but non-fatal — the email remains in PROCESSING.
+ */
 router.post("/api/tender-inbox/emails/:id/extract", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
     const userId = req.session.userId;
     const id = requireUUID(req, res, "id");
     if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
-    if (!email) return res.status(404).json({ error: "Tender email not found" });
+    if (!email) return sendNotFound(res, "Tender email not found");
 
     const docs = await db.select().from(tenderEmailDocuments)
       .where(eq(tenderEmailDocuments.inboundEmailId, id)).limit(200);
-    if (!docs.length) return res.status(404).json({ error: "No document found for extraction" });
+    if (!docs.length) return sendNotFound(res, "No document found for extraction");
 
     const doc = docs[0];
 
@@ -430,17 +443,24 @@ router.post("/api/tender-inbox/emails/:id/extract", requireAuth, async (req: Req
     const [updated] = await db.select().from(tenderInboundEmails)
       .where(eq(tenderInboundEmails.id, id)).limit(1);
 
-    res.json(updated);
+    sendSuccess(res, updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error triggering tender email extraction");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to trigger extraction" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to trigger extraction");
   }
 });
 
+/**
+ * Matches an inbound tender email to a tender + supplier, creating a submission
+ * if one doesn't already exist. When no submissionId is provided, it builds a
+ * new tenderSubmission from extracted fields (subtotal/tax/total/cover note),
+ * computing totalPrice from subtotal+tax when total is missing.
+ * Sets the email status to MATCHED with a timestamp for audit purposes.
+ */
 router.post("/api/tender-inbox/emails/:id/match", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
     const userId = req.session.userId;
     const id = requireUUID(req, res, "id");
     if (!id) return;
@@ -453,7 +473,7 @@ router.post("/api/tender-inbox/emails/:id/match", requireAuth, async (req: Reque
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
-    if (!email) return res.status(404).json({ error: "Tender email not found" });
+    if (!email) return sendNotFound(res, "Tender email not found");
 
     let submissionId = body.tenderSubmissionId || null;
 
@@ -515,24 +535,24 @@ router.post("/api/tender-inbox/emails/:id/match", requireAuth, async (req: Reque
       tenderSubmissionId: submissionId,
     });
 
-    res.json(updated);
+    sendSuccess(res, updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error matching tender email");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to match tender email" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to match tender email");
   }
 });
 
 router.patch("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
     const userId = req.session.userId;
     const id = requireUUID(req, res, "id");
     if (!id) return;
 
     const [existing] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
-    if (!existing) return res.status(404).json({ error: "Tender email not found" });
+    if (!existing) return sendNotFound(res, "Tender email not found");
 
     const body = z.object({
       supplierId: z.string().nullable().optional(),
@@ -562,7 +582,7 @@ router.patch("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, r
     }
 
     if (Object.keys(updates).length === 0) {
-      return res.json(existing);
+      return sendSuccess(res, existing);
     }
 
     const [updated] = await db.update(tenderInboundEmails)
@@ -574,23 +594,23 @@ router.patch("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, r
       await logTenderEmailActivity(id, "fields_updated", `Updated fields: ${changedFields.join(", ")}`, userId || undefined, { changedFields });
     }
 
-    res.json(updated);
+    sendSuccess(res, updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating tender email");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update tender email" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to update tender email");
   }
 });
 
 router.delete("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
     const id = requireUUID(req, res, "id");
     if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
-    if (!email) return res.status(404).json({ error: "Tender email not found" });
+    if (!email) return sendNotFound(res, "Tender email not found");
 
     const docs = await db.select().from(tenderEmailDocuments)
       .where(eq(tenderEmailDocuments.inboundEmailId, id)).limit(200);
@@ -606,50 +626,50 @@ router.delete("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, 
     await db.delete(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId)));
 
-    res.json({ success: true, deletedId: id });
+    sendSuccess(res, { success: true, deletedId: id });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting tender email");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete tender email" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to delete tender email");
   }
 });
 
 router.get("/api/tender-inbox/emails/:id/activity", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
     const id = requireUUID(req, res, "id");
     if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
-    if (!email) return res.status(404).json({ error: "Tender email not found" });
+    if (!email) return sendNotFound(res, "Tender email not found");
 
     const activity = await db.select().from(tenderEmailActivity)
       .where(eq(tenderEmailActivity.inboundEmailId, id))
       .orderBy(desc(tenderEmailActivity.createdAt))
       .limit(500);
 
-    res.json(activity);
+    sendSuccess(res, activity);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender email activity");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch activity");
   }
 });
 
 router.get("/api/tender-inbox/emails/:id/page-thumbnails", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
     const id = requireUUID(req, res, "id");
     if (!id) return;
 
     const [email] = await db.select().from(tenderInboundEmails)
       .where(and(eq(tenderInboundEmails.id, id), eq(tenderInboundEmails.companyId, companyId))).limit(1);
-    if (!email) return res.status(404).json({ error: "Tender email not found" });
+    if (!email) return sendNotFound(res, "Tender email not found");
 
     const docs = await db.select().from(tenderEmailDocuments)
       .where(eq(tenderEmailDocuments.inboundEmailId, id)).limit(200);
-    if (!docs.length) return res.status(404).json({ error: "No document found" });
+    if (!docs.length) return sendNotFound(res, "No document found");
 
     const doc = docs[0];
     const file = await objectStorageService.getObjectEntityFile(doc.storageKey);
@@ -714,7 +734,7 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
 
         const parseResult = safeJsonParse(result);
         const parsed = parseResult.success ? parseResult.data : { error: "Failed to parse extraction result", raw: result.slice(0, 500) };
-        res.json(parsed);
+        sendSuccess(res, parsed);
       } finally {
         try {
           const fs2 = await import("fs");
@@ -723,7 +743,7 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
       }
     } else if (doc.mimeType?.startsWith("image/")) {
       const thumbnail = buffer.toString("base64");
-      res.json({
+      sendSuccess(res, {
         totalPages: 1,
         pages: [{
           pageNumber: 1,
@@ -733,35 +753,35 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
         }],
       });
     } else {
-      res.status(400).json({ error: "Unsupported document type" });
+      sendBadRequest(res, "Unsupported document type");
     }
   } catch (error: unknown) {
     logger.error({ err: error }, "Error generating tender email page thumbnails");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate thumbnails" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to generate thumbnails");
   }
 });
 
 router.post("/api/tender-inbox/check-emails", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!companyId) return sendBadRequest(res, "Company context required");
 
     const [settings] = await db.select().from(tenderInboxSettings)
       .where(and(eq(tenderInboxSettings.companyId, companyId), eq(tenderInboxSettings.isEnabled, true)))
       .limit(1);
 
     if (!settings || !settings.inboundEmailAddress) {
-      return res.status(400).json({ error: "Tender email inbox not configured. Set up inbox settings first." });
+      return sendBadRequest(res, "Tender email inbox not configured. Set up inbox settings first.");
     }
 
     const { scheduler } = await import("../lib/background-scheduler");
     const isRunning = scheduler.isJobRunning("tender-email-poll");
     if (isRunning) {
-      return res.json({ triggered: true, message: "Tender email check is already running in the background" });
+      return sendSuccess(res, { triggered: true, message: "Tender email check is already running in the background" });
     }
 
     const triggered = await scheduler.triggerNow("tender-email-poll");
-    res.json({
+    sendSuccess(res, {
       triggered,
       message: triggered
         ? "Tender email check started in background. New emails will appear shortly."
@@ -769,7 +789,7 @@ router.post("/api/tender-inbox/check-emails", requireAuth, async (req: Request, 
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "[Tender Inbox] Error triggering email check");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to check emails" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to check emails");
   }
 });
 
@@ -788,12 +808,12 @@ router.get("/api/tender-inbox/background-status", requireAuth, async (req: Reque
         companyId ? eq(tenderInboundEmails.companyId, companyId) : sql`true`
       ));
 
-    res.json({
+    sendSuccess(res, {
       emailPoll: jobStatus["tender-email-poll"] || { running: false },
       pendingProcessing: receivedCount?.count || 0,
     });
   } catch (error: unknown) {
-    res.status(500).json({ error: "Failed to get background status" });
+    sendServerError(res, "Failed to get background status");
   }
 });
 

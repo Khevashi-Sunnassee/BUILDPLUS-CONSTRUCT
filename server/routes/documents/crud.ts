@@ -9,6 +9,7 @@ import { ObjectNotFoundError } from "../../replit_integrations/object_storage";
 import logger from "../../lib/logger";
 import { chunkText } from "../../services/kb-chunking.service";
 import { generateEmbeddingsBatch } from "../../services/kb-embedding.service";
+import { sendSuccess, sendCreated, sendBadRequest, sendNotFound, sendForbidden, sendServerError, sendError } from "../../lib/api-response";
 import {
   objectStorageService,
   upload,
@@ -57,10 +58,10 @@ router.get("/api/documents", requireAuth, async (req, res) => {
       allowedJobIds,
     });
     
-    res.json(result);
+    sendSuccess(res, result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching documents");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch documents" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch documents");
   }
 });
 
@@ -68,34 +69,34 @@ router.get("/api/documents/next-number", requireAuth, async (req, res) => {
   try {
     const { typeId } = req.query;
     if (!typeId) {
-      return res.status(400).json({ error: "typeId is required" });
+      return sendBadRequest(res, "typeId is required");
     }
     const nextNumber = await storage.getNextDocumentNumber(String(typeId));
-    res.json({ documentNumber: nextNumber });
+    sendSuccess(res, { documentNumber: nextNumber });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error getting next document number");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get next document number" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to get next document number");
   }
 });
 
 router.get("/api/documents/:id", requireAuth, async (req, res) => {
   try {
     const document = await storage.getDocument(String(req.params.id));
-    if (!document) return res.status(404).json({ error: "Document not found" });
-    res.json(document);
+    if (!document) return sendNotFound(res, "Document not found");
+    sendSuccess(res, document);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch document");
   }
 });
 
 router.get("/api/documents/:id/versions", requireAuth, async (req, res) => {
   try {
     const versions = await storage.getDocumentVersionHistory(String(req.params.id));
-    res.json(versions);
+    sendSuccess(res, versions);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document versions");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document versions" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch document versions");
   }
 });
 
@@ -103,12 +104,12 @@ router.post("/api/documents/check-duplicates", requireAuth, async (req: Request,
   try {
     const { documentNumbers } = req.body;
     if (!documentNumbers || !Array.isArray(documentNumbers) || documentNumbers.length === 0) {
-      return res.status(400).json({ error: "documentNumbers array is required" });
+      return sendBadRequest(res, "documentNumbers array is required");
     }
 
     const companyId = req.companyId;
     if (!companyId) {
-      return res.status(400).json({ error: "Company context required" });
+      return sendBadRequest(res, "Company context required");
     }
 
     const duplicates: Record<string, { id: string; title: string; version: string; revision: string; documentNumber: string; status: string; isLatestVersion: boolean }[]> = {};
@@ -150,23 +151,23 @@ router.post("/api/documents/check-duplicates", requireAuth, async (req: Request,
       }
     }
 
-    res.json({ duplicates });
+    sendSuccess(res, { duplicates });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error checking document duplicates");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to check duplicates" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to check duplicates");
   }
 });
 
 router.post("/api/documents/upload", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: "No file provided" });
+      return sendBadRequest(res, "No file provided");
     }
 
     const { title, description, typeId, disciplineId, categoryId, documentTypeStatusId, jobId, panelId, supplierId, purchaseOrderId, taskId, tags, isConfidential, documentNumber: manualDocNumber, revision: manualRevision, supersedeDocumentId } = req.body;
 
     if (!title) {
-      return res.status(400).json({ error: "Title is required" });
+      return sendBadRequest(res, "Title is required");
     }
 
     const uploadURL = await objectStorageService.getObjectEntityUploadURL();
@@ -200,16 +201,16 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
 
     const companyId = req.companyId;
     if (!companyId) {
-      return res.status(400).json({ error: "Company context required" });
+      return sendBadRequest(res, "Company context required");
     }
 
     if (supersedeDocumentId) {
       const parentDoc = await storage.getDocument(supersedeDocumentId);
       if (!parentDoc) {
-        return res.status(404).json({ error: "Document to supersede not found" });
+        return sendNotFound(res, "Document to supersede not found");
       }
       if (parentDoc.companyId !== companyId) {
-        return res.status(403).json({ error: "Access denied" });
+        return sendForbidden(res);
       }
 
       const currentVersion = parseFloat(parentDoc.version || "1.0");
@@ -246,7 +247,7 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
         isLatestVersion: true,
       });
 
-      return res.json({
+      return sendSuccess(res, {
         ...newDocument,
         affectedTenders: affectedTenders.length > 0 ? affectedTenders : undefined,
         supersededDocumentId: supersedeDocumentId,
@@ -283,10 +284,10 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
       isLatestVersion: true,
     });
 
-    res.json(document);
+    sendSuccess(res, document);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading document");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload document" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to upload document");
   }
 });
 
@@ -296,11 +297,11 @@ router.post("/api/documents/:id/new-version", requireAuth, upload.single("file")
     const parentDoc = await storage.getDocument(parentId);
     
     if (!parentDoc) {
-      return res.status(404).json({ error: "Parent document not found" });
+      return sendNotFound(res, "Parent document not found");
     }
 
     if (!req.file) {
-      return res.status(400).json({ error: "No file provided" });
+      return sendBadRequest(res, "No file provided");
     }
 
     const { changeSummary, version, revision } = req.body;
@@ -333,7 +334,7 @@ router.post("/api/documents/:id/new-version", requireAuth, upload.single("file")
 
     const companyId = req.companyId;
     if (!companyId) {
-      return res.status(400).json({ error: "Company context required" });
+      return sendBadRequest(res, "Company context required");
     }
 
     const affectedTenders = await findAffectedOpenTenders(parentId, companyId);
@@ -367,14 +368,14 @@ router.post("/api/documents/:id/new-version", requireAuth, upload.single("file")
       isLatestVersion: true,
     });
 
-    res.json({
+    sendSuccess(res, {
       ...newDocument,
       affectedTenders: affectedTenders.length > 0 ? affectedTenders : undefined,
       supersededDocumentId: parentId,
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating new document version");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create new version" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to create new version");
   }
 });
 
@@ -382,17 +383,17 @@ router.get("/api/documents/:id/view", requireAuth, async (req: Request, res: Res
   try {
     const document = await storage.getDocument(String(req.params.id));
     if (!document) {
-      return res.status(404).json({ error: "Document not found" });
+      return sendNotFound(res, "Document not found");
     }
 
     const objectFile = await objectStorageService.getObjectEntityFile(document.storageKey);
     await objectStorageService.downloadObject(objectFile, res);
   } catch (error: unknown) {
     if (error instanceof ObjectNotFoundError) {
-      return res.status(404).json({ error: "File not found in storage" });
+      return sendNotFound(res, "File not found in storage");
     }
     logger.error({ err: error }, "Error viewing document");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to view document" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to view document");
   }
 });
 
@@ -412,12 +413,12 @@ router.get("/api/documents/:id/thumbnail", requireAuth, async (req: Request, res
 
     const document = await storage.getDocument(docId);
     if (!document) {
-      return res.status(404).json({ error: "Document not found" });
+      return sendNotFound(res, "Document not found");
     }
 
     const mimeType = (document.mimeType || "").toLowerCase();
     if (!mimeType.startsWith("image/")) {
-      return res.status(415).json({ error: "Thumbnails only available for image files" });
+      return sendError(res, 415, "Thumbnails only available for image files");
     }
 
     const objectFile = await objectStorageService.getObjectEntityFile(document.storageKey);
@@ -428,7 +429,7 @@ router.get("/api/documents/:id/thumbnail", requireAuth, async (req: Request, res
     stream.on("error", (err) => {
       logger.error({ err }, "Error streaming for thumbnail");
       if (!res.headersSent) {
-        res.status(500).json({ error: "Error generating thumbnail" });
+        sendServerError(res, "Error generating thumbnail");
       }
     });
     stream.on("end", async () => {
@@ -456,17 +457,17 @@ router.get("/api/documents/:id/thumbnail", requireAuth, async (req: Request, res
       } catch (sharpErr) {
         logger.error({ err: sharpErr }, "Error resizing image for thumbnail");
         if (!res.headersSent) {
-          res.status(500).json({ error: "Error generating thumbnail" });
+          sendServerError(res, "Error generating thumbnail");
         }
       }
     });
   } catch (error: unknown) {
     if (error instanceof ObjectNotFoundError) {
-      return res.status(404).json({ error: "File not found in storage" });
+      return sendNotFound(res, "File not found in storage");
     }
     logger.error({ err: error }, "Error generating thumbnail");
     if (!res.headersSent) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate thumbnail" });
+      sendServerError(res, error instanceof Error ? error.message : "Failed to generate thumbnail");
     }
   }
 });
@@ -475,7 +476,7 @@ router.get("/api/documents/:id/download", requireAuth, async (req: Request, res:
   try {
     const document = await storage.getDocument(String(req.params.id));
     if (!document) {
-      return res.status(404).json({ error: "Document not found" });
+      return sendNotFound(res, "Document not found");
     }
 
     const objectFile = await objectStorageService.getObjectEntityFile(document.storageKey);
@@ -490,10 +491,10 @@ router.get("/api/documents/:id/download", requireAuth, async (req: Request, res:
     stream.pipe(res);
   } catch (error: unknown) {
     if (error instanceof ObjectNotFoundError) {
-      return res.status(404).json({ error: "File not found in storage" });
+      return sendNotFound(res, "File not found in storage");
     }
     logger.error({ err: error }, "Error downloading document");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to download document" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to download document");
   }
 });
 
@@ -501,14 +502,14 @@ router.patch("/api/documents/:id", requireAuth, async (req, res) => {
   try {
     const parsed = insertDocumentSchema.partial().safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+      return sendBadRequest(res, "Validation failed");
     }
     const document = await storage.updateDocument(String(req.params.id), parsed.data);
-    if (!document) return res.status(404).json({ error: "Document not found" });
-    res.json(document);
+    if (!document) return sendNotFound(res, "Document not found");
+    sendSuccess(res, document);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to update document");
   }
 });
 
@@ -523,11 +524,11 @@ router.patch("/api/documents/:id/status", requireRole("ADMIN", "MANAGER"), async
     }
     
     const document = await storage.updateDocument(String(req.params.id), updateData);
-    if (!document) return res.status(404).json({ error: "Document not found" });
-    res.json(document);
+    if (!document) return sendNotFound(res, "Document not found");
+    sendSuccess(res, document);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document status");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document status" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to update document status");
   }
 });
 
@@ -537,19 +538,19 @@ router.post("/api/documents/:id/add-to-kb", requireAuth, async (req, res) => {
     const userId = req.session.userId!;
     const { projectId } = req.body;
 
-    if (!projectId) return res.status(400).json({ error: "Knowledge Base project is required" });
+    if (!projectId) return sendBadRequest(res, "Knowledge Base project is required");
 
     const [project] = await db.select()
       .from(kbProjects)
       .where(and(eq(kbProjects.id, String(projectId)), eq(kbProjects.companyId, companyId)))
       .limit(1);
 
-    if (!project) return res.status(404).json({ error: "Knowledge Base project not found" });
+    if (!project) return sendNotFound(res, "Knowledge Base project not found");
 
     const doc = await storage.getDocument(String(req.params.id));
-    if (!doc) return res.status(404).json({ error: "Document not found" });
-    if (doc.companyId !== companyId) return res.status(403).json({ error: "Access denied" });
-    if (doc.kbDocumentId) return res.status(400).json({ error: "Document is already in the Knowledge Base" });
+    if (!doc) return sendNotFound(res, "Document not found");
+    if (doc.companyId !== companyId) return sendForbidden(res);
+    if (doc.kbDocumentId) return sendBadRequest(res, "Document is already in the Knowledge Base");
 
     let rawText = "";
     const mime = (doc.mimeType || "").toLowerCase();
@@ -594,14 +595,14 @@ router.post("/api/documents/:id/add-to-kb", requireAuth, async (req, res) => {
       .set({ kbDocumentId: kbDoc.id, updatedAt: new Date() })
       .where(eq(documents.id, String(req.params.id)));
 
-    res.status(201).json({ kbDocumentId: kbDoc.id, status: "PROCESSING" });
+    sendCreated(res, { kbDocumentId: kbDoc.id, status: "PROCESSING" });
 
     processKbDocumentAsync(kbDoc.id, rawText, doc.title, companyId, project.id).catch(err => {
       logger.error({ err, docId: doc.id, kbDocId: kbDoc.id }, "[KB] Background processing failed for document register doc");
     });
   } catch (error) {
     logger.error({ err: error }, "Error adding document to Knowledge Base");
-    res.status(500).json({ error: "Failed to add document to Knowledge Base" });
+    sendServerError(res, "Failed to add document to Knowledge Base");
   }
 });
 
@@ -659,9 +660,9 @@ router.post("/api/documents/:id/remove-from-kb", requireAuth, async (req, res) =
   try {
     const companyId = req.companyId as string;
     const doc = await storage.getDocument(String(req.params.id));
-    if (!doc) return res.status(404).json({ error: "Document not found" });
-    if (doc.companyId !== companyId) return res.status(403).json({ error: "Access denied" });
-    if (!doc.kbDocumentId) return res.status(400).json({ error: "Document is not in the Knowledge Base" });
+    if (!doc) return sendNotFound(res, "Document not found");
+    if (doc.companyId !== companyId) return sendForbidden(res);
+    if (!doc.kbDocumentId) return sendBadRequest(res, "Document is not in the Knowledge Base");
 
     await db.delete(kbDocuments)
       .where(and(eq(kbDocuments.id, doc.kbDocumentId), eq(kbDocuments.companyId, companyId)));
@@ -670,20 +671,20 @@ router.post("/api/documents/:id/remove-from-kb", requireAuth, async (req, res) =
       .set({ kbDocumentId: null, updatedAt: new Date() })
       .where(eq(documents.id, String(req.params.id)));
 
-    res.json({ success: true });
+    sendSuccess(res, { success: true });
   } catch (error) {
     logger.error({ err: error }, "Error removing document from Knowledge Base");
-    res.status(500).json({ error: "Failed to remove from Knowledge Base" });
+    sendServerError(res, "Failed to remove from Knowledge Base");
   }
 });
 
 router.delete("/api/documents/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
     await storage.deleteDocument(String(req.params.id));
-    res.json({ success: true });
+    sendSuccess(res, { success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete document" });
+    sendServerError(res, error instanceof Error ? error.message : "Failed to delete document");
   }
 });
 
