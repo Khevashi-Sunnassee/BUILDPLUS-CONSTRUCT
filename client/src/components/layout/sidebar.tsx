@@ -152,7 +152,6 @@ const adminNavItems = [
   { title: "Document Config", url: "/admin/document-config", icon: FileText },
   { title: "Checklist Templates", url: "/admin/checklist-templates", icon: ClipboardList },
   { title: "Items", url: "/admin/items", icon: Package },
-  { title: "Users", url: "/admin/users", icon: Users },
   { title: "Job Types & Workflows", url: "/admin/job-types", icon: Workflow },
   { title: "Cost Codes", url: "/admin/cost-codes", icon: Hash },
   { title: "Email Templates", url: "/admin/email-templates", icon: MailPlus },
@@ -163,6 +162,7 @@ const superAdminNavItems = [
 ];
 
 const contactsNavItems = [
+  { title: "Users", url: "/admin/users", icon: Users },
   { title: "Customers", url: "/admin/customers", icon: Handshake },
   { title: "Suppliers", url: "/admin/suppliers", icon: Building2 },
   { title: "Employees", url: "/admin/employees", icon: UserCheck },
