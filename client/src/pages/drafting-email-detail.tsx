@@ -21,7 +21,8 @@ import {
   ArrowLeft, FileText, CheckCircle2, Clock, Pencil,
   ZoomIn, ZoomOut, ChevronLeft, ChevronRight,
   Loader2, LinkIcon, RefreshCw, Mail, Eye, Trash2, Archive,
-  Code, Type, ExternalLink, Download, Sparkles, Copy, Ban
+  Code, Type, ExternalLink, Download, Sparkles, Copy, Ban,
+  PanelRightClose, PanelRightOpen
 } from "lucide-react";
 
 interface DraftingEmailDetail {
@@ -1196,6 +1197,7 @@ export default function DraftingEmailDetailPage() {
   useDocumentTitle("Drafting Email Detail");
 
   const [mobileTab, setMobileTab] = useState<"email" | "details">("email");
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
   const { data: email, isLoading } = useQuery<DraftingEmailDetail>({
     queryKey: [DRAFTING_INBOX_ROUTES.BY_ID(emailId || "")],
@@ -1496,13 +1498,24 @@ export default function DraftingEmailDetailPage() {
         </button>
       </div>
 
-      <div className="hidden md:flex flex-1 overflow-hidden">
-        <div className="w-[55%] border-r overflow-hidden">
+      <div className="hidden md:flex flex-1 overflow-hidden relative">
+        <div className={`${rightPanelCollapsed ? "w-full" : "w-[55%]"} border-r overflow-hidden transition-all duration-200`}>
           {leftPanel}
         </div>
-        <div className="w-[45%] overflow-hidden flex flex-col">
-          {detailsPanel}
-        </div>
+        {!rightPanelCollapsed && (
+          <div className="w-[45%] overflow-hidden flex flex-col transition-all duration-200">
+            {detailsPanel}
+          </div>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-2 right-2 z-10 h-7 w-7 bg-background/80 backdrop-blur-sm border shadow-sm"
+          onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+          data-testid="btn-toggle-details-panel"
+        >
+          {rightPanelCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
+        </Button>
       </div>
 
       <div className="flex md:hidden flex-1 overflow-hidden flex-col">
