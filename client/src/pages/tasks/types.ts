@@ -21,12 +21,15 @@ export interface TaskAssignee {
   user: User;
 }
 
+export type TaskTypeFilter = "all" | "personal" | "activity" | "email";
+
 export interface Task {
   id: string;
   groupId: string;
   parentId: string | null;
   jobId: string | null;
   jobActivityId: string | null;
+  draftingEmailId: string | null;
   title: string;
   status: TaskStatus;
   dueDate: string | null;

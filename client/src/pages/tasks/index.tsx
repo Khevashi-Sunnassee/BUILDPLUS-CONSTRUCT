@@ -34,13 +34,14 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   Workflow,
+  ListFilter,
 } from "lucide-react";
 import { Link } from "wouter";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { TaskGroupComponent } from "./TaskGroupComponent";
 import { TaskSidebar } from "./TaskSidebar";
 import { SendTasksEmailDialog } from "./SendTasksEmailDialog";
-import type { Task, TaskGroup, User, Job } from "./types";
+import type { Task, TaskGroup, User, Job, TaskTypeFilter } from "./types";
 import { STATUS_CONFIG } from "./types";
 
 export default function TasksPage() {
@@ -50,6 +51,7 @@ export default function TasksPage() {
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupJobId, setNewGroupJobId] = useState<string | null>(null);
+  const [taskTypeFilter, setTaskTypeFilter] = useState<TaskTypeFilter>("all");
   const [jobFilter, setJobFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showCompleted, setShowCompleted] = useState(false);
@@ -135,6 +137,11 @@ export default function TasksPage() {
     ...group,
     tasks: group.tasks.filter((task) => {
       if (!showCompleted && task.status === "DONE") return false;
+      if (taskTypeFilter !== "all") {
+        if (taskTypeFilter === "personal" && (task.jobActivityId || task.draftingEmailId)) return false;
+        if (taskTypeFilter === "activity" && !task.jobActivityId) return false;
+        if (taskTypeFilter === "email" && !task.draftingEmailId) return false;
+      }
       if (jobFilter !== "all") {
         if (jobFilter === "none" && task.jobId) return false;
         if (jobFilter !== "none" && task.jobId !== jobFilter) return false;
@@ -297,14 +304,19 @@ export default function TasksPage() {
       pdf.setTextColor(31, 41, 55);
       pdf.text(format(new Date(), "dd/MM/yyyy"), pageWidth - margin - 50, margin + 10);
 
+      const filterLabels: string[] = [];
+      if (taskTypeFilter !== "all") {
+        const typeLabels: Record<string, string> = { personal: "Personal Tasks", activity: "Job Programme Activity Tasks", email: "Email Actions" };
+        filterLabels.push(typeLabels[taskTypeFilter] || taskTypeFilter);
+      }
       if (jobFilter !== "all") {
-        const filterLabel = jobFilter === "none"
-          ? "No Job Assigned"
-          : jobs.find(j => j.id === jobFilter)?.name || "";
+        filterLabels.push(jobFilter === "none" ? "No Job Assigned" : (jobs.find(j => j.id === jobFilter)?.name || ""));
+      }
+      if (filterLabels.length > 0) {
         pdf.setFontSize(9);
         pdf.setFont("helvetica", "normal");
         pdf.setTextColor(107, 114, 128);
-        pdf.text(`Filter: ${filterLabel}`, pageWidth - margin - 50, margin + 16);
+        pdf.text(`Filter: ${filterLabels.join(" | ")}`, pageWidth - margin - 50, margin + 16);
       }
 
       pdf.setDrawColor(229, 231, 235);
@@ -667,6 +679,20 @@ export default function TasksPage() {
           <p className="text-muted-foreground">Manage your team's work and track progress</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <ListFilter className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <Select value={taskTypeFilter} onValueChange={(v) => setTaskTypeFilter(v as TaskTypeFilter)}>
+              <SelectTrigger className="w-[180px]" data-testid="select-task-type-filter">
+                <SelectValue placeholder="Task Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Tasks</SelectItem>
+                <SelectItem value="personal">Personal Tasks</SelectItem>
+                <SelectItem value="activity">Job Programme Activity Tasks</SelectItem>
+                <SelectItem value="email">Email Actions</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex items-center gap-2">
             <Briefcase className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             <Select value={jobFilter} onValueChange={setJobFilter}>
