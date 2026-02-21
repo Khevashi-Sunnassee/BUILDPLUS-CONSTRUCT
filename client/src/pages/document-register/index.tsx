@@ -15,6 +15,7 @@ import {
   Layers,
   Mail,
   Files,
+  File,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { useAuth } from "@/lib/auth";
 import { ShieldAlert } from "lucide-react";
@@ -427,18 +434,29 @@ export default function DocumentRegister() {
             <QrCode className="h-4 w-4 mr-2" />
             Create Bundle{selectedDocIds.size > 0 ? ` (${selectedDocIds.size})` : ""}
           </Button>
-          <Button variant="outline" onClick={() => setIsDrawingPackageOpen(true)} data-testid="button-drawing-package">
-            <Layers className="h-4 w-4 mr-2" />
-            Drawing Package
-          </Button>
-          <Button variant="outline" onClick={() => setIsBulkUploadOpen(true)} data-testid="button-bulk-upload">
-            <Files className="h-4 w-4 mr-2" />
-            Add Multiple
-          </Button>
-          <Button onClick={() => setIsUploadOpen(true)} data-testid="button-upload-document">
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Document
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button data-testid="button-upload-document">
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Document
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setIsUploadOpen(true)} data-testid="menu-single-document">
+                <File className="h-4 w-4 mr-2" />
+                Single Document
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsBulkUploadOpen(true)} data-testid="menu-multiple-pages">
+                <Files className="h-4 w-4 mr-2" />
+                Multiple Single Pages
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsDrawingPackageOpen(true)} data-testid="menu-drawing-package">
+                <Layers className="h-4 w-4 mr-2" />
+                Drawing Package
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
