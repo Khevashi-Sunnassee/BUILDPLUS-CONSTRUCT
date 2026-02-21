@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -61,6 +62,7 @@ const companySchema = z.object({
   name: z.string().min(1, "Company name is required"),
   code: z.string().min(1, "Company code is required").max(10, "Code must be 10 characters or less"),
   isActive: z.boolean().default(true),
+  cloneDefaultsFromCompanyId: z.string().optional(),
 });
 
 type CompanyFormData = z.infer<typeof companySchema>;
@@ -82,16 +84,30 @@ export default function AdminCompaniesPage({ embedded = false }: { embedded?: bo
       name: "",
       code: "",
       isActive: true,
+      cloneDefaultsFromCompanyId: "",
     },
   });
 
   const createCompanyMutation = useMutation({
     mutationFn: async (data: CompanyFormData) => {
-      return apiRequest("POST", ADMIN_ROUTES.COMPANIES, data);
+      const payload = {
+        ...data,
+        cloneDefaultsFromCompanyId: data.cloneDefaultsFromCompanyId && data.cloneDefaultsFromCompanyId !== "none"
+          ? data.cloneDefaultsFromCompanyId : undefined,
+      };
+      const res = await apiRequest("POST", ADMIN_ROUTES.COMPANIES, payload);
+      return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (result: any) => {
       queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.COMPANIES] });
-      toast({ title: "Company created successfully" });
+      const cloneInfo = result?.cloneResult;
+      if (cloneInfo) {
+        const counts = cloneInfo.clonedCounts || {};
+        const total = Object.values(counts).reduce((s: number, v: any) => s + (v || 0), 0);
+        toast({ title: `Company created and ${total} default records cloned` });
+      } else {
+        toast({ title: "Company created successfully" });
+      }
       setDialogOpen(false);
       form.reset();
     },
@@ -137,6 +153,7 @@ export default function AdminCompaniesPage({ embedded = false }: { embedded?: bo
       name: "",
       code: "",
       isActive: true,
+      cloneDefaultsFromCompanyId: "",
     });
     setDialogOpen(true);
   };
@@ -147,6 +164,7 @@ export default function AdminCompaniesPage({ embedded = false }: { embedded?: bo
       name: company.name,
       code: company.code,
       isActive: company.isActive,
+      cloneDefaultsFromCompanyId: "",
     });
     setDialogOpen(true);
   };
@@ -330,6 +348,34 @@ export default function AdminCompaniesPage({ embedded = false }: { embedded?: bo
                   </FormItem>
                 )}
               />
+              {!editingCompany && (
+                <FormField
+                  control={form.control}
+                  name="cloneDefaultsFromCompanyId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Clone System Defaults From</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-clone-defaults">
+                            <SelectValue placeholder="Select a company to clone defaults from (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No defaults (empty company)</SelectItem>
+                          {companies?.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.name} ({c.code})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground">
+                        Clone document types, cost codes, job types, and other configuration from an existing company
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <DialogFooter>
                 <Button 
                   type="submit" 

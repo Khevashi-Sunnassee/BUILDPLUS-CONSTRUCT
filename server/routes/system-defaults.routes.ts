@@ -9,6 +9,7 @@ import {
   emailTemplates,
   itemCategories, items,
   scopeTrades, scopes, scopeItems,
+  costCodes, childCostCodes,
 } from "@shared/schema";
 import logger from "../lib/logger";
 
@@ -30,6 +31,8 @@ const SYSTEM_DEFAULT_TABLES: Record<string, {
   items: { table: items, nameField: "name", label: "Items" },
   scopeTrades: { table: scopeTrades, nameField: "name", label: "Scope Trades" },
   scopes: { table: scopes, nameField: "name", label: "Scopes of Works" },
+  costCodes: { table: costCodes, nameField: "name", label: "Cost Codes (Parent)" },
+  childCostCodes: { table: childCostCodes, nameField: "name", label: "Cost Codes (Child)" },
 };
 
 router.get("/api/super-admin/system-defaults/tables", requireSuperAdmin, async (_req, res) => {
@@ -367,6 +370,62 @@ export async function cloneSystemDefaultsToCompany(sourceCompanyId: string, targ
         }
       } else {
         skippedCounts.scopes++;
+      }
+    }
+
+    const costCodeDefaults = await tx.select().from(costCodes)
+      .where(and(eq(costCodes.companyId, sourceCompanyId), eq(costCodes.isSystemDefault, true)));
+    clonedCounts.costCodes = 0;
+    skippedCounts.costCodes = 0;
+    for (const cc of costCodeDefaults) {
+      const { id: oldId, companyId: _, createdAt: _ca, updatedAt: _u, ...data } = cc;
+      const [existing] = await tx.select().from(costCodes)
+        .where(and(eq(costCodes.companyId, targetCompanyId), eq(costCodes.code, cc.code)))
+        .limit(1);
+      if (existing) {
+        idMapping[`costCode:${oldId}`] = existing.id;
+        skippedCounts.costCodes++;
+      } else {
+        const [newCc] = await tx.insert(costCodes).values({
+          ...data, companyId: targetCompanyId, parentId: null,
+        }).returning();
+        idMapping[`costCode:${oldId}`] = newCc.id;
+        clonedCounts.costCodes++;
+      }
+    }
+    for (const cc of costCodeDefaults) {
+      if (cc.parentId && idMapping[`costCode:${cc.parentId}`]) {
+        const newId = idMapping[`costCode:${cc.id}`];
+        const mappedParentId = idMapping[`costCode:${cc.parentId}`];
+        if (newId && mappedParentId) {
+          await tx.update(costCodes).set({ parentId: mappedParentId })
+            .where(eq(costCodes.id, newId));
+        }
+      }
+    }
+
+    clonedCounts.childCostCodes = 0;
+    skippedCounts.childCostCodes = 0;
+    for (const cc of costCodeDefaults) {
+      const oldId = cc.id;
+      const mappedParentId = idMapping[`costCode:${oldId}`];
+      if (!mappedParentId) continue;
+
+      const children = await tx.select().from(childCostCodes)
+        .where(and(eq(childCostCodes.parentCostCodeId, oldId), eq(childCostCodes.isSystemDefault, true)));
+      for (const child of children) {
+        const { id: _cid, companyId: _cc, parentCostCodeId: _pcid, createdAt: _cca, updatedAt: _cu, ...cData } = child;
+        const [existingChild] = await tx.select().from(childCostCodes)
+          .where(and(eq(childCostCodes.companyId, targetCompanyId), eq(childCostCodes.code, child.code)))
+          .limit(1);
+        if (existingChild) {
+          skippedCounts.childCostCodes++;
+        } else {
+          await tx.insert(childCostCodes).values({
+            ...cData, companyId: targetCompanyId, parentCostCodeId: mappedParentId,
+          });
+          clonedCounts.childCostCodes++;
+        }
       }
     }
 

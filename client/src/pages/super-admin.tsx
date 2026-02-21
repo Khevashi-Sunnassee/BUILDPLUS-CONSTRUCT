@@ -102,6 +102,8 @@ const TABLE_NAME_FIELDS: Record<string, string> = {
   items: "name",
   scopeTrades: "name",
   scopes: "name",
+  costCodes: "name",
+  childCostCodes: "name",
 };
 
 function SystemDefaultsManager({ companyId, companies }: { companyId: string; companies: Company[] }) {
