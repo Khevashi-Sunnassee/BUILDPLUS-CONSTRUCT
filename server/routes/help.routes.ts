@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import { requireAuth, requireRole, requireSuperAdmin } from "./middleware/auth.middleware";
 import { db } from "../db";
 import { helpEntries, helpEntryVersions, helpFeedback } from "@shared/schema";
 import { eq, and, or, ilike, sql, desc, asc } from "drizzle-orm";
@@ -149,7 +149,7 @@ router.post("/api/help/feedback", requireAuth, async (req: Request, res: Respons
   }
 });
 
-router.get("/api/help/admin/list", requireAuth, requireRole("ADMIN"), async (_req: Request, res: Response) => {
+router.get("/api/help/admin/list", requireAuth, requireSuperAdmin, async (_req: Request, res: Response) => {
   try {
     const all = await db
       .select()
@@ -162,7 +162,7 @@ router.get("/api/help/admin/list", requireAuth, requireRole("ADMIN"), async (_re
   }
 });
 
-router.post("/api/help/admin", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.post("/api/help/admin", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const result = helpAdminSchema.safeParse(req.body);
     if (!result.success) {
@@ -201,7 +201,7 @@ router.post("/api/help/admin", requireAuth, requireRole("ADMIN"), async (req: Re
   }
 });
 
-router.put("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.put("/api/help/admin/:id", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
     const [existing] = await db.select().from(helpEntries).where(eq(helpEntries.id, id));
@@ -249,7 +249,7 @@ router.put("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req:
   }
 });
 
-router.delete("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.delete("/api/help/admin/:id", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
     const [updated] = await db
@@ -266,7 +266,7 @@ router.delete("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (r
   }
 });
 
-router.get("/api/help/admin/:id/versions", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.get("/api/help/admin/:id/versions", requireAuth, requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
     const versions = await db

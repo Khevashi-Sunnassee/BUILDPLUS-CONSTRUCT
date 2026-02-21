@@ -120,6 +120,7 @@ export const users = pgTable("users", {
   role: roleEnum("role").default("USER").notNull(),
   userType: userTypeEnum("user_type").default("EMPLOYEE").notNull(),
   departmentId: varchar("department_id", { length: 36 }).references(() => departments.id),
+  isSuperAdmin: boolean("is_super_admin").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   poApprover: boolean("po_approver").default(false),
   poApprovalLimit: decimal("po_approval_limit", { precision: 12, scale: 2 }),
@@ -2584,7 +2585,7 @@ export type ReoScheduleWithDetails = ReoSchedule & {
 };
 
 // Safe user type (excludes sensitive data like passwordHash)
-export type SafeUser = Pick<User, 'id' | 'email' | 'name' | 'role'>;
+export type SafeUser = Pick<User, 'id' | 'email' | 'name' | 'role' | 'isSuperAdmin'>;
 
 // Extended types with relations
 export type DocumentWithDetails = Document & {

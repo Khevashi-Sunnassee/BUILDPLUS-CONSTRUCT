@@ -4,7 +4,7 @@ import { eq, and, ne, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { companies } from "@shared/schema";
 import { storage } from "../storage";
-import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import { requireAuth, requireRole, requireSuperAdmin } from "./middleware/auth.middleware";
 
 const router = Router();
 
@@ -54,7 +54,7 @@ async function validateInboxEmailUniqueness(
   return null;
 }
 
-router.get("/api/admin/companies", requireRole("ADMIN"), async (req, res) => {
+router.get("/api/admin/companies", requireSuperAdmin, async (req, res) => {
   try {
     const allCompanies = await storage.getAllCompanies();
     res.json(allCompanies);
@@ -63,7 +63,7 @@ router.get("/api/admin/companies", requireRole("ADMIN"), async (req, res) => {
   }
 });
 
-router.get("/api/admin/companies/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.get("/api/admin/companies/:id", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const companyId = req.params.id as string;
     const company = await storage.getCompany(companyId);
@@ -76,7 +76,7 @@ router.get("/api/admin/companies/:id", requireRole("ADMIN"), async (req: Request
   }
 });
 
-router.post("/api/admin/companies", requireRole("ADMIN"), async (req, res) => {
+router.post("/api/admin/companies", requireSuperAdmin, async (req, res) => {
   try {
     const result = companySchema.safeParse(req.body);
     if (!result.success) {
@@ -101,7 +101,7 @@ router.post("/api/admin/companies", requireRole("ADMIN"), async (req, res) => {
   }
 });
 
-router.put("/api/admin/companies/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.put("/api/admin/companies/:id", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const companyId = req.params.id as string;
     const result = companySchema.partial().safeParse(req.body);
@@ -126,7 +126,7 @@ router.put("/api/admin/companies/:id", requireRole("ADMIN"), async (req: Request
   }
 });
 
-router.delete("/api/admin/companies/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.delete("/api/admin/companies/:id", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
     const companyId = req.params.id as string;
     if (companyId === "1") {

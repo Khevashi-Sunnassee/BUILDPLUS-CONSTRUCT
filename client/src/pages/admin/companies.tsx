@@ -65,7 +65,7 @@ const companySchema = z.object({
 
 type CompanyFormData = z.infer<typeof companySchema>;
 
-export default function AdminCompaniesPage() {
+export default function AdminCompaniesPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
@@ -170,19 +170,29 @@ export default function AdminCompaniesPage() {
 
   return (
     <div className="space-y-6" role="main" aria-label="Companies Management">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-companies-title">Company Management</h1>
-            <PageHelpButton pageHelpKey="page.admin.companies" />
+      {!embedded && (
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-companies-title">Company Management</h1>
+              <PageHelpButton pageHelpKey="page.admin.companies" />
+            </div>
+            <p className="text-muted-foreground">Manage companies in the system</p>
           </div>
-          <p className="text-muted-foreground">Manage companies in the system</p>
+          <Button onClick={openCreateDialog} data-testid="button-create-company">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Company
+          </Button>
         </div>
-        <Button onClick={openCreateDialog} data-testid="button-create-company">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Company
-        </Button>
-      </div>
+      )}
+      {embedded && (
+        <div className="flex items-center justify-end">
+          <Button onClick={openCreateDialog} data-testid="button-create-company">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Company
+          </Button>
+        </div>
+      )}
 
       <Card>
         <CardHeader>

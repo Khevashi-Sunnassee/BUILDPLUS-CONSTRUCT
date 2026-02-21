@@ -74,7 +74,7 @@ router.post("/switch-company", requireAuth, async (req, res) => {
     const { companyId } = req.body;
     if (!companyId) return res.status(400).json({ error: "companyId is required" });
     const currentUser = await storage.getUser(req.session.userId!);
-    if (!currentUser || currentUser.role !== "ADMIN") {
+    if (!currentUser || (currentUser.role !== "ADMIN" && !currentUser.isSuperAdmin)) {
       return res.status(403).json({ error: "Only admins can switch companies" });
     }
     const targetCompany = await storage.getCompany(companyId);

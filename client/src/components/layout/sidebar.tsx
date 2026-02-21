@@ -148,7 +148,6 @@ const managerNavItems = [
 
 const adminNavItems = [
   { title: "Settings", url: "/admin/settings", icon: Settings },
-  { title: "Companies", url: "/admin/companies", icon: Building2 },
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
   { title: "Document Config", url: "/admin/document-config", icon: FileText },
   { title: "Checklist Templates", url: "/admin/checklist-templates", icon: ClipboardList },
@@ -160,8 +159,11 @@ const adminNavItems = [
   { title: "Job Types & Workflows", url: "/admin/job-types", icon: Workflow },
   { title: "Cost Codes", url: "/admin/cost-codes", icon: Hash },
   { title: "Data Management", url: "/admin/data-management", icon: Database },
-  { title: "Help Management", url: "/admin/help", icon: BookOpen },
   { title: "Email Templates", url: "/admin/email-templates", icon: MailPlus },
+];
+
+const superAdminNavItems = [
+  { title: "Super Admin", url: "/super-admin", icon: Shield },
 ];
 
 const contactsNavItems = [
@@ -625,6 +627,32 @@ export function AppSidebar() {
             </SidebarGroup>
           </Collapsible>
         )}
+
+        {user?.isSuperAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground px-2 py-1">
+              Platform
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {superAdminNavItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive(item.url)}
+                      className="transition-colors"
+                    >
+                      <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-3">
@@ -641,7 +669,7 @@ export function AppSidebar() {
                   {user?.name || user?.email}
                 </span>
                 <span className="text-xs text-muted-foreground capitalize">
-                  {user?.role?.toLowerCase()}
+                  {user?.isSuperAdmin ? "super admin" : user?.role?.toLowerCase()}
                 </span>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />

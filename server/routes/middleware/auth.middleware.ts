@@ -41,6 +41,18 @@ export const requireRole = (...roles: string[]) => {
   };
 };
 
+export const requireSuperAdmin = async (req: Request, res: Response, next: NextFunction) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  const user = await storage.getUser(req.session.userId);
+  if (!user || !user.isSuperAdmin) {
+    return res.status(403).json({ error: "Forbidden: Super Admin access required" });
+  }
+  req.companyId = req.session.companyId;
+  next();
+};
+
 export const requireCompanyContext = (req: Request, res: Response, next: NextFunction) => {
   if (!req.session.companyId) {
     return res.status(403).json({ error: "Company context required" });

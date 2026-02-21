@@ -90,6 +90,7 @@ const DocumentRegisterPage = lazyWithRetry(() => import("@/pages/document-regist
 const PublicBundlePage = lazyWithRetry(() => import("@/pages/public-bundle"));
 const AdminDocumentConfigPage = lazyWithRetry(() => import("@/pages/admin/document-config"));
 const AdminCompaniesPage = lazyWithRetry(() => import("@/pages/admin/companies"));
+const SuperAdminPage = lazyWithRetry(() => import("@/pages/super-admin"));
 const AdminChecklistTemplatesPage = lazyWithRetry(() => import("@/pages/admin/checklist-templates"));
 const AdminEmailTemplatesPage = lazyWithRetry(() => import("@/pages/admin/email-templates"));
 const MailRegisterPage = lazyWithRetry(() => import("@/pages/mail-register"));
@@ -170,7 +171,7 @@ const PmCallLogFormPage = lazyWithRetry(() => import("@/pages/pm-call-log-form")
 const PmCallLogDetailPage = lazyWithRetry(() => import("@/pages/pm-call-log-detail"));
 const KnowledgeBasePage = lazyWithRetry(() => import("@/pages/knowledge-base"));
 
-function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
+function ProtectedRoute({ children, requiredRole, requireSuperAdmin }: { children: React.ReactNode; requiredRole?: string[]; requireSuperAdmin?: boolean }) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
@@ -183,6 +184,10 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode;
 
   if (!user) {
     return <Redirect to="/login" />;
+  }
+
+  if (requireSuperAdmin && !user.isSuperAdmin) {
+    return <Redirect to="/dashboard" />;
   }
 
   if (requiredRole && !requiredRole.includes(user.role)) {
@@ -760,12 +765,16 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      <Route path="/admin/companies">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+      <Route path="/super-admin">
+        <ProtectedRoute requireSuperAdmin>
           <AuthenticatedLayout>
-            <AdminCompaniesPage />
+            <SuperAdminPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/companies">
+        <Redirect to="/super-admin" />
       </Route>
 
       <Route path="/admin/zones">
@@ -1018,11 +1027,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/help">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
-          <AuthenticatedLayout>
-            <AdminHelpPage />
-          </AuthenticatedLayout>
-        </ProtectedRoute>
+        <Redirect to="/super-admin" />
       </Route>
 
       <Route path="/knowledge-base">

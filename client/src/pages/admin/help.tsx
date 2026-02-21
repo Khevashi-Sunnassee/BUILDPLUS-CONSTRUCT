@@ -38,7 +38,7 @@ const emptyForm: FormData = {
   keywords: "", category: "", pageRoute: "", status: "PUBLISHED", rank: 0,
 };
 
-export default function AdminHelpPage() {
+export default function AdminHelpPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [editEntry, setEditEntry] = useState<HelpEntry | null>(null);
   const [formData, setFormData] = useState<FormData>(emptyForm);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -162,18 +162,28 @@ export default function AdminHelpPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-4" role="main" aria-label="Help Management" aria-busy={isLoading}>
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-6 w-6 text-muted-foreground" />
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-admin-help-title">Help Management</h1>
-          <PageHelpButton pageHelpKey="page.admin.help" />
+    <div className={`${embedded ? '' : 'max-w-6xl mx-auto'} space-y-4`} role="main" aria-label="Help Management" aria-busy={isLoading}>
+      {!embedded && (
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-6 w-6 text-muted-foreground" />
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-admin-help-title">Help Management</h1>
+            <PageHelpButton pageHelpKey="page.admin.help" />
+          </div>
+          <Button onClick={openCreate} data-testid="button-create-help">
+            <Plus className="h-4 w-4 mr-1.5" />
+            New Entry
+          </Button>
         </div>
-        <Button onClick={openCreate} data-testid="button-create-help">
-          <Plus className="h-4 w-4 mr-1.5" />
-          New Entry
-        </Button>
-      </div>
+      )}
+      {embedded && (
+        <div className="flex items-center justify-end">
+          <Button onClick={openCreate} data-testid="button-create-help">
+            <Plus className="h-4 w-4 mr-1.5" />
+            New Entry
+          </Button>
+        </div>
+      )}
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
