@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useCtrlScrollZoom } from "@/hooks/use-ctrl-scroll-zoom";
 import { dateInputProps } from "@/lib/validation";
 import { DRAFTING_INBOX_ROUTES } from "@shared/api-routes";
 import { useRoute, useLocation } from "wouter";
@@ -241,6 +242,9 @@ function DocumentsPanel({ email }: { email: DraftingEmailDetail }) {
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
+  const pdfContainerRef = useRef<HTMLDivElement>(null);
+
+  useCtrlScrollZoom({ containerRef: pdfContainerRef, zoom, setZoom, minZoom: 0.5, maxZoom: 5, step: 0.25 });
 
   const docs = email.documents || [];
   const selectedDoc = selectedDocId ? docs.find(d => d.id === selectedDocId) : null;
@@ -303,7 +307,7 @@ function DocumentsPanel({ email }: { email: DraftingEmailDetail }) {
               </Button>
             </div>
           </div>
-          <div className="p-2 overflow-auto max-h-[400px]">
+          <div ref={pdfContainerRef} className="p-2 overflow-auto max-h-[400px]">
             {thumbnailsLoading ? (
               <div className="flex items-center justify-center h-32">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
