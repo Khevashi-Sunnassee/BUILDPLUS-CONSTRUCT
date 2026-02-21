@@ -38,6 +38,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 export default function MobileLogisticsPage() {
   const { data: loadLists = [], isLoading } = useQuery<LoadList[]>({
     queryKey: [LOGISTICS_ROUTES.LOAD_LISTS],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const pendingLoads = loadLists.filter(l => l.status === "PENDING");
