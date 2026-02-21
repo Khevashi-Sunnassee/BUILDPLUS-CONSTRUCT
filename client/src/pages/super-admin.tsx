@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Building2, BookOpen, Shield, Database, Monitor, Settings2, Star, StarOff, Loader2, Check } from "lucide-react";
+import { Building2, BookOpen, Shield, Database, Monitor, Settings2, Star, StarOff, Loader2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -158,10 +158,11 @@ function SystemDefaultsManager({ companyId, companies }: { companyId: string; co
 
   const cloneMutation = useMutation({
     mutationFn: async ({ targetCompanyId }: { targetCompanyId: string }) => {
-      return apiRequest("POST", "/api/super-admin/system-defaults/clone-to-company", {
+      const res = await apiRequest("POST", "/api/super-admin/system-defaults/clone-to-company", {
         sourceCompanyId: companyId,
         targetCompanyId,
       });
+      return await res.json();
     },
     onSuccess: (data: any) => {
       const counts = data.clonedCounts || {};
