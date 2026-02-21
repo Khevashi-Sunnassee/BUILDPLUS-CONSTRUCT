@@ -84,6 +84,7 @@ import type { PermissionLevel } from "@shared/schema";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronUp, Eye, EyeOff, Pencil, X } from "lucide-react";
+import UserPermissionsPage from "./user-permissions";
 
 const INVITE_FUNCTION_LABELS: Record<string, string> = {
   tasks: "Tasks",
@@ -587,6 +588,10 @@ export default function AdminUsersPage() {
               <Badge variant="secondary" className="ml-1.5">{invitations.filter(i => i.status === "PENDING").length}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="permissions" data-testid="tab-permissions">
+            <Shield className="h-4 w-4 mr-1.5" />
+            Permissions
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -824,6 +829,10 @@ export default function AdminUsersPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="permissions" className="space-y-4">
+          <UserPermissionsPage embedded={true} />
         </TabsContent>
       </Tabs>
 

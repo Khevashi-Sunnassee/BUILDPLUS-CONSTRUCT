@@ -56,7 +56,6 @@ const AdminUsersPage = lazyWithRetry(() => import("@/pages/admin/users"));
 const AdminJobsPage = lazyWithRetry(() => import("@/pages/admin/jobs"));
 const AdminPanelsPage = lazyWithRetry(() => import("@/pages/admin/panels"));
 const AdminPanelTypesPage = lazyWithRetry(() => import("@/pages/admin/panel-types"));
-const AdminUserPermissionsPage = lazyWithRetry(() => import("@/pages/admin/user-permissions"));
 const AdminZonesPage = lazyWithRetry(() => import("@/pages/admin/zones"));
 const AdminCustomersPage = lazyWithRetry(() => import("@/pages/admin/customers"));
 const AdminSuppliersPage = lazyWithRetry(() => import("@/pages/admin/suppliers"));
@@ -99,7 +98,6 @@ const AssetDetailPage = lazyWithRetry(() => import("@/pages/admin/asset-detail")
 const AssetRepairFormPage = lazyWithRetry(() => import("@/pages/admin/asset-repair-form"));
 const TemplateEditorPage = lazyWithRetry(() => import("@/pages/admin/template-editor"));
 const DataManagementPage = lazyWithRetry(() => import("@/pages/admin/data-management"));
-const AdminItemCategoriesPage = lazyWithRetry(() => import("@/pages/admin/item-categories"));
 const ChecklistsPage = lazyWithRetry(() => import("@/pages/checklists"));
 const ChecklistFillPage = lazyWithRetry(() => import("@/pages/checklist-fill"));
 const ChecklistReportsPage = lazyWithRetry(() => import("@/pages/checklist-reports"));
@@ -758,11 +756,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/user-permissions">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
-          <AuthenticatedLayout>
-            <AdminUserPermissionsPage />
-          </AuthenticatedLayout>
-        </ProtectedRoute>
+        <Redirect to="/admin/users" />
       </Route>
 
       <Route path="/super-admin">
@@ -883,11 +877,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/item-categories">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
-          <AuthenticatedLayout>
-            <AdminItemCategoriesPage />
-          </AuthenticatedLayout>
-        </ProtectedRoute>
+        <Redirect to="/admin/items" />
       </Route>
 
       <Route path="/admin/checklist-templates">

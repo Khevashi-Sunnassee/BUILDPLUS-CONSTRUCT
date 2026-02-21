@@ -154,8 +154,6 @@ const adminNavItems = [
   { title: "Items", url: "/admin/items", icon: Package },
   { title: "Devices", url: "/admin/devices", icon: Monitor },
   { title: "Users", url: "/admin/users", icon: Users },
-  { title: "User Permissions", url: "/admin/user-permissions", icon: Shield },
-  { title: "Item Categories", url: "/admin/item-categories", icon: Tag },
   { title: "Job Types & Workflows", url: "/admin/job-types", icon: Workflow },
   { title: "Cost Codes", url: "/admin/cost-codes", icon: Hash },
   { title: "Data Management", url: "/admin/data-management", icon: Database },

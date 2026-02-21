@@ -735,7 +735,7 @@ function PermissionTypesTab() {
   );
 }
 
-export default function UserPermissionsPage() {
+export default function UserPermissionsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { toast } = useToast();
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [applyTypeUserId, setApplyTypeUserId] = useState<string | null>(null);
@@ -818,22 +818,32 @@ export default function UserPermissionsPage() {
 
   return (
     <div className="space-y-6" role="main" aria-label="User Permissions">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-        <div className="flex items-center gap-3">
-          <Shield className="h-8 w-8 text-primary" />
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold">User Permissions</h1>
-              <PageHelpButton pageHelpKey="page.admin.user-permissions" />
+      {!embedded && (
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <Shield className="h-8 w-8 text-primary" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold">User Permissions</h1>
+                <PageHelpButton pageHelpKey="page.admin.user-permissions" />
+              </div>
+              <p className="text-muted-foreground">Control access to functions for each user</p>
             </div>
-            <p className="text-muted-foreground">Control access to functions for each user</p>
           </div>
+          <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-permissions">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
-        <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-permissions">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
+      )}
+      {embedded && (
+        <div className="flex items-center justify-end">
+          <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-permissions">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+      )}
 
       <Card className="mb-6">
         <CardHeader className="pb-3">
