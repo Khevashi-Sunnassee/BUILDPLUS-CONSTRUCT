@@ -29,7 +29,7 @@ The system employs a client-server architecture. The frontend is a React applica
 - **Advanced Features:** Panel consolidation, contract retention tracking, visual document comparison, Asset Register, Employee Licences & Tickets management, Hire Booking Engine, Capital Expenditure (CAPEX) module, AI-powered Scope of Works Builder, and a four-phase Budget System with Bill of Quantities (BOQ).
 - **Project Activities / Workflow System:** Template-driven activity workflow system with nested tasks, statuses, comments, and MS Project-style dependencies.
 - **Email Systems:** Centralized email inbox configurations, AP Email Inbox Monitoring for automatic invoice processing, Drafting Email Inbox for AI-powered change request identification, and a rich text Email Template System with audit logging.
-- **Review Mode (Super Admin):** Dual-AI code review system with auto-discovery, sanitization, architecture context versioning, side-by-side comparison, diff view, and merged task pack generation.
+- **Review Mode (Super Admin):** Agent-driven page quality scoreboard with auto-discovery of 121+ pages, 8-dimension scoring (functionality, UI/UX, security, performance, code quality, data integrity, error handling, accessibility), audit history tracking, review queue management (unreviewed/needs-work/reviewed), and persistent score storage. The agent performs full-codebase reviews directly rather than through API-limited AI calls, recording scores via the review_audits table.
 
 **System Design Choices:**
 - **Multi-Tenancy:** Designed for multi-company deployment with strict data isolation.

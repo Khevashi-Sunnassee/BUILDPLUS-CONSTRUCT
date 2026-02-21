@@ -201,7 +201,7 @@ router.post("/api/super-admin/review-mode/contexts", requireSuperAdmin, async (r
 
 router.post("/api/super-admin/review-mode/contexts/:id/activate", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
-    await reviewModeMethods.activateContextVersion(req.params.id);
+    await reviewModeMethods.activateContextVersion(req.params.id as string);
     res.json({ ok: true });
   } catch (error: any) {
     logger.error({ error: error.message }, "Failed to activate context version");
@@ -359,7 +359,7 @@ router.get("/api/super-admin/review-mode/packets", requireSuperAdmin, async (_re
 
 router.get("/api/super-admin/review-mode/packets/:id", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
-    const packet = await reviewModeMethods.getPacket(req.params.id);
+    const packet = await reviewModeMethods.getPacket(req.params.id as string);
     if (!packet) return res.status(404).json({ error: "Packet not found" });
 
     const runs = await reviewModeMethods.getRunsForPacket(packet.id);
@@ -435,7 +435,7 @@ router.post("/api/super-admin/review-mode/runs", requireSuperAdmin, async (req: 
 
 router.get("/api/super-admin/review-mode/runs/:id", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
-    const run = await reviewModeMethods.getRun(req.params.id);
+    const run = await reviewModeMethods.getRun(req.params.id as string);
     if (!run) return res.status(404).json({ error: "Run not found" });
     res.json(run);
   } catch (error: any) {
@@ -480,7 +480,7 @@ router.post("/api/super-admin/review-mode/taskpacks/merge", requireSuperAdmin, a
 
 router.post("/api/super-admin/review-mode/packets/:id/score", requireSuperAdmin, async (req: Request, res: Response) => {
   try {
-    const packetId = req.params.id;
+    const packetId = req.params.id as string;
     const packet = await reviewModeMethods.getPacket(packetId);
     if (!packet) return res.status(404).json({ error: "Packet not found" });
 
@@ -537,6 +537,119 @@ router.get("/api/super-admin/review-mode/taskpacks", requireSuperAdmin, async (r
     res.json(taskpacks);
   } catch (error: any) {
     res.status(500).json({ error: "Failed to fetch taskpacks" });
+  }
+});
+
+const createAuditSchema = z.object({
+  targetId: z.string().min(1),
+  overallScore: z.number().min(1).max(5),
+  scoreBreakdown: z.object({
+    functionality: z.number().min(1).max(5),
+    uiUx: z.number().min(1).max(5),
+    security: z.number().min(1).max(5),
+    performance: z.number().min(1).max(5),
+    codeQuality: z.number().min(1).max(5),
+    dataIntegrity: z.number().min(1).max(5),
+    errorHandling: z.number().min(1).max(5),
+    accessibility: z.number().min(1).max(5),
+  }),
+  findingsMd: z.string().optional(),
+  fixesAppliedMd: z.string().optional(),
+  issuesFound: z.number().min(0).optional().default(0),
+  issuesFixed: z.number().min(0).optional().default(0),
+  status: z.enum(["REVIEWED", "FIXES_APPLIED", "RE_REVIEW_NEEDED"]).optional().default("REVIEWED"),
+});
+
+router.post("/api/super-admin/review-mode/audits", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const parsed = createAuditSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+
+    const target = await reviewModeMethods.getTarget(parsed.data.targetId);
+    if (!target) return res.status(404).json({ error: "Target not found" });
+
+    const audit = await reviewModeMethods.createAudit({
+      targetId: parsed.data.targetId,
+      overallScore: parsed.data.overallScore,
+      scoreBreakdown: parsed.data.scoreBreakdown,
+      findingsMd: parsed.data.findingsMd || null,
+      fixesAppliedMd: parsed.data.fixesAppliedMd || null,
+      issuesFound: parsed.data.issuesFound,
+      issuesFixed: parsed.data.issuesFixed,
+      status: parsed.data.status,
+    });
+
+    await reviewModeMethods.updateTarget(parsed.data.targetId, {
+      latestScore: parsed.data.overallScore,
+      latestScoreBreakdown: parsed.data.scoreBreakdown,
+      lastReviewedAt: new Date(),
+    });
+
+    res.json(audit);
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to create audit");
+    res.status(500).json({ error: "Failed to create audit" });
+  }
+});
+
+router.get("/api/super-admin/review-mode/audits", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const targetId = req.query.targetId as string | undefined;
+    if (targetId) {
+      const audits = await reviewModeMethods.getAuditsForTarget(targetId);
+      res.json(audits);
+    } else {
+      const audits = await reviewModeMethods.getAllAudits();
+      res.json(audits);
+    }
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to fetch audits");
+    res.status(500).json({ error: "Failed to fetch audits" });
+  }
+});
+
+router.patch("/api/super-admin/review-mode/audits/:id", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const updateSchema = z.object({
+      fixesAppliedMd: z.string().optional(),
+      issuesFixed: z.number().min(0).optional(),
+      status: z.enum(["REVIEWED", "FIXES_APPLIED", "RE_REVIEW_NEEDED"]).optional(),
+    });
+    const parsed = updateSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+
+    const audit = await reviewModeMethods.updateAudit(req.params.id as string, parsed.data as any);
+    res.json(audit);
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to update audit");
+    res.status(500).json({ error: "Failed to update audit" });
+  }
+});
+
+router.get("/api/super-admin/review-mode/queue", requireSuperAdmin, async (_req: Request, res: Response) => {
+  try {
+    const targets = await reviewModeMethods.getTargets();
+    const unreviewed = targets.filter(t => !t.lastReviewedAt);
+    const needsWork = targets.filter(t => t.latestScore !== null && t.latestScore < 4).sort((a, b) => (a.latestScore || 0) - (b.latestScore || 0));
+    const reviewed = targets.filter(t => t.latestScore !== null && t.latestScore >= 4).sort((a, b) => (b.latestScore || 0) - (a.latestScore || 0));
+
+    res.json({
+      unreviewed,
+      needsWork,
+      reviewed,
+      stats: {
+        total: targets.length,
+        unreviewedCount: unreviewed.length,
+        needsWorkCount: needsWork.length,
+        reviewedCount: reviewed.length,
+        avgScore: targets.filter(t => t.latestScore).length > 0
+          ? Math.round(targets.filter(t => t.latestScore).reduce((sum, t) => sum + (t.latestScore || 0), 0) / targets.filter(t => t.latestScore).length * 10) / 10
+          : null,
+      },
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to fetch review queue");
+    res.status(500).json({ error: "Failed to fetch review queue" });
   }
 });
 

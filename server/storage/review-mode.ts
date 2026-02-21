@@ -1,16 +1,18 @@
 import { db } from "../db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, isNull, isNotNull, asc } from "drizzle-orm";
 import {
   reviewContextVersions,
   reviewTargets,
   reviewPackets,
   reviewRuns,
   reviewTaskpacks,
+  reviewAudits,
   type InsertReviewContextVersion,
   type InsertReviewTarget,
   type InsertReviewPacket,
   type InsertReviewRun,
   type InsertReviewTaskpack,
+  type InsertReviewAudit,
 } from "@shared/schema";
 
 export const reviewModeMethods = {
@@ -99,5 +101,39 @@ export const reviewModeMethods = {
   async createTaskpack(data: InsertReviewTaskpack) {
     const [result] = await db.insert(reviewTaskpacks).values(data).returning();
     return result;
+  },
+
+  async createAudit(data: InsertReviewAudit) {
+    const [result] = await db.insert(reviewAudits).values(data).returning();
+    return result;
+  },
+
+  async getAuditsForTarget(targetId: string) {
+    return db.select().from(reviewAudits).where(eq(reviewAudits.targetId, targetId)).orderBy(desc(reviewAudits.reviewedAt)).limit(50);
+  },
+
+  async getLatestAuditForTarget(targetId: string) {
+    const [audit] = await db.select().from(reviewAudits).where(eq(reviewAudits.targetId, targetId)).orderBy(desc(reviewAudits.reviewedAt)).limit(1);
+    return audit ?? null;
+  },
+
+  async getAllAudits() {
+    return db.select().from(reviewAudits).orderBy(desc(reviewAudits.reviewedAt)).limit(500);
+  },
+
+  async updateAudit(id: string, data: Partial<InsertReviewAudit>) {
+    const [result] = await db.update(reviewAudits).set(data).where(eq(reviewAudits.id, id)).returning();
+    return result;
+  },
+
+  async getUnreviewedTargets() {
+    return db.select().from(reviewTargets).where(isNull(reviewTargets.lastReviewedAt)).orderBy(asc(reviewTargets.pageTitle)).limit(200);
+  },
+
+  async getLowestScoredTargets(limit = 20) {
+    return db.select().from(reviewTargets)
+      .where(isNotNull(reviewTargets.latestScore))
+      .orderBy(asc(reviewTargets.latestScore))
+      .limit(limit);
   },
 };

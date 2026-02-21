@@ -5788,3 +5788,26 @@ export const reviewTaskpacks = pgTable("review_taskpacks", {
 export const insertReviewTaskpackSchema = createInsertSchema(reviewTaskpacks).omit({ id: true, createdAt: true });
 export type InsertReviewTaskpack = z.infer<typeof insertReviewTaskpackSchema>;
 export type ReviewTaskpack = typeof reviewTaskpacks.$inferSelect;
+
+export const reviewAuditStatusEnum = pgEnum("review_audit_status", ["REVIEWED", "FIXES_APPLIED", "RE_REVIEW_NEEDED"]);
+
+export const reviewAudits = pgTable("review_audits", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  targetId: text("target_id").notNull().references(() => reviewTargets.id, { onDelete: "cascade" }),
+  overallScore: integer("overall_score").notNull(),
+  scoreBreakdown: jsonb("score_breakdown").notNull(),
+  findingsMd: text("findings_md"),
+  fixesAppliedMd: text("fixes_applied_md"),
+  issuesFound: integer("issues_found").notNull().default(0),
+  issuesFixed: integer("issues_fixed").notNull().default(0),
+  status: reviewAuditStatusEnum("status").notNull().default("REVIEWED"),
+  reviewedAt: timestamp("reviewed_at").defaultNow().notNull(),
+}, (table) => ({
+  targetIdIdx: index("review_audits_target_id_idx").on(table.targetId),
+  statusIdx: index("review_audits_status_idx").on(table.status),
+  reviewedAtIdx: index("review_audits_reviewed_at_idx").on(table.reviewedAt),
+}));
+
+export const insertReviewAuditSchema = createInsertSchema(reviewAudits).omit({ id: true, reviewedAt: true });
+export type InsertReviewAudit = z.infer<typeof insertReviewAuditSchema>;
+export type ReviewAudit = typeof reviewAudits.$inferSelect;
