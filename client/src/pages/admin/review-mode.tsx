@@ -101,7 +101,7 @@ function SeverityBadge({ severity }: { severity: string }) {
     P3: "bg-blue-500 text-white",
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${colors[severity] || "bg-gray-500 text-white"}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${colors[severity] || "bg-gray-500 text-white"}`} data-testid={`badge-severity-${severity}`}>
       {severity}
     </span>
   );
@@ -383,7 +383,7 @@ function NewReviewWizard({ onComplete }: { onComplete: () => void }) {
                     {createTargetMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
                     Create Target
                   </Button>
-                  <Button variant="ghost" onClick={() => setCreateNewTarget(false)}>Cancel</Button>
+                  <Button variant="ghost" onClick={() => setCreateNewTarget(false)} data-testid="button-cancel-target">Cancel</Button>
                 </div>
               </div>
             )}

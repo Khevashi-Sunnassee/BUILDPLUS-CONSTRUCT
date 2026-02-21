@@ -1,5 +1,6 @@
 import { simpleParser } from "mailparser";
 import OpenAI from "openai";
+import logger from "../lib/logger";
 
 export interface ParsedEmail {
   subject: string;
@@ -39,7 +40,7 @@ export async function summarizeEmailBody(body: string, maxWords: number = 80): P
     if (result) return result;
     return body.split(/\s+/).slice(0, maxWords).join(" ") + "...";
   } catch (error) {
-    console.error("Email summarization failed:", error instanceof Error ? error.message : error);
+    logger.error({ err: error }, "Email summarization failed");
     return body.split(/\s+/).slice(0, maxWords).join(" ") + "...";
   }
 }

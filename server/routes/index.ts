@@ -65,7 +65,7 @@ import { apInboxRouter } from "./ap-inbox.routes";
 import { tenderInboxRouter } from "./tender-inbox.routes";
 import { draftingInboxRouter } from "./drafting-inbox.routes";
 import { emailTemplatesRouter } from "./email-templates.routes";
-import { knowledgeBaseRouter } from "./knowledge-base.routes";
+import { knowledgeBaseRouter } from "./knowledge-base";
 import { mailRegisterRouter } from "./mail-register.routes";
 import { companyEmailInboxesRouter } from "./company-email-inboxes.routes";
 import { systemDefaultsRouter } from "./system-defaults.routes";

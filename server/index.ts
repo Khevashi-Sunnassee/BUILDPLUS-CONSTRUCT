@@ -108,6 +108,26 @@ const kbChatLimiter = rateLimit({
   keyGenerator: sessionKeyGenerator,
 });
 
+const aiHeavyLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many AI requests, please wait before trying again" },
+  validate: { xForwardedForHeader: false, ip: false, default: false },
+  keyGenerator: sessionKeyGenerator,
+});
+
+const reportExportLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many report/export requests, please try again shortly" },
+  validate: { xForwardedForHeader: false, ip: false, default: false },
+  keyGenerator: sessionKeyGenerator,
+});
+
 app.use('/api', (req: Request, res: Response, next: NextFunction) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.set('Pragma', 'no-cache');
@@ -199,6 +219,15 @@ app.use("/api/purchase-orders/:id/attachments", uploadLimiter);
 app.use("/api/chat/:conversationId/files", uploadLimiter);
 app.use("/api/procurement/items/import", uploadLimiter);
 app.use("/api/kb/conversations/:id/messages", kbChatLimiter);
+app.use("/api/super-admin/review-mode/runs", aiHeavyLimiter);
+app.use("/api/kb/documents/:id/process", aiHeavyLimiter);
+app.use("/api/documents/:id/ai-extract", aiHeavyLimiter);
+app.use("/api/scopes/:id/ai-generate", aiHeavyLimiter);
+app.use("/api/visual-diff", aiHeavyLimiter);
+app.use("/api/reports", reportExportLimiter);
+app.use("/api/cost-analysis", reportExportLimiter);
+app.use("/api/production-analytics", reportExportLimiter);
+app.use("/api/weekly-reports/:id/export", reportExportLimiter);
 app.use("/api/", apiLimiter);
 
 app.use("/api/", (req, res, next) => {
