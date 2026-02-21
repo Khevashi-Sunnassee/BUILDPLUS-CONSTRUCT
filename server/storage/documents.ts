@@ -371,13 +371,8 @@ export const documentMethods = {
     const [type] = await db.select().from(documentTypesConfig).where(eq(documentTypesConfig.id, typeId));
     const prefix = type?.prefix || "DOC";
     const year = new Date().getFullYear();
-    
-    const [countResult] = await db.select({ count: sql<number>`count(*)` })
-      .from(documents)
-      .where(sql`${documents.documentNumber} LIKE ${`${prefix}-${year}-%`}`);
-    
-    const count = Number(countResult?.count || 0) + 1;
-    return `${prefix}-${year}-${String(count).padStart(3, '0')}`;
+    const { getNextSequenceNumber } = await import("../lib/sequence-generator");
+    return getNextSequenceNumber("document", `${typeId}_${year}`, `${prefix}-${year}-`, 3);
   },
 
   async getDocumentVersionHistory(documentId: string): Promise<Document[]> {
@@ -412,17 +407,19 @@ export const documentMethods = {
   },
 
   async createNewVersion(parentDocumentId: string, data: InsertDocument): Promise<Document> {
-    await db.update(documents)
-      .set({ isLatestVersion: false, status: "SUPERSEDED", updatedAt: new Date() })
-      .where(eq(documents.id, parentDocumentId));
+    return await db.transaction(async (tx) => {
+      await tx.update(documents)
+        .set({ isLatestVersion: false, status: "SUPERSEDED", updatedAt: new Date() })
+        .where(eq(documents.id, parentDocumentId));
 
-    const [result] = await db.insert(documents).values({
-      ...data,
-      parentDocumentId,
-      isLatestVersion: true,
-    }).returning();
+      const [result] = await tx.insert(documents).values({
+        ...data,
+        parentDocumentId,
+        isLatestVersion: true,
+      }).returning();
 
-    return result;
+      return result;
+    });
   },
 
   async getAllDocumentBundles(companyId?: string): Promise<DocumentBundleWithItems[]> {

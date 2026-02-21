@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, sql, inArray } from "drizzle-orm";
 import { db } from "../db";
 import {
   dailyLogs, logRows, jobs, users, weeklyWageReports,
@@ -23,9 +23,15 @@ async function enrichWeeklyJobReport(report: WeeklyJobReport): Promise<WeeklyJob
     .where(eq(weeklyJobReportSchedules.reportId, report.id))
     .orderBy(asc(weeklyJobReportSchedules.priority));
   
-  const schedulesWithJobs = await Promise.all(schedules.map(async (schedule) => {
-    const [job] = await db.select().from(jobs).where(eq(jobs.id, schedule.jobId));
-    return { ...schedule, job };
+  const scheduleJobIds = [...new Set(schedules.map(s => s.jobId))];
+  const jobMap = new Map<string, typeof jobs.$inferSelect>();
+  if (scheduleJobIds.length > 0) {
+    const jobRows = await db.select().from(jobs).where(inArray(jobs.id, scheduleJobIds));
+    for (const j of jobRows) jobMap.set(j.id, j);
+  }
+  const schedulesWithJobs = schedules.map(schedule => ({
+    ...schedule,
+    job: jobMap.get(schedule.jobId) || null,
   }));
 
   return { ...report, projectManager, approvedBy, schedules: schedulesWithJobs };
@@ -60,18 +66,27 @@ export const reportMethods = {
     const approvedLogs = await db.select().from(dailyLogs).where(and(eq(dailyLogs.userId, userId), eq(dailyLogs.status, "APPROVED")));
 
     const recentLogs = await db.select().from(dailyLogs).where(eq(dailyLogs.userId, userId)).orderBy(desc(dailyLogs.logDay)).limit(5);
-    const recentLogsWithTotal = [];
-    for (const log of recentLogs) {
-      const rows = await db.select().from(logRows).where(eq(logRows.dailyLogId, log.id));
+    const recentLogIds = recentLogs.map(l => l.id);
+    const allRecentRows = recentLogIds.length > 0
+      ? await db.select().from(logRows).where(inArray(logRows.dailyLogId, recentLogIds))
+      : [];
+    const recentRowsByLogId = new Map<string, typeof allRecentRows>();
+    for (const row of allRecentRows) {
+      const existing = recentRowsByLogId.get(row.dailyLogId) || [];
+      existing.push(row);
+      recentRowsByLogId.set(row.dailyLogId, existing);
+    }
+    const recentLogsWithTotal = recentLogs.map(log => {
+      const rows = recentRowsByLogId.get(log.id) || [];
       const totalMinutes = rows.reduce((sum, r) => sum + r.durationMin, 0);
-      recentLogsWithTotal.push({
+      return {
         id: log.id,
         logDay: log.logDay,
         status: log.status,
         totalMinutes,
         app: rows[0]?.app || "revit",
-      });
-    }
+      };
+    });
 
     return {
       todayMinutes,
@@ -373,8 +388,10 @@ export const reportMethods = {
   },
 
   async deleteWeeklyJobReport(id: string): Promise<void> {
-    await db.delete(weeklyJobReportSchedules).where(eq(weeklyJobReportSchedules.reportId, id));
-    await db.delete(weeklyJobReports).where(eq(weeklyJobReports.id, id));
+    await db.transaction(async (tx) => {
+      await tx.delete(weeklyJobReportSchedules).where(eq(weeklyJobReportSchedules.reportId, id));
+      await tx.delete(weeklyJobReports).where(eq(weeklyJobReports.id, id));
+    });
   },
 
   async getJobsForProjectManager(projectManagerId: string): Promise<Job[]> {
@@ -466,11 +483,9 @@ export const reportMethods = {
   },
 
   async getNextEotClaimNumber(jobId: string): Promise<string> {
-    const existing = await db.select().from(eotClaims)
-      .where(eq(eotClaims.jobId, jobId));
-    const count = existing.length + 1;
     const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId));
     const jobNum = job?.jobNumber || "UNK";
-    return `EOT-${jobNum}-${String(count).padStart(3, "0")}`;
+    const { getNextSequenceNumber } = await import("../lib/sequence-generator");
+    return getNextSequenceNumber("eot_claim", jobId, `EOT-${jobNum}-`, 3);
   },
 };

@@ -32,7 +32,7 @@ The system employs a client-server architecture. The frontend is a React applica
 
 **System Design Choices:**
 - **Multi-Tenancy:** Designed for multi-company deployment with strict data isolation.
-- **Scalability:** Supports 300+ simultaneous users with robust error handling and consistent API responses.
+- **Scalability:** Supports 1,000+ simultaneous users with robust error handling, atomic sequence generation, batch query optimization, and consistent API responses.
 - **Security:** Multi-layered security with RBAC (USER/MANAGER/ADMIN roles + Super Admin flag), CSRF protection, CSP headers, input sanitization, and comprehensive validation. Super Admin (`isSuperAdmin` boolean on users) controls platform-wide settings (Companies, Help Management) via `/super-admin` page and `requireSuperAdmin` middleware, distinct from company-level ADMIN role.
 - **Data Integrity:** Enforced through CHECK constraints, unique constraints, foreign keys, and performance indexes; list endpoints use `.limit()` safeguards.
 - **Testing:** Comprehensive five-tier testing system including Frontend Component Tests, Backend API Tests, API Smoke Tests, CRUD Flow E2E Tests, and Load Testing.

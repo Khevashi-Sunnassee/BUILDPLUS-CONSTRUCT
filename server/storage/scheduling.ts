@@ -38,13 +38,34 @@ export const schedulingMethods = {
       ? await query.where(and(...conditions))
       : await query;
     
+    const panelIds = [...new Set(results.map(r => r.draftingProgram.panelId))];
+    const slotIds = [...new Set(results.map(r => r.draftingProgram.productionSlotId).filter((id): id is string => !!id))];
+    const assignedToIds = [...new Set(results.map(r => r.draftingProgram.assignedToId).filter((id): id is string => !!id))];
+
+    const panelMap = new Map<string, typeof panelRegister.$inferSelect>();
+    const slotMap = new Map<string, typeof productionSlots.$inferSelect>();
+    const userMap = new Map<string, typeof users.$inferSelect>();
+
+    if (panelIds.length > 0) {
+      const panelRows = await db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds));
+      for (const p of panelRows) panelMap.set(p.id, p);
+    }
+    if (slotIds.length > 0) {
+      const slotRows = await db.select().from(productionSlots).where(inArray(productionSlots.id, slotIds));
+      for (const s of slotRows) slotMap.set(s.id, s);
+    }
+    if (assignedToIds.length > 0) {
+      const userRows = await db.select().from(users).where(inArray(users.id, assignedToIds));
+      for (const u of userRows) userMap.set(u.id, u);
+    }
+
     const detailedResults: DraftingProgramWithDetails[] = [];
     for (const r of results) {
       const dp = r.draftingProgram;
       const job = r.job;
-      const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, dp.panelId));
-      const slot = dp.productionSlotId ? (await db.select().from(productionSlots).where(eq(productionSlots.id, dp.productionSlotId)))[0] : null;
-      const assignedTo = dp.assignedToId ? (await db.select().from(users).where(eq(users.id, dp.assignedToId)))[0] : null;
+      const panel = panelMap.get(dp.panelId);
+      const slot = dp.productionSlotId ? slotMap.get(dp.productionSlotId) || null : null;
+      const assignedTo = dp.assignedToId ? userMap.get(dp.assignedToId) || null : null;
       
       if (panel) {
         detailedResults.push({ ...dp, panel, job, productionSlot: slot, assignedTo });
@@ -226,6 +247,7 @@ export const schedulingMethods = {
       email: users.email,
       name: users.name,
       role: users.role,
+      isSuperAdmin: users.isSuperAdmin,
     }).from(users).where(eq(users.id, schedule.createdById));
     const items = await db.select().from(reoScheduleItems)
       .where(eq(reoScheduleItems.scheduleId, id))

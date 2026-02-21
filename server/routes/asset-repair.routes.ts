@@ -30,20 +30,9 @@ const updateRepairSchema = createRepairSchema.partial().extend({
 });
 
 async function getNextRepairNumber(companyId: string): Promise<string> {
+  const { getNextSequenceNumber } = await import("../lib/sequence-generator");
   const year = new Date().getFullYear();
-  const prefix = `RPR-${year}-`;
-  const result = await db.select({ repairNumber: assetRepairRequests.repairNumber })
-    .from(assetRepairRequests)
-    .where(and(
-      eq(assetRepairRequests.companyId, companyId),
-      sql`${assetRepairRequests.repairNumber} LIKE ${prefix + '%'}`
-    ))
-    .orderBy(desc(assetRepairRequests.repairNumber))
-    .limit(1);
-
-  if (result.length === 0) return `${prefix}0001`;
-  const lastNum = parseInt(result[0].repairNumber.replace(prefix, ""), 10);
-  return `${prefix}${String(lastNum + 1).padStart(4, "0")}`;
+  return getNextSequenceNumber("asset_repair", `${companyId}_${year}`, `RPR-${year}-`, 4);
 }
 
 router.get("/api/asset-repair-requests/next-number", requireAuth, async (req, res) => {

@@ -18,7 +18,7 @@ export async function prepareDocumentForExtraction(
     };
   }
 
-  const { execSync } = await import("child_process");
+  const { execFileSync } = await import("child_process");
   const fs = await import("fs");
   const os = await import("os");
   const path = await import("path");
@@ -32,7 +32,7 @@ export async function prepareDocumentForExtraction(
 
   try {
     try {
-      extractedText = execSync(`pdftotext -layout "${pdfPath}" -`, { timeout: 15000 }).toString("utf-8").trim();
+      extractedText = execFileSync("pdftotext", ["-layout", pdfPath, "-"], { timeout: 15000 }).toString("utf-8").trim();
       if (extractedText && extractedText.length < 20) {
         extractedText = null;
       }
@@ -42,21 +42,23 @@ export async function prepareDocumentForExtraction(
 
     let pageCount = 1;
     try {
-      const pagesOutput = execSync(`pdfinfo "${pdfPath}" 2>/dev/null | grep "^Pages:" | awk '{print $2}'`, { timeout: 5000 }).toString().trim();
+      const pdfInfoOutput = execFileSync("pdfinfo", [pdfPath], { timeout: 5000 }).toString();
+      const pagesMatch = pdfInfoOutput.match(/^Pages:\s+(\d+)/m);
+      const pagesOutput = pagesMatch ? pagesMatch[1] : "1";
       pageCount = parseInt(pagesOutput) || 1;
     } catch {
       pageCount = 1;
     }
 
     if (extractedText && extractedText.length > 100) {
-      execSync(`pdftoppm -png -r 200 -f 1 -l 1 "${pdfPath}" "${path.join(tmpDir, 'page')}"`, { timeout: 20000 });
+      execFileSync("pdftoppm", ["-png", "-r", "200", "-f", "1", "-l", "1", pdfPath, path.join(tmpDir, "page")], { timeout: 20000 });
 
       if (pageCount > 1) {
-        execSync(`pdftoppm -png -r 200 -f ${pageCount} -l ${pageCount} "${pdfPath}" "${path.join(tmpDir, 'lastpage')}"`, { timeout: 20000 });
+        execFileSync("pdftoppm", ["-png", "-r", "200", "-f", String(pageCount), "-l", String(pageCount), pdfPath, path.join(tmpDir, "lastpage")], { timeout: 20000 });
       }
     } else {
       const maxPages = Math.min(pageCount, 2);
-      execSync(`pdftoppm -png -r 200 -l ${maxPages} "${pdfPath}" "${path.join(tmpDir, 'page')}"`, { timeout: 30000 });
+      execFileSync("pdftoppm", ["-png", "-r", "200", "-l", String(maxPages), pdfPath, path.join(tmpDir, "page")], { timeout: 30000 });
     }
 
     const pageFiles = fs.readdirSync(tmpDir)

@@ -1,0 +1,286 @@
+Act as a senior full-stack engineer and architecture/security auditor. Implement a new **Super Admin** section called **Review Mode** inside the existing BuildPlus AI Management System. This feature must let Super Admins run **two holistic code/architecture opinions** (Replit/Claude + OpenAI) for any selected page/module, using the same “holistic context” (Replit.md + system profile) every time, then store results, show a diff, and generate an actionable task pack for engineers.
+
+========================================================
+1) PURPOSE / OUTCOMES
+========================================================
+Super Admin can:
+1) Select any UI page (desktop/mobile) and generate a structured **Review Packet** that includes frontend + backend + DB footprint (best-effort auto-discovery, plus manual overrides).
+2) Run two independent reviewers:
+   - Reviewer A: REPLIT_CLAUDE (your internal reviewer)
+   - Reviewer B: OPENAI (via existing OpenAI integration)
+   Both must receive the SAME Architecture Context + Review Packet.
+3) View results side-by-side, see a **Diff & Merge** tab, and produce a **Merged Task Pack** (markdown checklist + JSON) with severity, file paths, endpoints, and acceptance criteria.
+4) Keep the “holistic lens” versioned: store and activate **Architecture Context versions** so reviews remain consistent over time.
+
+Hard requirements:
+- SUPER ADMIN only (requireSuperAdmin middleware).
+- Sanitise/redact secrets + PII before sending to models.
+- Do NOT edit node_modules/ or package-lock.json.
+- Prefer incremental refactors; ask before proposing major rewrites.
+
+========================================================
+2) DATABASE (Drizzle + Postgres)
+========================================================
+Create these tables:
+
+A) review_context_versions
+- id (pk)
+- name (text) e.g. "Architecture Context v1"
+- content_md (text)  // full context markdown
+- createdByUserId
+- createdAt
+- isActive (boolean)
+
+B) review_targets
+- id (pk)
+- targetType (enum: DESKTOP_PAGE|MOBILE_PAGE)
+- routePath (text)
+- pageTitle (text)
+- module (text)  // Jobs/Panels/Finance/etc
+- frontendEntryFile (text) // TSX entry file path
+- createdAt
+
+C) review_packets
+- id (pk)
+- targetId (fk)
+- contextVersionId (fk)
+- packet_json (jsonb)
+- packet_md (text)
+- createdByUserId
+- createdAt
+- status (enum: DRAFT|GENERATED|FAILED)
+
+D) review_runs
+- id (pk)
+- packetId (fk)
+- reviewer (enum: REPLIT_CLAUDE|OPENAI)
+- modelName (text)
+- prompt_md (text)
+- response_md (text)
+- response_json (jsonb) // normalized findings schema
+- status (enum: SUCCESS|FAILED)
+- durationMs (int)
+- createdAt
+
+E) review_taskpacks
+- id (pk)
+- packetId (fk)
+- mergedTasks_md (text)
+- mergedTasks_json (jsonb)
+- createdByUserId
+- createdAt
+
+(Optionally persist findings in a table, but response_json + taskpacks is sufficient initially.)
+
+========================================================
+3) ARCHITECTURE CONTEXT (HOLISTIC LENS)
+========================================================
+On migration/seed, create an initial active context version with this EXACT markdown as review_context_versions.content_md:
+
+--- BEGIN CONTEXT ---
+# BuildPlus Architecture Context (v1)
+
+## Source Documents
+- Replit.md (project standards and architecture)
+- BuildPlus System Profile (scale metrics, modules, security, integrations)
+
+## Product Summary
+BuildPlus is an enterprise construction/manufacturing platform focused on panel production + delivery, covering sales/tenders → drafting → production → logistics → finance → communication → knowledge base → admin. Multi-tenant, 300+ concurrent user target, expanding to thousands.
+
+## Stack Summary
+Frontend: React + TypeScript, Vite, Tailwind, shadcn/ui, TanStack Query v5, Wouter, TipTap, React Hook Form + Zod.
+Backend: Express + TypeScript, Drizzle ORM, Postgres (Neon), pgvector for RAG, session-based auth (connect-pg-simple), bcrypt.
+Integrations: OpenAI, Resend, Mailgun, Twilio, MYOB, Replit Object Storage.
+
+## Non-Negotiables (Hard Rules)
+1) Multi-tenancy must be strict: every data access must be scoped to companyId unless explicitly platform-wide (Super Admin only).
+2) RBAC must be enforced on every endpoint: USER/MANAGER/ADMIN plus Super Admin (isSuperAdmin) for platform-wide functions.
+3) CSRF must protect all mutating endpoints using cookies/sessions.
+4) Validate all API inputs with Zod. Reject unknown/unsafe inputs.
+5) No changes to node_modules/ or package-lock.json.
+6) Ask before major changes. Prefer incremental refactors.
+7) Maintain consistent API responses and error schemas.
+8) File storage access must be tenant-safe (no cross-company file reads).
+
+## Architecture Invariants (Must Remain True)
+- Client-server separation (React client + Express API).
+- Sessions stored in Postgres; auth is server-side.
+- Company isolation is guaranteed by query filters and policy checks.
+- Super Admin is separate from company ADMIN and must use requireSuperAdmin middleware and /super-admin routes/pages.
+
+## Review Expectations (What “Good” Looks Like)
+### Backend
+- Thin routes: routes orchestrate; business logic lives in services; DB access in repo layer where possible.
+- Consistent response envelopes, pagination patterns, and error handling.
+- Rate limiting on sensitive endpoints; circuit breakers on external services.
+- Audit logging for critical operations (finance, permissions, panel lifecycle, approvals).
+
+### Frontend
+- Pages should be decomposed into feature components; avoid 2,000+ line pages.
+- TanStack Query keys must be consistent; invalidation should be systematic.
+- Forms must use React Hook Form + Zod; clear errors and loading states.
+- Permission-gated UI must match backend RBAC (defense in depth, not sole protection).
+
+### Performance
+- List endpoints must have .limit() safeguards and server-side pagination.
+- Avoid N+1 queries; use indexes on common filters (companyId, jobId, panelId, createdAt).
+- Cache frequently accessed data appropriately and safely (tenant-aware cache keys).
+
+### Security
+- Tenant leaks are P0.
+- RBAC bypasses are P0.
+- Unsigned webhooks or missing verification is P0.
+- Any object storage path that can be guessed cross-tenant is P0.
+
+### Testing
+System uses five-tier testing: Frontend component tests, backend API tests, API smoke tests, CRUD flow E2E, load testing.
+For changes: add minimal regression tests for risks touched.
+
+## Output Requirements For Review Mode
+- Provide findings across: Security, Multi-tenancy, RBAC, API contracts, Performance, Maintainability, UX, Testing, Observability.
+- For each finding: severity (P0–P3), impacted files/endpoints, suggested fix, acceptance criteria.
+- If recommending a major refactor, propose an incremental plan and request confirmation.
+--- END CONTEXT ---
+
+========================================================
+4) REVIEW PACKET (AUTO-GENERATE + OVERRIDES)
+========================================================
+Create a packet generator that builds packet_json like:
+
+{
+  "target": { routePath, targetType, pageTitle, module, frontendEntryFile, relatedFiles: [] },
+  "ui": { purpose, roles:[], keyUserFlows:[], knownIssues:[], riskFocus:[] },
+  "frontend": {
+    "files":[{path, loc}],
+    "reactQuery": { "queries":[{key,file}], "mutations":[{key,file}] },
+    "forms":[{schemaName,file}],
+    "permissionGuards":[{guard,file}]
+  },
+  "backend": {
+    "endpointsUsed":[{method,path,routeFile,authMiddleware,zodSchema}],
+    "tablesTouched":[],
+    "externalServicesTouched":[]
+  },
+  "notes": { "sanitization":"PII redacted, tokens removed", "generatedAt": ISO }
+}
+
+Best-effort auto-discovery:
+- From frontendEntryFile, collect an import graph depth-limited (2) to populate relatedFiles and files[] + LOC.
+- Heuristically detect useQuery/useMutation usage and extract query keys where possible.
+- Detect API calls by searching for our API client usage patterns (fetch wrapper / api client).
+- Map backend endpoints by searching for endpoint strings used in the frontend or known client helpers.
+- Identify route files and middleware used for those endpoints.
+Provide manual overrides UI to add/remove relatedFiles and endpointsUsed.
+
+========================================================
+5) BACKEND API (Express) – SUPER ADMIN ONLY
+========================================================
+Add server/routes/super-admin/review-mode.routes.ts (or your conventions) with Zod validation on all inputs:
+
+Contexts:
+- GET  /api/super-admin/review-mode/contexts
+- POST /api/super-admin/review-mode/contexts
+- POST /api/super-admin/review-mode/contexts/:id/activate
+
+Targets:
+- GET  /api/super-admin/review-mode/targets
+- POST /api/super-admin/review-mode/targets
+
+Packets:
+- POST /api/super-admin/review-mode/packets/generate
+- GET  /api/super-admin/review-mode/packets/:id
+
+Runs:
+- POST /api/super-admin/review-mode/runs
+  Body: { packetId, reviewer: "REPLIT_CLAUDE"|"OPENAI" }
+  Behavior:
+  1) Load packet + active context
+  2) Sanitize packet (redact PII/secrets)
+  3) Build prompt (template below)
+  4) Call correct model:
+     - REPLIT_CLAUDE: use existing internal Claude path you already use for audits
+     - OPENAI: use existing OpenAI integration
+  5) Parse output into normalized response_json schema and store
+
+Taskpacks:
+- POST /api/super-admin/review-mode/taskpacks/merge
+  Body: { packetId }
+  Behavior: merge both runs into one ordered checklist (P0 first), group by category/module
+- GET  /api/super-admin/review-mode/taskpacks?packetId=...
+
+========================================================
+6) PROMPT TEMPLATE + REQUIRED OUTPUT SCHEMA
+========================================================
+Both reviewers MUST output JSON matching this schema:
+
+{
+  "summary": { "overallHealth":"GOOD|MIXED|RISKY", "topRisks":[], "quickWins":[] },
+  "findings":[
+    {
+      "severity":"P0|P1|P2|P3",
+      "category":"SECURITY|MULTI_TENANCY|RBAC|API_CONTRACTS|PERFORMANCE|MAINTAINABILITY|UX|TESTING|OBSERVABILITY",
+      "title":"...",
+      "detail_md":"...",
+      "impactedFiles":["..."],
+      "impactedEndpoints":["..."],
+      "suggestedFix_md":"...",
+      "acceptanceCriteria_md":"..."
+    }
+  ],
+  "missingEvidence":[],
+  "followUpQuestions":[]
+}
+
+If the model response is not valid JSON or missing categories, re-prompt ONCE with: “Return valid JSON only, include all required categories.”
+
+Prompt content order:
+1) Architecture Context markdown (active context version)
+2) Review Packet JSON (sanitized)
+3) riskFocus flags
+4) Instructions: review across all categories and produce actionable tasks with file paths, endpoints, acceptance criteria; ask before major refactors.
+
+========================================================
+7) SUPER ADMIN UI (React + shadcn/ui + TanStack Query)
+========================================================
+Add menu: Super Admin → Review Mode
+
+Pages:
+A) /super-admin/review-mode
+- list packets + status + createdAt
+- button: New Review
+
+B) /super-admin/review-mode/new
+Step 1: choose existing target OR create target (routePath, title, module, entry file)
+Step 2: choose context version (default active), enter purpose/roles/flows/issues/riskFocus
+Step 3: Generate Packet (shows preview, allow manual overrides)
+Step 4: Run Both Reviews (two buttons or one “Run Both”)
+
+C) /super-admin/review-mode/packets/:id
+Tabs:
+- Packet (json + readable view)
+- Replit/Claude Opinion
+- OpenAI Opinion
+- Diff & Merge (highlight unique findings + disagreements)
+- Task Pack (editable markdown checklist + copy button)
+
+========================================================
+8) SANITIZATION
+========================================================
+Before sending to any model:
+- Redact emails, phone numbers, tokens, API keys, session ids.
+- Replace any sample payload values with placeholders.
+- Never include environment variables.
+Add unit tests for sanitization.
+
+========================================================
+9) ACCEPTANCE CRITERIA
+========================================================
+1) Super Admin can create/activate context versions and the seeded v1 context exists and is active.
+2) Super Admin can create targets and generate a review packet (auto-discovery + manual overrides).
+3) System can run both reviewers and persist results.
+4) Packet detail shows side-by-side results, diff view, and can generate merged task pack.
+5) Task pack includes severity, impacted files/endpoints, suggested fix + acceptance criteria.
+6) No secrets/PII leak; sanitization tested.
+7) No edits to node_modules or package-lock.json.
+
+Implement now following existing folder conventions, Zod validation, RBAC middleware, and TanStack Query patterns.

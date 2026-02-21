@@ -1,4 +1,5 @@
 import { useState } from "react";
+import DOMPurify from 'dompurify';
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MAIL_REGISTER_ROUTES } from "@shared/api-routes";
@@ -386,7 +387,7 @@ export default function MailRegisterPage() {
                   {selectedMail.htmlBody ? (
                     <div
                       className="text-sm prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: selectedMail.htmlBody }}
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedMail.htmlBody || '') }}
                     />
                   ) : (
                     <p className="text-sm text-muted-foreground">No message content</p>

@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, asc } from "drizzle-orm";
+import { eq, and, desc, sql, asc, inArray } from "drizzle-orm";
 import { db } from "../db";
 import {
   customers, suppliers, itemCategories, items, constructionStages,
@@ -398,16 +398,17 @@ export const procurementMethods = {
   },
 
   async deletePurchaseOrder(id: string): Promise<void> {
-    await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, id));
-    await db.delete(purchaseOrders).where(eq(purchaseOrders.id, id));
+    await db.transaction(async (tx) => {
+      await tx.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, id));
+      await tx.delete(purchaseOrders).where(eq(purchaseOrders.id, id));
+    });
   },
 
   async getNextPONumber(companyId?: string): Promise<string> {
-    const [result] = await db.select({ count: sql<number>`count(*)` }).from(purchaseOrders)
-      .where(companyId ? eq(purchaseOrders.companyId, companyId) : undefined);
-    const count = Number(result?.count || 0) + 1;
+    const { getNextSequenceNumber } = await import("../lib/sequence-generator");
     const year = new Date().getFullYear();
-    return `PO-${year}-${String(count).padStart(4, "0")}`;
+    const scope = companyId || "global";
+    return getNextSequenceNumber("purchase_order", `${scope}_${year}`, `PO-${year}-`, 4);
   },
 
   async getPurchaseOrderAttachments(poId: string): Promise<(PurchaseOrderAttachment & { uploadedBy?: Pick<User, 'id' | 'name' | 'email'> | null })[]> {
@@ -415,20 +416,23 @@ export const procurementMethods = {
       .where(eq(purchaseOrderAttachments.purchaseOrderId, poId))
       .orderBy(desc(purchaseOrderAttachments.createdAt));
     
-    const result: (PurchaseOrderAttachment & { uploadedBy?: Pick<User, 'id' | 'name' | 'email'> | null })[] = [];
-    for (const attachment of attachments) {
-      let uploadedBy: Pick<User, 'id' | 'name' | 'email'> | null = null;
-      if (attachment.uploadedById) {
-        const [user] = await db.select({
-          id: users.id,
-          name: users.name,
-          email: users.email,
-        }).from(users).where(eq(users.id, attachment.uploadedById));
-        uploadedBy = user || null;
+    const userIds = [...new Set(attachments.map(a => a.uploadedById).filter((id): id is string => !!id))];
+    const userMap = new Map<string, Pick<User, 'id' | 'name' | 'email'>>();
+    if (userIds.length > 0) {
+      const userRows = await db.select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+      }).from(users).where(inArray(users.id, userIds));
+      for (const u of userRows) {
+        userMap.set(u.id, u);
       }
-      result.push({ ...attachment, uploadedBy });
     }
-    return result;
+    
+    return attachments.map(attachment => ({
+      ...attachment,
+      uploadedBy: attachment.uploadedById ? userMap.get(attachment.uploadedById) || null : null,
+    }));
   },
 
   async getPurchaseOrderAttachment(id: string): Promise<PurchaseOrderAttachment | undefined> {

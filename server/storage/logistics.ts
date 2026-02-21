@@ -212,13 +212,15 @@ export const logisticsMethods = {
   },
 
   async createDeliveryRecord(data: InsertDeliveryRecord): Promise<DeliveryRecord> {
-    const [record] = await db.insert(deliveryRecords).values(data).returning();
-    
-    await db.update(loadLists)
-      .set({ status: "COMPLETE", updatedAt: new Date() })
-      .where(eq(loadLists.id, data.loadListId));
-    
-    return record;
+    return await db.transaction(async (tx) => {
+      const [record] = await tx.insert(deliveryRecords).values(data).returning();
+      
+      await tx.update(loadLists)
+        .set({ status: "COMPLETE", updatedAt: new Date() })
+        .where(eq(loadLists.id, data.loadListId));
+      
+      return record;
+    });
   },
 
   async updateDeliveryRecord(id: string, data: Partial<InsertDeliveryRecord>): Promise<DeliveryRecord | undefined> {

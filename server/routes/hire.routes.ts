@@ -42,24 +42,8 @@ const hireBookingSchema = z.object({
 });
 
 async function getNextBookingNumber(companyId: string): Promise<string> {
-  const result = await db
-    .select({ bookingNumber: hireBookings.bookingNumber })
-    .from(hireBookings)
-    .where(eq(hireBookings.companyId, companyId))
-    .orderBy(desc(hireBookings.createdAt))
-    .limit(1);
-
-  if (result.length === 0) {
-    return "HIRE-000001";
-  }
-
-  const lastNumber = result[0].bookingNumber;
-  const match = lastNumber.match(/HIRE-(\d+)/);
-  if (match) {
-    const next = parseInt(match[1], 10) + 1;
-    return `HIRE-${String(next).padStart(6, "0")}`;
-  }
-  return "HIRE-000001";
+  const { getNextSequenceNumber } = await import("../lib/sequence-generator");
+  return getNextSequenceNumber("hire_booking", companyId, "HIRE-", 6);
 }
 
 router.get("/api/hire-bookings", requireAuth, async (req: Request, res: Response) => {

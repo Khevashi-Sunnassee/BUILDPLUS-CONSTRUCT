@@ -211,11 +211,8 @@ export const capexMethods = {
   },
 
   async getNextCapexNumber(companyId: string): Promise<string> {
-    const result = await db.select({ count: sql<number>`count(*)` })
-      .from(capexRequests)
-      .where(eq(capexRequests.companyId, companyId));
-    const count = Number(result[0]?.count || 0) + 1;
-    return `CAPEX-${String(count).padStart(4, "0")}`;
+    const { getNextSequenceNumber } = await import("../lib/sequence-generator");
+    return getNextSequenceNumber("capex", companyId, "CAPEX-", 4);
   },
 
   async createCapexAuditEvent(data: InsertCapexAuditEvent): Promise<CapexAuditEvent> {

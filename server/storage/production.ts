@@ -81,7 +81,8 @@ export const productionMethods = {
       .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
       .innerJoin(users, eq(productionEntries.userId, users.id))
       .where(and(...conditions))
-      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
+      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark))
+      .limit(10000);
     return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
   },
 
@@ -96,7 +97,8 @@ export const productionMethods = {
       .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
       .innerJoin(users, eq(productionEntries.userId, users.id))
       .where(and(...conditions))
-      .orderBy(asc(productionEntries.productionDate), asc(jobs.jobNumber), asc(panelRegister.panelMark));
+      .orderBy(asc(productionEntries.productionDate), asc(jobs.jobNumber), asc(panelRegister.panelMark))
+      .limit(10000);
     return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
   },
 
@@ -127,8 +129,8 @@ export const productionMethods = {
       .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
       .innerJoin(users, eq(productionEntries.userId, users.id));
     const result = companyId
-      ? await query.where(eq(jobs.companyId, companyId)).orderBy(desc(productionEntries.productionDate), asc(jobs.jobNumber), asc(panelRegister.panelMark))
-      : await query.orderBy(desc(productionEntries.productionDate), asc(jobs.jobNumber), asc(panelRegister.panelMark));
+      ? await query.where(eq(jobs.companyId, companyId)).orderBy(desc(productionEntries.productionDate), asc(jobs.jobNumber), asc(panelRegister.panelMark)).limit(10000)
+      : await query.orderBy(desc(productionEntries.productionDate), asc(jobs.jobNumber), asc(panelRegister.panelMark)).limit(10000);
     return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
   },
 
@@ -241,23 +243,27 @@ export const productionMethods = {
         dayConditions.push(sql`(${productionDays.factoryId} IS NULL OR ${productionDays.factoryId} IN (${sql.join(companyFactoryIds.map(id => sql`${id}`), sql`, `)}))`);
       }
     }
-    await db.delete(productionEntries).where(and(...entryConditions));
-    await db.delete(productionDays).where(and(...dayConditions));
+    await db.transaction(async (tx) => {
+      await tx.delete(productionEntries).where(and(...entryConditions));
+      await tx.delete(productionDays).where(and(...dayConditions));
+    });
   },
 
   async deleteProductionDayByDateAndFactoryId(date: string, factoryId: string): Promise<void> {
-    await db.delete(productionEntries).where(
-      and(
-        eq(productionEntries.productionDate, date),
-        eq(productionEntries.factoryId, factoryId)
-      )
-    );
-    await db.delete(productionDays).where(
-      and(
-        eq(productionDays.productionDate, date),
-        eq(productionDays.factoryId, factoryId)
-      )
-    );
+    await db.transaction(async (tx) => {
+      await tx.delete(productionEntries).where(
+        and(
+          eq(productionEntries.productionDate, date),
+          eq(productionEntries.factoryId, factoryId)
+        )
+      );
+      await tx.delete(productionDays).where(
+        and(
+          eq(productionDays.productionDate, date),
+          eq(productionDays.factoryId, factoryId)
+        )
+      );
+    });
   },
 
   async getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[]; companyId?: string }): Promise<ProductionSlotWithDetails[]> {

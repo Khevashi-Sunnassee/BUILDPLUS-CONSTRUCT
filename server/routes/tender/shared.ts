@@ -79,25 +79,8 @@ export const lineItemSchema = z.object({
 });
 
 export async function getNextTenderNumber(companyId: string, tx?: typeof db): Promise<string> {
-  const queryDb = tx || db;
-  const result = await queryDb
-    .select({ tenderNumber: tenders.tenderNumber })
-    .from(tenders)
-    .where(eq(tenders.companyId, companyId))
-    .orderBy(desc(tenders.tenderNumber))
-    .limit(1);
-
-  if (result.length === 0) {
-    return "TDR-000001";
-  }
-
-  const lastNumber = result[0].tenderNumber;
-  const match = lastNumber.match(/TDR-(\d+)/);
-  if (match) {
-    const next = parseInt(match[1], 10) + 1;
-    return `TDR-${String(next).padStart(6, "0")}`;
-  }
-  return "TDR-000001";
+  const { getNextSequenceNumber } = await import("../../lib/sequence-generator");
+  return getNextSequenceNumber("tender", companyId, "TDR-", 6);
 }
 
 export const VALID_STATUSES = ["DRAFT", "OPEN", "UNDER_REVIEW", "APPROVED", "CLOSED", "CANCELLED"];

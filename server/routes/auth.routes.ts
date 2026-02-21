@@ -43,11 +43,18 @@ router.post("/login", async (req, res) => {
     }
 
     clearLoginAttempts(email);
-    req.session.userId = user.id;
-    req.session.companyId = user.companyId;
-    req.session.name = user.name ?? undefined;
-    rotateCsrfToken(res);
-    res.json({ user: { ...user, passwordHash: undefined } });
+    const userData = { ...user, passwordHash: undefined };
+    req.session.regenerate((err) => {
+      if (err) {
+        logger.error({ err }, "Session regeneration failed");
+        return res.status(500).json({ error: "Internal server error" });
+      }
+      req.session.userId = user.id;
+      req.session.companyId = user.companyId;
+      req.session.name = user.name ?? undefined;
+      rotateCsrfToken(res);
+      res.json({ user: userData });
+    });
   } catch (error: unknown) {
     res.status(500).json({ error: "Internal server error" });
   }
@@ -81,8 +88,16 @@ router.post("/switch-company", requireAuth, async (req, res) => {
     if (!targetCompany || !targetCompany.isActive) {
       return res.status(404).json({ error: "Company not found or inactive" });
     }
-    req.session.companyId = companyId;
-    res.json({ ok: true, companyName: targetCompany.name });
+    req.session.regenerate((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Session regeneration failed" });
+      }
+      req.session.userId = currentUser!.id;
+      req.session.companyId = companyId;
+      req.session.name = currentUser!.name ?? undefined;
+      rotateCsrfToken(res);
+      res.json({ ok: true, companyName: targetCompany.name });
+    });
   } catch (error: unknown) {
     res.status(500).json({ error: "Failed to switch company" });
   }

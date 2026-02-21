@@ -140,8 +140,10 @@ export const dailyLogMethods = {
   },
 
   async deleteDailyLog(id: string): Promise<void> {
-    await db.delete(logRows).where(eq(logRows.dailyLogId, id));
-    await db.delete(dailyLogs).where(eq(dailyLogs.id, id));
+    await db.transaction(async (tx) => {
+      await tx.delete(logRows).where(eq(logRows.dailyLogId, id));
+      await tx.delete(dailyLogs).where(eq(dailyLogs.id, id));
+    });
   },
 
   async createApprovalEvent(data: InsertApprovalEvent): Promise<ApprovalEvent> {
