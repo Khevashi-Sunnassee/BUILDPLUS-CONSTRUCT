@@ -691,7 +691,7 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
 
       res.write(`data: ${JSON.stringify({ done: true, sources })}\n\n`);
 
-      if (history.length === 0) {
+      if (history.length <= 1) {
         const shortTitle = content.trim().slice(0, 60) + (content.trim().length > 60 ? "..." : "");
         await db.update(kbConversations)
           .set({ title: shortTitle, updatedAt: new Date() })
