@@ -706,11 +706,21 @@ export default function TasksPage() {
               <SelectContent>
                 <SelectItem value="all">All Jobs</SelectItem>
                 <SelectItem value="none">No Job Assigned</SelectItem>
-                {jobs.slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
-                  <SelectItem key={job.id} value={job.id}>
-                    {job.jobNumber} - {job.name}
-                  </SelectItem>
-                ))}
+                {(() => {
+                  const jobIdsInTasks = new Set<string>();
+                  groups.forEach(g => {
+                    if (g.jobId) jobIdsInTasks.add(g.jobId);
+                    g.tasks.forEach(t => { if (t.jobId) jobIdsInTasks.add(t.jobId); });
+                  });
+                  return jobs
+                    .filter(j => jobIdsInTasks.has(j.id))
+                    .sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || ''))
+                    .map((job) => (
+                      <SelectItem key={job.id} value={job.id}>
+                        {job.jobNumber} - {job.name}
+                      </SelectItem>
+                    ));
+                })()}
               </SelectContent>
             </Select>
           </div>
