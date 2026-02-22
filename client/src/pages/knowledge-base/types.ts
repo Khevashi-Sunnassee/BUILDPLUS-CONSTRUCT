@@ -3,6 +3,7 @@ export interface KbProject {
   name: string;
   description: string | null;
   instructions: string | null;
+  color: string | null;
   createdById: string;
   createdAt: string;
   updatedAt: string;

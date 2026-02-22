@@ -127,11 +127,12 @@ router.patch("/api/kb/projects/:id", requireAuth, async (req: Request, res: Resp
     const access = await getProjectAccess(String(userId), String(req.params.id), String(companyId));
     if (!access.hasAccess || access.role === "VIEWER") return res.status(403).json({ error: "Edit access required" });
 
-    const { name, description, instructions } = req.body;
+    const { name, description, instructions, color } = req.body;
     const updates: any = { updatedAt: new Date() };
     if (name?.trim()) updates.name = name.trim();
     if (description !== undefined) updates.description = description?.trim() || null;
     if (instructions !== undefined) updates.instructions = instructions?.trim() || null;
+    if (color !== undefined) updates.color = color || null;
 
     const [updated] = await db.update(kbProjects)
       .set(updates)
