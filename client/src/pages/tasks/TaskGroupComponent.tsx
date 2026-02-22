@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -161,7 +161,7 @@ export function TaskGroupComponent({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUP_MEMBERS(group.id), group.id] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
   });
@@ -175,16 +175,16 @@ export function TaskGroupComponent({
   };
 
   const handleSetJob = (jobId: string | null) => {
-    updateGroupMutation.mutate({ jobId } as any);
+    updateGroupMutation.mutate({ jobId });
     setShowJobPopover(false);
     setJobSearch("");
   };
 
-  const filteredJobs = jobs.filter(j => {
+  const filteredJobs = useMemo(() => jobs.filter(j => {
     if (!jobSearch) return true;
     const q = jobSearch.toLowerCase();
     return j.jobNumber.toLowerCase().includes(q) || j.name.toLowerCase().includes(q);
-  }).slice(0, 20);
+  }).slice(0, 20), [jobs, jobSearch]);
 
   const [itemColWidth, setItemColWidth] = useState<number>(() => {
     const saved = localStorage.getItem(ITEM_COL_STORAGE_KEY);
@@ -251,27 +251,29 @@ export function TaskGroupComponent({
 
   const allExpanded = group.tasks.length > 0 && expandedTaskIds.size === group.tasks.length;
   
-  const sortedTasks = [...group.tasks].sort((a, b) => {
-    switch (sortOption) {
-      case "status":
-        const statusOrder = ["NOT_STARTED", "IN_PROGRESS", "ON_HOLD", "STUCK", "DONE"];
-        return statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status);
-      case "date-asc":
-        if (!a.dueDate && !b.dueDate) return 0;
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-      case "date-desc":
-        if (!a.dueDate && !b.dueDate) return 0;
-        if (!a.dueDate) return 1;
-        if (!b.dueDate) return -1;
-        return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
-      case "title":
-        return a.title.localeCompare(b.title);
-      default:
-        return a.sortOrder - b.sortOrder;
-    }
-  });
+  const sortedTasks = useMemo(() => {
+    const statusOrder = ["NOT_STARTED", "IN_PROGRESS", "ON_HOLD", "STUCK", "DONE"];
+    return [...group.tasks].sort((a, b) => {
+      switch (sortOption) {
+        case "status":
+          return statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status);
+        case "date-asc":
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        case "date-desc":
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+        case "title":
+          return a.title.localeCompare(b.title);
+        default:
+          return a.sortOrder - b.sortOrder;
+      }
+    });
+  }, [group.tasks, sortOption]);
 
   const updateGroupMutation = useMutation({
     mutationFn: async (data: Partial<TaskGroup>) => {
@@ -280,7 +282,7 @@ export function TaskGroupComponent({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
   });
@@ -293,7 +295,7 @@ export function TaskGroupComponent({
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       toast({ title: "Group deleted" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
   });
@@ -312,7 +314,7 @@ export function TaskGroupComponent({
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       setNewTaskTitle("");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
   });

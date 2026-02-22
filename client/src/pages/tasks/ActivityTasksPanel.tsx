@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -79,7 +79,7 @@ export function ActivityTasksPanel({
 
   const createTaskMutation = useMutation({
     mutationFn: async (title: string) => {
-      const body: any = { title, jobId };
+      const body: Record<string, unknown> = { title, jobId };
       if (activityEndDate) {
         body.dueDate = new Date(activityEndDate).toISOString();
       }
@@ -103,6 +103,9 @@ export function ActivityTasksPanel({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to reorder tasks", description: error.message });
     },
   });
 
@@ -343,7 +346,7 @@ function ActivityTaskRow({
       });
       return { previous };
     },
-    onError: (error: any, _variables, context) => {
+    onError: (error: Error, _variables, context) => {
       if (context?.previous) {
         queryClient.setQueryData(queryKey, context.previous);
       }
@@ -435,6 +438,9 @@ function ActivityTaskRow({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
     },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to add assignee", description: error.message });
+    },
   });
 
   const removeAssigneeMutation = useMutation({
@@ -444,7 +450,15 @@ function ActivityTaskRow({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
     },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Failed to remove assignee", description: error.message });
+    },
   });
+
+  const sortedUsers = useMemo(() => 
+    [...users].sort((a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || '')),
+    [users]
+  );
 
   function handleTitleBlur() {
     if (localTitle.trim() && localTitle !== task.title) {
@@ -618,7 +632,7 @@ function ActivityTaskRow({
           </PopoverTrigger>
           <PopoverContent className="w-64 p-2" align="start">
             <div className="space-y-1 max-h-60 overflow-y-auto">
-              {users.slice().sort((a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || '')).map((user) => {
+              {sortedUsers.map((user) => {
                 const isAssigned = (task.assignees || []).some((a) => a.userId === user.id);
                 return (
                   <div

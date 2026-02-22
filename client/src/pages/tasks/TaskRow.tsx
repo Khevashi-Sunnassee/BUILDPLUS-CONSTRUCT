@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -47,7 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Task, TaskStatus, TaskPriority, User, Job } from "./types";
+import type { Task, TaskGroup, TaskStatus, TaskPriority, User, Job } from "./types";
 import { STATUS_CONFIG, PRIORITY_CONFIG, PROJECT_STAGES, getInitials } from "./types";
 
 export function SortableTaskRow({
@@ -204,7 +204,7 @@ export function TaskRow({
         settledTimerRef.current = null;
       }
       const previousGroups = queryClient.getQueryData([TASKS_ROUTES.GROUPS]);
-      const updateTaskRecursive = (t: any): any => {
+      const updateTaskRecursive = (t: Task): Task => {
         if (t.id === task.id) {
           return { ...t, ...newData };
         }
@@ -213,16 +213,16 @@ export function TaskRow({
         }
         return t;
       };
-      queryClient.setQueryData([TASKS_ROUTES.GROUPS], (old: any) => {
+      queryClient.setQueryData([TASKS_ROUTES.GROUPS], (old: TaskGroup[] | undefined) => {
         if (!old) return old;
-        return old.map((group: any) => ({
+        return old.map((group: TaskGroup) => ({
           ...group,
           tasks: group.tasks.map(updateTaskRecursive),
         }));
       });
       return { previousGroups };
     },
-    onError: (error: any, _variables, context) => {
+    onError: (error: Error, _variables, context) => {
       if (context?.previousGroups) {
         queryClient.setQueryData([TASKS_ROUTES.GROUPS], context.previousGroups);
       }
@@ -247,7 +247,7 @@ export function TaskRow({
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       toast({ title: "Task deleted" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
   });
@@ -259,7 +259,7 @@ export function TaskRow({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
   });
@@ -306,7 +306,7 @@ export function TaskRow({
       setNewSubtaskProjectStage(null);
       setTimeout(() => subtaskInputRef.current?.focus(), 50);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
   });
@@ -333,56 +333,66 @@ export function TaskRow({
     );
   };
 
-  const handleTitleBlur = () => {
+  const sortedUsers = useMemo(() => 
+    [...users].sort((a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || '')),
+    [users]
+  );
+
+  const sortedJobs = useMemo(() => 
+    [...jobs].sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')),
+    [jobs]
+  );
+
+  const handleTitleBlur = useCallback(() => {
     if (localTitle !== task.title && localTitle.trim()) {
       updateTaskMutation.mutate({ title: localTitle });
     }
-  };
+  }, [localTitle, task.title, updateTaskMutation]);
 
-  const handleConsultantBlur = () => {
+  const handleConsultantBlur = useCallback(() => {
     if (localConsultant !== (task.consultant || "")) {
       updateTaskMutation.mutate({ consultant: localConsultant || null });
     }
-  };
+  }, [localConsultant, task.consultant, updateTaskMutation]);
 
-  const handleStatusChange = (status: TaskStatus) => {
+  const handleStatusChange = useCallback((status: TaskStatus) => {
     updateTaskMutation.mutate({ status });
-  };
+  }, [updateTaskMutation]);
 
-  const handlePriorityChange = (priority: string) => {
+  const handlePriorityChange = useCallback((priority: string) => {
     updateTaskMutation.mutate({ priority: priority === "none" ? null : priority });
-  };
+  }, [updateTaskMutation]);
 
-  const handleDateChange = (date: Date | undefined) => {
+  const handleDateChange = useCallback((date: Date | undefined) => {
     const isoDate = date instanceof Date && !isNaN(date.getTime()) ? date.toISOString() : null;
     updateTaskMutation.mutate({ dueDate: isoDate });
-  };
+  }, [updateTaskMutation]);
 
-  const handleReminderChange = (date: Date | undefined) => {
+  const handleReminderChange = useCallback((date: Date | undefined) => {
     const isoDate = date instanceof Date && !isNaN(date.getTime()) ? date.toISOString() : null;
     updateTaskMutation.mutate({ reminderDate: isoDate });
-  };
+  }, [updateTaskMutation]);
 
-  const handleStageChange = (stage: string) => {
+  const handleStageChange = useCallback((stage: string) => {
     updateTaskMutation.mutate({ projectStage: stage === "none" ? null : stage });
-  };
+  }, [updateTaskMutation]);
 
-  const handleJobChange = (jobId: string) => {
+  const handleJobChange = useCallback((jobId: string) => {
     const selectedJob = jobId === "none" ? null : jobs.find(j => j.id === jobId);
     const updateData = { 
       jobId: jobId === "none" ? null : jobId,
       job: selectedJob || null 
     };
     updateTaskMutation.mutate(updateData);
-  };
+  }, [jobs, updateTaskMutation]);
 
-  const handleToggleAssignee = (userId: string) => {
+  const handleToggleAssignee = useCallback((userId: string) => {
     const currentIds = (task.assignees || []).map((a) => a.userId);
     const newIds = currentIds.includes(userId)
       ? currentIds.filter((id) => id !== userId)
       : [...currentIds, userId];
     setAssigneesMutation.mutate(newIds);
-  };
+  }, [task.assignees, setAssigneesMutation]);
 
   const hasSubtasks = task.subtasks && task.subtasks.length > 0;
 
@@ -528,7 +538,7 @@ export function TaskRow({
           </PopoverTrigger>
           <PopoverContent className="w-64 p-2" align="start">
             <div className="space-y-1 max-h-60 overflow-y-auto">
-              {users.slice().sort((a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || '')).map((user) => {
+              {sortedUsers.map((user) => {
                 const isAssigned = (task.assignees || []).some((a) => a.userId === user.id);
                 return (
                   <div
@@ -566,7 +576,7 @@ export function TaskRow({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">No job</SelectItem>
-            {jobs.slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
+            {sortedJobs.map((job) => (
               <SelectItem key={job.id} value={job.id}>
                 {job.jobNumber}
               </SelectItem>
@@ -836,7 +846,7 @@ export function TaskRow({
             </PopoverTrigger>
             <PopoverContent className="w-64 p-2" align="start">
               <div className="space-y-1 max-h-60 overflow-y-auto">
-                {users.slice().sort((a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || '')).map((user) => {
+                {sortedUsers.map((user) => {
                   const isAssigned = newSubtaskAssignees.includes(user.id);
                   return (
                     <div
@@ -874,7 +884,7 @@ export function TaskRow({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">No job</SelectItem>
-              {jobs.slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
+              {sortedJobs.map((job) => (
                 <SelectItem key={job.id} value={job.id}>
                   {job.jobNumber}
                 </SelectItem>
