@@ -356,7 +356,21 @@ const { data } = await response.json();`}
                           )}
                         </div>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
-                          <span className="font-mono">{key.keyPrefix}...</span>
+                          <span className="flex items-center gap-1">
+                            <code className="font-mono bg-muted px-1.5 py-0.5 rounded text-xs select-all">{key.keyPrefix}...</code>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                copyToClipboard(key.keyPrefix);
+                              }}
+                              data-testid={`button-copy-prefix-${key.id}`}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </span>
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             Last used: {formatDate(key.lastUsedAt)}
@@ -561,33 +575,39 @@ const { data } = await response.json();`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Input
-                type={showKey ? "text" : "password"}
-                value={createdKey || ""}
-                readOnly
-                className="font-mono text-sm"
-                data-testid="input-created-key"
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowKey(!showKey)}
-                data-testid="button-toggle-key-visibility"
-              >
-                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(createdKey || "")}
-                data-testid="button-copy-key"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              Save this key now — it will only be shown once.
             </div>
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm text-amber-700 dark:text-amber-400">
-              Store this key securely. You will not be able to view it again after closing this dialog.
+            <div className="relative">
+              <div className="flex items-center gap-2 border rounded-lg p-3 bg-muted/50">
+                <code
+                  className="font-mono text-sm flex-1 break-all select-all cursor-text"
+                  data-testid="text-created-key"
+                >
+                  {showKey ? createdKey : "•".repeat(40)}
+                </code>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setShowKey(!showKey)}
+                    data-testid="button-toggle-key-visibility"
+                  >
+                    {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => copyToClipboard(createdKey || "")}
+                    data-testid="button-copy-key"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
