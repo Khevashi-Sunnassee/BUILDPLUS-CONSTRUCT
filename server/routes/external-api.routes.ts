@@ -715,8 +715,17 @@ externalApiRouter.post("/api/v1/external/documents/:id/markup-version", requireE
 
     const uploadUrl = await objectStorageService.getObjectEntityUploadURL();
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadUrl);
-    const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
-    await objectFile.save(req.file.buffer, { contentType: req.file.mimetype });
+
+    const uploadResponse = await fetch(uploadUrl, {
+      method: "PUT",
+      body: req.file.buffer,
+      headers: { "Content-Type": req.file.mimetype },
+    });
+
+    if (!uploadResponse.ok) {
+      logger.error({ status: uploadResponse.status }, "External API: Object storage upload failed");
+      return res.status(500).json({ error: "Failed to upload file to storage" });
+    }
 
     const currentVersion = document.version || "1.0";
     const versionParts = currentVersion.split(".");
