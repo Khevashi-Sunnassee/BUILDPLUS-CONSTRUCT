@@ -142,6 +142,7 @@ router.get("/api/broadcasts/recipients", requireAuth, async (req, res) => {
   try {
     const companyId = req.session.companyId;
     if (!companyId) return res.status(400).json({ error: "No company context" });
+    const companyIdStr = String(companyId);
 
     const [customerList, supplierList, employeeList] = await Promise.all([
       db.select({
@@ -154,7 +155,7 @@ router.get("/api/broadcasts/recipients", requireAuth, async (req, res) => {
         .from(customers)
         .where(
           and(
-            eq(customers.companyId, companyId),
+            eq(customers.companyId, companyIdStr),
             eq(customers.isActive, true),
             or(
               and(isNotNull(customers.email), ne(customers.email, "")),
@@ -173,7 +174,7 @@ router.get("/api/broadcasts/recipients", requireAuth, async (req, res) => {
         .from(suppliers)
         .where(
           and(
-            eq(suppliers.companyId, companyId),
+            eq(suppliers.companyId, companyIdStr),
             eq(suppliers.isActive, true),
             or(
               and(isNotNull(suppliers.email), ne(suppliers.email, "")),
@@ -192,7 +193,7 @@ router.get("/api/broadcasts/recipients", requireAuth, async (req, res) => {
         .from(employees)
         .where(
           and(
-            eq(employees.companyId, companyId),
+            eq(employees.companyId, companyIdStr),
             eq(employees.isActive, true),
             or(
               and(isNotNull(employees.email), ne(employees.email, "")),
