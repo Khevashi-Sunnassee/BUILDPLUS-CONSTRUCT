@@ -274,7 +274,7 @@ export default function PhotoGallery() {
   const [showFilters, setShowFilters] = useState(false);
   const [groupBy, setGroupBy] = useState<string>("job");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [excludeChat, setExcludeChat] = useState(false);
+  const [excludeChat, setExcludeChat] = useState(true);
 
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
