@@ -1,9 +1,17 @@
 import { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 import { db } from "../../db";
-import { externalApiKeys, externalApiLogs } from "@shared/schema";
+import { externalApiKeys, externalApiLogs, jobMembers } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import { storage } from "../../storage";
 import logger from "../../lib/logger";
+
+const JWT_SECRET = process.env.SESSION_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("SESSION_SECRET environment variable is required for external API authentication");
+}
+const TOKEN_EXPIRY = "1h";
 
 declare global {
   namespace Express {
@@ -13,6 +21,14 @@ declare global {
         companyId: string;
         name: string;
         permissions: string[];
+      };
+      externalUser?: {
+        id: string;
+        companyId: string;
+        email: string;
+        name: string | null;
+        role: string;
+        isSuperAdmin: boolean;
       };
     }
   }
@@ -44,7 +60,6 @@ export async function requireExternalApiKey(req: Request, res: Response, next: N
 
   try {
     const keyHash = hashApiKey(rawKey);
-    const prefix = rawKey.substring(0, 8);
 
     const [apiKey] = await db
       .select()
@@ -76,6 +91,50 @@ export async function requireExternalApiKey(req: Request, res: Response, next: N
       name: apiKey.name,
       permissions: (apiKey.permissions as string[]) || [],
     };
+
+    const userToken = req.headers["x-user-token"] as string | undefined;
+    if (userToken) {
+      try {
+        const decoded = jwt.verify(userToken, JWT_SECRET) as {
+          userId: string;
+          companyId: string;
+          email: string;
+          role: string;
+        };
+
+        if (decoded.companyId !== apiKey.companyId) {
+          return res.status(403).json({
+            error: "User token company does not match API key company",
+          });
+        }
+
+        const user = await storage.getUser(decoded.userId);
+        if (!user || !user.isActive) {
+          return res.status(401).json({ error: "User account is inactive or not found" });
+        }
+
+        if (user.companyId !== apiKey.companyId) {
+          return res.status(403).json({ error: "User does not belong to this company" });
+        }
+
+        req.externalUser = {
+          id: user.id,
+          companyId: user.companyId,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          isSuperAdmin: user.isSuperAdmin,
+        };
+      } catch (jwtErr: any) {
+        if (jwtErr.name === "TokenExpiredError") {
+          return res.status(401).json({ error: "User token has expired. Please login again." });
+        }
+        if (jwtErr.name === "JsonWebTokenError") {
+          return res.status(401).json({ error: "Invalid user token" });
+        }
+        return res.status(401).json({ error: "User token validation failed" });
+      }
+    }
 
     res.on("finish", () => {
       const responseTime = Date.now() - startTime;
@@ -125,4 +184,37 @@ export function requirePermission(...permissions: string[]) {
 
     next();
   };
+}
+
+export function requireExternalUser(req: Request, res: Response, next: NextFunction) {
+  if (!req.externalUser) {
+    return res.status(401).json({
+      error: "User authentication required",
+      message: "This endpoint requires a user token. Login via POST /api/v1/external/auth/login first, then include the token in the X-User-Token header.",
+    });
+  }
+  next();
+}
+
+export async function getAllowedJobIdsForUser(userId: string, role: string): Promise<Set<string> | null> {
+  if (role === "ADMIN" || role === "MANAGER") {
+    return null;
+  }
+
+  const memberships = await db.select({ jobId: jobMembers.jobId })
+    .from(jobMembers)
+    .where(eq(jobMembers.userId, userId));
+  return new Set(memberships.map(m => m.jobId));
+}
+
+export function generateUserToken(userId: string, companyId: string, email: string, role: string): { token: string; expiresIn: string; expiresAt: string } {
+  const token = jwt.sign(
+    { userId, companyId, email, role },
+    JWT_SECRET,
+    { expiresIn: TOKEN_EXPIRY }
+  );
+
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+  return { token, expiresIn: TOKEN_EXPIRY, expiresAt };
 }

@@ -14,8 +14,8 @@ import {
   jobTypes,
   companies,
 } from "@shared/schema";
-import { eq, desc, sql } from "drizzle-orm";
-import { requireExternalApiKey, requirePermission } from "./middleware/external-api-auth.middleware";
+import { eq, desc, sql, inArray } from "drizzle-orm";
+import { requireExternalApiKey, requirePermission, requireExternalUser, getAllowedJobIdsForUser, generateUserToken } from "./middleware/external-api-auth.middleware";
 import { requireAuth, requireSuperAdmin } from "./middleware/auth.middleware";
 import { storage } from "../storage";
 import logger from "../lib/logger";
@@ -372,14 +372,93 @@ externalApiRouter.get("/api/super-admin/external-api-keys/:id/logs", requireSupe
   }
 });
 
+const loginSchema = z.object({
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+externalApiRouter.post("/api/v1/external/auth/login", requireExternalApiKey, async (req, res) => {
+  try {
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    const { email, password } = parsed.data;
+    const companyId = req.apiKey!.companyId;
+
+    const user = await storage.getUserByEmail(email);
+
+    if (!user || user.companyId !== companyId) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ error: "User account is inactive" });
+    }
+
+    const validPassword = await storage.validatePassword(user, password);
+    if (!validPassword) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const tokenData = generateUserToken(user.id, user.companyId, user.email, user.role);
+
+    res.json({
+      token: tokenData.token,
+      expiresIn: tokenData.expiresIn,
+      expiresAt: tokenData.expiresAt,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "External API: Login failed");
+    res.status(500).json({ error: "Authentication failed" });
+  }
+});
+
+externalApiRouter.get("/api/v1/external/auth/me", requireExternalApiKey, requireExternalUser, async (req, res) => {
+  try {
+    const user = req.externalUser!;
+
+    const allowedJobIds = await getAllowedJobIdsForUser(user.id, user.role);
+
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
+      access: {
+        level: allowedJobIds === null ? "all_jobs" : "restricted",
+        allowedJobCount: allowedJobIds === null ? null : allowedJobIds.size,
+        allowedJobIds: allowedJobIds === null ? null : Array.from(allowedJobIds),
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "External API: Failed to fetch user info");
+    res.status(500).json({ error: "Failed to fetch user info" });
+  }
+});
+
 externalApiRouter.get("/api/v1/external/jobs", requireExternalApiKey, requirePermission("read:jobs", "*"), async (req, res) => {
   try {
     const companyId = req.apiKey!.companyId;
     const status = req.query.status as string | undefined;
 
-    let query = db.select().from(jobs).where(eq(jobs.companyId, companyId));
+    let allJobs = await db.select().from(jobs).where(eq(jobs.companyId, companyId)).orderBy(desc(jobs.createdAt)).limit(500);
 
-    const allJobs = await query.orderBy(desc(jobs.createdAt)).limit(500);
+    if (req.externalUser) {
+      const allowedJobIds = await getAllowedJobIdsForUser(req.externalUser.id, req.externalUser.role);
+      if (allowedJobIds !== null) {
+        allJobs = allJobs.filter(j => allowedJobIds.has(j.id));
+      }
+    }
 
     const filtered = status
       ? allJobs.filter(j => j.status === status)
@@ -388,6 +467,7 @@ externalApiRouter.get("/api/v1/external/jobs", requireExternalApiKey, requirePer
     res.json({
       data: filtered,
       total: filtered.length,
+      userFiltered: !!req.externalUser,
     });
   } catch (error) {
     logger.error({ error }, "External API: Failed to fetch jobs");
@@ -409,7 +489,14 @@ externalApiRouter.get("/api/v1/external/jobs/:id", requireExternalApiKey, requir
       return res.status(404).json({ error: "Job not found" });
     }
 
-    res.json({ data: job });
+    if (req.externalUser) {
+      const allowedJobIds = await getAllowedJobIdsForUser(req.externalUser.id, req.externalUser.role);
+      if (allowedJobIds !== null && !allowedJobIds.has(job.id)) {
+        return res.status(403).json({ error: "You do not have access to this job" });
+      }
+    }
+
+    res.json({ data: job, userFiltered: !!req.externalUser });
   } catch (error) {
     logger.error({ error }, "External API: Failed to fetch job");
     res.status(500).json({ error: "Failed to fetch job" });
@@ -452,11 +539,20 @@ externalApiRouter.get("/api/v1/external/documents", requireExternalApiKey, requi
     const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
     const offset = parseInt(req.query.offset as string) || 0;
 
+    let allowedJobIds: Set<string> | null = null;
+    if (req.externalUser) {
+      allowedJobIds = await getAllowedJobIdsForUser(req.externalUser.id, req.externalUser.role);
+    }
+
+    if (req.externalUser && allowedJobIds !== null && jobId && !allowedJobIds.has(jobId)) {
+      return res.status(403).json({ error: "You do not have access to documents for this job" });
+    }
+
     const whereClause = jobId
       ? sql`${documents.companyId} = ${companyId} AND ${documents.jobId} = ${jobId}`
       : sql`${documents.companyId} = ${companyId}`;
 
-    const docs = await db
+    let docs = await db
       .select({
         id: documents.id,
         documentNumber: documents.documentNumber,
@@ -488,11 +584,16 @@ externalApiRouter.get("/api/v1/external/documents", requireExternalApiKey, requi
       .limit(limit)
       .offset(offset);
 
+    if (req.externalUser && allowedJobIds !== null) {
+      docs = docs.filter(d => d.jobId && allowedJobIds!.has(d.jobId));
+    }
+
     res.json({
       data: docs,
       total: docs.length,
       limit,
       offset,
+      userFiltered: !!req.externalUser,
     });
   } catch (error) {
     logger.error({ error }, "External API: Failed to fetch documents");
@@ -562,7 +663,7 @@ const updateMarkupSchema = z.object({
 externalApiRouter.put("/api/v1/external/jobs/:id/markups", requireExternalApiKey, requirePermission("write:markups", "*"), async (req, res) => {
   try {
     const companyId = req.apiKey!.companyId;
-    const jobId = req.params.id;
+    const jobId = req.params.id as string;
 
     const [job] = await db
       .select()
@@ -572,6 +673,13 @@ externalApiRouter.put("/api/v1/external/jobs/:id/markups", requireExternalApiKey
 
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
+    }
+
+    if (req.externalUser) {
+      const allowedJobIds = await getAllowedJobIdsForUser(req.externalUser.id, req.externalUser.role);
+      if (allowedJobIds !== null && !allowedJobIds.has(jobId)) {
+        return res.status(403).json({ error: "You do not have access to this job" });
+      }
     }
 
     const parsed = updateMarkupSchema.omit({ jobId: true }).safeParse(req.body);
