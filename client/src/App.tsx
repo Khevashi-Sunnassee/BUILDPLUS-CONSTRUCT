@@ -121,6 +121,7 @@ const TenderEmailsPage = lazyWithRetry(() => import("@/pages/tender-emails"));
 const TenderEmailDetailPage = lazyWithRetry(() => import("@/pages/tender-email-detail"));
 const DraftingEmailsPage = lazyWithRetry(() => import("@/pages/drafting-emails"));
 const DraftingEmailDetailPage = lazyWithRetry(() => import("@/pages/drafting-email-detail"));
+const ExternalApiPage = lazyWithRetry(() => import("@/pages/admin/external-api"));
 
 const RegisterPage = lazyWithRetry(() => import("@/pages/register"));
 const MobileLoginPage = lazyWithRetry(() => import("@/pages/mobile/login"));
@@ -713,6 +714,14 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminUsersPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/external-api">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <ExternalApiPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

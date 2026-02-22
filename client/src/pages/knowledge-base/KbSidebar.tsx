@@ -132,7 +132,7 @@ export function KbSidebar({
     setCollapsedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
   };
 
-  const renderConvoItem = (convo: KbConversation, projectColor?: string) => (
+  const renderConvoItem = (convo: KbConversation) => (
     <div
       key={convo.id}
       className={cn(
@@ -144,12 +144,6 @@ export function KbSidebar({
       onClick={() => onSelectConvo(convo.id)}
       data-testid={`convo-item-${convo.id}`}
     >
-      {projectColor && (
-        <div
-          className="w-1 h-4 rounded-full shrink-0"
-          style={{ backgroundColor: projectColor }}
-        />
-      )}
       <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-70" />
       <span className="truncate flex-1">{convo.title}</span>
       <Button
@@ -253,35 +247,40 @@ export function KbSidebar({
               const isCollapsed = !!collapsedGroups[groupKey];
               const color = group.project
                 ? getProjectColor(group.project, groupIdx)
-                : undefined;
+                : "#6b7280";
 
               return (
                 <div key={groupKey} className="mb-1" data-testid={`convo-group-${groupKey}`}>
-                  <button
-                    className="flex items-center gap-1.5 w-full px-2 py-1 rounded-md text-xs font-medium text-muted-foreground hover-elevate"
-                    onClick={() => toggleGroup(groupKey)}
-                    data-testid={`btn-toggle-group-${groupKey}`}
+                  <div
+                    className="group/topic flex items-center gap-1 px-2 py-1.5 rounded-md hover-elevate"
+                    style={{ backgroundColor: `${color}20`, borderLeft: `3px solid ${color}` }}
                   >
-                    {isCollapsed ? (
-                      <ChevronRight className="h-3 w-3 shrink-0" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3 shrink-0" />
-                    )}
-                    {color && (
-                      <div
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: color }}
-                      />
-                    )}
-                    {!group.project && <FolderOpen className="h-3 w-3 shrink-0 opacity-60" />}
-                    <span className="truncate">{group.project?.name || "Unassigned"}</span>
-                    <Badge variant="secondary" className="text-[9px] h-4 px-1 ml-auto">
+                    <button
+                      onClick={() => toggleGroup(groupKey)}
+                      className="shrink-0 p-0.5"
+                      data-testid={`btn-toggle-group-${groupKey}`}
+                    >
+                      {isCollapsed ? (
+                        <ChevronRight className="h-3 w-3" />
+                      ) : (
+                        <ChevronDown className="h-3 w-3" />
+                      )}
+                    </button>
+                    <FolderOpen className="h-3.5 w-3.5 shrink-0" style={{ color }} />
+                    <button
+                      onClick={() => toggleGroup(groupKey)}
+                      className="text-xs font-semibold uppercase tracking-wider truncate flex-1 text-left"
+                      style={{ color }}
+                    >
+                      {group.project?.name || "Unassigned"}
+                    </button>
+                    <Badge variant="secondary" className="text-[9px] h-4 px-1 ml-auto shrink-0">
                       {group.convos.length}
                     </Badge>
-                  </button>
+                  </div>
                   {!isCollapsed && (
-                    <div className="ml-2 mt-0.5 space-y-0.5">
-                      {group.convos.map(c => renderConvoItem(c, color))}
+                    <div className="ml-2 pl-1 mt-0.5 space-y-0.5" style={{ borderLeft: `2px solid ${color}40` }}>
+                      {group.convos.map(c => renderConvoItem(c))}
                     </div>
                   )}
                 </div>

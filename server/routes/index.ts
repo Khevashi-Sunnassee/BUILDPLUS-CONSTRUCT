@@ -70,6 +70,7 @@ import { mailRegisterRouter } from "./mail-register.routes";
 import { companyEmailInboxesRouter } from "./company-email-inboxes.routes";
 import { systemDefaultsRouter } from "./system-defaults.routes";
 import { reviewModeRouter } from "./review-mode.routes";
+import { externalApiRouter } from "./external-api.routes";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
@@ -202,6 +203,7 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(companyEmailInboxesRouter);
   app.use(systemDefaultsRouter);
   app.use(reviewModeRouter);
+  app.use(externalApiRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);

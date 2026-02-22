@@ -263,6 +263,14 @@ router.post("/api/broadcasts/send", requireAuth, async (req, res) => {
 
     const { subject, message, channels, recipientType, recipientIds, customRecipients, templateId } = parsed.data;
 
+    const adminOnlyTypes = ["SPECIFIC_CUSTOMERS", "SPECIFIC_SUPPLIERS", "SPECIFIC_EMPLOYEES"];
+    if (adminOnlyTypes.includes(recipientType)) {
+      const user = await storage.getUser(userId);
+      if (!user || (user.role !== "ADMIN" && !user.isSuperAdmin)) {
+        return res.status(403).json({ error: "Only administrators can broadcast to customers, suppliers, or employees" });
+      }
+    }
+
     const broadcastMessage = await storage.createBroadcastMessage({
       companyId,
       templateId: templateId || null,

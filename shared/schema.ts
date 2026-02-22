@@ -5815,3 +5815,47 @@ export const reviewAudits = pgTable("review_audits", {
 export const insertReviewAuditSchema = createInsertSchema(reviewAudits).omit({ id: true, reviewedAt: true });
 export type InsertReviewAudit = z.infer<typeof insertReviewAuditSchema>;
 export type ReviewAudit = typeof reviewAudits.$inferSelect;
+
+export const externalApiKeys = pgTable("external_api_keys", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  keyHash: text("key_hash").notNull(),
+  keyPrefix: varchar("key_prefix", { length: 12 }).notNull(),
+  permissions: jsonb("permissions").notNull().default(sql`'[]'::jsonb`),
+  isActive: boolean("is_active").default(true).notNull(),
+  lastUsedAt: timestamp("last_used_at"),
+  createdById: varchar("created_by_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("external_api_keys_company_idx").on(table.companyId),
+  keyPrefixIdx: index("external_api_keys_key_prefix_idx").on(table.keyPrefix),
+  isActiveIdx: index("external_api_keys_is_active_idx").on(table.isActive),
+}));
+
+export const insertExternalApiKeySchema = createInsertSchema(externalApiKeys).omit({ id: true, createdAt: true, updatedAt: true, lastUsedAt: true });
+export type InsertExternalApiKey = z.infer<typeof insertExternalApiKeySchema>;
+export type ExternalApiKey = typeof externalApiKeys.$inferSelect;
+
+export const externalApiLogs = pgTable("external_api_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
+  apiKeyId: varchar("api_key_id", { length: 36 }).notNull().references(() => externalApiKeys.id, { onDelete: "cascade" }),
+  method: varchar("method", { length: 10 }).notNull(),
+  path: text("path").notNull(),
+  statusCode: integer("status_code").notNull(),
+  responseTimeMs: integer("response_time_ms"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("external_api_logs_company_idx").on(table.companyId),
+  apiKeyIdx: index("external_api_logs_api_key_idx").on(table.apiKeyId),
+  createdAtIdx: index("external_api_logs_created_at_idx").on(table.createdAt),
+}));
+
+export const insertExternalApiLogSchema = createInsertSchema(externalApiLogs).omit({ id: true, createdAt: true });
+export type InsertExternalApiLog = z.infer<typeof insertExternalApiLogSchema>;
+export type ExternalApiLog = typeof externalApiLogs.$inferSelect;

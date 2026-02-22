@@ -71,6 +71,7 @@ import {
   MailPlus,
   Brain,
   Mail,
+  Plug,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -155,6 +156,7 @@ const adminNavItems = [
   { title: "Job Types & Workflows", url: "/admin/job-types", icon: Workflow },
   { title: "Cost Codes", url: "/admin/cost-codes", icon: Hash },
   { title: "Email Templates", url: "/admin/email-templates", icon: MailPlus },
+  { title: "External API", url: "/admin/external-api", icon: Plug },
 ];
 
 const superAdminNavItems = [

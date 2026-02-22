@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
 import {
   Send,
   FileText,
@@ -152,6 +153,8 @@ function SendMessageTab({
 }: {
   onSent: () => void;
 }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN" || user?.isSuperAdmin;
   const { toast } = useToast();
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -430,39 +433,43 @@ function SendMessageTab({
                   Specific Users
                 </Label>
               </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem
-                  value="SPECIFIC_CUSTOMERS"
-                  id="recipient-customers"
-                  data-testid="radio-recipient-customers"
-                />
-                <Label htmlFor="recipient-customers" className="cursor-pointer flex items-center gap-1.5">
-                  <Building2 className="h-4 w-4" />
-                  Customers
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem
-                  value="SPECIFIC_SUPPLIERS"
-                  id="recipient-suppliers"
-                  data-testid="radio-recipient-suppliers"
-                />
-                <Label htmlFor="recipient-suppliers" className="cursor-pointer flex items-center gap-1.5">
-                  <Truck className="h-4 w-4" />
-                  Suppliers
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem
-                  value="SPECIFIC_EMPLOYEES"
-                  id="recipient-employees"
-                  data-testid="radio-recipient-employees"
-                />
-                <Label htmlFor="recipient-employees" className="cursor-pointer flex items-center gap-1.5">
-                  <HardHat className="h-4 w-4" />
-                  Employees
-                </Label>
-              </div>
+              {isAdmin && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem
+                      value="SPECIFIC_CUSTOMERS"
+                      id="recipient-customers"
+                      data-testid="radio-recipient-customers"
+                    />
+                    <Label htmlFor="recipient-customers" className="cursor-pointer flex items-center gap-1.5">
+                      <Building2 className="h-4 w-4" />
+                      Customers
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem
+                      value="SPECIFIC_SUPPLIERS"
+                      id="recipient-suppliers"
+                      data-testid="radio-recipient-suppliers"
+                    />
+                    <Label htmlFor="recipient-suppliers" className="cursor-pointer flex items-center gap-1.5">
+                      <Truck className="h-4 w-4" />
+                      Suppliers
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem
+                      value="SPECIFIC_EMPLOYEES"
+                      id="recipient-employees"
+                      data-testid="radio-recipient-employees"
+                    />
+                    <Label htmlFor="recipient-employees" className="cursor-pointer flex items-center gap-1.5">
+                      <HardHat className="h-4 w-4" />
+                      Employees
+                    </Label>
+                  </div>
+                </>
+              )}
               <div className="flex items-center gap-2">
                 <RadioGroupItem
                   value="CUSTOM_CONTACTS"

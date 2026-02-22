@@ -1057,3 +1057,10 @@ export const MAIL_REGISTER_ROUTES = {
   NEXT_NUMBER: '/api/mail-register/next-number',
 } as const;
 export type MailRegisterRoutes = typeof MAIL_REGISTER_ROUTES;
+
+export const EXTERNAL_API_ROUTES = {
+  KEYS: '/api/external-api-keys',
+  KEY_BY_ID: (id: string | number) => `/api/external-api-keys/${id}`,
+  KEY_LOGS: (id: string | number) => `/api/external-api-keys/${id}/logs`,
+} as const;
+export type ExternalApiRoutes = typeof EXTERNAL_API_ROUTES;

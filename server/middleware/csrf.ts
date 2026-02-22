@@ -17,6 +17,7 @@ const EXEMPT_PATHS = new Set([
 const EXEMPT_PATH_PREFIXES = [
   "/invitations/",
   "/webhooks/",
+  "/v1/external/",
 ];
 
 function isExemptPath(path: string): boolean {
