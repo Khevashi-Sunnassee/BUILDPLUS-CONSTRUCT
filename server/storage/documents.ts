@@ -173,6 +173,7 @@ export const documentMethods = {
     taskId?: string;
     conversationId?: string;
     messageId?: string;
+    kbFilter?: string;
     showLatestOnly?: boolean;
     mimeTypePrefix?: string;
     excludeChat?: boolean;
@@ -200,6 +201,13 @@ export const documentMethods = {
     if (filters.taskId) conditions.push(eq(documents.taskId, filters.taskId));
     if (filters.conversationId) conditions.push(eq(documents.conversationId, filters.conversationId));
     if (filters.messageId) conditions.push(eq(documents.messageId, filters.messageId));
+    if (filters.kbFilter === "linked") {
+      conditions.push(sql`${documents.kbDocumentId} IS NOT NULL`);
+    } else if (filters.kbFilter === "not_linked") {
+      conditions.push(sql`${documents.kbDocumentId} IS NULL`);
+    } else if (filters.kbFilter && filters.kbFilter !== "all") {
+      conditions.push(sql`${documents.kbDocumentId} IN (SELECT id FROM kb_documents WHERE project_id = ${filters.kbFilter})`);
+    }
     if (filters.showLatestOnly) conditions.push(eq(documents.isLatestVersion, true));
     if (filters.mimeTypePrefix) {
       const prefix = `${filters.mimeTypePrefix}%`;

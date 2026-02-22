@@ -26,7 +26,7 @@ const router = Router();
 
 router.get("/api/documents", requireAuth, async (req, res) => {
   try {
-    const { page, limit, search, status, typeId, disciplineId, categoryId, jobId, panelId, supplierId, purchaseOrderId, taskId, showLatestOnly, mimeTypePrefix, excludeChat } = req.query;
+    const { page, limit, search, status, typeId, disciplineId, categoryId, jobId, panelId, supplierId, purchaseOrderId, taskId, kbFilter, showLatestOnly, mimeTypePrefix, excludeChat } = req.query;
     
     let allowedJobIds: string[] | undefined;
     const user = await storage.getUser(req.session.userId!);
@@ -52,6 +52,7 @@ router.get("/api/documents", requireAuth, async (req, res) => {
       supplierId: supplierId ? String(supplierId) : undefined,
       purchaseOrderId: purchaseOrderId ? String(purchaseOrderId) : undefined,
       taskId: taskId ? String(taskId) : undefined,
+      kbFilter: kbFilter ? String(kbFilter) : undefined,
       showLatestOnly: showLatestOnly === "true",
       mimeTypePrefix: mimeTypePrefix ? String(mimeTypePrefix) : undefined,
       excludeChat: excludeChat === "true",

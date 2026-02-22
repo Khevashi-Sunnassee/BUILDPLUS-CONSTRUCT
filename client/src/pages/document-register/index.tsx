@@ -73,6 +73,7 @@ export default function DocumentRegister() {
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [disciplineFilter, setDisciplineFilter] = useState<string>("");
   const [jobFilter, setJobFilter] = useState<string>("");
+  const [kbFilter, setKbFilter] = useState<string>("");
   const [showLatestOnly, setShowLatestOnly] = useState(true);
   const [showFilters, setShowFilters] = useState(true);
   const [groupBy, setGroupBy] = useState<string>("job_discipline");
@@ -109,13 +110,14 @@ export default function DocumentRegister() {
     if (typeFilter && typeFilter !== "all") params.append("typeId", typeFilter);
     if (disciplineFilter && disciplineFilter !== "all") params.append("disciplineId", disciplineFilter);
     if (jobFilter && jobFilter !== "all") params.append("jobId", jobFilter);
+    if (kbFilter && kbFilter !== "all") params.append("kbFilter", kbFilter);
     params.append("showLatestOnly", String(showLatestOnly));
     params.append("excludeChat", "true");
     return params.toString();
-  }, [page, search, statusFilter, typeFilter, disciplineFilter, jobFilter, showLatestOnly]);
+  }, [page, search, statusFilter, typeFilter, disciplineFilter, jobFilter, kbFilter, showLatestOnly]);
 
   const { data: documentsData, isLoading: documentsLoading } = useQuery<DocumentsResponse>({
-    queryKey: [DOCUMENT_ROUTES.LIST, page, search, statusFilter, typeFilter, disciplineFilter, jobFilter, showLatestOnly, "excludeChat"],
+    queryKey: [DOCUMENT_ROUTES.LIST, page, search, statusFilter, typeFilter, disciplineFilter, jobFilter, kbFilter, showLatestOnly, "excludeChat"],
     queryFn: async () => {
       const response = await fetch(`${DOCUMENT_ROUTES.LIST}?${buildQueryString()}`);
       if (!response.ok) throw new Error("Failed to fetch documents");
@@ -133,6 +135,10 @@ export default function DocumentRegister() {
 
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
+  });
+
+  const { data: kbProjects = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ["/api/kb/projects"],
   });
 
   const isPrivileged = user?.role === "ADMIN" || user?.role === "MANAGER";
@@ -156,6 +162,7 @@ export default function DocumentRegister() {
     setTypeFilter("");
     setDisciplineFilter("");
     setJobFilter("");
+    setKbFilter("");
     setPage(1);
   };
 
@@ -557,6 +564,20 @@ export default function DocumentRegister() {
                   <SelectItem value="all">All Jobs</SelectItem>
                   {jobs.slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
                     <SelectItem key={job.id} value={job.id}>{job.jobNumber} - {job.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={kbFilter} onValueChange={(v) => { setKbFilter(v); setPage(1); }}>
+                <SelectTrigger className="w-[200px]" data-testid="select-kb-filter">
+                  <SelectValue placeholder="Knowledge Base" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Documents</SelectItem>
+                  <SelectItem value="linked">Linked to KB</SelectItem>
+                  <SelectItem value="not_linked">Not Linked to KB</SelectItem>
+                  {kbProjects.slice().sort((a, b) => a.name.localeCompare(b.name)).map((project) => (
+                    <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
