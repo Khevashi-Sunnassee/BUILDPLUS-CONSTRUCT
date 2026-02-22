@@ -22,6 +22,45 @@ import logger from "../lib/logger";
 
 export const externalApiRouter = Router();
 
+externalApiRouter.use("/api/v1/external", (req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key, X-User-Token");
+  res.setHeader("Access-Control-Max-Age", "86400");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+  next();
+});
+
+externalApiRouter.get("/api/v1/external/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    service: "BuildPlus API",
+    version: "1.0.0",
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      auth: "/api/v1/external/auth/login",
+      jobs: "/api/v1/external/jobs",
+      documents: "/api/v1/external/documents",
+      costCodes: "/api/v1/external/cost-codes",
+      company: "/api/v1/external/company",
+    },
+  });
+});
+
+externalApiRouter.get("/api/v1/external/ping", requireExternalApiKey, (req, res) => {
+  res.json({
+    status: "ok",
+    message: "API key is valid",
+    company: req.apiKey!.companyId,
+    keyName: req.apiKey!.name,
+    permissions: req.apiKey!.permissions,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 function generateApiKey(): string {
   const prefix = "bp_";
   const key = crypto.randomBytes(32).toString("hex");
