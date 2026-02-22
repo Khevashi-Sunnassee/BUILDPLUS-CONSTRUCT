@@ -21,6 +21,8 @@ import {
   Power,
   PowerOff,
   Clock,
+  Search,
+  KeyRound,
 } from "lucide-react";
 import { ADMIN_ROUTES, USER_ROUTES, INVITATION_ROUTES } from "@shared/api-routes";
 import { Factory as FactoryIcon } from "lucide-react";
@@ -78,7 +80,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { User as UserType, Role, Department, UserInvitation } from "@shared/schema";
+import type { User as UserType, Role, Department, UserInvitation, UserPermission, PermissionType } from "@shared/schema";
 import { FUNCTION_KEYS } from "@shared/schema";
 import type { PermissionLevel } from "@shared/schema";
 import { PageHelpButton } from "@/components/help/page-help-button";
@@ -212,6 +214,311 @@ const DAYS_OF_WEEK = [
   { key: "sunday", label: "Sunday" },
 ] as const;
 
+const PERM_SECTIONS = [
+  { label: "Main Navigation", keys: ["tasks", "chat", "jobs", "panel_register", "document_register", "photo_gallery", "checklists", "weekly_job_logs", "broadcast"] },
+  { label: "Production & Scheduling", keys: ["production_slots", "production_report", "drafting_program", "daily_reports", "reo_scheduling", "pm_call_logs", "logistics"] },
+  { label: "Finance & Commercial", keys: ["sales_pipeline", "contract_hub", "progress_claims", "purchase_orders", "hire_bookings", "weekly_wages", "admin_assets"] },
+  { label: "Management & Reporting", keys: ["kpi_dashboard", "manager_review", "checklist_reports"] },
+  { label: "Administration", keys: ["admin_settings", "admin_companies", "admin_factories", "admin_panel_types", "admin_document_config", "admin_checklist_templates", "admin_item_catalog", "admin_devices", "admin_users", "admin_user_permissions", "admin_job_types", "admin_jobs", "admin_data_management"] },
+  { label: "Contacts", keys: ["admin_customers", "admin_suppliers", "admin_employees"] },
+  { label: "Other", keys: ["admin_zones", "admin_work_types", "admin_trailer_types"] },
+];
+
+const PERM_LABELS: Record<string, string> = {
+  tasks: "Tasks", chat: "Chat", jobs: "Jobs", panel_register: "Panel Register", document_register: "Document Register",
+  photo_gallery: "Photo Gallery", checklists: "Checklists", weekly_job_logs: "Weekly Job Logs", broadcast: "Broadcast",
+  production_slots: "Production Slots", production_report: "Production Schedule", drafting_program: "Drafting Program",
+  daily_reports: "Drafting Register", reo_scheduling: "Reo Scheduling", pm_call_logs: "PM Call Logs", logistics: "Logistics",
+  sales_pipeline: "Sales Pipeline", contract_hub: "Contract Hub", progress_claims: "Progress Claims",
+  purchase_orders: "Purchase Orders", hire_bookings: "Hire Bookings", weekly_wages: "Weekly Wages", admin_assets: "Asset Register",
+  kpi_dashboard: "KPI Dashboard", manager_review: "Manager Review", checklist_reports: "Checklist Reports",
+  admin_settings: "Settings", admin_companies: "Companies", admin_factories: "Factories", admin_panel_types: "Panel Types",
+  admin_document_config: "Document Config", admin_checklist_templates: "Checklist Templates", admin_item_catalog: "Items & Categories",
+  admin_devices: "Devices", admin_users: "Users", admin_user_permissions: "User Permissions", admin_job_types: "Job Types & Workflows",
+  admin_jobs: "Jobs Management", admin_customers: "Customers", admin_suppliers: "Suppliers", admin_employees: "Employees",
+  admin_zones: "Zones", admin_work_types: "Work Types", admin_trailer_types: "Trailer Types", admin_data_management: "Data Management",
+};
+
+const SUPPORTS_OWN = ["purchase_orders", "tasks", "weekly_job_logs", "pm_call_logs"];
+
+function UserPermissionsDialog({ open, onOpenChange, userId, userName }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  userId: string;
+  userName: string;
+}) {
+  const { toast } = useToast();
+  const [applyTypeOpen, setApplyTypeOpen] = useState(false);
+
+  interface UserWithPermissions {
+    user: UserType;
+    permissions: UserPermission[];
+  }
+
+  const { data: allUsersPerms, isLoading } = useQuery<UserWithPermissions[]>({
+    queryKey: [ADMIN_ROUTES.USER_PERMISSIONS],
+  });
+
+  const userPerms = useMemo(() => {
+    if (!allUsersPerms) return null;
+    return allUsersPerms.find(up => up.user.id === userId);
+  }, [allUsersPerms, userId]);
+
+  const permissions = userPerms?.permissions || [];
+
+  const initializeMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", ADMIN_ROUTES.USER_PERMISSION_INITIALIZE(userId), {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USER_PERMISSIONS] });
+      toast({ title: "Permissions initialized" });
+    },
+    onError: () => {
+      toast({ title: "Failed to initialize permissions", variant: "destructive" });
+    },
+  });
+
+  const updatePermissionMutation = useMutation({
+    mutationFn: async ({ functionKey, permissionLevel }: { functionKey: string; permissionLevel: PermissionLevel }) => {
+      return apiRequest("PUT", ADMIN_ROUTES.USER_PERMISSION_UPDATE(userId, functionKey), { permissionLevel });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USER_PERMISSIONS] });
+      toast({ title: "Permission updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update permission", variant: "destructive" });
+    },
+  });
+
+  const getPermLevel = (functionKey: string): PermissionLevel => {
+    const p = permissions.find(p => p.functionKey === functionKey);
+    return (p?.permissionLevel as PermissionLevel) || "VIEW_AND_UPDATE";
+  };
+
+  const hasUnset = useMemo(() => {
+    const permMap = new Map(permissions.map(p => [p.functionKey, true]));
+    return FUNCTION_KEYS.some(k => !permMap.has(k));
+  }, [permissions]);
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle data-testid="text-permissions-dialog-title">
+              <div className="flex items-center gap-2">
+                <KeyRound className="h-5 w-5 text-primary" />
+                Permissions — {userName}
+              </div>
+            </DialogTitle>
+            <DialogDescription>
+              Control which features this user can access and what level of access they have.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                {hasUnset && (
+                  <Button
+                    size="sm"
+                    onClick={() => initializeMutation.mutate()}
+                    disabled={initializeMutation.isPending}
+                    data-testid="button-initialize-permissions"
+                  >
+                    {initializeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                    Initialize All
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setApplyTypeOpen(true)}
+                  data-testid="button-apply-type-dialog"
+                >
+                  <Shield className="h-4 w-4 mr-2" />
+                  Apply Permission Type
+                </Button>
+              </div>
+
+              {hasUnset && (
+                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-sm">
+                  <p className="font-medium text-amber-800 dark:text-amber-200">Some permissions are not set</p>
+                  <p className="text-amber-700 dark:text-amber-300">Click "Initialize All" to set defaults, or apply a permission type.</p>
+                </div>
+              )}
+
+              {PERM_SECTIONS.map(section => (
+                <div key={section.label}>
+                  <div className="flex items-center gap-2 py-2 mb-1">
+                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{section.label}</h4>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-1/2">Feature</TableHead>
+                        <TableHead>Access Level</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {section.keys.map(functionKey => {
+                        const currentLevel = getPermLevel(functionKey);
+                        return (
+                          <TableRow key={functionKey} data-testid={`row-perm-dialog-${functionKey}`}>
+                            <TableCell className="font-medium">{PERM_LABELS[functionKey] || functionKey}</TableCell>
+                            <TableCell>
+                              <Select
+                                value={currentLevel}
+                                onValueChange={(value) => {
+                                  updatePermissionMutation.mutate({ functionKey, permissionLevel: value as PermissionLevel });
+                                }}
+                                disabled={updatePermissionMutation.isPending}
+                              >
+                                <SelectTrigger className="w-48" data-testid={`select-perm-dialog-${functionKey}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="HIDDEN">
+                                    <div className="flex items-center gap-2">
+                                      <EyeOff className="h-4 w-4 text-red-500" />
+                                      Hidden
+                                    </div>
+                                  </SelectItem>
+                                  {SUPPORTS_OWN.includes(functionKey) && (
+                                    <SelectItem value="VIEW_OWN">
+                                      <div className="flex items-center gap-2">
+                                        <Eye className="h-4 w-4 text-blue-500" />
+                                        View Own Only
+                                      </div>
+                                    </SelectItem>
+                                  )}
+                                  <SelectItem value="VIEW">
+                                    <div className="flex items-center gap-2">
+                                      <Eye className="h-4 w-4 text-yellow-500" />
+                                      View All
+                                    </div>
+                                  </SelectItem>
+                                  {SUPPORTS_OWN.includes(functionKey) && (
+                                    <SelectItem value="VIEW_AND_UPDATE_OWN">
+                                      <div className="flex items-center gap-2">
+                                        <Pencil className="h-4 w-4 text-cyan-500" />
+                                        View & Edit Own Only
+                                      </div>
+                                    </SelectItem>
+                                  )}
+                                  <SelectItem value="VIEW_AND_UPDATE">
+                                    <div className="flex items-center gap-2">
+                                      <Pencil className="h-4 w-4 text-green-500" />
+                                      View & Edit All
+                                    </div>
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {applyTypeOpen && (
+        <ApplyPermissionTypeDialogInline
+          open={applyTypeOpen}
+          onOpenChange={setApplyTypeOpen}
+          userId={userId}
+          userName={userName}
+        />
+      )}
+    </>
+  );
+}
+
+function ApplyPermissionTypeDialogInline({ open, onOpenChange, userId, userName }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  userId: string;
+  userName: string;
+}) {
+  const { toast } = useToast();
+  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
+
+  const { data: permissionTypes } = useQuery<PermissionType[]>({
+    queryKey: [ADMIN_ROUTES.PERMISSION_TYPES],
+  });
+
+  const applyMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", ADMIN_ROUTES.USER_PERMISSION_APPLY_TYPE(userId), { permissionTypeId: selectedTypeId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USER_PERMISSIONS] });
+      toast({ title: "Permission type applied", description: `Permissions updated for ${userName}.` });
+      setSelectedTypeId("");
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to apply permission type", variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Apply Permission Type</DialogTitle>
+          <DialogDescription>
+            Select a permission type to apply to <strong>{userName}</strong>. This will overwrite all existing permissions.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Select value={selectedTypeId} onValueChange={setSelectedTypeId}>
+            <SelectTrigger data-testid="select-apply-perm-type-inline">
+              <SelectValue placeholder="Select a permission type..." />
+            </SelectTrigger>
+            <SelectContent>
+              {permissionTypes?.map(pt => (
+                <SelectItem key={pt.id} value={pt.id}>{pt.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={applyMutation.isPending}>Cancel</Button>
+          <Button
+            onClick={() => {
+              if (!selectedTypeId) {
+                toast({ title: "Select a type first", variant: "destructive" });
+                return;
+              }
+              applyMutation.mutate();
+            }}
+            disabled={applyMutation.isPending || !selectedTypeId}
+            data-testid="button-confirm-apply-perm-type"
+          >
+            {applyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Apply
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AdminUsersPage() {
   useDocumentTitle("User Management");
   const { toast } = useToast();
@@ -231,6 +538,9 @@ export default function AdminUsersPage() {
     return defaults;
   });
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [userSearch, setUserSearch] = useState("");
+  const [permissionsUserId, setPermissionsUserId] = useState<string | null>(null);
+  const [permissionsUserName, setPermissionsUserName] = useState<string>("");
 
   const { data: users, isLoading, isError, error, refetch } = useQuery<UserType[]>({
     queryKey: [ADMIN_ROUTES.USERS],
@@ -532,6 +842,28 @@ export default function AdminUsersPage() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   }, []);
 
+  const sortedFilteredUsers = useMemo(() => {
+    if (!users) return [];
+    let filtered = [...users];
+    if (userSearch.trim()) {
+      const search = userSearch.toLowerCase().trim();
+      filtered = filtered.filter(u =>
+        (u.name || "").toLowerCase().includes(search) ||
+        u.email.toLowerCase().includes(search)
+      );
+    }
+    filtered.sort((a, b) => {
+      const aName = a.name || "";
+      const bName = b.name || "";
+      if (!aName && bName) return 1;
+      if (aName && !bName) return -1;
+      const nameCompare = aName.localeCompare(bName);
+      if (nameCompare !== 0) return nameCompare;
+      return a.email.localeCompare(b.email);
+    });
+    return filtered;
+  }, [users, userSearch]);
+
   const pendingInvitationsCount = useMemo(() => invitations.filter(i => i.status === "PENDING").length, [invitations]);
 
   const sortedInvitations = useMemo(() => invitations.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [invitations]);
@@ -592,16 +924,24 @@ export default function AdminUsersPage() {
               <Badge variant="secondary" className="ml-1.5">{pendingInvitationsCount}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="permissions" data-testid="tab-permissions">
-            <Shield className="h-4 w-4 mr-1.5" />
-            Permissions
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
       <Card>
         <CardContent className="pt-6">
-          {users && users.length > 0 ? (
+          <div className="mb-4">
+            <div className="relative max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or email..."
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-users"
+              />
+            </div>
+          </div>
+          {sortedFilteredUsers.length > 0 ? (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -613,11 +953,11 @@ export default function AdminUsersPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
-                    <TableHead className="w-24"></TableHead>
+                    <TableHead className="w-28"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
+                  {sortedFilteredUsers.map((user) => (
                     <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -694,6 +1034,19 @@ export default function AdminUsersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            aria-label="User permissions"
+                            title="Permissions"
+                            onClick={() => {
+                              setPermissionsUserId(user.id);
+                              setPermissionsUserName(user.name || user.email);
+                            }}
+                            data-testid={`button-permissions-${user.id}`}
+                          >
+                            <KeyRound className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             aria-label="Delete user"
                             onClick={() => {
                               setDeletingUserId(user.id);
@@ -713,14 +1066,16 @@ export default function AdminUsersPage() {
           ) : (
             <div className="flex flex-col items-center justify-center py-12">
               <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium">No users yet</h3>
+              <h3 className="text-lg font-medium">{userSearch ? "No users found" : "No users yet"}</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Create a user to get started
+                {userSearch ? `No results for "${userSearch}"` : "Create a user to get started"}
               </p>
-              <Button className="mt-4" onClick={openNewUser}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add User
-              </Button>
+              {!userSearch && (
+                <Button className="mt-4" onClick={openNewUser}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add User
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
@@ -835,9 +1190,6 @@ export default function AdminUsersPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="permissions" className="space-y-4">
-          <UserPermissionsPage embedded={true} />
-        </TabsContent>
       </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -1468,6 +1820,15 @@ export default function AdminUsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {permissionsUserId && (
+        <UserPermissionsDialog
+          open={!!permissionsUserId}
+          onOpenChange={(open) => { if (!open) { setPermissionsUserId(null); setPermissionsUserName(""); } }}
+          userId={permissionsUserId}
+          userName={permissionsUserName}
+        />
+      )}
     </div>
   );
 }
