@@ -7,7 +7,8 @@ import { requireSuperAdmin } from "./middleware/auth.middleware";
 import { reviewModeMethods } from "../storage/review-mode";
 import { generatePacket, packetToMarkdown, runReview, mergeTaskpacks, sanitizeContent } from "../services/review-engine";
 import { db } from "../db";
-import { reviewContextVersions } from "@shared/schema";
+import { reviewContextVersions, reviewManualAssessments } from "@shared/schema";
+import { desc, sql } from "drizzle-orm";
 import logger from "../lib/logger";
 
 interface DiscoveredPage {
@@ -650,6 +651,89 @@ router.get("/api/super-admin/review-mode/queue", requireSuperAdmin, async (_req:
   } catch (error: any) {
     logger.error({ error: error.message }, "Failed to fetch review queue");
     res.status(500).json({ error: "Failed to fetch review queue" });
+  }
+});
+
+const manualAssessmentSchema = z.object({
+  targetId: z.string().min(1),
+  percentComplete: z.number().min(0).max(100),
+  starRating: z.number().min(1).max(5),
+  comments: z.string().optional().nullable(),
+});
+
+router.get("/api/super-admin/review-mode/assessments", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const targetId = req.query.targetId as string | undefined;
+    const assessments = targetId
+      ? await db.select().from(reviewManualAssessments).where(sql`${reviewManualAssessments.targetId} = ${targetId}`).orderBy(desc(reviewManualAssessments.createdAt))
+      : await db.select().from(reviewManualAssessments).orderBy(desc(reviewManualAssessments.createdAt));
+    res.json(assessments);
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to fetch manual assessments");
+    res.status(500).json({ error: "Failed to fetch manual assessments" });
+  }
+});
+
+router.post("/api/super-admin/review-mode/assessments", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const parsed = manualAssessmentSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+
+    const target = await reviewModeMethods.getTarget(parsed.data.targetId);
+    if (!target) return res.status(404).json({ error: "Target not found" });
+
+    const user = (req as any).user;
+    const [assessment] = await db.insert(reviewManualAssessments).values({
+      targetId: parsed.data.targetId,
+      percentComplete: parsed.data.percentComplete,
+      starRating: parsed.data.starRating,
+      comments: parsed.data.comments || null,
+      assessedByUserId: user?.id || null,
+      assessedByName: user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email : "Unknown",
+    }).returning();
+
+    res.json(assessment);
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to create manual assessment");
+    res.status(500).json({ error: "Failed to create manual assessment" });
+  }
+});
+
+router.patch("/api/super-admin/review-mode/assessments/:id", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const updateSchema = z.object({
+      percentComplete: z.number().min(0).max(100).optional(),
+      starRating: z.number().min(1).max(5).optional(),
+      comments: z.string().optional().nullable(),
+    });
+    const parsed = updateSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+
+    const [existing] = await db.select().from(reviewManualAssessments).where(sql`${reviewManualAssessments.id} = ${req.params.id}`);
+    if (!existing) return res.status(404).json({ error: "Assessment not found" });
+
+    const [updated] = await db.update(reviewManualAssessments)
+      .set({ ...parsed.data, updatedAt: new Date() })
+      .where(sql`${reviewManualAssessments.id} = ${req.params.id}`)
+      .returning();
+
+    res.json(updated);
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to update manual assessment");
+    res.status(500).json({ error: "Failed to update manual assessment" });
+  }
+});
+
+router.delete("/api/super-admin/review-mode/assessments/:id", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const [existing] = await db.select().from(reviewManualAssessments).where(sql`${reviewManualAssessments.id} = ${req.params.id}`);
+    if (!existing) return res.status(404).json({ error: "Assessment not found" });
+
+    await db.delete(reviewManualAssessments).where(sql`${reviewManualAssessments.id} = ${req.params.id}`);
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to delete manual assessment");
+    res.status(500).json({ error: "Failed to delete manual assessment" });
   }
 });
 

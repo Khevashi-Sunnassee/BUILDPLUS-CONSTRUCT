@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   ChevronLeft, Loader2, Monitor, Smartphone, Star, BarChart3,
   Search, CheckCircle2, XCircle, Clock, AlertTriangle, FileText,
-  Download, ArrowLeft, ChevronDown, ChevronRight
+  Download, ArrowLeft, ChevronDown, ChevronRight, Plus, Pencil, Trash2, User
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -348,6 +353,316 @@ function DashboardView({ onSelectTarget, onDiscover }: { onSelectTarget: (t: Rev
   );
 }
 
+interface ManualAssessment {
+  id: string;
+  targetId: string;
+  percentComplete: number;
+  starRating: number;
+  comments: string | null;
+  assessedByUserId: string | null;
+  assessedByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function InteractiveStarRating({ value, onChange, size = "md" }: { value: number; onChange: (v: number) => void; size?: "sm" | "md" | "lg" }) {
+  const [hovered, setHovered] = useState<number | null>(null);
+  const sizeClass = size === "sm" ? "h-4 w-4" : size === "lg" ? "h-8 w-8" : "h-6 w-6";
+  return (
+    <div className="flex items-center gap-1" data-testid="interactive-star-rating">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <Star
+          key={s}
+          className={`${sizeClass} cursor-pointer transition-colors ${
+            s <= (hovered ?? value)
+              ? "fill-yellow-400 text-yellow-400"
+              : "text-muted-foreground/30 hover:text-yellow-300"
+          }`}
+          onClick={() => onChange(s)}
+          onMouseEnter={() => setHovered(s)}
+          onMouseLeave={() => setHovered(null)}
+          data-testid={`star-select-${s}`}
+        />
+      ))}
+      <span className="ml-2 font-semibold text-sm">{hovered ?? value}/5</span>
+    </div>
+  );
+}
+
+function ManualAssessmentSection({ targetId }: { targetId: string }) {
+  const { toast } = useToast();
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingAssessment, setEditingAssessment] = useState<ManualAssessment | null>(null);
+  const [starRating, setStarRating] = useState(3);
+  const [percentComplete, setPercentComplete] = useState(50);
+  const [comments, setComments] = useState("");
+
+  const { data: assessments = [], isLoading } = useQuery<ManualAssessment[]>({
+    queryKey: [`${API_BASE}/assessments`, { targetId }],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { targetId: string; percentComplete: number; starRating: number; comments: string | null }) => {
+      const res = await apiRequest("POST", `${API_BASE}/assessments`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/assessments`] });
+      toast({ title: "Assessment added successfully" });
+      resetForm();
+      setShowAddDialog(false);
+    },
+    onError: () => toast({ title: "Failed to add assessment", variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { percentComplete?: number; starRating?: number; comments?: string | null } }) => {
+      const res = await apiRequest("PATCH", `${API_BASE}/assessments/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/assessments`] });
+      toast({ title: "Assessment updated successfully" });
+      setEditingAssessment(null);
+      resetForm();
+    },
+    onError: () => toast({ title: "Failed to update assessment", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `${API_BASE}/assessments/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/assessments`] });
+      toast({ title: "Assessment deleted" });
+    },
+    onError: () => toast({ title: "Failed to delete assessment", variant: "destructive" }),
+  });
+
+  const resetForm = () => {
+    setStarRating(3);
+    setPercentComplete(50);
+    setComments("");
+  };
+
+  const openAdd = () => {
+    resetForm();
+    setShowAddDialog(true);
+  };
+
+  const openEdit = (a: ManualAssessment) => {
+    setEditingAssessment(a);
+    setStarRating(a.starRating);
+    setPercentComplete(a.percentComplete);
+    setComments(a.comments || "");
+  };
+
+  const handleSubmit = () => {
+    if (editingAssessment) {
+      updateMutation.mutate({
+        id: editingAssessment.id,
+        data: { starRating, percentComplete, comments: comments || null },
+      });
+    } else {
+      createMutation.mutate({
+        targetId,
+        starRating,
+        percentComplete,
+        comments: comments || null,
+      });
+    }
+  };
+
+  const latestAssessment = assessments.length > 0 ? assessments[0] : null;
+
+  return (
+    <Card data-testid="manual-assessment-section">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-lg">My Assessment - % Complete</CardTitle>
+            <CardDescription>Your own star rating and progress assessment with comments</CardDescription>
+          </div>
+          <Button size="sm" onClick={openAdd} data-testid="button-add-assessment">
+            <Plus className="h-4 w-4 mr-1" />
+            Add Assessment
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {latestAssessment && (
+          <div className="mb-4 p-4 border rounded-lg bg-muted/30" data-testid="latest-assessment-summary">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Current Assessment</span>
+              <Badge variant="outline" className="text-xs">
+                {new Date(latestAssessment.updatedAt).toLocaleDateString()} {new Date(latestAssessment.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-6 flex-wrap">
+              <div className="flex items-center gap-2">
+                <StarRating score={latestAssessment.starRating} size="md" />
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-32 bg-muted rounded-full h-3 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      latestAssessment.percentComplete >= 80 ? "bg-green-500" :
+                      latestAssessment.percentComplete >= 50 ? "bg-yellow-500" : "bg-red-500"
+                    }`}
+                    style={{ width: `${latestAssessment.percentComplete}%` }}
+                  />
+                </div>
+                <span className="text-sm font-bold" data-testid="text-percent-complete">{latestAssessment.percentComplete}%</span>
+              </div>
+            </div>
+            {latestAssessment.comments && (
+              <p className="text-sm text-muted-foreground mt-2 italic" data-testid="text-latest-comment">"{latestAssessment.comments}"</p>
+            )}
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
+          </div>
+        ) : assessments.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground" data-testid="empty-assessments">
+            <Star className="h-8 w-8 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">No assessments recorded yet. Add your first assessment above.</p>
+          </div>
+        ) : (
+          <div>
+            <h4 className="text-sm font-medium mb-2">Assessment History ({assessments.length})</h4>
+            <div className="space-y-2 max-h-96 overflow-y-auto" data-testid="assessment-history-list">
+              {assessments.map((a) => (
+                <div key={a.id} className="flex items-start gap-3 p-3 border rounded-md" data-testid={`assessment-row-${a.id}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 flex-wrap mb-1">
+                      <StarRating score={a.starRating} size="sm" />
+                      <div className="flex items-center gap-1">
+                        <div className="w-20 bg-muted rounded-full h-2 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              a.percentComplete >= 80 ? "bg-green-500" :
+                              a.percentComplete >= 50 ? "bg-yellow-500" : "bg-red-500"
+                            }`}
+                            style={{ width: `${a.percentComplete}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-semibold">{a.percentComplete}%</span>
+                      </div>
+                    </div>
+                    {a.comments && (
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2" data-testid={`text-comment-${a.id}`}>{a.comments}</p>
+                    )}
+                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                      {a.assessedByName && (
+                        <span className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          {a.assessedByName}
+                        </span>
+                      )}
+                      <span>
+                        {new Date(a.createdAt).toLocaleDateString()} {new Date(a.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      {a.updatedAt !== a.createdAt && (
+                        <span className="italic">(updated {new Date(a.updatedAt).toLocaleDateString()} {new Date(a.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(a)} data-testid={`button-edit-assessment-${a.id}`}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-destructive hover:text-destructive"
+                      onClick={() => deleteMutation.mutate(a.id)}
+                      disabled={deleteMutation.isPending}
+                      data-testid={`button-delete-assessment-${a.id}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+
+      <Dialog open={showAddDialog || !!editingAssessment} onOpenChange={(open) => {
+        if (!open) {
+          setShowAddDialog(false);
+          setEditingAssessment(null);
+          resetForm();
+        }
+      }}>
+        <DialogContent className="sm:max-w-md" data-testid="assessment-dialog">
+          <DialogHeader>
+            <DialogTitle>{editingAssessment ? "Update Assessment" : "Add Assessment"}</DialogTitle>
+            <DialogDescription>
+              Rate the page completion with stars and set percent complete.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Star Rating</label>
+              <InteractiveStarRating value={starRating} onChange={setStarRating} size="lg" />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Percent Complete: <span className="font-bold">{percentComplete}%</span></label>
+              <Slider
+                value={[percentComplete]}
+                onValueChange={(v) => setPercentComplete(v[0])}
+                max={100}
+                min={0}
+                step={5}
+                className="mt-2"
+                data-testid="slider-percent-complete"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>0%</span>
+                <span>25%</span>
+                <span>50%</span>
+                <span>75%</span>
+                <span>100%</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Comments</label>
+              <Textarea
+                value={comments}
+                onChange={(e) => setComments(e.target.value)}
+                placeholder="Add your assessment notes..."
+                rows={3}
+                data-testid="input-assessment-comments"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowAddDialog(false); setEditingAssessment(null); resetForm(); }} data-testid="button-cancel-assessment">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={createMutation.isPending || updateMutation.isPending}
+              data-testid="button-save-assessment"
+            >
+              {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {editingAssessment ? "Update" : "Save"} Assessment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 function TargetDetailView({ target, onBack }: { target: ReviewTarget; onBack: () => void }) {
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
 
@@ -412,6 +727,8 @@ function TargetDetailView({ target, onBack }: { target: ReviewTarget; onBack: ()
           )}
         </CardContent>
       </Card>
+
+      <ManualAssessmentSection targetId={target.id} />
 
       <Card>
         <CardHeader>

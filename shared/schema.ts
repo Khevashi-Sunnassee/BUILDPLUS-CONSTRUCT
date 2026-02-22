@@ -5816,6 +5816,25 @@ export const insertReviewAuditSchema = createInsertSchema(reviewAudits).omit({ i
 export type InsertReviewAudit = z.infer<typeof insertReviewAuditSchema>;
 export type ReviewAudit = typeof reviewAudits.$inferSelect;
 
+export const reviewManualAssessments = pgTable("review_manual_assessments", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  targetId: text("target_id").notNull().references(() => reviewTargets.id, { onDelete: "cascade" }),
+  percentComplete: integer("percent_complete").notNull(),
+  starRating: integer("star_rating").notNull(),
+  comments: text("comments"),
+  assessedByUserId: text("assessed_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  assessedByName: text("assessed_by_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  targetIdIdx: index("review_manual_assessments_target_id_idx").on(table.targetId),
+  createdAtIdx: index("review_manual_assessments_created_at_idx").on(table.createdAt),
+}));
+
+export const insertReviewManualAssessmentSchema = createInsertSchema(reviewManualAssessments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertReviewManualAssessment = z.infer<typeof insertReviewManualAssessmentSchema>;
+export type ReviewManualAssessment = typeof reviewManualAssessments.$inferSelect;
+
 export const externalApiKeys = pgTable("external_api_keys", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
