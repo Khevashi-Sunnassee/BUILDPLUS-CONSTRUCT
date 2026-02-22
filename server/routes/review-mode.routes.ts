@@ -510,7 +510,19 @@ router.post("/api/super-admin/review-mode/packets/:id/score", requireSuperAdmin,
       Object.values(avgBreakdown).reduce((a, b) => a + b, 0) / breakdownKeys.length
     );
 
-    const scoreBreakdown = { ...avgBreakdown, reviewerScores: scores };
+    const dimensionNotes: Record<string, string> = {};
+    const notesKeys = breakdownKeys.map(k => `${k}Notes`);
+    for (const key of breakdownKeys) {
+      const notesKey = `${key}Notes`;
+      const allNotes = scores
+        .map(s => s.breakdown?.[notesKey] || s.notes?.[key])
+        .filter((v: any) => typeof v === "string" && v.length > 0);
+      if (allNotes.length > 0) {
+        dimensionNotes[notesKey] = allNotes.join("\n\n");
+      }
+    }
+
+    const scoreBreakdown = { ...avgBreakdown, ...dimensionNotes, reviewerScores: scores };
 
     await reviewModeMethods.updatePacket(packetId, {
       score: overallScore,
@@ -553,7 +565,15 @@ const createAuditSchema = z.object({
     dataIntegrity: z.number().min(1).max(5),
     errorHandling: z.number().min(1).max(5),
     accessibility: z.number().min(1).max(5),
-  }),
+    functionalityNotes: z.string().optional(),
+    uiUxNotes: z.string().optional(),
+    securityNotes: z.string().optional(),
+    performanceNotes: z.string().optional(),
+    codeQualityNotes: z.string().optional(),
+    dataIntegrityNotes: z.string().optional(),
+    errorHandlingNotes: z.string().optional(),
+    accessibilityNotes: z.string().optional(),
+  }).passthrough(),
   findingsMd: z.string().optional(),
   fixesAppliedMd: z.string().optional(),
   issuesFound: z.number().min(0).optional().default(0),
@@ -615,6 +635,7 @@ router.patch("/api/super-admin/review-mode/audits/:id", requireSuperAdmin, async
       fixesAppliedMd: z.string().optional(),
       issuesFixed: z.number().min(0).optional(),
       status: z.enum(["REVIEWED", "FIXES_APPLIED", "RE_REVIEW_NEEDED"]).optional(),
+      scoreBreakdown: z.record(z.any()).optional(),
     });
     const parsed = updateSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
@@ -626,6 +647,182 @@ router.patch("/api/super-admin/review-mode/audits/:id", requireSuperAdmin, async
     res.status(500).json({ error: "Failed to update audit" });
   }
 });
+
+router.post("/api/super-admin/review-mode/audits/:id/generate-notes", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const auditId = req.params.id as string;
+    const audits = await reviewModeMethods.getAllAudits();
+    const audit = audits.find((a: any) => a.id === auditId);
+    if (!audit) return res.status(404).json({ error: "Audit not found" });
+
+    const breakdown = audit.scoreBreakdown as any;
+    if (!breakdown) return res.status(400).json({ error: "No score breakdown found" });
+
+    const dimensionKeys = ["functionality", "uiUx", "security", "performance", "codeQuality", "dataIntegrity", "errorHandling", "accessibility"];
+    const updatedBreakdown = { ...breakdown };
+
+    for (const key of dimensionKeys) {
+      const notesKey = `${key}Notes`;
+      if (!updatedBreakdown[notesKey]) {
+        const score = updatedBreakdown[key] ?? 0;
+        updatedBreakdown[notesKey] = generateDefaultNotes(key, score, audit.findingsMd);
+      }
+    }
+
+    await reviewModeMethods.updateAudit(auditId, { scoreBreakdown: updatedBreakdown } as any);
+
+    const target = await reviewModeMethods.getTarget(audit.targetId);
+    if (target) {
+      const latestAudits = await reviewModeMethods.getAuditsForTarget(audit.targetId);
+      if (latestAudits.length > 0 && latestAudits[0].id === auditId) {
+        await reviewModeMethods.updateTarget(audit.targetId, {
+          latestScoreBreakdown: updatedBreakdown,
+        });
+      }
+    }
+
+    res.json({ scoreBreakdown: updatedBreakdown });
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to generate notes");
+    res.status(500).json({ error: "Failed to generate notes" });
+  }
+});
+
+router.post("/api/super-admin/review-mode/generate-all-notes", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const audits = await reviewModeMethods.getAllAudits();
+    let updated = 0;
+
+    for (const audit of audits) {
+      const breakdown = audit.scoreBreakdown as any;
+      if (!breakdown) continue;
+
+      const dimensionKeys = ["functionality", "uiUx", "security", "performance", "codeQuality", "dataIntegrity", "errorHandling", "accessibility"];
+      let hasNew = false;
+      const updatedBreakdown = { ...breakdown };
+
+      for (const key of dimensionKeys) {
+        const notesKey = `${key}Notes`;
+        if (!updatedBreakdown[notesKey]) {
+          const score = updatedBreakdown[key] ?? 0;
+          updatedBreakdown[notesKey] = generateDefaultNotes(key, score, audit.findingsMd);
+          hasNew = true;
+        }
+      }
+
+      if (hasNew) {
+        await reviewModeMethods.updateAudit(audit.id, { scoreBreakdown: updatedBreakdown } as any);
+        updated++;
+      }
+    }
+
+    const targets = await reviewModeMethods.getTargets();
+    for (const target of targets) {
+      const latestAudits = await reviewModeMethods.getAuditsForTarget(target.id);
+      if (latestAudits.length > 0) {
+        const latestBreakdown = latestAudits[0].scoreBreakdown as any;
+        await reviewModeMethods.updateTarget(target.id, {
+          latestScoreBreakdown: latestBreakdown,
+        });
+      }
+    }
+
+    res.json({ updated, total: audits.length });
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to generate all notes");
+    res.status(500).json({ error: "Failed to generate notes" });
+  }
+});
+
+function generateDefaultNotes(dimension: string, score: number, findingsMd: string | null): string {
+  const findings = findingsMd || "";
+
+  const dimensionGuidance: Record<string, { low: string; medium: string; high: string }> = {
+    functionality: {
+      low: "## Issues\nMultiple features are broken or incomplete. Core CRUD operations may fail or produce incorrect results.\n\n## Improvements Needed\n- Verify all form submissions save correctly\n- Test edge cases (empty inputs, special characters)\n- Ensure all buttons and links work as expected\n- Add missing features that users would expect",
+      medium: "## Current State\nCore features work but some edge cases or secondary features need attention.\n\n## Improvements Needed\n- Test all user workflows end-to-end\n- Handle edge cases (empty states, max limits, concurrent edits)\n- Verify data validation covers all scenarios\n- Add any missing filter/sort/search functionality",
+      high: "## Current State\nAll major features work correctly with good edge case handling.\n\n## To Reach 5/5\n- Ensure every feature works flawlessly under all conditions\n- Add advanced features (bulk operations, keyboard shortcuts)\n- Verify cross-browser compatibility",
+    },
+    uiUx: {
+      low: "## Issues\nLayout issues, inconsistent styling, or poor user experience patterns throughout.\n\n## Improvements Needed\n- Fix alignment and spacing issues\n- Add consistent hover states and visual feedback\n- Improve form layouts and validation messages\n- Add loading states and skeleton screens",
+      medium: "## Current State\nGood visual design with minor inconsistencies in some areas.\n\n## Improvements Needed\n- Ensure consistent spacing and alignment across all elements\n- Add smooth transitions and micro-interactions\n- Improve mobile responsiveness\n- Add proper empty states with helpful guidance",
+      high: "## Current State\nClean, professional design with good user experience patterns.\n\n## To Reach 5/5\n- Polish all transitions and animations\n- Ensure pixel-perfect alignment\n- Add delightful micro-interactions\n- Optimise for all screen sizes",
+    },
+    security: {
+      low: "## Issues\nMissing authentication checks, unsanitized inputs, or exposed sensitive data.\n\n## Improvements Needed\n- Add authentication middleware to all protected routes\n- Sanitize all user inputs to prevent XSS/injection\n- Implement RBAC checks for role-specific actions\n- Remove any hardcoded secrets or sensitive data",
+      medium: "## Current State\nBasic security measures in place but some gaps remain.\n\n## Improvements Needed\n- Add rate limiting to prevent abuse\n- Implement CSRF protection on forms\n- Verify all API endpoints check authorization properly\n- Add input validation on both client and server side",
+      high: "## Current State\nStrong security posture with proper authentication and authorization.\n\n## To Reach 5/5\n- Implement Content Security Policy headers\n- Add audit logging for sensitive actions\n- Review for any data leakage in API responses\n- Ensure all file uploads are validated",
+    },
+    performance: {
+      low: "## Issues\nSlow page loads, excessive re-renders, or unoptimized database queries.\n\n## Improvements Needed\n- Add pagination to list endpoints (avoid loading all records)\n- Implement React.memo and useMemo for expensive computations\n- Optimize database queries with proper indexes\n- Add lazy loading for heavy components",
+      medium: "## Current State\nReasonable performance but room for optimization.\n\n## Improvements Needed\n- Add query result caching where appropriate\n- Implement virtual scrolling for long lists\n- Optimize bundle size with code splitting\n- Use React.memo to prevent unnecessary re-renders\n- Add debouncing to search/filter inputs",
+      high: "## Current State\nGood performance with most optimizations in place.\n\n## To Reach 5/5\n- Profile and eliminate any remaining render bottlenecks\n- Implement prefetching for predictable navigation\n- Optimize image loading with lazy loading\n- Consider server-side caching for expensive queries",
+    },
+    codeQuality: {
+      low: "## Issues\nInconsistent code style, missing types, or poor code organization.\n\n## Improvements Needed\n- Add TypeScript types to all function parameters and returns\n- Extract duplicated code into reusable utilities\n- Follow consistent naming conventions\n- Break large components into smaller, focused ones\n- Remove dead code and unused imports",
+      medium: "## Current State\nDecent code organization but some areas need cleanup.\n\n## Improvements Needed\n- Add proper TypeScript interfaces for all data structures\n- Extract business logic from UI components into hooks\n- Reduce component file sizes (aim for under 300 lines)\n- Add JSDoc comments to complex functions\n- Replace any magic numbers with named constants",
+      high: "## Current State\nWell-organized code with good TypeScript usage.\n\n## To Reach 5/5\n- Ensure 100% type safety (no 'any' types)\n- Add comprehensive documentation\n- Refactor any remaining large files\n- Ensure consistent error handling patterns",
+    },
+    dataIntegrity: {
+      low: "## Issues\nMissing validation, potential data corruption, or inconsistent data handling.\n\n## Improvements Needed\n- Add Zod validation schemas for all API inputs\n- Implement database constraints (NOT NULL, UNIQUE, CHECK)\n- Add foreign key constraints for related data\n- Validate data on both client and server side",
+      medium: "## Current State\nBasic validation in place but some gaps in data integrity.\n\n## Improvements Needed\n- Add database-level constraints for critical fields\n- Implement optimistic locking for concurrent edits\n- Validate enum values and ranges server-side\n- Add cascade rules for related data deletion\n- Ensure all required fields are properly validated",
+      high: "## Current State\nGood data validation and integrity checks.\n\n## To Reach 5/5\n- Add transaction wrapping for multi-table operations\n- Implement soft-delete where appropriate\n- Add data migration strategies\n- Verify referential integrity across all relations",
+    },
+    errorHandling: {
+      low: "## Issues\nCrashes on errors, missing error boundaries, or silent failures.\n\n## Improvements Needed\n- Add try-catch blocks to all API route handlers\n- Implement React error boundaries for component trees\n- Show user-friendly error messages (not raw errors)\n- Add proper error logging on the server\n- Handle network timeout and connection errors",
+      medium: "## Current State\nBasic error handling exists but coverage is incomplete.\n\n## Improvements Needed\n- Add error boundaries around major page sections\n- Show specific error messages for different failure types\n- Implement retry logic for transient failures\n- Add proper 404/500 error pages\n- Log errors with sufficient context for debugging",
+      high: "## Current State\nGood error handling with proper user feedback.\n\n## To Reach 5/5\n- Add automatic error reporting/monitoring\n- Implement graceful degradation for non-critical features\n- Add circuit breakers for external service calls\n- Ensure all async operations have timeout handling",
+    },
+    accessibility: {
+      low: "## Issues\nMissing alt text, poor keyboard navigation, or no ARIA labels.\n\n## Improvements Needed\n- Add alt text to all images\n- Ensure all interactive elements are keyboard accessible\n- Add ARIA labels to icon-only buttons\n- Use semantic HTML elements (main, nav, section)\n- Ensure sufficient color contrast ratios",
+      medium: "## Current State\nBasic accessibility features present but not comprehensive.\n\n## Improvements Needed\n- Add skip-to-content links\n- Ensure focus management in modals and dialogs\n- Add ARIA live regions for dynamic content updates\n- Test with screen reader to identify gaps\n- Ensure form fields have associated labels",
+      high: "## Current State\nGood accessibility with proper semantic structure.\n\n## To Reach 5/5\n- Add comprehensive ARIA landmarks\n- Implement focus trapping in all modal dialogs\n- Add screen reader announcements for state changes\n- Ensure complete keyboard-only navigation\n- Test with multiple assistive technologies",
+    },
+  };
+
+  const guidance = dimensionGuidance[dimension];
+  if (!guidance) return "";
+
+  let notes = "";
+  if (score <= 2) {
+    notes = guidance.low;
+  } else if (score <= 3) {
+    notes = guidance.medium;
+  } else {
+    notes = guidance.high;
+  }
+
+  if (findings) {
+    const relevantFindings = extractRelevantFindings(findings, dimension);
+    if (relevantFindings) {
+      notes += `\n\n## Specific Findings\n${relevantFindings}`;
+    }
+  }
+
+  return notes;
+}
+
+function extractRelevantFindings(findingsMd: string, dimension: string): string {
+  const keywordMap: Record<string, string[]> = {
+    functionality: ["feature", "crud", "form", "submit", "button", "filter", "search", "navigation", "workflow", "missing"],
+    uiUx: ["layout", "spacing", "alignment", "responsive", "mobile", "design", "style", "ui", "ux", "visual", "hover"],
+    security: ["auth", "security", "role", "permission", "rbac", "xss", "injection", "csrf", "sanitize", "access"],
+    performance: ["performance", "slow", "render", "memo", "usememo", "cache", "pagination", "lazy", "optimize", "bundle"],
+    codeQuality: ["code", "type", "typescript", "refactor", "duplicate", "naming", "convention", "import", "dead code"],
+    dataIntegrity: ["validation", "constraint", "schema", "data", "integrity", "null", "unique", "foreign key", "zod"],
+    errorHandling: ["error", "catch", "boundary", "exception", "handling", "try", "fallback", "toast", "message"],
+    accessibility: ["aria", "accessibility", "a11y", "keyboard", "screen reader", "alt", "label", "focus", "semantic"],
+  };
+
+  const keywords = keywordMap[dimension] || [];
+  const sentences = findingsMd.split(/[.!?\n]/).filter(s => s.trim().length > 10);
+  const relevant = sentences.filter(s => {
+    const lower = s.toLowerCase();
+    return keywords.some(kw => lower.includes(kw));
+  });
+
+  return relevant.length > 0 ? relevant.slice(0, 5).map(s => `- ${s.trim()}`).join("\n") : "";
+}
 
 router.get("/api/super-admin/review-mode/queue", requireSuperAdmin, async (_req: Request, res: Response) => {
   try {

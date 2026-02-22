@@ -106,38 +106,154 @@ function StarRating({ score, size = "md" }: { score: number | null; size?: "sm" 
   );
 }
 
-function ScoreBreakdownCard({ breakdown }: { breakdown: any }) {
+const DIMENSION_DEFINITIONS = [
+  { key: "functionality", label: "Functionality", notesKey: "functionalityNotes" },
+  { key: "uiUx", label: "UI/UX", notesKey: "uiUxNotes" },
+  { key: "security", label: "Security", notesKey: "securityNotes" },
+  { key: "performance", label: "Performance", notesKey: "performanceNotes" },
+  { key: "codeQuality", label: "Code Quality", notesKey: "codeQualityNotes" },
+  { key: "dataIntegrity", label: "Data Integrity", notesKey: "dataIntegrityNotes" },
+  { key: "errorHandling", label: "Error Handling", notesKey: "errorHandlingNotes" },
+  { key: "accessibility", label: "Accessibility", notesKey: "accessibilityNotes" },
+];
+
+function ScoreBreakdownCard({ breakdown, expandable = true }: { breakdown: any; expandable?: boolean }) {
+  const [expandedDimension, setExpandedDimension] = useState<string | null>(null);
   if (!breakdown) return null;
-  const dimensions = [
-    { key: "functionality", label: "Functionality" },
-    { key: "uiUx", label: "UI/UX" },
-    { key: "security", label: "Security" },
-    { key: "performance", label: "Performance" },
-    { key: "codeQuality", label: "Code Quality" },
-    { key: "dataIntegrity", label: "Data Integrity" },
-    { key: "errorHandling", label: "Error Handling" },
-    { key: "accessibility", label: "Accessibility" },
-  ];
+
+  const hasAnyNotes = DIMENSION_DEFINITIONS.some(({ notesKey }) => breakdown[notesKey]);
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="score-breakdown">
-      {dimensions.map(({ key, label }) => {
-        const val = breakdown[key] ?? 0;
-        const color = val >= 4 ? "text-green-600" : val >= 3 ? "text-yellow-600" : "text-red-600";
-        return (
-          <div key={key} className="flex flex-col items-center p-2 border rounded-md">
-            <span className="text-xs text-muted-foreground">{label}</span>
-            <div className="flex items-center gap-1 mt-1">
-              {[1, 2, 3, 4, 5].map((s) => (
-                <Star key={s} className={`h-3 w-3 ${s <= val ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/20"}`} />
-              ))}
+    <div className="space-y-3" data-testid="score-breakdown">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {DIMENSION_DEFINITIONS.map(({ key, label, notesKey }) => {
+          const val = breakdown[key] ?? 0;
+          const notes = breakdown[notesKey];
+          const color = val >= 4 ? "text-green-600" : val >= 3 ? "text-yellow-600" : "text-red-600";
+          const bgColor = val >= 4 ? "border-green-500/20" : val >= 3 ? "border-yellow-500/20" : "border-red-500/20";
+          const isExpanded = expandedDimension === key;
+          const hasNotes = !!notes;
+
+          return (
+            <div
+              key={key}
+              className={`flex flex-col items-center p-2 border rounded-md transition-colors ${bgColor} ${
+                expandable && hasNotes ? "cursor-pointer hover:bg-muted/50" : ""
+              } ${isExpanded ? "ring-1 ring-primary/50 bg-muted/30" : ""}`}
+              onClick={() => {
+                if (expandable && hasNotes) {
+                  setExpandedDimension(isExpanded ? null : key);
+                }
+              }}
+              data-testid={`dimension-card-${key}`}
+            >
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <div className="flex items-center gap-1 mt-1">
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star key={s} className={`h-3 w-3 ${s <= val ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/20"}`} />
+                ))}
+              </div>
+              <span className={`text-sm font-bold ${color}`}>{val}/5</span>
+              {expandable && hasNotes && (
+                <span className="text-[10px] text-muted-foreground mt-1 flex items-center gap-0.5">
+                  {isExpanded ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
+                  {isExpanded ? "Hide details" : "View details"}
+                </span>
+              )}
             </div>
-            <span className={`text-sm font-bold ${color}`}>{val}/5</span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+
+      {expandedDimension && (
+        <DimensionNotesPanel
+          dimension={DIMENSION_DEFINITIONS.find(d => d.key === expandedDimension)!}
+          breakdown={breakdown}
+          onClose={() => setExpandedDimension(null)}
+        />
+      )}
+
+      {expandable && hasAnyNotes && !expandedDimension && (
+        <p className="text-xs text-muted-foreground text-center italic">Click on a dimension card to see details and improvement suggestions</p>
+      )}
     </div>
   );
+}
+
+function DimensionNotesPanel({
+  dimension,
+  breakdown,
+  onClose,
+}: {
+  dimension: { key: string; label: string; notesKey: string };
+  breakdown: any;
+  onClose: () => void;
+}) {
+  const val = breakdown[dimension.key] ?? 0;
+  const notes = breakdown[dimension.notesKey] || "";
+  const color = val >= 4 ? "text-green-600" : val >= 3 ? "text-yellow-600" : "text-red-600";
+  const bgClass = val >= 4 ? "border-green-500/30 bg-green-500/5" : val >= 3 ? "border-yellow-500/30 bg-yellow-500/5" : "border-red-500/30 bg-red-500/5";
+
+  const sections = parseNoteSections(notes);
+
+  return (
+    <div className={`border rounded-lg p-4 space-y-3 ${bgClass}`} data-testid={`dimension-notes-${dimension.key}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <h4 className="text-sm font-semibold">{dimension.label}</h4>
+          <span className={`text-sm font-bold ${color}`}>{val}/5</span>
+          <div className="flex items-center gap-0.5">
+            {[1, 2, 3, 4, 5].map((s) => (
+              <Star key={s} className={`h-3 w-3 ${s <= val ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/20"}`} />
+            ))}
+          </div>
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-dimension-notes">
+          <XCircle className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {sections.length > 0 ? (
+        <div className="space-y-2">
+          {sections.map((section, idx) => (
+            <div key={idx}>
+              {section.heading && (
+                <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{section.heading}</h5>
+              )}
+              <div className="text-sm whitespace-pre-wrap leading-relaxed">{section.content}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm whitespace-pre-wrap leading-relaxed">{notes}</p>
+      )}
+    </div>
+  );
+}
+
+function parseNoteSections(notes: string): { heading: string | null; content: string }[] {
+  if (!notes) return [];
+  const lines = notes.split("\n");
+  const sections: { heading: string | null; content: string }[] = [];
+  let currentHeading: string | null = null;
+  let currentLines: string[] = [];
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^##?\s+(.+)/);
+    if (headingMatch) {
+      if (currentLines.length > 0) {
+        sections.push({ heading: currentHeading, content: currentLines.join("\n").trim() });
+      }
+      currentHeading = headingMatch[1];
+      currentLines = [];
+    } else {
+      currentLines.push(line);
+    }
+  }
+  if (currentLines.length > 0) {
+    sections.push({ heading: currentHeading, content: currentLines.join("\n").trim() });
+  }
+  return sections.filter(s => s.content.length > 0);
 }
 
 function scoreColor(score: number | null): string {
@@ -145,6 +261,93 @@ function scoreColor(score: number | null): string {
   if (score >= 4) return "text-green-600";
   if (score >= 3) return "text-yellow-600";
   return "text-red-600";
+}
+
+function LatestScoreCard({ target, audits }: { target: ReviewTarget; audits: ReviewAudit[] }) {
+  const { toast } = useToast();
+  const hasNotes = target.latestScoreBreakdown && DIMENSION_DEFINITIONS.some(
+    ({ notesKey }) => (target.latestScoreBreakdown as any)?.[notesKey]
+  );
+
+  const latestAudit = audits.length > 0 ? audits[0] : null;
+
+  const generateNotesMutation = useMutation({
+    mutationFn: async () => {
+      if (!latestAudit) throw new Error("No audit to generate notes for");
+      const res = await apiRequest("POST", `${API_BASE}/audits/${latestAudit.id}/generate-notes`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/targets`] });
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/audits`] });
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/queue`] });
+      toast({ title: "Dimension notes generated successfully" });
+    },
+    onError: () => toast({ title: "Failed to generate notes", variant: "destructive" }),
+  });
+
+  const generateAllNotesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `${API_BASE}/generate-all-notes`);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/targets`] });
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/audits`] });
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/queue`] });
+      toast({ title: `Notes generated for ${data.updated} of ${data.total} audits` });
+    },
+    onError: () => toast({ title: "Failed to generate notes", variant: "destructive" }),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg">Latest Score</CardTitle>
+          <div className="flex items-center gap-2">
+            {latestAudit && !hasNotes && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => generateNotesMutation.mutate()}
+                disabled={generateNotesMutation.isPending}
+                data-testid="button-generate-notes"
+              >
+                {generateNotesMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                ) : (
+                  <FileText className="h-3.5 w-3.5 mr-1" />
+                )}
+                Generate Notes
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => generateAllNotesMutation.mutate()}
+              disabled={generateAllNotesMutation.isPending}
+              data-testid="button-generate-all-notes"
+            >
+              {generateAllNotesMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+              ) : (
+                <BarChart3 className="h-3.5 w-3.5 mr-1" />
+              )}
+              Generate All Notes
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <StarRating score={target.latestScore} size="lg" />
+        <ScoreBreakdownCard breakdown={target.latestScoreBreakdown} />
+        {target.latestScore === null && (
+          <p className="text-sm text-muted-foreground">This page has not been audited yet.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 function TargetRow({ target, onClick }: { target: ReviewTarget; onClick: () => void }) {
@@ -715,18 +918,7 @@ function TargetDetailView({ target, onBack }: { target: ReviewTarget; onBack: ()
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Latest Score</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <StarRating score={target.latestScore} size="lg" />
-          <ScoreBreakdownCard breakdown={target.latestScoreBreakdown} />
-          {target.latestScore === null && (
-            <p className="text-sm text-muted-foreground">This page has not been audited yet.</p>
-          )}
-        </CardContent>
-      </Card>
+      <LatestScoreCard target={target} audits={audits} />
 
       <ManualAssessmentSection targetId={target.id} />
 
