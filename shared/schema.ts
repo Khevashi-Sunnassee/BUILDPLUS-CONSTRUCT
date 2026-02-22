@@ -5530,6 +5530,7 @@ export const kbProjects = pgTable("kb_projects", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   instructions: text("instructions"),
+  color: varchar("color", { length: 20 }),
   createdById: varchar("created_by_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
