@@ -86,7 +86,7 @@ export default function AdminPanelsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingPanelId, setDeletingPanelId] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [importData, setImportData] = useState<any[]>([]);
+  const [importData, setImportData] = useState<Record<string, unknown>[]>([]);
   const [selectedJobForImport, setSelectedJobForImport] = useState<string>("");
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [importErrors, setImportErrors] = useState<string[]>([]);
@@ -275,11 +275,17 @@ export default function AdminPanelsPage() {
       setDeleteSourceDialogOpen(false);
       setSourceToDelete(null);
     },
-    onError: async (error: any) => {
-      const errorData = error.response ? await error.response.json().catch(() => ({})) : {};
+    onError: async (error: Error) => {
+      let description = "Some panels have production records";
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch {
+        if (error.message) description = error.message;
+      }
       toast({
         title: "Cannot delete panels",
-        description: errorData.error || "Some panels have production records",
+        description,
         variant: "destructive"
       });
     },
@@ -618,7 +624,7 @@ export default function AdminPanelsPage() {
       setPanelDialogOpen(false);
       panelForm.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Failed to create panel", description: error.message, variant: "destructive" });
     },
   });
@@ -674,16 +680,16 @@ export default function AdminPanelsPage() {
   });
 
   const importPanelsMutation = useMutation({
-    mutationFn: async ({ data, jobId }: { data: any[]; jobId?: string }) => {
+    mutationFn: async ({ data, jobId }: { data: Record<string, unknown>[]; jobId?: string }) => {
       return apiRequest("POST", ADMIN_ROUTES.PANELS_IMPORT, { data, jobId: jobId || undefined });
     },
     onSuccess: async (response) => {
-      const result = await response.json();
+      const result = await response.json() as { imported: number; skipped: number; errors?: string[] };
       queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
       queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       if (result.errors && result.errors.length > 0) {
         setImportErrors(result.errors);
-        const jobErrors = result.errors.filter((e: string) => e.includes("not found"));
+        const jobErrors = result.errors.filter((e) => e.includes("not found"));
         if (jobErrors.length > 0 && result.imported === 0) {
           toast({
             title: "Import Failed - Jobs Not Found",
@@ -705,12 +711,16 @@ export default function AdminPanelsPage() {
         setImportErrors([]);
       }
     },
-    onError: async (error: any) => {
-      const errorData = error.response ? await error.response.json().catch(() => ({})) : {};
-      setImportErrors(errorData.details || []);
+    onError: (error: Error) => {
+      let errorMsg = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        if (parsed.details) setImportErrors(parsed.details);
+        errorMsg = parsed.error || parsed.message || errorMsg;
+      } catch { /* use raw message */ }
       toast({
         title: "Import failed",
-        description: errorData.error || error.message,
+        description: errorMsg,
         variant: "destructive"
       });
     },
@@ -747,7 +757,7 @@ export default function AdminPanelsPage() {
       }
       setIsAnalyzing(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Failed to analyze PDF", description: error.message, variant: "destructive" });
       setIsAnalyzing(false);
     },
@@ -763,7 +773,7 @@ export default function AdminPanelsPage() {
       toast({ title: "Panel approved for production" });
       closeBuildDialog();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Failed to approve panel", description: error.message, variant: "destructive" });
     },
   });
@@ -777,7 +787,7 @@ export default function AdminPanelsPage() {
       queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       toast({ title: "Production approval revoked" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Failed to revoke approval", description: error.message, variant: "destructive" });
     },
   });
@@ -868,8 +878,9 @@ export default function AdminPanelsPage() {
             }));
           }
           analyzePdfMutation.mutate({ panelId: buildingPanel.id, pdfBase64: base64 });
-        } catch (error: any) {
-          toast({ title: "Error uploading PDF", description: error.message, variant: "destructive" });
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : "Unknown error";
+          toast({ title: "Error uploading PDF", description: msg, variant: "destructive" });
           setIsAnalyzing(false);
         }
       }
@@ -911,10 +922,10 @@ export default function AdminPanelsPage() {
     headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
       headers[colNumber] = String(cell.value || "");
     });
-    const jsonData: any[] = [];
+    const jsonData: Record<string, unknown>[] = [];
     worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       if (rowNumber === 1) return;
-      const rowObj: any = {};
+      const rowObj: Record<string, unknown> = {};
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         if (headers[colNumber]) {
           rowObj[headers[colNumber]] = cell.value;
@@ -1085,7 +1096,7 @@ export default function AdminPanelsPage() {
       setConsolidationDialogOpen(false);
       setConsolidationData(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Consolidation Failed", description: error.message, variant: "destructive" });
     },
   });
@@ -1166,7 +1177,7 @@ export default function AdminPanelsPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; icon: any; className?: string }> = {
+    const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ComponentType<{ className?: string }>; className?: string }> = {
       NOT_STARTED: { variant: "outline", icon: AlertCircle },
       IN_PROGRESS: { variant: "default", icon: ClockIcon },
       COMPLETED: { variant: "secondary", icon: CheckCircle },
@@ -1954,7 +1965,7 @@ export default function AdminPanelsPage() {
         selectedJobForImport={selectedJobForImport}
         setSelectedJobForImport={setSelectedJobForImport}
         jobs={jobs}
-        onImport={(data: { data: any[]; jobId?: string }) => importPanelsMutation.mutate(data)}
+        onImport={(data: { data: Record<string, unknown>[]; jobId?: string }) => importPanelsMutation.mutate(data)}
         importPending={importPanelsMutation.isPending}
       />
 

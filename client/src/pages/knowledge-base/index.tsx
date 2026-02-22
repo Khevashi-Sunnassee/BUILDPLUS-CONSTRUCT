@@ -70,6 +70,7 @@ export default function KnowledgeBasePage() {
       setShowDeleteConvo(null);
       toast({ title: "Conversation deleted" });
     },
+    onError: () => toast({ title: "Failed to delete conversation", variant: "destructive" }),
   });
 
   const handleNewChat = () => {
@@ -92,7 +93,7 @@ export default function KnowledgeBasePage() {
   };
 
   return (
-    <div className="flex h-full" data-testid="knowledge-base-page">
+    <div className="flex h-full" role="main" aria-label="Knowledge Base" data-testid="knowledge-base-page">
       <div className="w-64 shrink-0 hidden md:flex flex-col">
         <KbSidebar
           projects={projects}

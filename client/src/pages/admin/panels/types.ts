@@ -146,9 +146,17 @@ export interface BuildFormData {
   productionPdfUrl: string;
 }
 
+export interface ConsolidationPanel {
+  id: string;
+  panelMark: string;
+  loadWidth: string | null;
+  loadHeight: string | null;
+  level: string | null;
+}
+
 export interface ConsolidationData {
   primaryPanelId: string;
-  panels: any[];
+  panels: ConsolidationPanel[];
   newPanelMark: string;
   newWidth: string;
   newHeight: string;

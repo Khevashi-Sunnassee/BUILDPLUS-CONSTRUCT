@@ -127,7 +127,7 @@ export default function AdminJobsPage() {
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
   const [deletingJobPanelCount, setDeletingJobPanelCount] = useState(0);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [importData, setImportData] = useState<any[]>([]);
+  const [importData, setImportData] = useState<Record<string, unknown>[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [costOverridesDialogOpen, setCostOverridesDialogOpen] = useState(false);
   const [costOverridesJob, setCostOverridesJob] = useState<JobWithPanels | null>(null);
@@ -308,7 +308,7 @@ export default function AdminJobsPage() {
       setJobDialogOpen(false);
       jobForm.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       let msg = error.message || "Unknown error";
       try {
         const jsonMatch = msg.match(/\{.*\}/);
@@ -316,7 +316,7 @@ export default function AdminJobsPage() {
           const parsed = JSON.parse(jsonMatch[0]);
           msg = parsed.error || parsed.message || msg;
         }
-      } catch (error) { /* non-critical error parsing - use fallback message */ }
+      } catch { /* non-critical error parsing - use fallback message */ }
       toast({ title: "Failed to create job", description: msg, variant: "destructive" });
     },
   });
@@ -352,7 +352,7 @@ export default function AdminJobsPage() {
         jobForm.reset();
       }
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       let msg = error.message || "Unknown error";
       try {
         const jsonMatch = msg.match(/\{.*\}/);
@@ -360,7 +360,7 @@ export default function AdminJobsPage() {
           const parsed = JSON.parse(jsonMatch[0]);
           msg = parsed.error || parsed.message || msg;
         }
-      } catch (error) { /* non-critical error parsing - use fallback message */ }
+      } catch { /* non-critical error parsing - use fallback message */ }
       toast({ title: "Failed to update job", description: msg, variant: "destructive" });
     },
   });
@@ -404,7 +404,7 @@ export default function AdminJobsPage() {
       setQuickAddCustomerName("");
       toast({ title: "Customer created and selected" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Failed to create customer", description: error.message, variant: "destructive" });
     },
   });
@@ -578,7 +578,7 @@ export default function AdminJobsPage() {
   }, {} as Record<string, CostOverride[]>);
 
   const importJobsMutation = useMutation({
-    mutationFn: async (data: any[]) => {
+    mutationFn: async (data: Record<string, unknown>[]) => {
       return apiRequest("POST", ADMIN_ROUTES.JOBS_IMPORT, { data });
     },
     onSuccess: async (response) => {
@@ -607,10 +607,10 @@ export default function AdminJobsPage() {
     headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
       headers[colNumber] = String(cell.value || "");
     });
-    const jsonData: any[] = [];
+    const jsonData: Record<string, unknown>[] = [];
     worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       if (rowNumber === 1) return;
-      const rowObj: any = {};
+      const rowObj: Record<string, unknown> = {};
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         if (headers[colNumber]) {
           rowObj[headers[colNumber]] = cell.value;
@@ -788,9 +788,9 @@ export default function AdminJobsPage() {
     }
   };
 
-  const onFormError = (errors: any) => {
+  const onFormError = (errors: Record<string, { message?: string }>) => {
     const errorMessages = Object.entries(errors)
-      .map(([field, err]: [string, any]) => `${field}: ${err?.message || "invalid"}`)
+      .map(([field, err]) => `${field}: ${err?.message || "invalid"}`)
       .join(", ");
     toast({ title: "Please fix form errors", description: errorMessages, variant: "destructive" });
   };

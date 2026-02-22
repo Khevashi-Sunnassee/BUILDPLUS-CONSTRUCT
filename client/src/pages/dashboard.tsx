@@ -1,3 +1,4 @@
+import { useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -133,21 +134,33 @@ export default function DashboardPage() {
     },
   });
 
-  const unreadTaskNotifications = taskNotifications.filter(n => !n.readAt);
+  const unreadTaskNotifications = useMemo(
+    () => taskNotifications.filter(n => !n.readAt),
+    [taskNotifications]
+  );
 
-  const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-  const totalMentions = conversations.reduce((sum, c) => sum + (c.unreadMentions || 0), 0);
-  const unreadConversations = conversations.filter(c => c.unreadCount > 0);
+  const totalUnread = useMemo(
+    () => conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0),
+    [conversations]
+  );
+  const totalMentions = useMemo(
+    () => conversations.reduce((sum, c) => sum + (c.unreadMentions || 0), 0),
+    [conversations]
+  );
+  const unreadConversations = useMemo(
+    () => conversations.filter(c => c.unreadCount > 0),
+    [conversations]
+  );
 
-  const formatMinutes = (minutes: number) => {
+  const formatMinutes = useCallback((minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     if (hours === 0) return `${mins}m`;
     if (mins === 0) return `${hours}h`;
     return `${hours}h ${mins}m`;
-  };
+  }, []);
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = useCallback((status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
       PENDING: { variant: "secondary", label: "Pending" },
       SUBMITTED: { variant: "default", label: "Submitted" },
@@ -156,7 +169,7 @@ export default function DashboardPage() {
     };
     const config = variants[status] || variants.PENDING;
     return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
+  }, []);
 
   if (isError) {
     return (

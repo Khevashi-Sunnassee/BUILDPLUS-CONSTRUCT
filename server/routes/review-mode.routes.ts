@@ -828,8 +828,20 @@ router.get("/api/super-admin/review-mode/queue", requireSuperAdmin, async (_req:
   try {
     const targets = await reviewModeMethods.getTargets();
     const unreviewed = targets.filter(t => !t.lastReviewedAt);
-    const needsWork = targets.filter(t => t.latestScore !== null && t.latestScore < 4).sort((a, b) => (a.latestScore || 0) - (b.latestScore || 0));
-    const reviewed = targets.filter(t => t.latestScore !== null && t.latestScore >= 4).sort((a, b) => (b.latestScore || 0) - (a.latestScore || 0));
+
+    const dimensionKeys = ["functionality", "uiUx", "security", "performance", "codeQuality", "dataIntegrity", "errorHandling", "accessibility"];
+    const hasAnyDimensionBelow4 = (t: typeof targets[0]): boolean => {
+      if (!t.latestScoreBreakdown || typeof t.latestScoreBreakdown !== "object") return false;
+      const breakdown = t.latestScoreBreakdown as Record<string, unknown>;
+      return dimensionKeys.some(key => {
+        const val = breakdown[key];
+        const numVal = typeof val === "number" ? val : typeof val === "string" ? Number(val) : NaN;
+        return !isNaN(numVal) && numVal < 4;
+      });
+    };
+
+    const needsWork = targets.filter(t => t.latestScore !== null && (t.latestScore < 4 || hasAnyDimensionBelow4(t))).sort((a, b) => (a.latestScore || 0) - (b.latestScore || 0));
+    const reviewed = targets.filter(t => t.latestScore !== null && t.latestScore >= 4 && !hasAnyDimensionBelow4(t)).sort((a, b) => (b.latestScore || 0) - (a.latestScore || 0));
 
     res.json({
       unreviewed,
@@ -845,8 +857,9 @@ router.get("/api/super-admin/review-mode/queue", requireSuperAdmin, async (_req:
           : null,
       },
     });
-  } catch (error: any) {
-    logger.error({ error: error.message }, "Failed to fetch review queue");
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    logger.error({ error: msg }, "Failed to fetch review queue");
     res.status(500).json({ error: "Failed to fetch review queue" });
   }
 });

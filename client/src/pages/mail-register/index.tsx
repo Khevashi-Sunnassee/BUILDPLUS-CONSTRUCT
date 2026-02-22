@@ -146,7 +146,7 @@ export default function MailRegisterPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="flex flex-col h-full" data-testid="page-mail-register">
+    <div className="flex flex-col h-full" role="main" aria-label="Mail Register" data-testid="page-mail-register">
       <div className="flex items-center justify-between px-6 py-4 border-b">
         <div>
           <h1 className="text-xl font-semibold flex items-center gap-2" data-testid="text-mail-register-title">

@@ -56,12 +56,12 @@ import { getSourceLabel } from "./types";
 interface ImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  importData: any[];
+  importData: Record<string, unknown>[];
   selectedJobForImport: string;
   setSelectedJobForImport: (v: string) => void;
   importErrors: string[];
   jobs: Job[] | undefined;
-  onImport: (data: { data: any[]; jobId?: string }) => void;
+  onImport: (data: { data: Record<string, unknown>[]; jobId?: string }) => void;
   importPending: boolean;
 }
 
@@ -132,11 +132,11 @@ export function ImportDialog({
               <TableBody>
                 {importData.slice(0, 10).map((row, idx) => (
                   <TableRow key={idx}>
-                    <TableCell className="font-mono text-sm">{row["Job Number"] || row.jobNumber || row.job_number || row["Job"] || "-"}</TableCell>
-                    <TableCell className="font-mono">{row.panelMark || row["Panel Mark"] || row["Mark"] || "-"}</TableCell>
-                    <TableCell>{row.panelType || row["Panel Type"] || row["Type"] || "WALL"}</TableCell>
-                    <TableCell>{row.description || row["Description"] || "-"}</TableCell>
-                    <TableCell>{row.estimatedHours || row["Estimated Hours"] || "-"}</TableCell>
+                    <TableCell className="font-mono text-sm">{String(row["Job Number"] || row.jobNumber || row.job_number || row["Job"] || "-")}</TableCell>
+                    <TableCell className="font-mono">{String(row.panelMark || row["Panel Mark"] || row["Mark"] || "-")}</TableCell>
+                    <TableCell>{String(row.panelType || row["Panel Type"] || row["Type"] || "WALL")}</TableCell>
+                    <TableCell>{String(row.description || row["Description"] || "-")}</TableCell>
+                    <TableCell>{String(row.estimatedHours || row["Estimated Hours"] || "-")}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -496,7 +496,7 @@ export function ConsolidationDialog({
             <div className="rounded-md border p-4 bg-muted/20">
               <h4 className="font-medium mb-2">Panels Being Consolidated</h4>
               <div className="space-y-1">
-                {consolidationData.panels.map((p: any) => (
+                {consolidationData.panels.map((p) => (
                   <div key={p.id} className="flex items-center justify-between text-sm" data-testid={`consolidation-panel-${p.id}`}>
                     <span className="font-mono">{p.panelMark}</span>
                     <span className="text-muted-foreground">
@@ -522,7 +522,7 @@ export function ConsolidationDialog({
               <div className="space-y-2">
                 <Label>Level</Label>
                 <Input
-                  value={consolidationData.panels.find((p: any) => p.id === consolidationData.primaryPanelId)?.level || ""}
+                  value={consolidationData.panels.find((p) => p.id === consolidationData.primaryPanelId)?.level || ""}
                   disabled
                   data-testid="input-consolidation-level"
                 />
@@ -586,8 +586,8 @@ export function ConsolidationDialog({
               </p>
               <ul className="mt-1 list-disc pl-5 text-muted-foreground">
                 {consolidationData.panels
-                  .filter((p: any) => p.id !== consolidationData.primaryPanelId)
-                  .map((p: any) => (
+                  .filter((p) => p.id !== consolidationData.primaryPanelId)
+                  .map((p) => (
                     <li key={p.id}>{p.panelMark} ({p.loadWidth} x {p.loadHeight}mm)</li>
                   ))}
               </ul>
@@ -601,7 +601,7 @@ export function ConsolidationDialog({
                 onClick={() => {
                   if (!consolidationData) return;
                   onConsolidate({
-                    panelIds: consolidationData.panels.map((p: any) => p.id),
+                    panelIds: consolidationData.panels.map((p) => p.id),
                     primaryPanelId: consolidationData.primaryPanelId,
                     newPanelMark: consolidationData.newPanelMark,
                     newLoadWidth: consolidationData.newWidth,
