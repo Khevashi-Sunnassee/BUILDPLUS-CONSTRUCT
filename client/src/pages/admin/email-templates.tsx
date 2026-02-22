@@ -26,6 +26,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Plus,
   ArrowLeft,
@@ -34,6 +44,9 @@ import {
   Pencil,
   Trash2,
   FileText,
+  Sparkles,
+  Loader2,
+  Wand2,
 } from "lucide-react";
 
 type TemplateType =
@@ -92,6 +105,255 @@ function typeBadgeVariant(type: TemplateType): "default" | "secondary" | "outlin
   }
 }
 
+const TONE_OPTIONS = [
+  "Professional",
+  "Formal",
+  "Friendly",
+  "Authoritative",
+  "Urgent",
+  "Informative",
+  "Persuasive",
+  "Apologetic",
+  "Congratulatory",
+];
+
+const JOB_TYPE_OPTIONS = [
+  "Panel Production",
+  "Structural Steel",
+  "Precast Concrete",
+  "Tilt Panel",
+  "Formwork",
+  "General Construction",
+  "Fit-Out / Interior",
+  "Civil Works",
+  "Demolition",
+  "Maintenance / Defects",
+  "Other",
+];
+
+function AskAIDialog({
+  open,
+  onOpenChange,
+  onGenerated,
+  templateName,
+  templateType,
+  subjectLine,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onGenerated: (htmlBody: string) => void;
+  templateName: string;
+  templateType: TemplateType;
+  subjectLine: string;
+}) {
+  const { toast } = useToast();
+  const [purpose, setPurpose] = useState("");
+  const [tone, setTone] = useState("Professional");
+  const [jobType, setJobType] = useState("");
+  const [preview, setPreview] = useState<string | null>(null);
+
+  const generateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/email-templates/ai/generate", {
+        purpose,
+        tone,
+        jobType: jobType === "none" ? "" : jobType,
+        templateType,
+        templateName,
+        subjectLine,
+      });
+      return res.json();
+    },
+    onSuccess: (data: { htmlBody: string }) => {
+      setPreview(data.htmlBody);
+      toast({ title: "AI generated your email content" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to generate content",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGenerate = () => {
+    if (!purpose.trim()) {
+      toast({ title: "Please describe what the email should do", variant: "destructive" });
+      return;
+    }
+    generateMutation.mutate();
+  };
+
+  const handleUseContent = () => {
+    if (preview) {
+      onGenerated(preview);
+      onOpenChange(false);
+      setPurpose("");
+      setTone("Professional");
+      setJobType("");
+      setPreview(null);
+    }
+  };
+
+  const handleRegenerate = () => {
+    if (!purpose.trim()) {
+      toast({ title: "Please describe what the email should do", variant: "destructive" });
+      return;
+    }
+    setPreview(null);
+    generateMutation.mutate();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(val) => {
+      if (!val) {
+        setPreview(null);
+      }
+      onOpenChange(val);
+    }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            Ask AI to Write Your Email
+          </DialogTitle>
+          <DialogDescription>
+            Tell AI what you want the email to say and it will generate professional content for you.
+          </DialogDescription>
+        </DialogHeader>
+
+        {!preview ? (
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="ai-purpose">What should this email do and say?</Label>
+              <Textarea
+                id="ai-purpose"
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value)}
+                placeholder="e.g., Notify the client that their panel delivery has been scheduled for next week. Include details about preparation requirements and site access needs."
+                className="min-h-[120px]"
+                data-testid="textarea-ai-purpose"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tone</Label>
+              <Select value={tone} onValueChange={setTone}>
+                <SelectTrigger data-testid="select-ai-tone">
+                  <SelectValue placeholder="Select tone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TONE_OPTIONS.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Job Type (optional)</Label>
+              <Select value={jobType} onValueChange={setJobType}>
+                <SelectTrigger data-testid="select-ai-job-type">
+                  <SelectValue placeholder="Select job type for context" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No specific job type</SelectItem>
+                  {JOB_TYPE_OPTIONS.map((j) => (
+                    <SelectItem key={j} value={j}>{j}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {templateName && (
+              <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-md">
+                AI will also consider: Template Name "{templateName}"
+                {subjectLine && `, Subject "${subjectLine}"`}
+                {templateType !== "GENERAL" && `, Type: ${TYPE_LABELS[templateType]}`}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Wand2 className="h-4 w-4 text-primary" />
+                Generated Content Preview
+              </Label>
+              <div
+                className="border rounded-md p-4 bg-white dark:bg-zinc-900 max-h-[400px] overflow-y-auto text-sm prose prose-sm dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: preview }}
+                data-testid="div-ai-preview"
+              />
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          {!preview ? (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                data-testid="button-ai-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleGenerate}
+                disabled={generateMutation.isPending || !purpose.trim()}
+                data-testid="button-ai-generate"
+              >
+                {generateMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate
+                  </>
+                )}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => { setPreview(null); }}
+                data-testid="button-ai-back"
+              >
+                Back to Brief
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleRegenerate}
+                disabled={generateMutation.isPending}
+                data-testid="button-ai-regenerate"
+              >
+                {generateMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Wand2 className="h-4 w-4 mr-2" />
+                )}
+                Regenerate
+              </Button>
+              <Button
+                onClick={handleUseContent}
+                data-testid="button-ai-use-content"
+              >
+                Use This Content
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function EmailTemplatesPage() {
   useDocumentTitle("Email Templates");
   const { toast } = useToast();
@@ -101,6 +363,7 @@ export default function EmailTemplatesPage() {
   const [filterType, setFilterType] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<EmailTemplate | null>(null);
+  const [showAIDialog, setShowAIDialog] = useState(false);
 
   const [formName, setFormName] = useState("");
   const [formType, setFormType] = useState<TemplateType>("GENERAL");
@@ -327,9 +590,20 @@ export default function EmailTemplatesPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">
-                  Email Body
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-foreground">
+                    Email Body
+                  </label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAIDialog(true)}
+                    data-testid="button-ask-ai"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Ask AI
+                  </Button>
+                </div>
                 <RichTextEditor
                   content={formBody}
                   onChange={setFormBody}
@@ -358,6 +632,15 @@ export default function EmailTemplatesPage() {
             </CardContent>
           </Card>
         )}
+
+        <AskAIDialog
+          open={showAIDialog}
+          onOpenChange={setShowAIDialog}
+          onGenerated={(html) => setFormBody(html)}
+          templateName={formName}
+          templateType={formType}
+          subjectLine={formSubject}
+        />
       </div>
     );
   }

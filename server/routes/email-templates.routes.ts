@@ -283,4 +283,109 @@ router.get("/api/email-send-logs", requireAuth, async (req: Request, res: Respon
   }
 });
 
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<iframe\b[^>]*>.*?<\/iframe>/gi, "")
+    .replace(/<object\b[^>]*>.*?<\/object>/gi, "")
+    .replace(/<embed\b[^>]*\/?>/gi, "")
+    .replace(/<form\b[^>]*>.*?<\/form>/gi, "")
+    .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
+    .replace(/\son\w+\s*=\s*\S+/gi, "")
+    .replace(/javascript\s*:/gi, "")
+    .replace(/data\s*:\s*text\/html/gi, "");
+}
+
+const aiGenerateSchema = z.object({
+  purpose: z.string().min(1, "Purpose is required").max(2000),
+  tone: z.string().min(1, "Tone is required").max(100),
+  jobType: z.string().max(200).optional().default(""),
+  templateType: z.enum(TEMPLATE_TYPES).optional().default("GENERAL"),
+  templateName: z.string().max(255).optional().default(""),
+  subjectLine: z.string().max(500).optional().default(""),
+});
+
+router.post("/api/email-templates/ai/generate", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = (req as any).companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const parsed = aiGenerateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    const { purpose, tone, jobType, templateType, templateName, subjectLine } = parsed.data;
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ error: "AI service is not configured" });
+    }
+
+    const OpenAI = (await import("openai")).default;
+    const openai = new OpenAI({ apiKey });
+
+    const systemPrompt = `You are a professional email template writer for a construction and manufacturing company called BuildPlus. 
+You create well-structured, professional email templates that can be used for business communication.
+The company manages panel production, delivery, construction projects, and related operations.
+
+Important rules:
+- Write in clean HTML format suitable for email clients
+- Use professional formatting with proper paragraphs
+- Include placeholders where appropriate using {{placeholder_name}} syntax (e.g., {{recipient_name}}, {{job_number}}, {{project_name}}, {{company_name}}, {{sender_name}})
+- Make the email feel professional yet personable
+- Include a proper greeting and sign-off
+- Structure with clear sections if the content is detailed
+- Do NOT include <html>, <head>, or <body> tags - just the inner HTML content
+- Use simple inline styles for formatting if needed (bold, lists, etc.)`;
+
+    let userPrompt = `Generate a professional email template with the following requirements:
+
+PURPOSE: ${purpose}
+TONE: ${tone}`;
+
+    if (jobType) {
+      userPrompt += `\nJOB TYPE / CONTEXT: ${jobType}`;
+    }
+    if (templateType && templateType !== "GENERAL") {
+      userPrompt += `\nTEMPLATE CATEGORY: ${templateType}`;
+    }
+    if (templateName) {
+      userPrompt += `\nTEMPLATE NAME: ${templateName}`;
+    }
+    if (subjectLine) {
+      userPrompt += `\nSUBJECT LINE CONTEXT: ${subjectLine}`;
+    }
+
+    userPrompt += `\n\nPlease generate the email body HTML content only. Use {{placeholder_name}} syntax for any dynamic values like names, dates, job numbers etc. Make sure to include common placeholders like {{recipient_name}} and {{sender_name}}.`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 2000,
+      temperature: 0.7,
+    });
+
+    const generatedContent = completion.choices[0]?.message?.content || "";
+
+    let cleanContent = generatedContent
+      .replace(/```html\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+
+    cleanContent = sanitizeHtml(cleanContent);
+
+    res.json({
+      htmlBody: cleanContent,
+      tokensUsed: completion.usage?.total_tokens || 0,
+    });
+  } catch (err: any) {
+    logger.error({ err: err.message }, "Error generating email template with AI");
+    res.status(500).json({ error: "Failed to generate email content" });
+  }
+});
+
 export { router as emailTemplatesRouter };
