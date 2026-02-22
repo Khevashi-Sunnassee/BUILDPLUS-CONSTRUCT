@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   ImageIcon,
@@ -17,6 +17,9 @@ import {
   CheckSquare,
   Square,
   Trash2,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,6 +49,7 @@ import { useAuth } from "@/lib/auth";
 import { ShieldAlert } from "lucide-react";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useCtrlScrollZoom } from "@/hooks/use-ctrl-scroll-zoom";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -193,11 +197,54 @@ function FullscreenViewer({
   hasNext: boolean;
   onDelete: (doc: DocumentWithDetails) => void;
 }) {
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useCtrlScrollZoom({
+    containerRef,
+    zoom,
+    setZoom,
+    minZoom: 0.25,
+    maxZoom: 10,
+    step: 0.15,
+    enabled: open,
+  });
+
+  const resetZoom = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (zoom <= 1) return;
+    e.preventDefault();
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  }, [zoom, pan]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  }, [isDragging, dragStart]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  const handleNavigate = useCallback((direction: "prev" | "next") => {
+    resetZoom();
+    if (direction === "prev") onPrev();
+    else onNext();
+  }, [resetZoom, onPrev, onNext]);
+
   if (!doc) return null;
   const viewUrl = DOCUMENT_ROUTES.VIEW(doc.id);
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { resetZoom(); onClose(); } }}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden" data-testid="fullscreen-viewer">
         <DialogTitle className="sr-only">{doc.title}</DialogTitle>
         <DialogDescription className="sr-only">Full-size photo viewer</DialogDescription>
@@ -212,7 +259,7 @@ function FullscreenViewer({
                 size="icon"
                 variant="outline"
                 disabled={!hasPrev}
-                onClick={onPrev}
+                onClick={() => handleNavigate("prev")}
                 data-testid="button-viewer-prev"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -221,11 +268,43 @@ function FullscreenViewer({
                 size="icon"
                 variant="outline"
                 disabled={!hasNext}
-                onClick={onNext}
+                onClick={() => handleNavigate("next")}
                 data-testid="button-viewer-next"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
+              <div className="border-l mx-1" />
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => setZoom(prev => Math.min(10, prev + 0.25))}
+                data-testid="button-viewer-zoom-in"
+                title="Zoom in"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => { setZoom(prev => { const next = Math.max(0.25, prev - 0.25); if (next <= 1) setPan({ x: 0, y: 0 }); return next; }); }}
+                data-testid="button-viewer-zoom-out"
+                title="Zoom out"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={resetZoom}
+                data-testid="button-viewer-zoom-reset"
+                title="Reset zoom"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+              <span className="flex items-center text-xs text-muted-foreground min-w-[3rem] justify-center" data-testid="text-viewer-zoom-level">
+                {Math.round(zoom * 100)}%
+              </span>
+              <div className="border-l mx-1" />
               <Button
                 size="icon"
                 variant="outline"
@@ -246,12 +325,26 @@ function FullscreenViewer({
               </Button>
             </div>
           </div>
-          <div className="flex-1 flex items-center justify-center bg-muted/50 overflow-auto p-4">
+          <div
+            ref={containerRef}
+            className="flex-1 flex items-center justify-center bg-muted/50 overflow-hidden"
+            style={{ cursor: zoom > 1 ? (isDragging ? "grabbing" : "grab") : "default" }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            data-testid="viewer-zoom-container"
+          >
             <img
               src={viewUrl}
               alt={doc.title}
-              style={{ imageOrientation: "from-image" }}
-              className="max-w-full max-h-full object-contain"
+              draggable={false}
+              style={{
+                imageOrientation: "from-image",
+                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+                transition: isDragging ? "none" : "transform 0.15s ease-out",
+              }}
+              className="max-w-full max-h-full object-contain select-none"
               data-testid="img-viewer-full"
             />
           </div>
