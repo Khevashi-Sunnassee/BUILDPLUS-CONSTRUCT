@@ -104,6 +104,7 @@ export function ChatSidebar({
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
   const [editingTopicName, setEditingTopicName] = useState("");
   const [draggingConvId, setDraggingConvId] = useState<string | null>(null);
+  const [pendingTopicId, setPendingTopicId] = useState<string | null>(null);
 
   const [newConversation, setNewConversation] = useState({
     name: "",
@@ -115,16 +116,28 @@ export function ChatSidebar({
 
   const createConversationMutation = useMutation({
     mutationFn: async (data: typeof newConversation) => {
-      return apiRequest("POST", CHAT_ROUTES.CONVERSATIONS, data);
+      const res = await apiRequest("POST", CHAT_ROUTES.CONVERSATIONS, data);
+      return res;
     },
-    onSuccess: () => {
+    onSuccess: async (response: Response) => {
+      if (pendingTopicId) {
+        try {
+          const created = await response.json();
+          if (created?.id) {
+            await apiRequest("PATCH", CHAT_ROUTES.CONVERSATION_TOPIC(created.id), { topicId: pendingTopicId });
+          }
+        } catch (_e) {
+        }
+      }
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
       setShowNewConversationDialog(false);
       setNewConversation({ name: "", type: "GROUP", memberIds: [], jobId: null, panelId: null });
+      setPendingTopicId(null);
       toast({ title: "Conversation created" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to create conversation", description: error.message, variant: "destructive" });
+      setPendingTopicId(null);
     },
   });
 
@@ -315,16 +328,22 @@ export function ChatSidebar({
           >
             <FolderOpen className="h-4 w-4" />
           </Button>
-          <Dialog open={showNewConversationDialog} onOpenChange={setShowNewConversationDialog}>
+          <Dialog open={showNewConversationDialog} onOpenChange={(open) => { setShowNewConversationDialog(open); if (!open) setPendingTopicId(null); }}>
             <DialogTrigger asChild>
-              <Button size="icon" variant="ghost" data-testid="button-new-conversation">
+              <Button size="icon" variant="ghost" data-testid="button-new-conversation" onClick={() => setPendingTopicId(null)}>
                 <Plus className="h-4 w-4" />
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>New Conversation</DialogTitle>
-                <DialogDescription>Create a new direct message, group chat, or channel.</DialogDescription>
+                <DialogDescription>
+                  {pendingTopicId ? (
+                    <>Create a new conversation in topic: <strong>{topics.find(t => t.id === pendingTopicId)?.name}</strong></>
+                  ) : (
+                    "Create a new direct message, group chat, or channel."
+                  )}
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -551,6 +570,23 @@ export function ChatSidebar({
                               </Badge>
                             )}
                             <Badge variant="secondary" className="text-[10px] px-1 py-0 h-[16px]">{convs.length}</Badge>
+                            {!isEditing && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 shrink-0 invisible group-hover/topic:visible"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPendingTopicId(topic.id);
+                                  setNewConversation({ name: "", type: "GROUP", memberIds: [], jobId: null, panelId: null });
+                                  setShowNewConversationDialog(true);
+                                }}
+                                data-testid={`button-add-conversation-topic-${topic.id}`}
+                                title="New conversation in this topic"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            )}
                             {!isEditing && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
