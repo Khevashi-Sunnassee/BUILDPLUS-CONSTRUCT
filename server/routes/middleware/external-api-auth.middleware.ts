@@ -7,9 +7,12 @@ import { eq, and } from "drizzle-orm";
 import { storage } from "../../storage";
 import logger from "../../lib/logger";
 
-const JWT_SECRET = process.env.SESSION_SECRET;
-if (!JWT_SECRET) {
-  throw new Error("SESSION_SECRET environment variable is required for external API authentication");
+function getJwtSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    throw new Error("SESSION_SECRET environment variable is required for external API authentication");
+  }
+  return secret;
 }
 const TOKEN_EXPIRY = "1h";
 
@@ -95,7 +98,7 @@ export async function requireExternalApiKey(req: Request, res: Response, next: N
     const userToken = req.headers["x-user-token"] as string | undefined;
     if (userToken) {
       try {
-        const decoded = jwt.verify(userToken, JWT_SECRET) as {
+        const decoded = jwt.verify(userToken, getJwtSecret()) as {
           userId: string;
           companyId: string;
           email: string;
@@ -210,7 +213,7 @@ export async function getAllowedJobIdsForUser(userId: string, role: string): Pro
 export function generateUserToken(userId: string, companyId: string, email: string, role: string): { token: string; expiresIn: string; expiresAt: string } {
   const token = jwt.sign(
     { userId, companyId, email, role },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: TOKEN_EXPIRY }
   );
 
