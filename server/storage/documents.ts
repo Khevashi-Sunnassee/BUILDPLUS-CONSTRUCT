@@ -177,6 +177,7 @@ export const documentMethods = {
     showLatestOnly?: boolean;
     mimeTypePrefix?: string;
     excludeChat?: boolean;
+    chatUserId?: string;
     allowedJobIds?: string[];
   }): Promise<{ documents: DocumentWithDetails[]; total: number; page: number; limit: number; totalPages: number }> {
     const page = filters.page || 1;
@@ -216,6 +217,12 @@ export const documentMethods = {
     if (filters.excludeChat) {
       conditions.push(sql`${documents.conversationId} IS NULL`);
       conditions.push(sql`${documents.messageId} IS NULL`);
+    } else if (filters.chatUserId) {
+      conditions.push(sql`(
+        (${documents.conversationId} IS NULL AND ${documents.messageId} IS NULL)
+        OR ${documents.conversationId} IN (SELECT conversation_id FROM conversation_members WHERE user_id = ${filters.chatUserId})
+        OR ${documents.messageId} IN (SELECT id FROM chat_messages WHERE conversation_id IN (SELECT conversation_id FROM conversation_members WHERE user_id = ${filters.chatUserId}))
+      )`);
     }
     if (filters.allowedJobIds) {
       if (filters.allowedJobIds.length === 0) {

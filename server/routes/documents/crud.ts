@@ -3,7 +3,7 @@ import crypto from "crypto";
 import sharp from "sharp";
 import { storage, db } from "../../storage";
 import { eq, and } from "drizzle-orm";
-import { jobMembers, documents, insertDocumentSchema, kbDocuments, kbProjects, kbChunks } from "@shared/schema";
+import { jobMembers, documents, insertDocumentSchema, kbDocuments, kbProjects, kbChunks, conversationMembers, chatMessages } from "@shared/schema";
 import { requireAuth, requireRole } from "../middleware/auth.middleware";
 import { ObjectNotFoundError } from "../../replit_integrations/object_storage";
 import logger from "../../lib/logger";
@@ -21,6 +21,27 @@ import {
 } from "./shared";
 
 const router = Router();
+
+async function checkChatDocumentAccess(doc: any, userId: string): Promise<boolean> {
+  if (!doc.conversationId && !doc.messageId) return true;
+  let convoId = doc.conversationId;
+  if (!convoId && doc.messageId) {
+    const [msg] = await db.select({ conversationId: chatMessages.conversationId })
+      .from(chatMessages)
+      .where(eq(chatMessages.id, doc.messageId))
+      .limit(1);
+    if (!msg) return false;
+    convoId = msg.conversationId;
+  }
+  const [membership] = await db.select({ id: conversationMembers.id })
+    .from(conversationMembers)
+    .where(and(
+      eq(conversationMembers.conversationId, convoId),
+      eq(conversationMembers.userId, userId),
+    ))
+    .limit(1);
+  return !!membership;
+}
 
 // ==================== DOCUMENTS ====================
 
@@ -56,6 +77,7 @@ router.get("/api/documents", requireAuth, async (req, res) => {
       showLatestOnly: showLatestOnly === "true",
       mimeTypePrefix: mimeTypePrefix ? String(mimeTypePrefix) : undefined,
       excludeChat: excludeChat === "true",
+      chatUserId: req.session.userId!,
       allowedJobIds,
     });
     
@@ -84,6 +106,9 @@ router.get("/api/documents/:id", requireAuth, async (req, res) => {
   try {
     const document = await storage.getDocument(String(req.params.id));
     if (!document) return sendNotFound(res, "Document not found");
+    if (!await checkChatDocumentAccess(document, req.session.userId!)) {
+      return sendForbidden(res, "You do not have access to this document");
+    }
     sendSuccess(res, document);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document");
@@ -93,6 +118,11 @@ router.get("/api/documents/:id", requireAuth, async (req, res) => {
 
 router.get("/api/documents/:id/versions", requireAuth, async (req, res) => {
   try {
+    const document = await storage.getDocument(String(req.params.id));
+    if (!document) return sendNotFound(res, "Document not found");
+    if (!await checkChatDocumentAccess(document, req.session.userId!)) {
+      return sendForbidden(res, "You do not have access to this document");
+    }
     const versions = await storage.getDocumentVersionHistory(String(req.params.id));
     sendSuccess(res, versions);
   } catch (error: unknown) {
@@ -386,6 +416,9 @@ router.get("/api/documents/:id/view", requireAuth, async (req: Request, res: Res
     if (!document) {
       return sendNotFound(res, "Document not found");
     }
+    if (!await checkChatDocumentAccess(document, req.session.userId!)) {
+      return sendForbidden(res, "You do not have access to this document");
+    }
 
     const objectFile = await objectStorageService.getObjectEntityFile(document.storageKey);
     await objectStorageService.downloadObject(objectFile, res);
@@ -415,6 +448,9 @@ router.get("/api/documents/:id/thumbnail", requireAuth, async (req: Request, res
     const document = await storage.getDocument(docId);
     if (!document) {
       return sendNotFound(res, "Document not found");
+    }
+    if (!await checkChatDocumentAccess(document, req.session.userId!)) {
+      return sendForbidden(res, "You do not have access to this document");
     }
 
     const mimeType = (document.mimeType || "").toLowerCase();
@@ -478,6 +514,9 @@ router.get("/api/documents/:id/download", requireAuth, async (req: Request, res:
     const document = await storage.getDocument(String(req.params.id));
     if (!document) {
       return sendNotFound(res, "Document not found");
+    }
+    if (!await checkChatDocumentAccess(document, req.session.userId!)) {
+      return sendForbidden(res, "You do not have access to this document");
     }
 
     const objectFile = await objectStorageService.getObjectEntityFile(document.storageKey);
