@@ -161,7 +161,7 @@ export function registerCoreRoutes(router: Router, deps: SharedDeps): void {
       if (!companyId) return res.status(400).json({ error: "Company context required" });
       const userId = req.session.userId!;
 
-      const [statusCounts, assignedToMe, pendingMyApproval] = await Promise.all([
+      const [statusCounts, assignedToMe, pendingMyApproval, totalValueResult] = await Promise.all([
         db
           .select({
             status: apInvoices.status,
@@ -191,15 +191,20 @@ export function registerCoreRoutes(router: Router, deps: SharedDeps): void {
               eq(apInvoiceApprovals.status, "PENDING"),
             )
           ),
+        db
+          .select({ total: sql<string>`COALESCE(SUM(CAST(${apInvoices.totalInc} AS NUMERIC)), 0)` })
+          .from(apInvoices)
+          .where(eq(apInvoices.companyId, companyId)),
       ]);
 
-      const counts: Record<string, number> = {};
+      const counts: Record<string, number | string> = {};
       for (const row of statusCounts) {
         counts[row.status] = row.count;
       }
       const assignedCount = assignedToMe[0]?.count || 0;
       const approvalCount = pendingMyApproval[0]?.count || 0;
       counts.waitingOnMe = assignedCount + approvalCount;
+      counts.totalValue = totalValueResult[0]?.total || "0";
 
       res.json(counts);
     } catch (error: unknown) {

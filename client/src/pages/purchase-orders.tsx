@@ -25,7 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Eye, Edit, Paperclip, Search, X, Mail, Send, Loader2, Printer, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Plus, Eye, Edit, Paperclip, Search, X, Mail, Send, Loader2, Printer, Trash2, ArrowUp, ArrowDown, ArrowUpDown, FileText, Clock, CheckCircle, DollarSign, XCircle, ShoppingCart } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -971,6 +971,37 @@ export default function PurchaseOrdersPage() {
     });
   }, [purchaseOrders, statusFilter, supplierFilter, searchQuery, capexFilter, sortField, sortDirection, getCostCodeDisplay]);
 
+  const poSummaryStats = useMemo(() => {
+    let totalValue = 0;
+    let draftCount = 0;
+    let submittedCount = 0;
+    let approvedCount = 0;
+    let rejectedCount = 0;
+    let receivedCount = 0;
+
+    purchaseOrders.forEach(po => {
+      totalValue += parseFloat(String(po.total || "0"));
+      switch (po.status) {
+        case "DRAFT": draftCount++; break;
+        case "SUBMITTED": submittedCount++; break;
+        case "APPROVED": approvedCount++; break;
+        case "REJECTED": rejectedCount++; break;
+        case "RECEIVED":
+        case "RECEIVED_IN_PART": receivedCount++; break;
+      }
+    });
+
+    return {
+      total: purchaseOrders.length,
+      draftCount,
+      submittedCount,
+      approvedCount,
+      rejectedCount,
+      receivedCount,
+      totalValue,
+    };
+  }, [purchaseOrders]);
+
   const clearFilters = () => {
     setSearchQuery("");
     setSupplierFilter("all");
@@ -1051,6 +1082,67 @@ export default function PurchaseOrdersPage() {
           </Link>
         </CardHeader>
         <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+            <Card data-testid="stat-total-pos">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total POs</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-2xl font-bold" data-testid="text-total-pos-count">{poSummaryStats.total}</div>
+              </CardContent>
+            </Card>
+            <Card data-testid="stat-draft-pos">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Drafts</CardTitle>
+                <Edit className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-2xl font-bold" data-testid="text-draft-pos-count">{poSummaryStats.draftCount}</div>
+              </CardContent>
+            </Card>
+            <Card data-testid="stat-pending-approval-pos">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Pending Approval</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className={`text-2xl font-bold ${poSummaryStats.submittedCount > 0 ? "text-amber-600 dark:text-amber-400" : ""}`} data-testid="text-pending-pos-count">
+                  {poSummaryStats.submittedCount}
+                </div>
+              </CardContent>
+            </Card>
+            <Card data-testid="stat-approved-pos">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Approved</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-2xl font-bold" data-testid="text-approved-pos-count">{poSummaryStats.approvedCount}</div>
+              </CardContent>
+            </Card>
+            <Card data-testid="stat-total-value-pos">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Value</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="text-2xl font-bold" data-testid="text-total-value-pos">{formatCurrency(poSummaryStats.totalValue)}</div>
+              </CardContent>
+            </Card>
+            <Card data-testid="stat-rejected-pos">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Rejected</CardTitle>
+                <XCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className={`text-2xl font-bold ${poSummaryStats.rejectedCount > 0 ? "text-red-600 dark:text-red-400" : ""}`} data-testid="text-rejected-pos-count">
+                  {poSummaryStats.rejectedCount}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />

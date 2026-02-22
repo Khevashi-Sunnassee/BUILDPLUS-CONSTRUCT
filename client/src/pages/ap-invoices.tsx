@@ -18,8 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Card } from "@/components/ui/card";
-import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Filter, Loader2, Eye, Send, Settings, Mail, Copy, Check, RefreshCw } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Search, Upload, Trash2, MoreHorizontal, FileText, CheckCircle, XCircle, Clock, AlertTriangle, Filter, Loader2, Eye, Send, Settings, Mail, Copy, Check, RefreshCw, DollarSign, PauseCircle } from "lucide-react";
 import { SortIcon } from "@/components/ui/sort-icon";
 
 interface ApInvoice {
@@ -67,6 +67,7 @@ interface StatusCounts {
   failed_export: number;
   rejected: number;
   all: number;
+  totalValue: string;
 }
 
 const STATUS_TABS = [
@@ -559,6 +560,73 @@ export default function ApInvoicesPage() {
               Upload Invoices
             </Button>
           </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <Card data-testid="stat-total-invoices">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Invoices</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-total-invoices-count">
+                {getCount("imported") + getCount("processed") + getCount("confirmed") + getCount("partially_approved") + getCount("approved") + getCount("on_hold") + getCount("exported") + getCount("failed_export") + getCount("rejected")}
+              </div>
+            </CardContent>
+          </Card>
+          <Card data-testid="stat-waiting-on-me">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Waiting On Me</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${getCount("waiting_on_me") > 0 ? "text-amber-600 dark:text-amber-400" : ""}`} data-testid="text-waiting-count">
+                {getCount("waiting_on_me")}
+              </div>
+            </CardContent>
+          </Card>
+          <Card data-testid="stat-pending-invoices">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Pending Approval</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${(getCount("confirmed") + getCount("partially_approved")) > 0 ? "text-amber-600 dark:text-amber-400" : ""}`} data-testid="text-pending-invoices-count">
+                {getCount("confirmed") + getCount("partially_approved")}
+              </div>
+            </CardContent>
+          </Card>
+          <Card data-testid="stat-approved-invoices">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Approved</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-approved-invoices-count">{getCount("approved")}</div>
+            </CardContent>
+          </Card>
+          <Card data-testid="stat-total-value-invoices">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Value</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-total-value-invoices">
+                ${parseFloat((statusCounts as any)?.totalValue || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </CardContent>
+          </Card>
+          <Card data-testid="stat-on-hold-invoices">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground">On Hold</CardTitle>
+              <PauseCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${getCount("on_hold") > 0 ? "text-red-600 dark:text-red-400" : ""}`} data-testid="text-on-hold-invoices-count">
+                {getCount("on_hold")}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {(bgStatus?.emailPoll?.isRunning || bgStatus?.invoiceExtraction?.isRunning || (bgStatus?.pendingExtraction > 0)) && (
