@@ -14,9 +14,8 @@ import {
   documents,
   jobTypes,
   companies,
-  markupCredentials,
 } from "@shared/schema";
-import { eq, desc, sql, inArray, and } from "drizzle-orm";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import { requireExternalApiKey, requirePermission, requireExternalUser, getAllowedJobIdsForUser, generateUserToken } from "./middleware/external-api-auth.middleware";
 import { requireAuth, requireSuperAdmin } from "./middleware/auth.middleware";
 import { storage } from "../storage";
@@ -655,7 +654,7 @@ externalApiRouter.get("/api/v1/external/documents/:id/download", requireExternal
     const [document] = await db
       .select()
       .from(documents)
-      .where(and(eq(documents.id, docId), eq(documents.companyId, companyId)))
+      .where(sql`${documents.id} = ${docId} AND ${documents.companyId} = ${companyId}`)
       .limit(1);
 
     if (!document) {
@@ -698,7 +697,7 @@ externalApiRouter.post("/api/v1/external/documents/:id/markup-version", requireE
     const [document] = await db
       .select()
       .from(documents)
-      .where(and(eq(documents.id, docId), eq(documents.companyId, companyId)))
+      .where(sql`${documents.id} = ${docId} AND ${documents.companyId} = ${companyId}`)
       .limit(1);
 
     if (!document) {
@@ -736,7 +735,7 @@ externalApiRouter.post("/api/v1/external/documents/:id/markup-version", requireE
       mimeType: req.file.mimetype,
       fileSize: req.file.size,
       storageKey: objectPath,
-      status: "FOR_REVIEW",
+      status: "REVIEW",
       version: newVersion,
       revision: `M${minorNum + 1}`,
       isLatestVersion: true,
@@ -1013,7 +1012,7 @@ externalApiRouter.post("/api/markup/handoff", requireAuth, async (req, res) => {
     const [document] = await db
       .select()
       .from(documents)
-      .where(and(eq(documents.id, documentId), eq(documents.companyId, companyId)))
+      .where(sql`${documents.id} = ${documentId} AND ${documents.companyId} = ${companyId}`)
       .limit(1);
     if (!document) return res.status(404).json({ error: "Document not found" });
 
