@@ -14,7 +14,7 @@ import {
 } from "@shared/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { requireExternalApiKey, requirePermission } from "./middleware/external-api-auth.middleware";
-import { requireAuth } from "./middleware/auth.middleware";
+import { requireAuth, requireSuperAdmin } from "./middleware/auth.middleware";
 import { storage } from "../storage";
 import logger from "../lib/logger";
 
@@ -217,6 +217,155 @@ externalApiRouter.get("/api/external-api-keys/:id/logs", requireAuth, async (req
     res.json(logs);
   } catch (error) {
     logger.error({ error }, "Failed to fetch API logs");
+    res.status(500).json({ error: "Failed to fetch API logs" });
+  }
+});
+
+// Super Admin routes - manage API keys for any company
+externalApiRouter.get("/api/super-admin/external-api-keys", requireSuperAdmin, async (req, res) => {
+  try {
+    const companyId = req.query.companyId as string;
+    if (!companyId) return res.status(400).json({ error: "companyId query parameter required" });
+
+    const keys = await db
+      .select({
+        id: externalApiKeys.id,
+        name: externalApiKeys.name,
+        keyPrefix: externalApiKeys.keyPrefix,
+        permissions: externalApiKeys.permissions,
+        isActive: externalApiKeys.isActive,
+        lastUsedAt: externalApiKeys.lastUsedAt,
+        createdById: externalApiKeys.createdById,
+        expiresAt: externalApiKeys.expiresAt,
+        createdAt: externalApiKeys.createdAt,
+        updatedAt: externalApiKeys.updatedAt,
+      })
+      .from(externalApiKeys)
+      .where(eq(externalApiKeys.companyId, companyId))
+      .orderBy(desc(externalApiKeys.createdAt));
+
+    res.json(keys);
+  } catch (error) {
+    logger.error({ error }, "Super Admin: Failed to fetch API keys");
+    res.status(500).json({ error: "Failed to fetch API keys" });
+  }
+});
+
+externalApiRouter.post("/api/super-admin/external-api-keys", requireSuperAdmin, async (req, res) => {
+  try {
+    const companyId = req.query.companyId as string;
+    if (!companyId) return res.status(400).json({ error: "companyId query parameter required" });
+
+    const parsed = createApiKeySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    const rawKey = generateApiKey();
+    const keyHash = hashApiKey(rawKey);
+    const keyPrefix = rawKey.substring(0, 8);
+
+    const [apiKey] = await db
+      .insert(externalApiKeys)
+      .values({
+        companyId,
+        name: parsed.data.name,
+        keyHash,
+        keyPrefix,
+        permissions: parsed.data.permissions,
+        createdById: req.session.userId!,
+        expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
+      })
+      .returning();
+
+    res.status(201).json({
+      ...apiKey,
+      rawKey,
+      keyHash: undefined,
+    });
+  } catch (error) {
+    logger.error({ error }, "Super Admin: Failed to create API key");
+    res.status(500).json({ error: "Failed to create API key" });
+  }
+});
+
+externalApiRouter.patch("/api/super-admin/external-api-keys/:id", requireSuperAdmin, async (req, res) => {
+  try {
+    const companyId = req.query.companyId as string;
+    if (!companyId) return res.status(400).json({ error: "companyId query parameter required" });
+
+    const parsed = updateApiKeySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    if (parsed.data.name !== undefined) updateData.name = parsed.data.name;
+    if (parsed.data.permissions !== undefined) updateData.permissions = parsed.data.permissions;
+    if (parsed.data.isActive !== undefined) updateData.isActive = parsed.data.isActive;
+    if (parsed.data.expiresAt !== undefined) updateData.expiresAt = parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null;
+
+    const [updated] = await db
+      .update(externalApiKeys)
+      .set(updateData)
+      .where(
+        sql`${externalApiKeys.id} = ${req.params.id} AND ${externalApiKeys.companyId} = ${companyId}`
+      )
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "API key not found" });
+    }
+
+    res.json(updated);
+  } catch (error) {
+    logger.error({ error }, "Super Admin: Failed to update API key");
+    res.status(500).json({ error: "Failed to update API key" });
+  }
+});
+
+externalApiRouter.delete("/api/super-admin/external-api-keys/:id", requireSuperAdmin, async (req, res) => {
+  try {
+    const companyId = req.query.companyId as string;
+    if (!companyId) return res.status(400).json({ error: "companyId query parameter required" });
+
+    const [deleted] = await db
+      .delete(externalApiKeys)
+      .where(
+        sql`${externalApiKeys.id} = ${req.params.id} AND ${externalApiKeys.companyId} = ${companyId}`
+      )
+      .returning();
+
+    if (!deleted) {
+      return res.status(404).json({ error: "API key not found" });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ error }, "Super Admin: Failed to delete API key");
+    res.status(500).json({ error: "Failed to delete API key" });
+  }
+});
+
+externalApiRouter.get("/api/super-admin/external-api-keys/:id/logs", requireSuperAdmin, async (req, res) => {
+  try {
+    const companyId = req.query.companyId as string;
+    if (!companyId) return res.status(400).json({ error: "companyId query parameter required" });
+
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+
+    const logs = await db
+      .select()
+      .from(externalApiLogs)
+      .where(
+        sql`${externalApiLogs.apiKeyId} = ${req.params.id} AND ${externalApiLogs.companyId} = ${companyId}`
+      )
+      .orderBy(desc(externalApiLogs.createdAt))
+      .limit(limit);
+
+    res.json(logs);
+  } catch (error) {
+    logger.error({ error }, "Super Admin: Failed to fetch API logs");
     res.status(500).json({ error: "Failed to fetch API logs" });
   }
 });

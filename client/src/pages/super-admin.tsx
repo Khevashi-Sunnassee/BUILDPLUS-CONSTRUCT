@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useCallback, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Building2, BookOpen, Shield, Database, Monitor, Settings2, Star, StarOff, Loader2, FileSearch } from "lucide-react";
+import { Building2, BookOpen, Shield, Database, Monitor, Settings2, Star, StarOff, Loader2, FileSearch, Key, Plus, Copy, Trash2, ToggleLeft, ToggleRight, Clock, Activity, AlertTriangle } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import AdminCompaniesPage from "./admin/companies";
 import AdminHelpPage from "./admin/help";
 import DataManagementPage from "./admin/data-management";
@@ -413,6 +417,381 @@ function SystemDefaultsManager({ companyId, companies }: { companyId: string; co
   );
 }
 
+type ApiKeyRecord = {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  permissions: string[];
+  isActive: boolean;
+  lastUsedAt: string | null;
+  createdById: string;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ApiLog = {
+  id: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  responseTimeMs: number;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+};
+
+const AVAILABLE_PERMISSIONS = [
+  { key: "*", label: "Full Access" },
+  { key: "read:jobs", label: "Read Jobs" },
+  { key: "read:cost-codes", label: "Read Cost Codes" },
+  { key: "read:documents", label: "Read Documents" },
+  { key: "read:job-types", label: "Read Job Types" },
+  { key: "read:company", label: "Read Company Info" },
+  { key: "write:markups", label: "Write Markups" },
+  { key: "write:estimates", label: "Write Estimates" },
+];
+
+function ApiKeysManager({ companyId }: { companyId: string }) {
+  const { toast } = useToast();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingKeyId, setDeletingKeyId] = useState<string | null>(null);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newKeyPermissions, setNewKeyPermissions] = useState<string[]>(["*"]);
+  const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [expandedKeyId, setExpandedKeyId] = useState<string | null>(null);
+
+  const apiBase = `/api/super-admin/external-api-keys`;
+
+  const { data: apiKeys = [], isLoading } = useQuery<ApiKeyRecord[]>({
+    queryKey: [apiBase, { companyId }],
+    queryFn: async () => {
+      const res = await fetch(`${apiBase}?companyId=${companyId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch API keys");
+      return res.json();
+    },
+  });
+
+  const { data: logs = [] } = useQuery<ApiLog[]>({
+    queryKey: [apiBase, expandedKeyId, "logs", { companyId }],
+    queryFn: async () => {
+      const res = await fetch(`${apiBase}/${expandedKeyId}/logs?companyId=${companyId}&limit=20`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch logs");
+      return res.json();
+    },
+    enabled: !!expandedKeyId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `${apiBase}?companyId=${companyId}`, {
+        name: newKeyName,
+        permissions: newKeyPermissions,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [apiBase, { companyId }] });
+      setNewlyCreatedKey(data.rawKey);
+      setNewKeyName("");
+      setNewKeyPermissions(["*"]);
+      toast({ title: "API key created successfully" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to create API key", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      await apiRequest("PATCH", `${apiBase}/${id}?companyId=${companyId}`, { isActive });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [apiBase, { companyId }] });
+      toast({ title: "API key updated" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to update API key", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `${apiBase}/${id}?companyId=${companyId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [apiBase, { companyId }] });
+      toast({ title: "API key deleted" });
+      setDeleteDialogOpen(false);
+      setDeletingKeyId(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to delete API key", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleCopyKey = useCallback((key: string) => {
+    navigator.clipboard.writeText(key);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, []);
+
+  const togglePermission = (perm: string) => {
+    if (perm === "*") {
+      setNewKeyPermissions(["*"]);
+      return;
+    }
+    const filtered = newKeyPermissions.filter(p => p !== "*");
+    if (filtered.includes(perm)) {
+      setNewKeyPermissions(filtered.filter(p => p !== perm));
+    } else {
+      setNewKeyPermissions([...filtered, perm]);
+    }
+  };
+
+  const formatDate = (d: string | null) => {
+    if (!d) return "Never";
+    return new Date(d).toLocaleString("en-AU", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
+
+  if (isLoading) {
+    return <Skeleton className="h-[300px] w-full" />;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <Key className="h-5 w-5" />
+            External API Keys
+          </h3>
+          <p className="text-sm text-muted-foreground">Manage API keys for external system integration</p>
+        </div>
+        <Button onClick={() => { setCreateDialogOpen(true); setNewlyCreatedKey(null); }} data-testid="button-sa-create-api-key">
+          <Plus className="h-4 w-4 mr-2" />
+          Create API Key
+        </Button>
+      </div>
+
+      {apiKeys.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Key className="h-10 w-10 mb-3" />
+            <p className="text-sm">No API keys configured for this company</p>
+            <p className="text-xs mt-1">Create an API key to allow external systems to access this company's data</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="pt-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Key Prefix</TableHead>
+                  <TableHead>Permissions</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Last Used</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {apiKeys.map((key) => (
+                  <Fragment key={key.id}>
+                    <TableRow data-testid={`row-api-key-${key.id}`}>
+                      <TableCell className="font-medium">{key.name}</TableCell>
+                      <TableCell>
+                        <code className="text-xs bg-muted px-2 py-1 rounded">{key.keyPrefix}...</code>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {key.permissions.includes("*") ? (
+                            <Badge variant="default" className="text-xs">Full Access</Badge>
+                          ) : (
+                            key.permissions.slice(0, 3).map(p => (
+                              <Badge key={p} variant="outline" className="text-xs">{p}</Badge>
+                            ))
+                          )}
+                          {!key.permissions.includes("*") && key.permissions.length > 3 && (
+                            <Badge variant="outline" className="text-xs">+{key.permissions.length - 3}</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={key.isActive ? "default" : "secondary"} className={key.isActive ? "bg-green-600" : ""}>
+                          {key.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{formatDate(key.lastUsedAt)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{formatDate(key.createdAt)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setExpandedKeyId(expandedKeyId === key.id ? null : key.id)}
+                            data-testid={`button-logs-${key.id}`}
+                          >
+                            <Activity className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleMutation.mutate({ id: key.id, isActive: !key.isActive })}
+                            data-testid={`button-toggle-${key.id}`}
+                          >
+                            {key.isActive ? <ToggleRight className="h-4 w-4 text-green-600" /> : <ToggleLeft className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => { setDeletingKeyId(key.id); setDeleteDialogOpen(true); }}
+                            data-testid={`button-delete-key-${key.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {expandedKeyId === key.id && (
+                      <TableRow key={`logs-${key.id}`}>
+                        <TableCell colSpan={7} className="bg-muted/30">
+                          <div className="p-3">
+                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                              <Activity className="h-4 w-4" />
+                              Recent Activity
+                            </h4>
+                            {logs.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">No API calls recorded yet</p>
+                            ) : (
+                              <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                                {logs.map((log) => (
+                                  <div key={log.id} className="flex items-center gap-3 text-xs">
+                                    <Badge variant={log.statusCode < 400 ? "outline" : "destructive"} className="text-[10px] px-1.5">
+                                      {log.statusCode}
+                                    </Badge>
+                                    <span className="font-mono">{log.method}</span>
+                                    <span className="text-muted-foreground truncate max-w-[200px]">{log.path}</span>
+                                    <span className="text-muted-foreground">{log.responseTimeMs}ms</span>
+                                    <span className="text-muted-foreground ml-auto">{formatDate(log.createdAt)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      <Dialog open={createDialogOpen} onOpenChange={(open) => { setCreateDialogOpen(open); if (!open) setNewlyCreatedKey(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create API Key</DialogTitle>
+            <DialogDescription>
+              Create an API key for this company to allow external systems to access its data securely.
+            </DialogDescription>
+          </DialogHeader>
+
+          {newlyCreatedKey ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4">
+                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 mb-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span className="text-sm font-medium">Save this key now — it will only be shown once</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <code className="text-xs bg-background p-2 rounded border flex-1 break-all" data-testid="text-new-api-key">
+                    {newlyCreatedKey}
+                  </code>
+                  <Button variant="outline" size="icon" onClick={() => handleCopyKey(newlyCreatedKey)} data-testid="button-copy-key">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                {copied && <p className="text-xs text-green-600 mt-1">Copied to clipboard</p>}
+              </div>
+              <DialogFooter>
+                <Button onClick={() => { setCreateDialogOpen(false); setNewlyCreatedKey(null); }} data-testid="button-done-key">
+                  Done
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Key Name</Label>
+                <Input
+                  placeholder="e.g. Measure App - Salvo"
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  data-testid="input-key-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Permissions</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {AVAILABLE_PERMISSIONS.map((perm) => (
+                    <label key={perm.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={newKeyPermissions.includes("*") ? perm.key === "*" : newKeyPermissions.includes(perm.key)}
+                        onCheckedChange={() => togglePermission(perm.key)}
+                        data-testid={`checkbox-perm-${perm.key}`}
+                      />
+                      {perm.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => createMutation.mutate()}
+                  disabled={!newKeyName.trim() || createMutation.isPending}
+                  data-testid="button-confirm-create-key"
+                >
+                  {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Create Key
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete API Key</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this API key. Any external systems using it will immediately lose access. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingKeyId && deleteMutation.mutate(deletingKeyId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-key"
+            >
+              Delete Key
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 export default function SuperAdminPage() {
   useDocumentTitle("Super Admin");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
@@ -456,6 +835,10 @@ export default function SuperAdminPage() {
           <TabsTrigger value="data-management" data-testid="tab-super-data-management">
             <Database className="h-4 w-4 mr-1.5" />
             Data Management
+          </TabsTrigger>
+          <TabsTrigger value="api-keys" data-testid="tab-super-api-keys">
+            <Key className="h-4 w-4 mr-1.5" />
+            API Keys
           </TabsTrigger>
           <TabsTrigger value="review-mode" data-testid="tab-super-review-mode">
             <FileSearch className="h-4 w-4 mr-1.5" />
@@ -511,6 +894,22 @@ export default function SuperAdminPage() {
             <DataManagementPage embedded={true} companyId={selectedCompanyId} key={`data-${selectedCompanyId}`} />
           ) : (
             <CompanyRequiredPlaceholder icon={Database} message="Select a company above to manage its data" />
+          )}
+        </TabsContent>
+
+        <TabsContent value="api-keys" className="space-y-6">
+          <CompanySelector
+            selectedCompanyId={selectedCompanyId}
+            onCompanyChange={setSelectedCompanyId}
+            companies={companies}
+          />
+          {selectedCompanyId ? (
+            <ApiKeysManager
+              companyId={selectedCompanyId}
+              key={`api-keys-${selectedCompanyId}`}
+            />
+          ) : (
+            <CompanyRequiredPlaceholder icon={Key} message="Select a company to manage its API keys for external integrations" />
           )}
         </TabsContent>
 
