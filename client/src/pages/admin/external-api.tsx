@@ -19,6 +19,8 @@ import {
   ChevronDown,
   ChevronRight,
   Code,
+  Download,
+  FileText,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -243,6 +245,38 @@ export default function ExternalApiPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg border">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm mb-1 flex items-center gap-1.5">
+                  <Download className="h-4 w-4" />
+                  Download Documentation Files
+                </h3>
+                <p className="text-xs text-muted-foreground">Share these files with external developers to help them integrate with BuildPlus</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open("/api/external-api-docs/integration-guide", "_blank")}
+                  data-testid="button-download-integration-guide"
+                >
+                  <FileText className="h-4 w-4 mr-1.5" />
+                  Integration Guide
+                  <Download className="h-3 w-3 ml-1.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open("/api/external-api-docs/schema-reference", "_blank")}
+                  data-testid="button-download-schema-reference"
+                >
+                  <FileText className="h-4 w-4 mr-1.5" />
+                  Schema Reference
+                  <Download className="h-3 w-3 ml-1.5" />
+                </Button>
+              </div>
+            </div>
+
             <div>
               <h3 className="font-semibold mb-2">Authentication</h3>
               <div className="bg-muted rounded-lg p-3 font-mono text-sm">

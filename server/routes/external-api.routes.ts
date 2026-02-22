@@ -1,5 +1,7 @@
 import { Router } from "express";
 import crypto from "crypto";
+import path from "path";
+import fs from "fs";
 import { z } from "zod";
 import { db } from "../db";
 import {
@@ -676,4 +678,38 @@ externalApiRouter.get("/api/v1/external/health", requireExternalApiKey, async (_
     version: "1.0",
     timestamp: new Date().toISOString(),
   });
+});
+
+const API_DOC_FILES: Record<string, { filename: string; path: string }> = {
+  "integration-guide": {
+    filename: "EXTERNAL_API_INTEGRATION_GUIDE.md",
+    path: path.resolve(process.cwd(), "EXTERNAL_API_INTEGRATION_GUIDE.md"),
+  },
+  "schema-reference": {
+    filename: "API_SCHEMA_REFERENCE.md",
+    path: path.resolve(process.cwd(), "API_SCHEMA_REFERENCE.md"),
+  },
+};
+
+externalApiRouter.get("/api/external-api-docs/:docKey", requireAuth, async (req, res) => {
+  try {
+    const docKey = req.params.docKey as string;
+    const doc = API_DOC_FILES[docKey];
+
+    if (!doc) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    if (!fs.existsSync(doc.path)) {
+      return res.status(404).json({ error: "File not found on server" });
+    }
+
+    res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${doc.filename}"`);
+    const stream = fs.createReadStream(doc.path);
+    stream.pipe(res);
+  } catch (error) {
+    logger.error({ error }, "Failed to serve API documentation file");
+    res.status(500).json({ error: "Failed to download file" });
+  }
 });
