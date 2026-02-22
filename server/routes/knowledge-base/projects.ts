@@ -47,7 +47,7 @@ router.post("/api/kb/projects", requireAuth, async (req: Request, res: Response)
     const userId = req.session.userId;
     if (!companyId || !userId) return res.status(403).json({ error: "Auth required" });
 
-    const { name, description, instructions } = req.body;
+    const { name, description, instructions, color } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: "Project name is required" });
 
     const [project] = await db.insert(kbProjects).values({
@@ -55,6 +55,7 @@ router.post("/api/kb/projects", requireAuth, async (req: Request, res: Response)
       name: name.trim(),
       description: description?.trim() || null,
       instructions: instructions?.trim() || null,
+      color: color?.trim() || null,
       createdById: String(userId),
     }).returning();
 

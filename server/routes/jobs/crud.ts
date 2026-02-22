@@ -286,8 +286,9 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
       productionDaysInAdvance: z.number().int().min(1).optional().nullable(),
       procurementDaysInAdvance: z.number().int().min(1).optional().nullable(),
       procurementTimeDays: z.number().int().min(1).optional().nullable(),
-      status: z.enum(["ACTIVE", "COMPLETED", "ON_HOLD", "ARCHIVED", "OPPORTUNITY", "QUOTING", "WON", "LOST", "CANCELLED", "CONTRACTED", "IN_PROGRESS"]).optional(),
+      status: z.enum(["ACTIVE", "COMPLETED", "ON_HOLD", "ARCHIVED", "OPPORTUNITY", "QUOTING", "WON", "LOST", "CANCELLED", "CONTRACTED", "IN_PROGRESS", "DEFECT_LIABILITY_PERIOD"]).optional(),
       factoryId: z.string().max(36).optional().nullable(),
+      defectLiabilityEndDate: z.string().optional().nullable(),
     }).passthrough();
     const parsed = jobCreateSchema.safeParse(body);
     if (!parsed.success) {
@@ -317,6 +318,11 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
       data.productionStartDate = new Date(data.productionStartDate);
     } else if (!data.productionStartDate || data.productionStartDate === '') {
       data.productionStartDate = null;
+    }
+    if (typeof data.defectLiabilityEndDate === 'string' && data.defectLiabilityEndDate.trim() !== '') {
+      data.defectLiabilityEndDate = new Date(data.defectLiabilityEndDate);
+    } else {
+      data.defectLiabilityEndDate = null;
     }
     const emptyStringFields = [
       "client", "address", "city", "description", "craneCapacity",
@@ -388,6 +394,13 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
         data.estimatedStartDate = new Date(data.estimatedStartDate);
       } else {
         data.estimatedStartDate = null;
+      }
+    }
+    if (data.defectLiabilityEndDate !== undefined) {
+      if (data.defectLiabilityEndDate && typeof data.defectLiabilityEndDate === 'string') {
+        data.defectLiabilityEndDate = new Date(data.defectLiabilityEndDate);
+      } else {
+        data.defectLiabilityEndDate = null;
       }
     }
     if (data.daysToAchieveIfc !== undefined && data.daysToAchieveIfc !== null) {

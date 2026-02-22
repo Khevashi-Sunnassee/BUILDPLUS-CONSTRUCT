@@ -70,6 +70,31 @@ import { cn } from "@/lib/utils";
 import { KbUploadDialog } from "./KbUploadDialog";
 import type { KbProject, KbProjectDetail, KbMember, KbCompanyUser } from "./types";
 
+const PROJECT_COLOR_OPTIONS = [
+  "#6366f1", "#8b5cf6", "#ec4899", "#ef4444", "#f97316",
+  "#f59e0b", "#10b981", "#14b8a6", "#3b82f6", "#06b6d4",
+];
+
+function ColorPicker({ value, onChange, testId }: { value: string; onChange: (c: string) => void; testId: string }) {
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap" data-testid={testId}>
+      {PROJECT_COLOR_OPTIONS.map(color => (
+        <button
+          key={color}
+          type="button"
+          className={cn(
+            "w-6 h-6 rounded-full border-2 transition-all",
+            value === color ? "border-foreground scale-110" : "border-transparent opacity-80 hover:opacity-100"
+          )}
+          style={{ backgroundColor: color }}
+          onClick={() => onChange(color)}
+          data-testid={`color-${color}`}
+        />
+      ))}
+    </div>
+  );
+}
+
 interface KbProjectsProps {
   projects: KbProject[];
   loadingProjects: boolean;
@@ -94,9 +119,11 @@ export function KbProjects({
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDesc, setNewProjectDesc] = useState("");
   const [newProjectInstructions, setNewProjectInstructions] = useState("");
+  const [newProjectColor, setNewProjectColor] = useState<string>("#6366f1");
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectDesc, setEditProjectDesc] = useState("");
   const [editProjectInstructions, setEditProjectInstructions] = useState("");
+  const [editProjectColor, setEditProjectColor] = useState<string>("#6366f1");
   const [inviteRole, setInviteRole] = useState<string>("EDITOR");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [userSearch, setUserSearch] = useState("");
@@ -122,6 +149,7 @@ export function KbProjects({
         name: newProjectName.trim(),
         description: newProjectDesc.trim() || null,
         instructions: newProjectInstructions.trim() || null,
+        color: newProjectColor || null,
       });
       return res.json();
     },
@@ -131,6 +159,7 @@ export function KbProjects({
       setNewProjectName("");
       setNewProjectDesc("");
       setNewProjectInstructions("");
+      setNewProjectColor("#6366f1");
       onSelectProject(project.id);
       toast({ title: "Project created" });
     },
@@ -144,6 +173,7 @@ export function KbProjects({
         name: editProjectName.trim(),
         description: editProjectDesc.trim() || null,
         instructions: editProjectInstructions.trim() || null,
+        color: editProjectColor || null,
       });
       return res.json();
     },
@@ -306,7 +336,11 @@ export function KbProjects({
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <FolderOpen className="h-5 w-5 text-primary shrink-0" />
+                      {project.color ? (
+                        <div className="w-5 h-5 rounded-full shrink-0" style={{ backgroundColor: project.color }} />
+                      ) : (
+                        <FolderOpen className="h-5 w-5 text-primary shrink-0" />
+                      )}
                       <h3 className="font-semibold truncate">{project.name}</h3>
                     </div>
                     {project.description && (
@@ -342,6 +376,7 @@ export function KbProjects({
                           setEditProjectName(project.name);
                           setEditProjectDesc(project.description || "");
                           setEditProjectInstructions(project.instructions || "");
+                          setEditProjectColor(project.color || "#6366f1");
                         }}
                         data-testid={`btn-edit-project-${project.id}`}
                       >
@@ -657,6 +692,11 @@ export function KbProjects({
                 data-testid="input-project-instructions-create"
               />
             </div>
+            <div>
+              <label className="text-sm font-medium">Color</label>
+              <p className="text-xs text-muted-foreground mb-2">Choose a color to identify this project in the sidebar</p>
+              <ColorPicker value={newProjectColor} onChange={setNewProjectColor} testId="color-picker-create" />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowProjectDialog(false)}>Cancel</Button>
@@ -696,6 +736,11 @@ export function KbProjects({
                 rows={3}
                 data-testid="input-edit-project-instructions"
               />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Color</label>
+              <p className="text-xs text-muted-foreground mb-2">Choose a color to identify this project in the sidebar</p>
+              <ColorPicker value={editProjectColor} onChange={setEditProjectColor} testId="color-picker-edit" />
             </div>
           </div>
           <DialogFooter>

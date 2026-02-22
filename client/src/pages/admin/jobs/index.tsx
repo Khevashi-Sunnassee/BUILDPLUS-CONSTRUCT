@@ -294,6 +294,7 @@ export default function AdminJobsPage() {
       factoryId: null,
       productionSlotColor: null,
       jobTypeId: null,
+      defectLiabilityEndDate: null,
     },
   });
 
@@ -734,6 +735,7 @@ export default function AdminJobsPage() {
       factoryId: job.factoryId || null,
       productionSlotColor: job.productionSlotColor || getNextAvailableColor(),
       jobTypeId: job.jobTypeId || null,
+      defectLiabilityEndDate: job.defectLiabilityEndDate ? new Date(job.defectLiabilityEndDate).toISOString().split('T')[0] : null,
     });
     setJobDialogOpen(true);
     
@@ -1169,18 +1171,28 @@ export default function AdminJobsPage() {
                         {(() => {
                           const status = (job.status || "STARTED") as JobStatus;
                           const colors = STATUS_COLORS[status as keyof typeof STATUS_COLORS];
-                          if (!colors) {
-                            return (
-                              <Badge variant="outline" className="text-xs" data-testid={`badge-status-${job.id}`}>
-                                {getStatusLabel(status)}
-                              </Badge>
-                            );
-                          }
-                          return (
-                            <Badge variant="outline" className={`${colors} text-xs`} data-testid={`badge-status-${job.id}`}>
+                          const badge = (
+                            <Badge variant="outline" className={`${colors || ""} text-xs`} data-testid={`badge-status-${job.id}`}>
                               {getStatusLabel(status)}
                             </Badge>
                           );
+                          if (status === "DEFECT_LIABILITY_PERIOD" && job.defectLiabilityEndDate) {
+                            const endDate = new Date(job.defectLiabilityEndDate);
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const endDay = new Date(endDate);
+                            endDay.setHours(0, 0, 0, 0);
+                            const isExpired = endDay < today;
+                            return (
+                              <div className="flex flex-col gap-0.5">
+                                {badge}
+                                <span className={`text-[10px] ${isExpired ? "text-destructive font-medium" : "text-muted-foreground"}`} data-testid={`text-dlp-end-${job.id}`}>
+                                  {isExpired ? "Expired" : "Ends"}: {endDate.toLocaleDateString()}
+                                </span>
+                              </div>
+                            );
+                          }
+                          return badge;
                         })()}
                       </TableCell>
                       <TableCell>

@@ -7,7 +7,7 @@ export const roleEnum = pgEnum("role", ["USER", "MANAGER", "ADMIN"]);
 export const userTypeEnum = pgEnum("user_type", ["EMPLOYEE", "EXTERNAL"]);
 export const logStatusEnum = pgEnum("log_status", ["PENDING", "SUBMITTED", "APPROVED", "REJECTED"]);
 export const disciplineEnum = pgEnum("discipline", ["DRAFTING"]);
-export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED", "OPPORTUNITY", "QUOTING", "WON", "LOST", "CANCELLED", "CONTRACTED", "IN_PROGRESS", "PENDING_START", "STARTED"]);
+export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED", "OPPORTUNITY", "QUOTING", "WON", "LOST", "CANCELLED", "CONTRACTED", "IN_PROGRESS", "PENDING_START", "STARTED", "DEFECT_LIABILITY_PERIOD"]);
 export const opportunityStatusEnum = pgEnum("opportunity_status", ["NEW", "CONTACTED", "PROPOSAL_SENT", "NEGOTIATING", "WON", "LOST", "ON_HOLD"]);
 export const salesStageEnum = pgEnum("sales_stage", ["OPPORTUNITY", "PRE_QUALIFICATION", "ESTIMATING", "SUBMITTED", "AWARDED", "LOST"]);
 export const opportunityTypeEnum = pgEnum("opportunity_type", ["BUILDER_SELECTED", "OPEN_TENDER", "NEGOTIATED_CONTRACT", "GENERAL_PRICING"]);
@@ -425,6 +425,7 @@ export const jobs = pgTable("jobs", {
   submissionDate: timestamp("submission_date"),
   comments: text("comments"),
   jobTypeId: varchar("job_type_id", { length: 36 }),
+  defectLiabilityEndDate: timestamp("defect_liability_end_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -1643,7 +1644,7 @@ export type PermissionType = typeof permissionTypes.$inferSelect;
 
 export type Role = "USER" | "MANAGER" | "ADMIN";
 export type LogStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
-export type JobStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
+export type JobStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "DEFECT_LIABILITY_PERIOD" | "ARCHIVED";
 export type PanelStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "ON_HOLD";
 export type PanelType = "WALL" | "COLUMN" | "CUBE_BASE" | "CUBE_RING" | "LANDING_WALL" | "OTHER";
 export type LoadListStatus = "PENDING" | "COMPLETE";

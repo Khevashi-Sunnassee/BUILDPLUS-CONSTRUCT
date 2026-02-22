@@ -14,6 +14,7 @@ export const JOB_STATUSES = [
   "PENDING_START",
   "STARTED",
   "COMPLETED",
+  "DEFECT_LIABILITY_PERIOD",
   "ARCHIVED",
 ] as const;
 
@@ -23,7 +24,7 @@ export const PHASE_ALLOWED_STATUSES: Record<JobPhase, readonly JobStatus[]> = {
   OPPORTUNITY: ["ACTIVE", "ON_HOLD"],
   QUOTING: ["ACTIVE", "ON_HOLD"],
   WON_AWAITING_CONTRACT: ["ACTIVE", "ON_HOLD", "PENDING_START", "STARTED"],
-  CONTRACTED: ["ACTIVE", "ON_HOLD", "PENDING_START", "STARTED", "COMPLETED", "ARCHIVED"],
+  CONTRACTED: ["ACTIVE", "ON_HOLD", "PENDING_START", "STARTED", "COMPLETED", "DEFECT_LIABILITY_PERIOD", "ARCHIVED"],
   LOST: ["ARCHIVED"],
 };
 
@@ -41,6 +42,7 @@ export const STATUS_LABELS: Record<JobStatus, string> = {
   PENDING_START: "Pending Start",
   STARTED: "Started",
   COMPLETED: "Completed",
+  DEFECT_LIABILITY_PERIOD: "Defect Liability Period",
   ARCHIVED: "Archived",
 };
 
@@ -58,6 +60,7 @@ export const STATUS_COLORS: Record<JobStatus, string> = {
   PENDING_START: "bg-violet-500/10 text-violet-600 border-violet-500/20",
   STARTED: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
   COMPLETED: "bg-slate-500/10 text-slate-600 border-slate-500/20",
+  DEFECT_LIABILITY_PERIOD: "bg-amber-500/10 text-amber-600 border-amber-500/20",
   ARCHIVED: "bg-gray-500/10 text-gray-500 border-gray-500/20",
 };
 

@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus,
@@ -9,23 +10,28 @@ import {
   Mail,
   Check,
   X,
+  ChevronDown,
+  ChevronRight,
+  FolderOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import type { KbProject, KbConversation, KbInvitation } from "./types";
+
+const DEFAULT_PROJECT_COLORS = [
+  "#6366f1", "#ec4899", "#f59e0b", "#10b981", "#3b82f6",
+  "#8b5cf6", "#ef4444", "#14b8a6", "#f97316", "#06b6d4",
+];
+
+function getProjectColor(project: KbProject, index: number): string {
+  return project.color || DEFAULT_PROJECT_COLORS[index % DEFAULT_PROJECT_COLORS.length];
+}
 
 interface KbSidebarProps {
   projects: KbProject[];
@@ -55,6 +61,7 @@ export function KbSidebar({
   newChatPending,
 }: KbSidebarProps) {
   const { toast } = useToast();
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   const { data: invitations = [] } = useQuery<KbInvitation[]>({
     queryKey: ["/api/kb/invitations"],
@@ -93,6 +100,76 @@ export function KbSidebar({
 
   const pendingInvites = invitations.filter(inv => inv.status === "INVITED");
 
+  const groupedConversations = useMemo(() => {
+    const projectMap = new Map<string, KbProject>();
+    projects.forEach(p => projectMap.set(p.id, p));
+
+    const groups: { projectId: string | null; project: KbProject | null; convos: KbConversation[] }[] = [];
+    const byProject = new Map<string | null, KbConversation[]>();
+
+    conversations.forEach(c => {
+      const key = c.projectId || null;
+      if (!byProject.has(key)) byProject.set(key, []);
+      byProject.get(key)!.push(c);
+    });
+
+    projects.forEach(p => {
+      const convos = byProject.get(p.id) || [];
+      if (convos.length > 0 || selectedProjectId === p.id) {
+        groups.push({ projectId: p.id, project: p, convos });
+      }
+    });
+
+    const ungrouped = byProject.get(null);
+    if (ungrouped && ungrouped.length > 0) {
+      groups.push({ projectId: null, project: null, convos: ungrouped });
+    }
+
+    return groups;
+  }, [conversations, projects, selectedProjectId]);
+
+  const toggleGroup = (groupId: string) => {
+    setCollapsedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
+  };
+
+  const renderConvoItem = (convo: KbConversation, projectColor?: string) => (
+    <div
+      key={convo.id}
+      className={cn(
+        "group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm",
+        selectedConvoId === convo.id
+          ? "bg-sidebar-accent text-sidebar-accent-foreground"
+          : "hover-elevate"
+      )}
+      onClick={() => onSelectConvo(convo.id)}
+      data-testid={`convo-item-${convo.id}`}
+    >
+      {projectColor && (
+        <div
+          className="w-1 h-4 rounded-full shrink-0"
+          style={{ backgroundColor: projectColor }}
+        />
+      )}
+      <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-70" />
+      <span className="truncate flex-1">{convo.title}</span>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-6 w-6 shrink-0 invisible group-hover:visible"
+        onClick={(e) => {
+          e.stopPropagation();
+          onDeleteConvo(convo.id);
+        }}
+        data-testid={`btn-delete-convo-${convo.id}`}
+      >
+        <Trash2 className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+
+  const shouldShowGrouped = groupedConversations.length > 1 ||
+    (groupedConversations.length === 1 && groupedConversations[0].projectId !== null);
+
   return (
     <div className="flex flex-col h-full border-r bg-sidebar" data-testid="kb-sidebar">
       <div className="p-3 flex items-center justify-between gap-2 border-b">
@@ -113,25 +190,8 @@ export function KbSidebar({
         </Tooltip>
       </div>
 
-      <div className="p-2">
-        <Select
-          value={selectedProjectId || "all"}
-          onValueChange={(val) => onSelectProject(val === "all" ? null : val)}
-        >
-          <SelectTrigger className="h-8 text-xs" data-testid="select-project-filter">
-            <SelectValue placeholder="All Projects" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Projects</SelectItem>
-            {projects.map(p => (
-              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
       {pendingInvites.length > 0 && (
-        <div className="px-2 pb-2">
+        <div className="px-2 pt-2 pb-1">
           <div className="flex items-center gap-1.5 px-2 mb-1">
             <Mail className="h-3 w-3 text-primary" />
             <span className="text-[10px] font-semibold uppercase text-muted-foreground">Invitations</span>
@@ -171,12 +231,12 @@ export function KbSidebar({
               </div>
             </div>
           ))}
-          <Separator className="mt-2" />
+          <Separator className="mt-1" />
         </div>
       )}
 
       <ScrollArea className="flex-1">
-        <div className="p-2 space-y-1">
+        <div className="p-2 space-y-0.5">
           {loadingConvos ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -187,35 +247,48 @@ export function KbSidebar({
               <p>No conversations yet</p>
               <p className="text-xs mt-1">Start a new chat</p>
             </div>
+          ) : shouldShowGrouped ? (
+            groupedConversations.map((group, groupIdx) => {
+              const groupKey = group.projectId || "_ungrouped";
+              const isCollapsed = !!collapsedGroups[groupKey];
+              const color = group.project
+                ? getProjectColor(group.project, groupIdx)
+                : undefined;
+
+              return (
+                <div key={groupKey} className="mb-1" data-testid={`convo-group-${groupKey}`}>
+                  <button
+                    className="flex items-center gap-1.5 w-full px-2 py-1 rounded-md text-xs font-medium text-muted-foreground hover-elevate"
+                    onClick={() => toggleGroup(groupKey)}
+                    data-testid={`btn-toggle-group-${groupKey}`}
+                  >
+                    {isCollapsed ? (
+                      <ChevronRight className="h-3 w-3 shrink-0" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3 shrink-0" />
+                    )}
+                    {color && (
+                      <div
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: color }}
+                      />
+                    )}
+                    {!group.project && <FolderOpen className="h-3 w-3 shrink-0 opacity-60" />}
+                    <span className="truncate">{group.project?.name || "Unassigned"}</span>
+                    <Badge variant="secondary" className="text-[9px] h-4 px-1 ml-auto">
+                      {group.convos.length}
+                    </Badge>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="ml-2 mt-0.5 space-y-0.5">
+                      {group.convos.map(c => renderConvoItem(c, color))}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           ) : (
-            conversations.map(convo => (
-              <div
-                key={convo.id}
-                className={cn(
-                  "group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm",
-                  selectedConvoId === convo.id
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "hover-elevate"
-                )}
-                onClick={() => onSelectConvo(convo.id)}
-                data-testid={`convo-item-${convo.id}`}
-              >
-                <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                <span className="truncate flex-1">{convo.title}</span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-6 w-6 shrink-0 invisible group-hover:visible"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteConvo(convo.id);
-                  }}
-                  data-testid={`btn-delete-convo-${convo.id}`}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            ))
+            conversations.map(convo => renderConvoItem(convo))
           )}
         </div>
       </ScrollArea>

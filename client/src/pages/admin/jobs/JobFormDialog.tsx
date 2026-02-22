@@ -231,6 +231,30 @@ export function JobFormDialog({
                 }}
               />
 
+              {jobForm.watch("status") === "DEFECT_LIABILITY_PERIOD" && (
+                <FormField
+                  control={jobForm.control}
+                  name="defectLiabilityEndDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Defect Liability Period End Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          value={field.value ? field.value.substring(0, 10) : ""}
+                          onChange={(e) => field.onChange(e.target.value || null)}
+                          data-testid="input-defect-liability-end-date"
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        The date when the defect liability period ends per contract terms
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
               <FormField
                 control={jobForm.control}
                 name="jobTypeId"

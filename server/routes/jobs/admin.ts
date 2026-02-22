@@ -77,6 +77,7 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
     const schema = z.object({
       jobPhase: z.enum(JOB_PHASES as unknown as [string, ...string[]]).optional(),
       status: z.string().optional(),
+      defectLiabilityEndDate: z.string().nullable().optional(),
     });
 
     const parsed = schema.safeParse(req.body);
@@ -84,7 +85,7 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
       return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
     }
 
-    const { jobPhase: newPhase, status: newStatus } = parsed.data;
+    const { jobPhase: newPhase, status: newStatus, defectLiabilityEndDate } = parsed.data;
     const currentPhase = intToPhase(job.jobPhase ?? 0);
     const currentStatus = job.status;
 
@@ -135,8 +136,16 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
         });
       }
 
+      const statusUpdateData: Record<string, unknown> = {
+        status: newStatus as typeof jobs.status.enumValues[number],
+        updatedAt: new Date(),
+      };
+      if (defectLiabilityEndDate !== undefined) {
+        statusUpdateData.defectLiabilityEndDate = defectLiabilityEndDate ? new Date(defectLiabilityEndDate) : null;
+      }
+
       await db.update(jobs)
-        .set({ status: newStatus as typeof jobs.status.enumValues[number], updatedAt: new Date() })
+        .set(statusUpdateData)
         .where(eq(jobs.id, job.id));
 
       const statusUserName = await resolveUserName(req);
@@ -149,6 +158,14 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
         statusUserName
       );
 
+      const updatedJob = await storage.getJob(job.id);
+      return res.json(serializeJobPhase(updatedJob));
+    }
+
+    if (defectLiabilityEndDate !== undefined) {
+      await db.update(jobs)
+        .set({ defectLiabilityEndDate: defectLiabilityEndDate ? new Date(defectLiabilityEndDate) : null, updatedAt: new Date() })
+        .where(eq(jobs.id, job.id));
       const updatedJob = await storage.getJob(job.id);
       return res.json(serializeJobPhase(updatedJob));
     }
