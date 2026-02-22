@@ -557,7 +557,7 @@ export default function ProductionReportPage() {
                 <Input
                   placeholder="Search by date..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => setSearchQuery(e.target.value.replace(/<[^>]*>/g, "").trim())}
                   className="pl-9 w-48"
                   data-testid="input-search"
                 />

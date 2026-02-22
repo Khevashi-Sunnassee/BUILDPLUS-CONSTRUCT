@@ -172,6 +172,7 @@ export default function DailyReportsPage() {
   const { data: logs, isLoading } = useQuery<DailyLogSummary[]>({
     queryKey: [DAILY_LOGS_ROUTES.LIST, { status: statusFilter, dateRange }],
     select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
+    staleTime: 30 * 1000,
   });
 
   const { data: allocatedData } = useQuery<{
@@ -256,13 +257,27 @@ export default function DailyReportsPage() {
     mutationFn: async (id: string) => {
       return await apiRequest("DELETE", DAILY_LOGS_ROUTES.BY_ID(id), {});
     },
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST] });
+      const previousLogs = queryClient.getQueriesData({ queryKey: [DAILY_LOGS_ROUTES.LIST] });
+      queryClient.setQueriesData({ queryKey: [DAILY_LOGS_ROUTES.LIST] }, (old: any) => {
+        if (Array.isArray(old)) return old.filter((log: any) => log.id !== id);
+        return old;
+      });
+      return { previousLogs };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST] });
       setDeleteDialogOpen(false);
       setDeletingLogId(null);
       toast({ title: "Daily log deleted" });
     },
-    onError: () => {
+    onError: (_error, _id, context) => {
+      if (context?.previousLogs) {
+        context.previousLogs.forEach(([queryKey, data]: [any, any]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
       toast({ title: "Failed to delete daily log", variant: "destructive" });
     },
   });
@@ -292,11 +307,11 @@ export default function DailyReportsPage() {
       return false;
     }
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+      const query = searchQuery.replace(/<[^>]*>/g, "").trim().toLowerCase();
       return (
-        log.logDay.includes(query) ||
-        log.userName?.toLowerCase().includes(query) ||
-        log.userEmail?.toLowerCase().includes(query)
+        log.logDay?.includes(query) ||
+        log.userName?.toLowerCase()?.includes(query) ||
+        log.userEmail?.toLowerCase()?.includes(query)
       );
     }
     return true;
@@ -595,13 +610,21 @@ export default function DailyReportsPage() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={() =>
+                  onClick={() => {
+                    if (!newDayDate) {
+                      toast({ title: "Date is required", variant: "destructive" });
+                      return;
+                    }
+                    if (!newDayFactory) {
+                      toast({ title: "Factory is required", variant: "destructive" });
+                      return;
+                    }
                     createDailyLogMutation.mutate({
                       logDay: newDayDate,
                       factory: newDayFactory,
-                    })
-                  }
-                  disabled={createDailyLogMutation.isPending}
+                    });
+                  }}
+                  disabled={!newDayDate || !newDayFactory || createDailyLogMutation.isPending}
                   data-testid="button-create-new-day"
                 >
                   {createDailyLogMutation.isPending && (
@@ -725,7 +748,7 @@ export default function DailyReportsPage() {
                       <Input
                         placeholder="Search panel or job..."
                         value={allocatedSearch}
-                        onChange={(e) => setAllocatedSearch(e.target.value)}
+                        onChange={(e) => setAllocatedSearch(e.target.value.replace(/<[^>]*>/g, "").trim())}
                         className="pl-8 h-8"
                         data-testid="input-allocated-search"
                       />
@@ -902,7 +925,7 @@ export default function DailyReportsPage() {
                 <Input
                   placeholder="Search..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => setSearchQuery(e.target.value.replace(/<[^>]*>/g, "").trim())}
                   className="pl-9 w-48"
                   data-testid="input-search"
                 />

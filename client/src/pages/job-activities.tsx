@@ -112,7 +112,7 @@ export default function JobActivitiesPage() {
   const [printIncludeTasks, setPrintIncludeTasks] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
-  const { data: job } = useQuery<any>({
+  const { data: job } = useQuery<Record<string, unknown>>({
     queryKey: [`/api/admin/jobs/${jobId}`],
     enabled: !!jobId,
   });
@@ -136,11 +136,11 @@ export default function JobActivitiesPage() {
     queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_TYPES],
   });
 
-  const { data: users } = useQuery<any[]>({
+  const { data: users } = useQuery<Record<string, unknown>[]>({
     queryKey: ["/api/admin/users"],
   });
 
-  const { data: jobsList } = useQuery<any[]>({
+  const { data: jobsList } = useQuery<Record<string, unknown>[]>({
     queryKey: ["/api/admin/jobs"],
   });
 
@@ -224,7 +224,7 @@ export default function JobActivitiesPage() {
     mutationFn: async () => {
       return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES_RECALCULATE(jobId), {});
     },
-    onSuccess: async (res: any) => {
+    onSuccess: async (res: Response) => {
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
       toast({ title: "Dates recalculated", description: `${data.updated} activities updated` });
@@ -238,7 +238,7 @@ export default function JobActivitiesPage() {
     mutationFn: async () => {
       return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES_SYNC_PREDECESSORS(jobId), {});
     },
-    onSuccess: async (res: any) => {
+    onSuccess: async (res: Response) => {
       const data = await res.json();
       await queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
       toast({ title: "Predecessors synced", description: `${data.synced} of ${data.total} activities updated from template` });
@@ -250,11 +250,11 @@ export default function JobActivitiesPage() {
   });
 
   const updateActivityMutation = useMutation({
-    mutationFn: async ({ id, _recalculate, ...data }: any) => {
+    mutationFn: async ({ id, _recalculate, ...data }: Record<string, unknown> & { id: string; _recalculate?: boolean }) => {
       const res = await apiRequest("PATCH", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_BY_ID(id), data);
       return { res, _recalculate };
     },
-    onSuccess: async ({ _recalculate }: any) => {
+    onSuccess: async ({ _recalculate }: { res: Response; _recalculate?: boolean }) => {
       await queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
       if (_recalculate) {
         recalculateMutation.mutate();
@@ -265,57 +265,57 @@ export default function JobActivitiesPage() {
     },
   });
 
-  function toggleStageCollapse(stageId: string) {
+  const toggleStageCollapse = useCallback((stageId: string) => {
     setCollapsedStages(prev => {
       const next = new Set(prev);
       if (next.has(stageId)) next.delete(stageId);
       else next.add(stageId);
       return next;
     });
-  }
+  }, []);
 
-  function collapseAll() {
+  const collapseAll = useCallback(() => {
     setCollapsedStages(new Set(orderedStageIds));
-  }
+  }, [orderedStageIds]);
 
-  function expandAll() {
+  const expandAll = useCallback(() => {
     setCollapsedStages(new Set());
-  }
+  }, []);
 
-  function expandAllActivities() {
+  const expandAllActivities = useCallback(() => {
     const ids = parentActivities.filter(a => (childActivities.get(a.id) || []).length > 0).map(a => a.id);
     setExpandedActivities(new Set(ids));
-  }
+  }, [parentActivities, childActivities]);
 
-  function collapseAllActivities() {
+  const collapseAllActivities = useCallback(() => {
     setExpandedActivities(new Set());
-  }
+  }, []);
 
-  function expandAllTasks() {
+  const expandAllTasks = useCallback(() => {
     setExpandedTasks(new Set(parentActivities.map(a => a.id)));
-  }
+  }, [parentActivities]);
 
-  function collapseAllTasks() {
+  const collapseAllTasks = useCallback(() => {
     setExpandedTasks(new Set());
-  }
+  }, []);
 
-  function toggleActivityExpanded(activityId: string) {
+  const toggleActivityExpanded = useCallback((activityId: string) => {
     setExpandedActivities(prev => {
       const next = new Set(prev);
       if (next.has(activityId)) next.delete(activityId);
       else next.add(activityId);
       return next;
     });
-  }
+  }, []);
 
-  function toggleTasksExpanded(activityId: string) {
+  const toggleTasksExpanded = useCallback((activityId: string) => {
     setExpandedTasks(prev => {
       const next = new Set(prev);
       if (next.has(activityId)) next.delete(activityId);
       else next.add(activityId);
       return next;
     });
-  }
+  }, []);
 
   const uniquePhases = useMemo(() => {
     if (!activities) return [];
@@ -346,10 +346,13 @@ export default function JobActivitiesPage() {
     }
   }, [activities]);
 
-  const totalActivities = allParentActivities.length;
-  const doneCount = allParentActivities.filter(a => a.status === "DONE").length;
-  const overdueCount = allParentActivities.filter(a => isOverdue(a)).length;
-  const progressPct = totalActivities > 0 ? Math.round((doneCount / totalActivities) * 100) : 0;
+  const { totalActivities, doneCount, overdueCount, progressPct } = useMemo(() => {
+    const total = allParentActivities.length;
+    const done = allParentActivities.filter(a => a.status === "DONE").length;
+    const overdue = allParentActivities.filter(a => isOverdue(a)).length;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { totalActivities: total, doneCount: done, overdueCount: overdue, progressPct: pct };
+  }, [allParentActivities]);
 
   const exportActivitiesToPDF = async () => {
     setIsExporting(true);
@@ -504,7 +507,7 @@ export default function JobActivitiesPage() {
         stageActs.forEach(a => printedActivityIds.add(a.id));
       }
 
-      let taskDataCache: Map<string, any[]> | null = null;
+      let taskDataCache: Map<string, Record<string, unknown>[]> | null = null;
       if (printIncludeTasks) {
         taskDataCache = new Map();
         const fetchPromises = Array.from(printedActivityIds).map(async (actId) => {
@@ -601,8 +604,9 @@ export default function JobActivitiesPage() {
           rx += endCol;
 
           const assigneeNames = activity.assignees?.map(a => {
-            const u = users?.find((u: any) => u.id === a.userId);
-            return u?.name?.split(" ")[0] || "";
+            const u = users?.find((u: Record<string, unknown>) => u.id === a.userId);
+            const name = u?.name as string | undefined;
+            return name?.split(" ")[0] || "";
           }).filter(Boolean).join(", ") || "-";
           pdf.setTextColor(107, 114, 128);
           pdf.setFontSize(7);
@@ -659,7 +663,7 @@ export default function JobActivitiesPage() {
                 pdf.text(task.dueDate ? format(new Date(task.dueDate), "dd/MM/yy") : "-", tx + 2, currentY + 4);
                 tx += taskColWidths[3];
 
-                const taskAssignees = task.assignees?.map((a: any) => a.user?.name?.split(" ")[0] || "").filter(Boolean).join(", ") || "-";
+                const taskAssignees = task.assignees?.map((a: { user?: { name?: string }; userId?: string }) => a.user?.name?.split(" ")[0] || "").filter(Boolean).join(", ") || "-";
                 const taskAssText = taskAssignees.length > 18 ? taskAssignees.substring(0, 15) + "..." : taskAssignees;
                 pdf.text(taskAssText, tx + 2, currentY + 4);
 
@@ -1087,9 +1091,9 @@ function ActivityRow({
   allParentActivities: ActivityWithAssignees[];
   onSelect: (a: ActivityWithAssignees) => void;
   onStatusChange: (id: string, status: string) => void;
-  onFieldChange: (id: string, data: Record<string, any>, recalculate: boolean) => void;
-  users: any[];
-  jobs: any[];
+  onFieldChange: (id: string, data: Record<string, unknown>, recalculate: boolean) => void;
+  users: Record<string, unknown>[];
+  jobs: Record<string, unknown>[];
   jobId: string;
   currentUserId?: string;
   expanded: boolean;
@@ -1372,7 +1376,7 @@ function InstantiateDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   jobTypesData: JobType[];
-  job: any;
+  job: Record<string, unknown> | undefined;
   selectedJobTypeId: string;
   setSelectedJobTypeId: (id: string) => void;
   onConfirm: (jobTypeId: string, startDate: string) => void;
@@ -1476,24 +1480,24 @@ function ActivitySidebar({
   activity: ActivityWithAssignees | null;
   onClose: () => void;
   jobId: string;
-  users: any[];
+  users: Record<string, unknown>[];
   allParentActivities: ActivityWithAssignees[];
 }) {
   const { toast } = useToast();
   const [commentText, setCommentText] = useState("");
   const [activeTab, setActiveTab] = useState("details");
 
-  const { data: updates, isLoading: loadingUpdates } = useQuery<any[]>({
+  const { data: updates, isLoading: loadingUpdates } = useQuery<{ id: string; userId: string; content: string; createdAt: string }[]>({
     queryKey: [activity ? PROJECT_ACTIVITIES_ROUTES.ACTIVITY_UPDATES(activity.id) : ""],
     enabled: !!activity,
   });
 
-  const { data: files, isLoading: loadingFiles } = useQuery<any[]>({
+  const { data: files, isLoading: loadingFiles } = useQuery<{ id: string; fileName: string; fileUrl: string; fileSize?: number }[]>({
     queryKey: [activity ? PROJECT_ACTIVITIES_ROUTES.ACTIVITY_FILES(activity.id) : ""],
     enabled: !!activity,
   });
 
-  const { data: checklistItems = [] } = useQuery<any[]>({
+  const { data: checklistItems = [] } = useQuery<{ id: string; label: string; isChecked: boolean; checkedByName?: string }[]>({
     queryKey: [activity ? PROJECT_ACTIVITIES_ROUTES.ACTIVITY_CHECKLISTS(activity.id) : ""],
     enabled: !!activity && (activity.checklistTotal || 0) > 0,
   });
@@ -1555,11 +1559,11 @@ function ActivitySidebar({
   });
 
   const updateActivityMutation = useMutation({
-    mutationFn: async ({ id, _recalculate, ...data }: any) => {
+    mutationFn: async ({ id, _recalculate, ...data }: Record<string, unknown> & { id: string; _recalculate?: boolean }) => {
       const res = await apiRequest("PATCH", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_BY_ID(id), data);
       return { res, _recalculate };
     },
-    onSuccess: async ({ _recalculate }: any) => {
+    onSuccess: async ({ _recalculate }: { res: Response; _recalculate?: boolean }) => {
       await queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
       if (_recalculate) {
         recalculateMutation.mutate();
@@ -1572,7 +1576,7 @@ function ActivitySidebar({
 
   function getUserName(userId: string) {
     const user = users?.find(u => u.id === userId);
-    return user?.name || user?.email || "Unknown";
+    return (user?.name as string) || (user?.email as string) || "Unknown";
   }
 
   function getUserInitials(userId: string) {
@@ -1767,7 +1771,7 @@ function ActivitySidebar({
                     <Skeleton className="h-12 w-full" />
                   </div>
                 ) : updates && updates.length > 0 ? (
-                  updates.map((update: any) => (
+                  updates.map((update) => (
                     <div key={update.id} className="flex gap-2" data-testid={`update-${update.id}`}>
                       <Avatar className="h-8 w-8">
                         <AvatarFallback className="text-xs">{getUserInitials(update.userId)}</AvatarFallback>
@@ -1838,7 +1842,7 @@ function ActivitySidebar({
                 <Skeleton className="h-20 w-full" />
               ) : files && files.length > 0 ? (
                 <div className="space-y-2">
-                  {files.map((file: any) => (
+                  {files.map((file) => (
                     <div key={file.id} className="flex items-center justify-between gap-2 p-2 border rounded" data-testid={`file-${file.id}`}>
                       <div className="flex items-center gap-2 min-w-0">
                         <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -1862,7 +1866,7 @@ function ActivitySidebar({
 
           <TabsContent value="checklist" className="mt-4">
             <div className="space-y-2">
-              {checklistItems.length > 0 ? checklistItems.map((item: any) => (
+              {checklistItems.length > 0 ? checklistItems.map((item) => (
                 <div
                   key={item.id}
                   className="flex items-center gap-3 p-2 border rounded cursor-pointer hover-elevate"

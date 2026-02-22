@@ -213,8 +213,13 @@ export default function AdminSettingsPage() {
       toast({ title: editingDept ? "Department updated" : "Department created" });
       closeDeptDialog();
     },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to save department", variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Error", description: description || "Failed to save department", variant: "destructive" });
     },
   });
 
@@ -228,8 +233,13 @@ export default function AdminSettingsPage() {
       setShowDeleteDeptDialog(false);
       setDeletingDept(null);
     },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to delete department", variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Error", description: description || "Failed to delete department", variant: "destructive" });
     },
   });
 
@@ -513,8 +523,13 @@ export default function AdminSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/inbox-emails"] });
       toast({ title: "Inbox email addresses saved successfully" });
     },
-    onError: (err: any) => {
-      toast({ title: err.message || "Failed to save inbox emails", variant: "destructive" });
+    onError: (err: Error) => {
+      let description = err.message;
+      try {
+        const parsed = JSON.parse(err.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: description || "Failed to save inbox emails", variant: "destructive" });
     },
   });
 

@@ -89,7 +89,7 @@ export default function LogisticsPage() {
 
   const { data: loadLists, isLoading: loadListsLoading, isError, error, refetch } = useQuery<LoadListWithDetails[]>({
     queryKey: [LOGISTICS_ROUTES.LOAD_LISTS],
-    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
+    select: (raw: unknown) => Array.isArray(raw) ? raw : ((raw as Record<string, unknown>)?.data as LoadListWithDetails[] ?? []),
   });
 
   const { data: jobs } = useQuery<Job[]>({
@@ -183,8 +183,13 @@ export default function LogisticsPage() {
       setPendingJobFilter("all");
       setActiveTab("pending");
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to create load list", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to create load list", description, variant: "destructive" });
     },
   });
 
@@ -276,8 +281,13 @@ export default function LogisticsPage() {
       setPendingJobFilter("all");
       setActiveTab("pending");
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to create load list", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to create load list", description, variant: "destructive" });
     },
   });
 
@@ -307,13 +317,18 @@ export default function LogisticsPage() {
       deliveryForm.reset();
       setSelectedLoadList(null);
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to create delivery record", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to create delivery record", description, variant: "destructive" });
     },
   });
 
   const createReturnMutation = useMutation({
-    mutationFn: async ({ loadListId, data }: { loadListId: string; data: any }) => {
+    mutationFn: async ({ loadListId, data }: { loadListId: string; data: Record<string, unknown> }) => {
       return apiRequest("POST", LOGISTICS_ROUTES.LOAD_LIST_RETURN(loadListId), data);
     },
     onSuccess: () => {
@@ -322,8 +337,13 @@ export default function LogisticsPage() {
       setReturnDialogOpen(false);
       resetReturnForm();
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to record return", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to record return", description, variant: "destructive" });
     },
   });
 

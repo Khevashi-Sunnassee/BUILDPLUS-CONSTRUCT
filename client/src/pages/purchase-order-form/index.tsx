@@ -366,7 +366,7 @@ export default function PurchaseOrderFormPage() {
   useEffect(() => {
     if (existingPO?.items) {
       const alreadyReceived = new Set(
-        existingPO.items.filter((item: any) => item.received).map((item: any) => item.id)
+        existingPO.items.filter((item: Record<string, unknown>) => item.received).map((item: Record<string, unknown>) => item.id as string)
       );
       setReceivedItemIds(alreadyReceived);
     }
@@ -396,7 +396,7 @@ export default function PurchaseOrderFormPage() {
     setReceivingMode(false);
     if (existingPO?.items) {
       const alreadyReceived = new Set(
-        existingPO.items.filter((item: any) => item.received).map((item: any) => item.id)
+        existingPO.items.filter((item: Record<string, unknown>) => item.received).map((item: Record<string, unknown>) => item.id as string)
       );
       setReceivedItemIds(alreadyReceived);
     }
@@ -602,21 +602,21 @@ export default function PurchaseOrderFormPage() {
     };
   }, [lineItems]);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     const formData = form.getValues();
     if (isNew) {
       createMutation.mutate({ po: formData, items: lineItems });
     } else {
       updateMutation.mutate({ po: formData, items: lineItems });
     }
-  };
+  }, [form, isNew, lineItems, createMutation, updateMutation]);
 
-  const handleUpdate = () => {
+  const handleUpdate = useCallback(() => {
     const formData = form.getValues();
     updateMutation.mutate({ po: formData, items: lineItems });
-  };
+  }, [form, lineItems, updateMutation]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     const formData = form.getValues();
     if (isNew) {
       createMutation.mutate({ po: formData, items: lineItems }, {
@@ -628,7 +628,7 @@ export default function PurchaseOrderFormPage() {
       await updateMutation.mutateAsync({ po: formData, items: lineItems });
       submitMutation.mutate(poId!);
     }
-  };
+  }, [form, isNew, lineItems, createMutation, updateMutation, submitMutation, poId]);
 
   const handlePrint = useCallback(async () => {
     if (!existingPO) return;
@@ -636,11 +636,11 @@ export default function PurchaseOrderFormPage() {
   }, [existingPO, lineItems, settings, poTermsSettings]);
 
   const canEdit = true;
-  const canApprove = existingPO?.status === "SUBMITTED" && (user?.poApprover || user?.role === "ADMIN");
+  const canApprove = useMemo(() => existingPO?.status === "SUBMITTED" && (user?.poApprover || user?.role === "ADMIN"), [existingPO?.status, user?.poApprover, user?.role]);
   const isApproved = existingPO?.status === "APPROVED";
   const isRejected = existingPO?.status === "REJECTED";
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = useCallback((status: string) => {
     switch (status) {
       case "DRAFT":
         return <Badge variant="secondary" data-testid="badge-status">Draft</Badge>;
@@ -657,7 +657,7 @@ export default function PurchaseOrderFormPage() {
       default:
         return <Badge variant="outline" data-testid="badge-status">{status}</Badge>;
     }
-  };
+  }, []);
 
   if (!isNew && loadingPO) {
     return (

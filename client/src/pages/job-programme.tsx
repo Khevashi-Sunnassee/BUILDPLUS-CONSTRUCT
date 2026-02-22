@@ -352,6 +352,12 @@ export default function JobProgrammePage() {
   const params = useParams<{ id: string }>();
   const jobId = params.id;
   const { toast } = useToast();
+
+  const isValidId = useMemo(() => {
+    if (!jobId) return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId);
+  }, [jobId]);
+
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"table" | "gantt">("table");
@@ -577,6 +583,21 @@ export default function JobProgrammePage() {
 
   const isSaving = patchEntryMutation.isPending || splitMutation.isPending || reorderMutation.isPending || recalcMutation.isPending || deleteMutation.isPending || generateFromSettingsMutation.isPending || generateFromPanelsMutation.isPending || updateProductionSlotsMutation.isPending;
   const isLoading = jobLoading || programmeLoading;
+
+  if (!isValidId) {
+    return (
+      <div className="p-8 text-center" data-testid="text-invalid-id">
+        <h2 className="text-lg font-semibold">Invalid Job ID format</h2>
+        <p className="text-muted-foreground mt-2">The job ID in the URL is not valid.</p>
+        <Link href="/admin/jobs">
+          <Button variant="outline" className="mt-4">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Jobs
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

@@ -128,7 +128,13 @@ export default function ProductionReportDetailPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const selectedDate = params?.date || format(new Date(), "yyyy-MM-dd");
-  
+
+  const isValidDate = useMemo(() => {
+    if (!params?.date) return false;
+    const d = new Date(params.date);
+    return !isNaN(d.getTime()) && /^\d{4}-\d{2}-\d{2}$/.test(params.date);
+  }, [params?.date]);
+
   // Get factory from URL query params
   const urlParams = new URLSearchParams(window.location.search);
   const factory = urlParams.get("factory") || "QLD";
@@ -544,6 +550,18 @@ export default function ProductionReportDetailPage() {
       setIsExporting(false);
     }
   };
+
+  if (!isValidDate) {
+    return (
+      <div className="p-8 text-center" data-testid="text-invalid-date">
+        <h2 className="text-lg font-semibold">Invalid date format</h2>
+        <p className="text-muted-foreground mt-2">The date in the URL is not valid. Expected format: YYYY-MM-DD</p>
+        <Button variant="outline" className="mt-4" onClick={() => setLocation("/production-report")}>
+          Back to Production Reports
+        </Button>
+      </div>
+    );
+  }
 
   if (entriesLoading) {
     return (

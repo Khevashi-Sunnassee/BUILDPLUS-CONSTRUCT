@@ -479,9 +479,9 @@ function JobMatchPanel({ email, emailId }: { email: DraftingEmailDetail; emailId
 
   const { data: jobs } = useQuery<Array<{ id: string; name: string; jobNumber?: string }>>({
     queryKey: ["/api/jobs"],
-    select: (data: any) => {
+    select: (data: unknown) => {
       if (Array.isArray(data)) return data;
-      if (data?.jobs) return data.jobs;
+      if (data && typeof data === "object" && "jobs" in data) return (data as { jobs: Array<{ id: string; name: string; jobNumber?: string }> }).jobs;
       return [];
     },
   });
@@ -678,9 +678,9 @@ function CreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail; email
 
   const { data: companyUsers = [] } = useQuery<Array<{ id: string; name: string; role: string }>>({
     queryKey: ["/api/users"],
-    select: (data: any) => {
-      const list = Array.isArray(data) ? data : data?.users || [];
-      return list.filter((u: any) => u.name).sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
+    select: (data: unknown) => {
+      const list = Array.isArray(data) ? data : (data && typeof data === "object" && "users" in data ? (data as { users: Array<{ id: string; name: string; role: string }> }).users : []);
+      return list.filter((u: { id: string; name: string; role: string }) => u.name).sort((a: { id: string; name: string; role: string }, b: { id: string; name: string; role: string }) => (a.name || "").localeCompare(b.name || ""));
     },
   });
 

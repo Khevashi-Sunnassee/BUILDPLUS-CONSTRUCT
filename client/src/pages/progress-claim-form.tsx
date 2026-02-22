@@ -302,8 +302,10 @@ export default function ProgressClaimFormPage() {
   const subtotal = useMemo(() => {
     return activeItems.reduce((sum, item) => sum + item.lineTotal, 0);
   }, [activeItems]);
-  const taxAmount = subtotal * taxRate / 100;
-  const total = subtotal + taxAmount;
+  const { taxAmount, total } = useMemo(() => {
+    const tax = subtotal * taxRate / 100;
+    return { taxAmount: tax, total: subtotal + tax };
+  }, [subtotal, taxRate]);
 
   const retentionCalc = useMemo(() => {
     if (!retentionSummary) return { rate: 0, amount: 0, netClaim: total };
@@ -336,22 +338,22 @@ export default function ProgressClaimFormPage() {
   }, [claimId]);
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       const res = await apiRequest("POST", PROGRESS_CLAIMS_ROUTES.LIST, data);
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { id: string }) => {
       invalidateClaimQueries();
       toast({ title: "Progress claim created" });
       navigate(`/progress-claims/${data.id}/edit`);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       const res = await apiRequest("PATCH", PROGRESS_CLAIMS_ROUTES.BY_ID(claimId!), data);
       return res.json();
     },
@@ -359,7 +361,7 @@ export default function ProgressClaimFormPage() {
       invalidateClaimQueries();
       toast({ title: "Progress claim updated" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -373,7 +375,7 @@ export default function ProgressClaimFormPage() {
       toast({ title: "Claim submitted for approval" });
       navigate("/progress-claims");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -387,7 +389,7 @@ export default function ProgressClaimFormPage() {
       toast({ title: "Claim approved" });
       navigate("/progress-claims");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -401,7 +403,7 @@ export default function ProgressClaimFormPage() {
       toast({ title: "Claim rejected" });
       navigate("/progress-claims");
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
@@ -435,7 +437,11 @@ export default function ProgressClaimFormPage() {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
-  const getLifecycleBadge = (status: number) => {
+  const sortedJobsList = useMemo(() => {
+    return [...jobsList].sort((a, b) => (a.jobNumber || a.name || '').localeCompare(b.jobNumber || b.name || ''));
+  }, [jobsList]);
+
+  const getLifecycleBadge = useCallback((status: number) => {
     const label = PANEL_LIFECYCLE_LABELS[status] || `Status ${status}`;
     const colors = PANEL_LIFECYCLE_COLORS[status];
     if (!colors) return <Badge variant="outline">{label}</Badge>;
@@ -444,7 +450,7 @@ export default function ProgressClaimFormPage() {
         {label}
       </Badge>
     );
-  };
+  }, []);
 
   if (!isNew && !existingClaim && claimId) {
     return (
@@ -532,7 +538,7 @@ export default function ProgressClaimFormPage() {
                 <p className="text-sm text-muted-foreground">Contract Value</p>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-2xl font-bold mt-1" data-testid="text-contract-value">{formatCurrency(parseFloat(jobSummary.contractValue as any) || 0)}</p>
+              <p className="text-2xl font-bold mt-1" data-testid="text-contract-value">{formatCurrency(parseFloat(String(jobSummary.contractValue)) || 0)}</p>
               <p className="text-xs text-muted-foreground mt-1">Total job value</p>
             </CardContent>
           </Card>
@@ -542,7 +548,7 @@ export default function ProgressClaimFormPage() {
                 <p className="text-sm text-muted-foreground">Claimed to Date</p>
                 <CheckCircle className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-2xl font-bold mt-1" data-testid="text-claimed-to-date">{formatCurrency(parseFloat(jobSummary.claimedToDate as any) || 0)}</p>
+              <p className="text-2xl font-bold mt-1" data-testid="text-claimed-to-date">{formatCurrency(parseFloat(String(jobSummary.claimedToDate)) || 0)}</p>
               {parseFloat(jobSummary.contractValue) > 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
                   {((parseFloat(jobSummary.claimedToDate) / parseFloat(jobSummary.contractValue)) * 100).toFixed(1)}% of contract
@@ -556,7 +562,7 @@ export default function ProgressClaimFormPage() {
                 <p className="text-sm text-muted-foreground">Remaining</p>
                 <TrendingDown className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-2xl font-bold mt-1" data-testid="text-remaining-value">{formatCurrency(parseFloat(jobSummary.remainingValue as any) || 0)}</p>
+              <p className="text-2xl font-bold mt-1" data-testid="text-remaining-value">{formatCurrency(parseFloat(String(jobSummary.remainingValue)) || 0)}</p>
               {parseFloat(jobSummary.contractValue) > 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
                   {((parseFloat(jobSummary.remainingValue) / parseFloat(jobSummary.contractValue)) * 100).toFixed(1)}% remaining
@@ -580,7 +586,7 @@ export default function ProgressClaimFormPage() {
                     <SelectValue placeholder="Choose a job..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {[...jobsList].sort((a, b) => (a.jobNumber || a.name || '').localeCompare(b.jobNumber || b.name || '')).map((job) => (
+                    {sortedJobsList.map((job) => (
                       <SelectItem key={job.id} value={job.id} data-testid={`option-job-${job.id}`}>
                         {job.jobNumber} - {job.name}
                       </SelectItem>
@@ -794,7 +800,7 @@ export default function ProgressClaimFormPage() {
                         </div>
                         <div className="flex items-center justify-between">
                           <span>Retention cap ({retentionSummary.retentionCapPct}% of contract)</span>
-                          <span className="font-mono">{formatCurrency(parseFloat(retentionSummary.retentionCapAmount as any) || 0)}</span>
+                          <span className="font-mono">{formatCurrency(parseFloat(String(retentionSummary.retentionCapAmount)) || 0)}</span>
                         </div>
                       </div>
                     )}

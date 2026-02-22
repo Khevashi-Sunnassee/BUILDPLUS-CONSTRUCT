@@ -468,8 +468,13 @@ export default function AdminItemsPage() {
       setCategoryDialogOpen(false);
       categoryForm.reset();
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to create category", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to create category", description, variant: "destructive" });
     },
   });
 
@@ -485,8 +490,13 @@ export default function AdminItemsPage() {
       setEditingCategory(null);
       categoryForm.reset();
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to update category", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to update category", description, variant: "destructive" });
     },
   });
 
@@ -501,8 +511,13 @@ export default function AdminItemsPage() {
       setCategoryDeleteDialogOpen(false);
       setDeletingCategoryId(null);
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to delete category", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to delete category", description, variant: "destructive" });
     },
   });
 
@@ -555,8 +570,13 @@ export default function AdminItemsPage() {
       setDialogOpen(false);
       form.reset();
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to create item", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to create item", description, variant: "destructive" });
     },
   });
 
@@ -580,8 +600,13 @@ export default function AdminItemsPage() {
       setEditingItem(null);
       form.reset();
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to update item", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to update item", description, variant: "destructive" });
     },
   });
 
@@ -595,8 +620,13 @@ export default function AdminItemsPage() {
       setDeleteDialogOpen(false);
       setDeletingItemId(null);
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to delete item", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to delete item", description, variant: "destructive" });
     },
   });
 
@@ -629,8 +659,13 @@ export default function AdminItemsPage() {
         fileInputRef.current.value = "";
       }
     },
-    onError: (error: any) => {
-      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Import failed", description, variant: "destructive" });
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -244,8 +244,8 @@ export default function AdminUsersPage() {
     queryKey: [ADMIN_ROUTES.DEPARTMENTS],
   });
 
-  const activeDepartments = departmentsList.filter((d) => d.isActive);
-  const activeFactories = factories.filter((f) => f.isActive);
+  const activeDepartments = useMemo(() => departmentsList.filter((d) => d.isActive), [departmentsList]);
+  const activeFactories = useMemo(() => factories.filter((f) => f.isActive), [factories]);
 
   type InvitationWithInviter = UserInvitation & { invitedByName: string };
   const { data: invitations = [], isLoading: invitationsLoading } = useQuery<InvitationWithInviter[]>({
@@ -423,7 +423,7 @@ export default function AdminUsersPage() {
     },
   });
 
-  const openWorkHoursDialog = (user: UserType) => {
+  const openWorkHoursDialog = useCallback((user: UserType) => {
     setWorkHoursUser(user);
     workHoursForm.reset({
       mondayStartTime: user.mondayStartTime || "08:00",
@@ -442,7 +442,7 @@ export default function AdminUsersPage() {
       sundayHours: user.sundayHours || "0",
     });
     setWorkHoursDialogOpen(true);
-  };
+  }, [workHoursForm]);
 
   const onWorkHoursSubmit = (data: WorkHoursFormData) => {
     if (workHoursUser) {
@@ -450,7 +450,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  const openEditUser = (user: UserType) => {
+  const openEditUser = useCallback((user: UserType) => {
     setEditingUser(user);
     form.reset({
       email: user.email,
@@ -466,7 +466,7 @@ export default function AdminUsersPage() {
       defaultFactoryId: user.defaultFactoryId || null,
     });
     setDialogOpen(true);
-  };
+  }, [form]);
 
   const openNewUser = () => {
     setEditingUser(null);
@@ -511,7 +511,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  const getRoleIcon = (role: Role) => {
+  const getRoleIcon = useCallback((role: Role) => {
     switch (role) {
       case "ADMIN":
         return <ShieldAlert className="h-4 w-4 text-red-600" />;
@@ -520,9 +520,9 @@ export default function AdminUsersPage() {
       default:
         return <Shield className="h-4 w-4 text-muted-foreground" />;
     }
-  };
+  }, []);
 
-  const getRoleBadge = (role: Role) => {
+  const getRoleBadge = useCallback((role: Role) => {
     const variants: Record<Role, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
       ADMIN: { variant: "destructive", label: "Admin" },
       MANAGER: { variant: "default", label: "Manager" },
@@ -530,7 +530,11 @@ export default function AdminUsersPage() {
     };
     const config = variants[role] || variants.USER;
     return <Badge variant={config.variant}>{config.label}</Badge>;
-  };
+  }, []);
+
+  const pendingInvitationsCount = useMemo(() => invitations.filter(i => i.status === "PENDING").length, [invitations]);
+
+  const sortedInvitations = useMemo(() => invitations.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()), [invitations]);
 
   if (isLoading) {
     return (
@@ -584,8 +588,8 @@ export default function AdminUsersPage() {
           <TabsTrigger value="invitations" data-testid="tab-invitations">
             <Mail className="h-4 w-4 mr-1.5" />
             Invitations
-            {invitations.filter(i => i.status === "PENDING").length > 0 && (
-              <Badge variant="secondary" className="ml-1.5">{invitations.filter(i => i.status === "PENDING").length}</Badge>
+            {pendingInvitationsCount > 0 && (
+              <Badge variant="secondary" className="ml-1.5">{pendingInvitationsCount}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="permissions" data-testid="tab-permissions">
@@ -748,7 +752,7 @@ export default function AdminUsersPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {invitations.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((inv) => {
+                      {sortedInvitations.map((inv) => {
                         const isExpired = inv.status === "PENDING" && new Date(inv.expiresAt) < new Date();
                         const displayStatus = isExpired ? "EXPIRED" : inv.status;
                         return (

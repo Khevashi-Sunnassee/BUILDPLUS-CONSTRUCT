@@ -166,6 +166,7 @@ export default function SalesPipelinePage() {
   const { data: opportunities = [], isLoading, isError, error, refetch } = useQuery<Opportunity[]>({
     queryKey: [JOBS_ROUTES.OPPORTUNITIES],
     select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
+    staleTime: 30 * 1000,
   });
 
   const { data: statusHistory = [], isLoading: historyLoading } = useQuery<StatusHistoryEntry[]>({
@@ -228,6 +229,19 @@ export default function SalesPipelinePage() {
       const res = await apiRequest("PATCH", JOBS_ROUTES.OPPORTUNITY_BY_ID(id), data);
       return res.json();
     },
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: [JOBS_ROUTES.OPPORTUNITIES] });
+      const previousOpportunities = queryClient.getQueryData<Opportunity[]>([JOBS_ROUTES.OPPORTUNITIES]);
+      queryClient.setQueryData<Opportunity[]>([JOBS_ROUTES.OPPORTUNITIES], (old) => {
+        if (!old) return old;
+        return old.map((opp) => opp.id === id ? { ...opp, ...data } : opp);
+      });
+      const previousSelectedOpp = selectedOpp;
+      if (selectedOpp && selectedOpp.id === id) {
+        setSelectedOpp({ ...selectedOpp, ...data });
+      }
+      return { previousOpportunities, previousSelectedOpp };
+    },
     onSuccess: (updatedJob) => {
       queryClient.invalidateQueries({ queryKey: [JOBS_ROUTES.OPPORTUNITIES] });
       queryClient.invalidateQueries({ queryKey: [JOBS_ROUTES.OPPORTUNITIES, selectedOpp?.id, "history"] });
@@ -237,7 +251,13 @@ export default function SalesPipelinePage() {
       setStatusNote("");
       toast({ title: "Opportunity updated" });
     },
-    onError: (error: any) => {
+    onError: (error: any, _variables, context) => {
+      if (context?.previousOpportunities) {
+        queryClient.setQueryData([JOBS_ROUTES.OPPORTUNITIES], context.previousOpportunities);
+      }
+      if (context?.previousSelectedOpp) {
+        setSelectedOpp(context.previousSelectedOpp);
+      }
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
     },
   });

@@ -219,7 +219,7 @@ export default function TenderCenterPage() {
   }, [tenders, searchQuery]);
 
   const createTenderMutation = useMutation({
-    mutationFn: async (data: Record<string, any>) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       return apiRequest("POST", "/api/tenders", data);
     },
     onSuccess: () => {
@@ -233,7 +233,7 @@ export default function TenderCenterPage() {
   });
 
   const updateTenderMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; [key: string]: any }) => {
+    mutationFn: async ({ id, ...data }: { id: string } & Record<string, unknown>) => {
       return apiRequest("PATCH", `/api/tenders/${id}`, data);
     },
     onSuccess: () => {
@@ -251,7 +251,7 @@ export default function TenderCenterPage() {
       const res = await apiRequest("POST", `/api/tenders/${tenderId}/send-invitations`, { memberIds, subject, message });
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { sent: number; failed: number }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tenders"] });
       if (invitationTender) {
         queryClient.invalidateQueries({ queryKey: ["/api/tenders", invitationTender.id, "members"] });
@@ -323,7 +323,7 @@ export default function TenderCenterPage() {
       toast({ title: "Closed Date cannot be before Open Date", variant: "destructive" });
       return;
     }
-    const data: Record<string, any> = {
+    const data: Record<string, unknown> = {
       jobId: formJobId,
       title: formTitle.trim(),
       description: formDescription.trim() || undefined,

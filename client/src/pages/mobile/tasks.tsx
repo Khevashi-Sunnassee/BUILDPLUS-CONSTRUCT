@@ -152,9 +152,9 @@ export default function MobileTasksPage() {
 
   const { data: jobs = [], isLoading: jobsLoading } = useQuery<SimpleJob[]>({
     queryKey: [JOBS_ROUTES.LIST],
-    select: (data: any) => {
+    select: (data: unknown) => {
       if (Array.isArray(data)) return data;
-      if (data?.jobs) return data.jobs;
+      if (data && typeof data === 'object' && 'jobs' in data) return (data as { jobs: SimpleJob[] }).jobs;
       return [];
     },
   });
@@ -700,7 +700,7 @@ function TasksListView({
   newTaskTitle: string;
   setNewTaskTitle: (title: string) => void;
   handleCreateTask: (groupId: string) => void;
-  createTaskMutation: any;
+  createTaskMutation: ReturnType<typeof useMutation<Response, Error, { groupId: string; title: string }>>;
 }) {
   const { toast } = useToast();
   const [membersGroupId, setMembersGroupId] = useState<string | null>(null);
@@ -1062,7 +1062,7 @@ function ActivityTasksView({
   searchQuery: string;
   cycleStatus: (task: Task) => void;
   setSelectedTask: (task: Task) => void;
-  updateTaskMutation: any;
+  updateTaskMutation: ReturnType<typeof useMutation<Response, Error, { taskId: string; data: Partial<Task> }>>;
 }) {
   if (!selectedJobId) {
     return (
@@ -1331,7 +1331,7 @@ function TaskDetailSheet({
     (projectStage || null) !== (task.projectStage || null);
 
   const handleSave = () => {
-    const data: Record<string, any> = {};
+    const data: Record<string, unknown> = {};
     if (title !== task.title) data.title = title;
     if (status !== task.status) data.status = status;
     if ((dueDate || null) !== (task.dueDate ? task.dueDate.split("T")[0] : null)) {

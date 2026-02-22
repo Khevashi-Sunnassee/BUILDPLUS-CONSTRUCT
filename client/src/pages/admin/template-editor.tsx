@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { PageHelpButton } from "@/components/help/page-help-button";
@@ -254,7 +254,7 @@ export default function TemplateEditorPage() {
     },
   });
 
-  const handleOpenSectionDialog = (section?: ChecklistSection) => {
+  const handleOpenSectionDialog = useCallback((section?: ChecklistSection) => {
     if (section) {
       setEditingSection(section);
       sectionForm.reset({
@@ -271,7 +271,7 @@ export default function TemplateEditorPage() {
       });
     }
     setSectionDialogOpen(true);
-  };
+  }, [sectionForm]);
 
   const handleOpenFieldDialog = (sectionId: string, field?: ChecklistField) => {
     setEditingFieldSectionId(sectionId);
@@ -420,19 +420,18 @@ export default function TemplateEditorPage() {
     setDeletingFieldSectionId(null);
   };
 
-  const moveSection = (index: number, direction: "up" | "down") => {
-    const newIndex = direction === "up" ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= sections.length) return;
-
+  const moveSection = useCallback((index: number, direction: "up" | "down") => {
     setSections((prev) => {
+      const newIndex = direction === "up" ? index - 1 : index + 1;
+      if (newIndex < 0 || newIndex >= prev.length) return prev;
       const newSections = [...prev];
       [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
       return newSections.map((s, i) => ({ ...s, order: i }));
     });
     setHasChanges(true);
-  };
+  }, []);
 
-  const moveField = (sectionId: string, fieldIndex: number, direction: "up" | "down") => {
+  const moveField = useCallback((sectionId: string, fieldIndex: number, direction: "up" | "down") => {
     setSections((prev) =>
       prev.map((section) => {
         if (section.id !== sectionId) return section;
@@ -446,9 +445,9 @@ export default function TemplateEditorPage() {
       })
     );
     setHasChanges(true);
-  };
+  }, []);
 
-  const duplicateField = (sectionId: string, field: ChecklistField) => {
+  const duplicateField = useCallback((sectionId: string, field: ChecklistField) => {
     setSections((prev) =>
       prev.map((section) => {
         if (section.id !== sectionId) return section;
@@ -461,9 +460,9 @@ export default function TemplateEditorPage() {
       })
     );
     setHasChanges(true);
-  };
+  }, []);
 
-  const addFieldFromPalette = (sectionId: string, fieldType: string) => {
+  const addFieldFromPalette = useCallback((sectionId: string, fieldType: string) => {
     const config = FIELD_TYPE_CONFIG[fieldType];
     if (!config) return;
 
@@ -501,7 +500,9 @@ export default function TemplateEditorPage() {
     if (!expandedSections.includes(sectionId)) {
       setExpandedSections((prev) => [...prev, sectionId]);
     }
-  };
+  }, [expandedSections]);
+
+  const totalFieldCount = useMemo(() => sections.reduce((sum, s) => sum + (s.items?.length || 0), 0), [sections]);
 
   const addOption = () => {
     setEditingFieldOptions((prev) => [
@@ -522,9 +523,9 @@ export default function TemplateEditorPage() {
 
   const allFieldsFlat = useMemo(() => sections.flatMap((s) => (s.items || []).map((f) => ({ ...f, sectionName: s.name }))), [sections]);
 
-  const fieldTypeRequiresOptions = (type: string) => {
+  const fieldTypeRequiresOptions = useCallback((type: string) => {
     return ["radio_button", "dropdown", "checkbox", "condition_option"].includes(type);
-  };
+  }, []);
 
   if (isLoading) {
     return (

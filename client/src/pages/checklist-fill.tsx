@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { PageHelpButton } from "@/components/help/page-help-button";
@@ -107,12 +107,12 @@ export default function ChecklistFillPage() {
     },
   });
 
-  const handleResponseChange = (newResponses: Record<string, unknown>) => {
+  const handleResponseChange = useCallback((newResponses: Record<string, unknown>) => {
     setResponses(newResponses);
     setHasChanges(true);
-  };
+  }, []);
 
-  const handleComplete = () => {
+  const handleComplete = useCallback(() => {
     if (!template) return;
     const missing = getMissingRequiredFields(template, responses);
     if (missing.length > 0) {
@@ -124,11 +124,11 @@ export default function ChecklistFillPage() {
       return;
     }
     setCompleteDialogOpen(true);
-  };
+  }, [template, responses, toast]);
 
   const isLoading = instanceLoading || templateLoading;
-  const isCompleted = instance?.status === "completed" || instance?.status === "signed_off";
-  const statusConfig = instance?.status ? STATUS_CONFIG[instance.status] : null;
+  const isCompleted = useMemo(() => instance?.status === "completed" || instance?.status === "signed_off", [instance?.status]);
+  const statusConfig = useMemo(() => instance?.status ? STATUS_CONFIG[instance.status] : null, [instance?.status]);
 
   if (isLoading) {
     return (

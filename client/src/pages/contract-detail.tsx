@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { dateInputProps } from "@/lib/validation";
@@ -75,7 +75,7 @@ interface Contract {
   liquidatedDamagesRate: string | null;
   liquidatedDamagesStartDate: string | null;
   precastScopeDescription: string | null;
-  precastElementsIncluded: any;
+  precastElementsIncluded: string[] | null;
   estimatedPieceCount: number | null;
   estimatedTotalWeight: string | null;
   estimatedTotalVolume: string | null;
@@ -132,7 +132,7 @@ interface Contract {
   claimableAtPhase: number | null;
   riskRating: number | null;
   riskOverview: string | null;
-  riskHighlights: any;
+  riskHighlights: Array<{ category: string; severity: string; description: string }> | null;
   aiAnalyzedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -192,7 +192,7 @@ function BooleanField({ label, value, onChange, testId }: { label: string; value
   );
 }
 
-function TextField({ label, value, onChange, testId, type = "text", placeholder, ...rest }: { label: string; value: string; onChange: (v: string) => void; testId: string; type?: string; placeholder?: string; [key: string]: any }) {
+function TextField({ label, value, onChange, testId, type = "text", placeholder, ...rest }: { label: string; value: string; onChange: (v: string) => void; testId: string; type?: string; placeholder?: string; disabled?: boolean; readOnly?: boolean; className?: string; min?: string | number; max?: string | number; step?: string | number } & Record<string, unknown>) {
   return (
     <div className="space-y-1">
       <Label className="text-sm">{label}</Label>
@@ -218,7 +218,7 @@ export default function ContractDetailPage() {
   const [formData, setFormData] = useState<Partial<Contract>>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
-  const [aiResult, setAiResult] = useState<any>(null);
+  const [aiResult, setAiResult] = useState<{ extractedFields?: Record<string, unknown>; riskRating?: number; riskOverview?: string; riskHighlights?: Array<{ category: string; severity: string; description: string }> } | null>(null);
   const [docUploadOpen, setDocUploadOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
   const aiFileInputRef = useRef<HTMLInputElement>(null);
@@ -297,9 +297,9 @@ export default function ContractDetailPage() {
   }, [customer, jobPopulated, contract]);
 
   const isLoaded = !jobLoading && !contractLoading;
-  const currentData = { ...contract, ...formData };
+  const currentData = useMemo(() => ({ ...contract, ...formData }), [contract, formData]);
 
-  const updateField = useCallback((field: string, value: any) => {
+  const updateField = useCallback((field: string, value: string | number | boolean | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
   }, []);
@@ -318,8 +318,13 @@ export default function ContractDetailPage() {
       setHasChanges(false);
       toast({ title: "Contract saved successfully" });
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to save contract", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to save contract", description, variant: "destructive" });
     },
   });
 
@@ -343,27 +348,32 @@ export default function ContractDetailPage() {
     onSuccess: (data) => {
       setAiResult(data);
     },
-    onError: (error: any) => {
-      toast({ title: "AI Analysis Failed", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "AI Analysis Failed", description, variant: "destructive" });
     },
   });
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     const saveData = { ...formData };
     if (!contract?.id) {
       saveData.contractStatus = saveData.contractStatus || "AWAITING_CONTRACT";
     }
     saveMutation.mutate(saveData);
-  };
+  }, [formData, contract?.id, saveMutation]);
 
-  const handleAiUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAiUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       aiAnalyzeMutation.mutate(file);
     }
-  };
+  }, [aiAnalyzeMutation]);
 
-  const applyAiFields = () => {
+  const applyAiFields = useCallback(() => {
     if (!aiResult?.extractedFields) return;
 
     const fields = aiResult.extractedFields;
@@ -384,7 +394,7 @@ export default function ContractDetailPage() {
     setHasChanges(true);
     setAiDialogOpen(false);
     toast({ title: "AI analysis applied to contract fields" });
-  };
+  }, [aiResult, toast]);
 
   const handleProjectDocUpload = async (files: FileList) => {
     for (let i = 0; i < files.length; i++) {
@@ -403,7 +413,7 @@ export default function ContractDetailPage() {
           body: formDataUpload,
           credentials: "include",
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         toast({ title: `Failed to upload ${file.name}`, variant: "destructive" });
       }
     }
@@ -422,7 +432,7 @@ export default function ContractDetailPage() {
   }
 
   const riskRating = currentData.riskRating;
-  const riskHighlights = (currentData.riskHighlights || []) as Array<{ title: string; description: string; severity: string }>;
+  const riskHighlights = useMemo(() => (currentData.riskHighlights || []) as Array<{ title: string; description: string; severity: string }>, [currentData.riskHighlights]);
 
   return (
     <div className="space-y-6" data-testid="contract-detail-page" role="main" aria-label="Contract Detail">
@@ -509,7 +519,7 @@ export default function ContractDetailPage() {
                   <div className="min-w-[200px]">
                     <p className="text-sm font-medium mb-2">Key Risks</p>
                     <div className="space-y-1">
-                      {riskHighlights.slice(0, 3).map((risk: any, i: number) => (
+                      {riskHighlights.slice(0, 3).map((risk: { category: string; severity: string; description: string }, i: number) => (
                         <div key={i} className="flex items-center gap-2">
                           <Badge variant={risk.severity === "HIGH" ? "destructive" : risk.severity === "MEDIUM" ? "secondary" : "outline"} className="text-xs">
                             {risk.severity}
@@ -910,7 +920,7 @@ export default function ContractDetailPage() {
                   </div>
                 )}
                 <div className="space-y-3">
-                  {riskHighlights.map((risk: any, i: number) => (
+                  {riskHighlights.map((risk: { category: string; severity: string; description: string }, i: number) => (
                     <div key={i} className="flex items-start gap-3 p-3 rounded-md border">
                       <Badge variant={risk.severity === "HIGH" ? "destructive" : risk.severity === "MEDIUM" ? "secondary" : "outline"}>
                         {risk.severity}
@@ -980,7 +990,7 @@ export default function ContractDetailPage() {
               {aiResult.riskHighlights?.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Key Risks Identified:</p>
-                  {aiResult.riskHighlights.map((risk: any, i: number) => (
+                  {aiResult.riskHighlights.map((risk: { category: string; severity: string; description: string }, i: number) => (
                     <div key={i} className="flex items-start gap-2 text-sm">
                       <Badge variant={risk.severity === "HIGH" ? "destructive" : risk.severity === "MEDIUM" ? "secondary" : "outline"} className="text-xs flex-shrink-0">
                         {risk.severity}

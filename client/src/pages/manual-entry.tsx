@@ -190,7 +190,7 @@ export default function ManualEntryPage() {
   // Fetch existing daily logs to find the latest end time
   const { data: dailyLogs } = useQuery<DailyLogWithRows[]>({
     queryKey: [DAILY_LOGS_ROUTES.LIST],
-    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
+    select: (raw: unknown) => Array.isArray(raw) ? raw : ((raw && typeof raw === "object" && "data" in raw) ? (raw as { data: DailyLogWithRows[] }).data : []),
   });
 
   // Fetch active timer for this panel
@@ -305,8 +305,13 @@ export default function ManualEntryPage() {
       form.setValue("endTime", "");
       toast({ title: "Timer started", description: "Recording time for this panel" });
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to start timer", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to start timer", description, variant: "destructive" });
     },
   });
 
@@ -339,8 +344,13 @@ export default function ManualEntryPage() {
       queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST] });
       toast({ title: "Timer stopped", description: "Time entry saved" });
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to stop timer", description: error.message, variant: "destructive" });
+    onError: (error: Error) => {
+      let description = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        description = parsed.error || parsed.message || description;
+      } catch { /* use raw message */ }
+      toast({ title: "Failed to stop timer", description, variant: "destructive" });
     },
   });
 
@@ -354,14 +364,13 @@ export default function ManualEntryPage() {
     },
   });
 
-  // Format timer display
-  const formatTimer = (ms: number) => {
+  const formatTimer = useCallback((ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  };
+  }, []);
 
   // Calculate the latest end time from existing entries for the selected date
   const latestEndTime = useMemo(() => {
@@ -400,19 +409,17 @@ export default function ManualEntryPage() {
     return `${hours}:${minutes}`;
   }, [dailyLogs, selectedDate]);
 
-  // Calculate end time (30 minutes after start)
-  const calculateEndTime = (startTime: string): string => {
+  const calculateEndTime = useCallback((startTime: string): string => {
     const [hours, minutes] = startTime.split(':').map(Number);
     const totalMinutes = hours * 60 + minutes + 30;
     const endHours = Math.floor(totalMinutes / 60) % 24;
     const endMinutes = totalMinutes % 60;
     return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
-  };
+  }, []);
 
-  const filteredPanels = panels?.filter(p => 
+  const filteredPanels = useMemo(() => panels?.filter(p => 
     !selectedJobId || selectedJobId === "none" || p.jobId === selectedJobId
   )?.sort((a, b) => {
-    // Sort by Building first, then by Level, then by Panel Mark
     const buildingA = a.building || "";
     const buildingB = b.building || "";
     if (buildingA !== buildingB) {
@@ -424,10 +431,9 @@ export default function ManualEntryPage() {
       return levelA.localeCompare(levelB, undefined, { numeric: true });
     }
     return a.panelMark.localeCompare(b.panelMark, undefined, { numeric: true });
-  });
+  }), [panels, selectedJobId]);
 
-  // Group panels by Building and Level for display
-  const groupedPanels = filteredPanels?.filter(p => p.status !== "COMPLETED").reduce((acc, panel) => {
+  const groupedPanels = useMemo(() => filteredPanels?.filter(p => p.status !== "COMPLETED").reduce((acc, panel) => {
     const building = panel.building || "No Building";
     const level = panel.level || "No Level";
     const key = `${building}|${level}`;
@@ -436,7 +442,7 @@ export default function ManualEntryPage() {
     }
     acc[key].panels.push(panel);
     return acc;
-  }, {} as Record<string, { building: string; level: string; panels: typeof filteredPanels }>);
+  }, {} as Record<string, { building: string; level: string; panels: typeof filteredPanels }>), [filteredPanels]);
 
   const form = useForm<ManualEntryForm>({
     resolver: zodResolver(manualEntrySchema),
@@ -571,23 +577,20 @@ export default function ManualEntryPage() {
     }
   }, [latestEndTime, form, isTimerForSelectedPanel, hasProcessedUrlParams, activeTimer]);
 
-  // Handle date change - update selectedDate state
-  const handleDateChange = (newDate: string) => {
+  const handleDateChange = useCallback((newDate: string) => {
     setSelectedDate(newDate);
     form.setValue("logDay", newDate);
-  };
+  }, [form]);
 
-  // Prevent Enter key from submitting form on date input
-  const handleDateKeyDown = (e: React.KeyboardEvent) => {
+  const handleDateKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
     }
-  };
+  }, []);
 
   const watchedPanelRegisterId = form.watch("panelRegisterId");
 
-  // Get the selected panel for display
-  const selectedPanel = panels?.find(p => p.id === watchedPanelRegisterId);
+  const selectedPanel = useMemo(() => panels?.find(p => p.id === watchedPanelRegisterId), [panels, watchedPanelRegisterId]);
 
   useEffect(() => {
     if (watchedPanelRegisterId && watchedPanelRegisterId !== "none") {
@@ -837,8 +840,9 @@ export default function ManualEntryPage() {
           }));
         }
         analyzePdfMutation.mutate({ panelId: productionPanel.id, pdfBase64: base64 });
-      } catch (error: any) {
-        toast({ title: "Error uploading PDF", description: error.message, variant: "destructive" });
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        toast({ title: "Error uploading PDF", description: message, variant: "destructive" });
         setIsAnalyzing(false);
       }
     };
@@ -964,7 +968,7 @@ export default function ManualEntryPage() {
     id: string;
     panelId: string;
     action: string;
-    changedFields: Record<string, any> | null;
+    changedFields: Record<string, unknown> | null;
     previousLifecycleStatus: number | null;
     newLifecycleStatus: number | null;
     changedById: string | null;
