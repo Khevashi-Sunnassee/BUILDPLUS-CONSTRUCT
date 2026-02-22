@@ -3,6 +3,7 @@ import crypto from "crypto";
 import path from "path";
 import fs from "fs";
 import { z } from "zod";
+import multer from "multer";
 import { db } from "../db";
 import {
   externalApiKeys,
@@ -13,12 +14,18 @@ import {
   documents,
   jobTypes,
   companies,
+  markupCredentials,
 } from "@shared/schema";
-import { eq, desc, sql, inArray } from "drizzle-orm";
+import { eq, desc, sql, inArray, and } from "drizzle-orm";
 import { requireExternalApiKey, requirePermission, requireExternalUser, getAllowedJobIdsForUser, generateUserToken } from "./middleware/external-api-auth.middleware";
 import { requireAuth, requireSuperAdmin } from "./middleware/auth.middleware";
 import { storage } from "../storage";
 import logger from "../lib/logger";
+import { ObjectStorageService } from "../replit_integrations/object_storage";
+import { ObjectNotFoundError } from "../replit_integrations/object_storage";
+
+const objectStorageService = new ObjectStorageService();
+const externalUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
 
 export const externalApiRouter = Router();
 
@@ -640,6 +647,132 @@ externalApiRouter.get("/api/v1/external/documents", requireExternalApiKey, requi
   }
 });
 
+externalApiRouter.get("/api/v1/external/documents/:id/download", requireExternalApiKey, requirePermission("read:documents", "*"), async (req, res) => {
+  try {
+    const companyId = req.apiKey!.companyId;
+    const docId = req.params.id;
+
+    const [document] = await db
+      .select()
+      .from(documents)
+      .where(and(eq(documents.id, docId), eq(documents.companyId, companyId)))
+      .limit(1);
+
+    if (!document) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    if (req.externalUser) {
+      const allowedJobIds = await getAllowedJobIdsForUser(req.externalUser.id, req.externalUser.role);
+      if (allowedJobIds !== null && document.jobId && !allowedJobIds.has(document.jobId)) {
+        return res.status(403).json({ error: "You do not have access to this document" });
+      }
+    }
+
+    const objectFile = await objectStorageService.getObjectEntityFile(document.storageKey);
+    const [metadata] = await objectFile.getMetadata();
+
+    res.set({
+      "Content-Type": metadata.contentType || document.mimeType || "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${encodeURIComponent(document.originalName || document.fileName)}"`,
+      "Access-Control-Expose-Headers": "Content-Disposition",
+    });
+
+    const stream = objectFile.createReadStream();
+    stream.pipe(res);
+  } catch (error: unknown) {
+    if (error instanceof ObjectNotFoundError) {
+      return res.status(404).json({ error: "File not found in storage" });
+    }
+    logger.error({ error }, "External API: Failed to download document");
+    res.status(500).json({ error: "Failed to download document" });
+  }
+});
+
+externalApiRouter.post("/api/v1/external/documents/:id/markup-version", requireExternalApiKey, requireExternalUser, requirePermission("write:documents", "*"), externalUpload.single("file"), async (req, res) => {
+  try {
+    const companyId = req.apiKey!.companyId;
+    const docId = req.params.id;
+    const notes = req.body?.notes || "";
+
+    const [document] = await db
+      .select()
+      .from(documents)
+      .where(and(eq(documents.id, docId), eq(documents.companyId, companyId)))
+      .limit(1);
+
+    if (!document) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No file provided" });
+    }
+
+    const allowedMimeTypes = ["application/pdf", "image/png", "image/jpeg", "image/tiff", "image/svg+xml"];
+    if (!allowedMimeTypes.includes(req.file.mimetype) && !req.file.mimetype.startsWith("image/")) {
+      return res.status(400).json({ error: "File type not supported for markup. Accepted: PDF, PNG, JPEG, TIFF, SVG." });
+    }
+
+    const uploadUrl = await objectStorageService.getObjectEntityUploadURL();
+    const objectPath = objectStorageService.normalizeObjectEntityPath(uploadUrl);
+    const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+    await objectFile.save(req.file.buffer, { contentType: req.file.mimetype });
+
+    const currentVersion = document.version || "1.0";
+    const versionParts = currentVersion.split(".");
+    const majorNum = parseInt(versionParts[0]) || 1;
+    const minorNum = parseInt(versionParts[1]) || 0;
+    const newVersion = `${majorNum}.${minorNum + 1}`;
+
+    const newDoc = await storage.createDocument({
+      companyId,
+      jobId: document.jobId,
+      documentNumber: document.documentNumber,
+      title: notes ? `${document.title} - Markup: ${notes}` : `${document.title} (Marked Up)`,
+      description: notes || `Markup version of ${document.title}`,
+      fileName: req.file.originalname,
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      fileSize: req.file.size,
+      storageKey: objectPath,
+      status: "FOR_REVIEW",
+      version: newVersion,
+      revision: `M${minorNum + 1}`,
+      isLatestVersion: true,
+      parentDocumentId: document.parentDocumentId || document.id,
+      uploadedBy: req.externalUser!.id,
+      typeId: document.typeId,
+      disciplineId: document.disciplineId,
+      categoryId: document.categoryId,
+      tags: document.tags,
+      isConfidential: document.isConfidential ?? false,
+    });
+
+    await db
+      .update(documents)
+      .set({ isLatestVersion: false })
+      .where(eq(documents.id, document.id));
+
+    logger.info({ docId, newDocId: newDoc.id, newVersion }, "External API: Markup version uploaded");
+
+    res.json({
+      success: true,
+      document: {
+        id: newDoc.id,
+        documentNumber: newDoc.documentNumber,
+        title: newDoc.title,
+        version: newDoc.version,
+        revision: newDoc.revision,
+        parentDocumentId: document.parentDocumentId || document.id,
+      },
+    });
+  } catch (error) {
+    logger.error({ error }, "External API: Failed to upload markup version");
+    res.status(500).json({ error: "Failed to upload markup version" });
+  }
+});
+
 externalApiRouter.get("/api/v1/external/job-types", requireExternalApiKey, requirePermission("read:job-types", "*"), async (req, res) => {
   try {
     const companyId = req.apiKey!.companyId;
@@ -819,12 +952,102 @@ externalApiRouter.put("/api/v1/external/estimates", requireExternalApiKey, requi
   }
 });
 
-externalApiRouter.get("/api/v1/external/health", requireExternalApiKey, async (_req, res) => {
-  res.json({
-    status: "ok",
-    version: "1.0",
-    timestamp: new Date().toISOString(),
-  });
+externalApiRouter.get("/api/markup-credentials", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const companyId = req.session.companyId;
+    if (!userId || !companyId) return res.status(400).json({ error: "No session" });
+
+    const cred = await storage.getMarkupCredential(userId, companyId);
+    res.json(cred || null);
+  } catch (error) {
+    logger.error({ error }, "Failed to get markup credentials");
+    res.status(500).json({ error: "Failed to get markup credentials" });
+  }
+});
+
+externalApiRouter.post("/api/markup-credentials", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const companyId = req.session.companyId;
+    if (!userId || !companyId) return res.status(400).json({ error: "No session" });
+
+    const { markupAppUrl, markupEmail, markupApiKey } = req.body;
+    if (!markupAppUrl || !markupEmail) {
+      return res.status(400).json({ error: "markupAppUrl and markupEmail are required" });
+    }
+
+    const cred = await storage.upsertMarkupCredential({
+      userId, companyId, markupAppUrl, markupEmail, markupApiKey: markupApiKey || undefined
+    });
+    res.json(cred);
+  } catch (error) {
+    logger.error({ error }, "Failed to save markup credentials");
+    res.status(500).json({ error: "Failed to save markup credentials" });
+  }
+});
+
+externalApiRouter.delete("/api/markup-credentials", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const companyId = req.session.companyId;
+    if (!userId || !companyId) return res.status(400).json({ error: "No session" });
+
+    await storage.deleteMarkupCredential(userId, companyId);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error({ error }, "Failed to delete markup credentials");
+    res.status(500).json({ error: "Failed to delete markup credentials" });
+  }
+});
+
+externalApiRouter.post("/api/markup/handoff", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    const companyId = req.session.companyId;
+    if (!userId || !companyId) return res.status(400).json({ error: "No session" });
+
+    const { documentId } = req.body;
+    if (!documentId) return res.status(400).json({ error: "documentId is required" });
+
+    const [document] = await db
+      .select()
+      .from(documents)
+      .where(and(eq(documents.id, documentId), eq(documents.companyId, companyId)))
+      .limit(1);
+    if (!document) return res.status(404).json({ error: "Document not found" });
+
+    const cred = await storage.getMarkupCredential(userId, companyId);
+    if (!cred) return res.status(400).json({ error: "Markup credentials not configured. Please set up your BuildPlus Markup connection first." });
+
+    await storage.updateMarkupCredentialLastUsed(cred.id);
+
+    const handoffPayload = {
+      documentId: document.id,
+      documentNumber: document.documentNumber,
+      title: document.title,
+      fileName: document.originalName || document.fileName,
+      mimeType: document.mimeType,
+      sourceApp: "buildplus-construct",
+      timestamp: Date.now(),
+      userEmail: cred.markupEmail,
+    };
+
+    const handoffToken = Buffer.from(JSON.stringify(handoffPayload)).toString("base64url");
+
+    const markupUrl = new URL("/markup/open", cred.markupAppUrl);
+    markupUrl.searchParams.set("token", handoffToken);
+    markupUrl.searchParams.set("source", "buildplus-construct");
+
+    res.json({
+      handoffUrl: markupUrl.toString(),
+      documentId: document.id,
+      documentTitle: document.title,
+    });
+  } catch (error) {
+    logger.error({ error }, "Failed to create markup handoff");
+    res.status(500).json({ error: "Failed to create markup handoff" });
+  }
 });
 
 const API_DOC_FILES: Record<string, { filename: string; path: string }> = {

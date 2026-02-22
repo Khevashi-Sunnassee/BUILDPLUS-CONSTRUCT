@@ -5878,3 +5878,22 @@ export const externalApiLogs = pgTable("external_api_logs", {
 export const insertExternalApiLogSchema = createInsertSchema(externalApiLogs).omit({ id: true, createdAt: true });
 export type InsertExternalApiLog = z.infer<typeof insertExternalApiLogSchema>;
 export type ExternalApiLog = typeof externalApiLogs.$inferSelect;
+
+export const markupCredentials = pgTable("markup_credentials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  companyId: varchar("company_id").notNull().references(() => companies.id),
+  markupAppUrl: text("markup_app_url").notNull(),
+  markupEmail: text("markup_email").notNull(),
+  markupApiKey: text("markup_api_key"),
+  lastUsedAt: timestamp("last_used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index("markup_credentials_user_idx").on(table.userId),
+  companyUserIdx: index("markup_credentials_company_user_idx").on(table.companyId, table.userId),
+}));
+
+export const insertMarkupCredentialSchema = createInsertSchema(markupCredentials).omit({ id: true, createdAt: true, updatedAt: true, lastUsedAt: true });
+export type InsertMarkupCredential = z.infer<typeof insertMarkupCredentialSchema>;
+export type MarkupCredential = typeof markupCredentials.$inferSelect;

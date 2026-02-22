@@ -1,5 +1,5 @@
-import { useCallback } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Upload,
   Download,
@@ -19,6 +19,8 @@ import {
   FileAudio,
   BookOpen,
   BookX,
+  ExternalLink,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -156,6 +158,37 @@ export function DocumentTable({
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const markupCredentialsQuery = useQuery<{ id: string; markupAppUrl: string; markupEmail: string } | null>({
+    queryKey: ["/api/markup-credentials"],
+  });
+
+  const markupHandoffMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const res = await apiRequest("POST", "/api/markup/handoff", { documentId });
+      return res.json();
+    },
+    onSuccess: (data: { handoffUrl: string; documentTitle: string }) => {
+      window.open(data.handoffUrl, "_blank");
+      toast({ title: "Opening Markup", description: `${data.documentTitle} opened in BuildPlus Markup` });
+    },
+    onError: (error: Error) => {
+      if (error.message.includes("credentials not configured")) {
+        toast({
+          title: "Markup Not Set Up",
+          description: "Please configure your BuildPlus Markup connection in Settings first.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
+    },
+  });
+
+  const isMarkupCompatible = (mimeType: string | null | undefined) => {
+    const mime = (mimeType || "").toLowerCase();
+    return mime === "application/pdf" || mime.startsWith("image/") || mime.includes("dwg") || mime.includes("dxf");
+  };
 
   const renderDocumentRow = useCallback((doc: DocumentWithDetails) => {
     const legacyStatus = statusConfig[doc.status] || statusConfig.DRAFT;
@@ -321,6 +354,20 @@ export function DocumentTable({
                     </DropdownMenuItem>
                   </>
                 )}
+                {isMarkupCompatible(doc.mimeType) && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => markupHandoffMutation.mutate(doc.id)}
+                      disabled={markupHandoffMutation.isPending}
+                      data-testid={`button-markup-${doc.id}`}
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Open in Markup
+                      <ExternalLink className="h-3 w-3 ml-auto opacity-50" />
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 {doc.kbDocumentId ? (
                   <DropdownMenuItem
@@ -345,7 +392,7 @@ export function DocumentTable({
         </TableCell>
       </TableRow>
     );
-  }, [updateStatusMutation, removeFromKbMutation, selectedDocIds, onToggleDocSelection, onOpenVersionHistory, onOpenNewVersion, onAddToKnowledgeBase]);
+  }, [updateStatusMutation, removeFromKbMutation, markupHandoffMutation, selectedDocIds, onToggleDocSelection, onOpenVersionHistory, onOpenNewVersion, onAddToKnowledgeBase]);
 
   const allIds = documents.map((d) => d.id);
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedDocIds.has(id));

@@ -16,6 +16,8 @@ import {
   Mail,
   Files,
   File,
+  Pencil,
+  Settings2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { useAuth } from "@/lib/auth";
 import { ShieldAlert } from "lucide-react";
@@ -61,6 +64,7 @@ import { DrawingPackageDialog } from "./DrawingPackageDialog";
 import { DocumentTable } from "./DocumentTable";
 import { BundleGridView } from "./BundleGridView";
 import { AddToKnowledgeBaseDialog } from "./AddToKnowledgeBaseDialog";
+import { MarkupSetupDialog } from "./MarkupSetupDialog";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function DocumentRegister() {
@@ -100,6 +104,7 @@ export default function DocumentRegister() {
 
   const [isOverlayDialogOpen, setIsOverlayDialogOpen] = useState(false);
   const [kbDialogDoc, setKbDialogDoc] = useState<DocumentWithDetails | null>(null);
+  const [isMarkupSetupOpen, setIsMarkupSetupOpen] = useState(false);
 
   const buildQueryString = useCallback(() => {
     const params = new URLSearchParams();
@@ -417,6 +422,19 @@ export default function DocumentRegister() {
             <Layers className="h-4 w-4 mr-2" />
             Compare ({selectedDocIds.size === 2 ? "2" : selectedDocIds.size})
           </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsMarkupSetupOpen(true)}
+                data-testid="button-markup-settings"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Markup Connection Settings</TooltipContent>
+          </Tooltip>
           <Button
             variant="outline"
             onClick={() => setIsEmailDialogOpen(true)}
@@ -840,6 +858,11 @@ export default function DocumentRegister() {
         open={!!kbDialogDoc}
         onOpenChange={(open) => { if (!open) setKbDialogDoc(null); }}
         document={kbDialogDoc}
+      />
+
+      <MarkupSetupDialog
+        open={isMarkupSetupOpen}
+        onOpenChange={setIsMarkupSetupOpen}
       />
     </div>
   );

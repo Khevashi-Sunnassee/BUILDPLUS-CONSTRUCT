@@ -18,6 +18,7 @@ import { employeeMethods } from "./employees";
 import { invitationMethods } from "./invitations";
 import { capexMethods } from "./capex";
 import { opportunityMethods } from "./opportunities";
+import { markupCredentialMethods } from "./markup-credentials";
 
 export type { IStorage } from "./types";
 export type {
@@ -470,6 +471,11 @@ export class DatabaseStorage implements IStorage {
   getOpportunityFile = opportunityMethods.getOpportunityFile;
   createOpportunityFile = opportunityMethods.createOpportunityFile;
   deleteOpportunityFile = opportunityMethods.deleteOpportunityFile;
+
+  getMarkupCredential = markupCredentialMethods.getMarkupCredential;
+  upsertMarkupCredential = markupCredentialMethods.upsertMarkupCredential;
+  updateMarkupCredentialLastUsed = markupCredentialMethods.updateMarkupCredentialLastUsed;
+  deleteMarkupCredential = markupCredentialMethods.deleteMarkupCredential;
 }
 
 export const storage = new DatabaseStorage();
