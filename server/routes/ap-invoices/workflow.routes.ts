@@ -5,7 +5,7 @@ import logger from "../../lib/logger";
 import { eq, and, asc, sql, inArray, count } from "drizzle-orm";
 import {
   apInvoices, apInvoiceSplits, apInvoiceApprovals,
-  myobExportLogs, apInboundEmails,
+  myobExportLogs, apInboundEmails, users,
 } from "@shared/schema";
 import { assignApprovalPathToInvoice } from "../../lib/ap-approval-assign";
 import { requireUUID } from "../../lib/api-utils";
@@ -228,6 +228,21 @@ export function registerWorkflowRoutes(router: Router, deps: SharedDeps): void {
         return res.status(403).json({ error: `It's not your turn to approve. Waiting on step ${currentStep.stepIndex} approver.` });
       }
 
+      const invoiceTotal = parseFloat(existing.totalInc || "0");
+      if (invoiceTotal > 0) {
+        const [approver] = await db
+          .select({ poApprovalLimit: users.poApprovalLimit })
+          .from(users)
+          .where(eq(users.id, userId))
+          .limit(1);
+        const limit = parseFloat(approver?.poApprovalLimit || "0");
+        if (limit > 0 && invoiceTotal > limit) {
+          return res.status(403).json({
+            error: `Invoice amount exceeds your approval limit of $${limit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Requires approval from a user with higher limit.`,
+          });
+        }
+      }
+
       await db
         .update(apInvoiceApprovals)
         .set({ status: "APPROVED", decisionAt: new Date(), note: body.note || null })
@@ -413,11 +428,24 @@ export function registerWorkflowRoutes(router: Router, deps: SharedDeps): void {
         )
         .limit(1000);
 
+      const [approverUser] = await db
+        .select({ poApprovalLimit: users.poApprovalLimit })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      const userLimit = parseFloat(approverUser?.poApprovalLimit || "0");
+
       const approved: string[] = [];
       const errors: Array<{ id: string; error: string }> = [];
 
       for (const invoice of invoices) {
         try {
+          const invTotal = parseFloat(invoice.totalInc || "0");
+          if (userLimit > 0 && invTotal > 0 && invTotal > userLimit) {
+            errors.push({ id: invoice.id, error: `Invoice amount $${invTotal.toFixed(2)} exceeds your approval limit of $${userLimit.toFixed(2)}` });
+            continue;
+          }
+
           const allSteps = await db
             .select()
             .from(apInvoiceApprovals)

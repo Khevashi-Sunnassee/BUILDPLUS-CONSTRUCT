@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AP_INVOICE_ROUTES, AP_INBOX_ROUTES } from "@shared/api-routes";
 import { Link, useLocation } from "wouter";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -391,6 +392,7 @@ function LoadingSkeleton() {
 export default function ApInvoicesPage() {
   useDocumentTitle("Invoices");
   const { toast } = useToast();
+  const { user } = useAuth();
   const [, navigate] = useLocation();
 
   const [search, setSearch] = useState("");
@@ -456,7 +458,7 @@ export default function ApInvoicesPage() {
 
   const bulkApproveMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      await apiRequest("POST", AP_INVOICE_ROUTES.BULK_APPROVE, { ids });
+      await apiRequest("POST", AP_INVOICE_ROUTES.BULK_APPROVE, { invoiceIds: ids });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
@@ -748,15 +750,22 @@ export default function ApInvoicesPage() {
                 Clear
               </Button>
             )}
-            <Button
-              size="sm"
-              disabled={selectedRows.size === 0 || bulkApproveMutation.isPending}
-              onClick={() => bulkApproveMutation.mutate(Array.from(selectedRows))}
-              data-testid="button-approve-selected"
-            >
-              {bulkApproveMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-              Approve selected ({selectedRows.size})
-            </Button>
+            <div className="flex items-center gap-2">
+              {user?.poApprovalLimit && parseFloat(user.poApprovalLimit) > 0 && (
+                <span className="text-xs text-muted-foreground" data-testid="text-approval-limit">
+                  Your limit: {formatCurrency(parseFloat(user.poApprovalLimit))}
+                </span>
+              )}
+              <Button
+                size="sm"
+                disabled={selectedRows.size === 0 || bulkApproveMutation.isPending}
+                onClick={() => bulkApproveMutation.mutate(Array.from(selectedRows))}
+                data-testid="button-approve-selected"
+              >
+                {bulkApproveMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                Approve selected ({selectedRows.size})
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -912,6 +921,9 @@ export default function ApInvoicesPage() {
                             >
                               <CheckCircle className="h-4 w-4 mr-2" />
                               Approve
+                              {user?.poApprovalLimit && parseFloat(user.poApprovalLimit) > 0 && inv.totalInc && parseFloat(String(inv.totalInc)) > parseFloat(user.poApprovalLimit) && (
+                                <span className="ml-1 text-xs text-destructive">(over limit)</span>
+                              )}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={async () => {
