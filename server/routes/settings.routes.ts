@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
-import sanitizeHtml from "sanitize-html";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { getDefaultTemplate, clearBrandingCache } from "../lib/email-template";
+import { sanitizeRichHtml } from "../utils/sanitize-html";
 import { db } from "../db";
 import { companies } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -215,23 +215,7 @@ router.put("/api/settings/po-terms", requireRole("ADMIN"), async (req, res) => {
       return res.status(400).json({ error: result.error.format() });
     }
     const { poTermsHtml } = result.data;
-    const cleanHtml = sanitizeHtml(poTermsHtml, {
-      allowedTags: sanitizeHtml.defaults.allowedTags.concat(["h1", "h2", "u", "s", "span", "div"]),
-      allowedAttributes: {
-        ...sanitizeHtml.defaults.allowedAttributes,
-        span: ["style"],
-        div: ["style"],
-        p: ["style"],
-      },
-      allowedStyles: {
-        "*": {
-          "text-align": [/^left$/, /^right$/, /^center$/, /^justify$/],
-          "text-decoration": [/^underline$/, /^line-through$/],
-          "font-weight": [/^bold$/, /^normal$/, /^\d+$/],
-          "font-style": [/^italic$/, /^normal$/],
-        },
-      },
-    });
+    const cleanHtml = sanitizeRichHtml(poTermsHtml);
     const settings = await storage.updateGlobalSettings({ poTermsHtml: cleanHtml }, companyId);
     res.json({ success: true, poTermsHtml: settings.poTermsHtml });
   } catch (error: unknown) {
@@ -263,7 +247,8 @@ router.put("/api/settings/email-template", requireRole("ADMIN"), async (req, res
       return res.status(400).json({ error: result.error.format() });
     }
     const { emailTemplateHtml } = result.data;
-    const settings = await storage.updateGlobalSettings({ emailTemplateHtml }, companyId);
+    const cleanHtml = emailTemplateHtml ? sanitizeRichHtml(emailTemplateHtml) : null;
+    const settings = await storage.updateGlobalSettings({ emailTemplateHtml: cleanHtml }, companyId);
     clearBrandingCache(companyId);
     res.json({ success: true, emailTemplateHtml: (settings as any).emailTemplateHtml });
   } catch (error: unknown) {
