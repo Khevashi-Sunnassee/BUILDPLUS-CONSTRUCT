@@ -374,6 +374,7 @@ export default function ChecklistsPage() {
                                     <tr className="text-xs text-muted-foreground border-b">
                                       <th className="text-left py-2 px-3 font-medium">Checklist #</th>
                                       <th className="text-left py-2 px-3 font-medium">Job</th>
+                                      <th className="text-left py-2 px-3 font-medium">User</th>
                                       <th className="text-left py-2 px-3 font-medium">Progress</th>
                                       <th className="text-left py-2 px-3 font-medium">Date</th>
                                       <th className="text-right py-2 px-3 font-medium">Actions</th>
@@ -397,6 +398,11 @@ export default function ChecklistsPage() {
                                             ) : (
                                               <span className="text-muted-foreground">-</span>
                                             )}
+                                          </td>
+                                          <td className="py-2 px-3">
+                                            <span className="text-sm" data-testid={`text-checklist-user-${instance.id}`}>
+                                              {(instance as any).assignedToName || (instance as any).staffName || "—"}
+                                            </span>
                                           </td>
                                           <td className="py-2 px-3">
                                             <div className="flex items-center gap-2">

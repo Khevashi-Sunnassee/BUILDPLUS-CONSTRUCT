@@ -1,8 +1,8 @@
 import {
   Router, Request, Response,
-  eq, and, desc,
+  eq, and, desc, dsql,
   db,
-  checklistTemplates, checklistInstances,
+  checklistTemplates, checklistInstances, users,
   insertChecklistInstanceSchema,
   requireAuth, requireRole,
   logger,
@@ -46,7 +46,27 @@ router.get("/api/checklist/instances", requireAuth, async (req: Request, res: Re
       .orderBy(desc(checklistInstances.createdAt))
       .limit(safeLimit);
 
-    res.json(instances);
+    const userIds = new Set<string>();
+    instances.forEach(i => {
+      if (i.assignedTo) userIds.add(i.assignedTo);
+      if (i.staffId) userIds.add(i.staffId);
+    });
+
+    let userNameMap: Record<string, string> = {};
+    if (userIds.size > 0) {
+      const userRows = await db.select({ id: users.id, name: users.name })
+        .from(users)
+        .where(dsql`${users.id} IN (${dsql.join([...userIds].map(id => dsql`${id}`), dsql`, `)})`);
+      userRows.forEach(u => { if (u.name) userNameMap[u.id] = u.name; });
+    }
+
+    const enriched = instances.map(i => ({
+      ...i,
+      assignedToName: i.assignedTo ? (userNameMap[i.assignedTo] || null) : null,
+      staffName: i.staffId ? (userNameMap[i.staffId] || null) : null,
+    }));
+
+    res.json(enriched);
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch instances");
     res.status(500).json({ error: "Failed to fetch instances" });

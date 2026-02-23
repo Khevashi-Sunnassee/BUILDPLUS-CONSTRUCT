@@ -17,6 +17,7 @@ export {
   checklistTemplates,
   checklistInstances,
   checklistWorkOrders,
+  users,
   insertEntityTypeSchema,
   insertEntitySubtypeSchema,
   insertChecklistTemplateSchema,
