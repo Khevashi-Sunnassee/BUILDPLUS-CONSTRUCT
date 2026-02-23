@@ -312,7 +312,7 @@ export default function AdminCustomersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showActiveOnly, setShowActiveOnly] = useState(true);
+  const [showWithJobsOnly, setShowWithJobsOnly] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -334,6 +334,13 @@ export default function AdminCustomersPage() {
   const { data: customersList, isLoading, isError, error, refetch } = useQuery<Customer[]>({
     queryKey: [PROCUREMENT_ROUTES.CUSTOMERS],
   });
+
+  const { data: customerIdsWithJobs } = useQuery<string[]>({
+    queryKey: [PROCUREMENT_ROUTES.CUSTOMERS_WITH_JOBS],
+    enabled: showWithJobsOnly,
+  });
+
+  const customerJobSet = useMemo(() => new Set(customerIdsWithJobs || []), [customerIdsWithJobs]);
 
   const importMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -376,8 +383,8 @@ export default function AdminCustomersPage() {
 
   const filteredCustomers = useMemo(() => {
     let list = customersList || [];
-    if (showActiveOnly) {
-      list = list.filter((c) => c.isActive);
+    if (showWithJobsOnly) {
+      list = list.filter((c) => customerJobSet.has(c.id));
     }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -404,7 +411,7 @@ export default function AdminCustomersPage() {
       const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: "base" });
       return sortDirection === "asc" ? cmp : -cmp;
     });
-  }, [customersList, searchQuery, showActiveOnly, sortColumn, sortDirection]);
+  }, [customersList, searchQuery, showWithJobsOnly, customerJobSet, sortColumn, sortDirection]);
 
   const totalPages = Math.ceil((filteredCustomers?.length || 0) / pageSize);
   const paginatedCustomers = useMemo(() => {
@@ -415,7 +422,7 @@ export default function AdminCustomersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, showActiveOnly, sortColumn, sortDirection]);
+  }, [searchQuery, showWithJobsOnly, sortColumn, sortDirection]);
 
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -588,7 +595,7 @@ export default function AdminCustomersPage() {
                 Customers
               </CardTitle>
               <CardDescription>
-                {filteredCustomers?.length || 0} {showActiveOnly ? "active " : ""}customer{filteredCustomers?.length !== 1 ? "s" : ""}{searchQuery ? " matching search" : " configured"}
+                {filteredCustomers?.length || 0} customer{filteredCustomers?.length !== 1 ? "s" : ""}{showWithJobsOnly ? " with jobs" : ""}{searchQuery ? " matching search" : " configured"}
               </CardDescription>
             </div>
             <div className="flex items-center gap-3">
@@ -604,12 +611,12 @@ export default function AdminCustomersPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Switch
-                  checked={showActiveOnly}
-                  onCheckedChange={setShowActiveOnly}
-                  data-testid="switch-active-only-customers"
+                  checked={showWithJobsOnly}
+                  onCheckedChange={setShowWithJobsOnly}
+                  data-testid="switch-with-jobs-customers"
                 />
-                <label className="text-sm text-muted-foreground whitespace-nowrap cursor-pointer" onClick={() => setShowActiveOnly(!showActiveOnly)}>
-                  Active only
+                <label className="text-sm text-muted-foreground whitespace-nowrap cursor-pointer" onClick={() => setShowWithJobsOnly(!showWithJobsOnly)}>
+                  Customers with Jobs
                 </label>
               </div>
             </div>

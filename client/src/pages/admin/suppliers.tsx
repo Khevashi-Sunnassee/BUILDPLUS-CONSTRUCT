@@ -153,7 +153,7 @@ export default function AdminSuppliersPage() {
   const [sortColumn, setSortColumn] = useState<string>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [searchQuery, setSearchQuery] = useState("");
-  const [showActiveOnly, setShowActiveOnly] = useState(true);
+  const [showWithPOsOnly, setShowWithPOsOnly] = useState(false);
   const [costCodeFilter, setCostCodeFilter] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -177,6 +177,13 @@ export default function AdminSuppliersPage() {
     queryKey: ["/api/cost-codes"],
   });
 
+  const { data: supplierIdsWithPOs } = useQuery<string[]>({
+    queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_WITH_POS],
+    enabled: showWithPOsOnly,
+  });
+
+  const supplierPOSet = useMemo(() => new Set(supplierIdsWithPOs || []), [supplierIdsWithPOs]);
+
   const parentCostCodes = useMemo(() => costCodes.filter(cc => !cc.parentId), [costCodes]);
 
   const costCodeMap = useMemo(() => {
@@ -190,8 +197,8 @@ export default function AdminSuppliersPage() {
   const suppliers = useMemo(() => {
     if (!suppliersRaw) return undefined;
     let filtered = suppliersRaw;
-    if (showActiveOnly) {
-      filtered = filtered.filter(s => s.isActive);
+    if (showWithPOsOnly) {
+      filtered = filtered.filter(s => supplierPOSet.has(s.id));
     }
     if (costCodeFilter) {
       if (costCodeFilter === "__none__") {
@@ -251,7 +258,7 @@ export default function AdminSuppliersPage() {
       const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: "base" });
       return sortDirection === "asc" ? cmp : -cmp;
     });
-  }, [suppliersRaw, sortColumn, sortDirection, searchQuery, showActiveOnly, costCodeFilter, typeFilter, costCodeMap]);
+  }, [suppliersRaw, sortColumn, sortDirection, searchQuery, showWithPOsOnly, supplierPOSet, costCodeFilter, typeFilter, costCodeMap]);
 
   const totalPages = Math.ceil((suppliers?.length || 0) / pageSize);
   const paginatedSuppliers = useMemo(() => {
@@ -262,7 +269,7 @@ export default function AdminSuppliersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, showActiveOnly, sortColumn, sortDirection, costCodeFilter, typeFilter]);
+  }, [searchQuery, showWithPOsOnly, sortColumn, sortDirection, costCodeFilter, typeFilter]);
 
   const importMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -567,19 +574,19 @@ export default function AdminSuppliersPage() {
         </div>
         <div className="flex items-center gap-2">
           <Switch
-            checked={showActiveOnly}
-            onCheckedChange={setShowActiveOnly}
-            data-testid="switch-active-only-suppliers"
+            checked={showWithPOsOnly}
+            onCheckedChange={setShowWithPOsOnly}
+            data-testid="switch-with-pos-suppliers"
           />
-          <label className="text-sm text-muted-foreground whitespace-nowrap cursor-pointer" onClick={() => setShowActiveOnly(!showActiveOnly)}>
-            Active only
+          <label className="text-sm text-muted-foreground whitespace-nowrap cursor-pointer" onClick={() => setShowWithPOsOnly(!showWithPOsOnly)}>
+            Suppliers with Purchases
           </label>
         </div>
-        {(costCodeFilter || typeFilter || !showActiveOnly) && (
+        {(costCodeFilter || typeFilter || showWithPOsOnly) && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => { setCostCodeFilter(""); setTypeFilter(""); setShowActiveOnly(true); }}
+            onClick={() => { setCostCodeFilter(""); setTypeFilter(""); setShowWithPOsOnly(false); }}
             data-testid="button-clear-filters"
           >
             <X className="h-3 w-3 mr-1" />
@@ -595,7 +602,7 @@ export default function AdminSuppliersPage() {
             Suppliers
           </CardTitle>
           <CardDescription>
-            {suppliers?.length || 0} {showActiveOnly ? "active " : ""}supplier{suppliers?.length !== 1 ? "s" : ""}{searchQuery ? " found" : " configured"}
+            {suppliers?.length || 0} supplier{suppliers?.length !== 1 ? "s" : ""}{showWithPOsOnly ? " with purchases" : ""}{searchQuery ? " found" : " configured"}
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -5,6 +5,9 @@ import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
+import { db } from "../db";
+import { jobs } from "@shared/schema";
+import { eq, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -120,6 +123,21 @@ router.get("/api/customers/active", requireAuth, async (req, res) => {
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active customers");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch customers" });
+  }
+});
+
+router.get("/api/customers/with-jobs", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db.selectDistinct({ customerId: jobs.customerId })
+      .from(jobs)
+      .where(eq(jobs.companyId, companyId))
+      .then(rows => rows.filter(r => r.customerId != null).map(r => r.customerId));
+    res.json(result);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching customers with jobs");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch customers with jobs" });
   }
 });
 

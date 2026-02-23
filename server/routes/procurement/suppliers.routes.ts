@@ -5,7 +5,7 @@ import { requireAuth, requireRole } from "../middleware/auth.middleware";
 import logger from "../../lib/logger";
 import { db } from "../../db";
 import { purchaseOrders } from "@shared/schema";
-import { eq, and, notInArray } from "drizzle-orm";
+import { eq, and, notInArray, sql } from "drizzle-orm";
 import {
   supplierSchema,
   SUPPLIER_TEMPLATE_COLUMNS,
@@ -49,6 +49,21 @@ router.get("/api/procurement/suppliers/equipment-hire", requireAuth, async (req,
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching equipment hire suppliers");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
+  }
+});
+
+router.get("/api/procurement/suppliers/with-purchase-orders", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db.selectDistinct({ supplierId: purchaseOrders.supplierId })
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.companyId, companyId))
+      .then(rows => rows.filter(r => r.supplierId != null).map(r => r.supplierId));
+    res.json(result);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching suppliers with purchase orders");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers with purchase orders" });
   }
 });
 
