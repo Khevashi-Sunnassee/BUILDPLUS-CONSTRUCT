@@ -287,6 +287,49 @@ router.post("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res:
   }
 });
 
+router.patch("/api/panels/bulk-status", requireRole("ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const schema = z.object({
+      panelIds: z.array(z.string()).min(1, "At least one panel ID required"),
+      status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]),
+    });
+
+    const validation = schema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: "Validation failed", details: validation.error.format() });
+    }
+
+    const { panelIds, status } = validation.data;
+
+    const panelsWithJobs = await db
+      .select({ panelId: panelRegister.id, companyId: jobs.companyId })
+      .from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+      .where(and(inArray(panelRegister.id, panelIds), eq(jobs.companyId, companyId)));
+
+    const validIds = panelsWithJobs.map(p => p.panelId);
+    if (validIds.length === 0) {
+      return res.status(404).json({ error: "No valid panels found" });
+    }
+
+    await db.update(panelRegister)
+      .set({ status, updatedAt: new Date() })
+      .where(inArray(panelRegister.id, validIds));
+
+    for (const id of validIds) {
+      logPanelChange(id, `Bulk status update to ${status}`, req.session.userId, { changedFields: { status } });
+    }
+
+    res.json({ updated: validIds.length });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Failed to bulk update panel status");
+    res.status(500).json({ error: "Failed to bulk update panel status" });
+  }
+});
+
 router.put("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const validationResult = updatePanelSchema.safeParse(req.body);
   if (!validationResult.success) return res.status(400).json({ error: "Validation failed", details: validationResult.error.format() });

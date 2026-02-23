@@ -24,6 +24,8 @@ interface PanelTableRowProps {
   consolidationMode: boolean;
   selectedConsolidationPanels: Set<string>;
   onToggleConsolidation: (panelId: string, checked: boolean) => void;
+  selectedPanels: Set<string>;
+  onToggleSelection: (panelId: string, checked: boolean) => void;
   panelCounts: Record<string, { messageCount: number; documentCount: number }> | undefined;
   showJobColumn: boolean;
   showFactoryColumn: boolean;
@@ -44,6 +46,8 @@ export function PanelTableRow({
   consolidationMode,
   selectedConsolidationPanels,
   onToggleConsolidation,
+  selectedPanels,
+  onToggleSelection,
   panelCounts,
   showJobColumn,
   showFactoryColumn,
@@ -77,7 +81,7 @@ export function PanelTableRow({
         borderLeft: `4px solid ${panel.job.productionSlotColor}`
       } : undefined}
     >
-      {consolidationMode && (
+      {consolidationMode ? (
         <TableCell className="w-10">
           <Checkbox
             checked={selectedConsolidationPanels.has(panel.id)}
@@ -86,6 +90,17 @@ export function PanelTableRow({
             }}
             onClick={(e) => e.stopPropagation()}
             data-testid={`checkbox-consolidate-${panel.id}`}
+          />
+        </TableCell>
+      ) : (
+        <TableCell className="w-10">
+          <Checkbox
+            checked={selectedPanels.has(panel.id)}
+            onCheckedChange={(checked) => {
+              onToggleSelection(panel.id, !!checked);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            data-testid={`checkbox-select-${panel.id}`}
           />
         </TableCell>
       )}

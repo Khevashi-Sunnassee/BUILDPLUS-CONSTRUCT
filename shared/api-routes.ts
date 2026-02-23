@@ -405,6 +405,7 @@ export const ADMIN_ROUTES = {
   
   // Panels (admin management routes - uses /api/panels/admin pattern)
   PANELS: '/api/panels/admin',
+  PANELS_BULK_STATUS: '/api/panels/bulk-status',
   PANEL_BY_ID: (id: string | number) => `/api/panels/admin/${id}`,
   PANELS_IMPORT: '/api/panels/admin/import',
   PANELS_SOURCE_COUNTS: '/api/panels/admin/source-counts',

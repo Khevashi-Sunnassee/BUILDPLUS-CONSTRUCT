@@ -33,6 +33,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import {
@@ -110,6 +111,8 @@ export default function AdminPanelsPage() {
 
   const [consolidationMode, setConsolidationMode] = useState(false);
   const [selectedConsolidationPanels, setSelectedConsolidationPanels] = useState<Set<string>>(new Set());
+  const [selectedPanels, setSelectedPanels] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState<string>("");
   const [consolidationData, setConsolidationData] = useState<ConsolidationData | null>(null);
   const [consolidationDialogOpen, setConsolidationDialogOpen] = useState(false);
   const [consolidationWarnings, setConsolidationWarnings] = useState<Record<string, ConsolidationWarning> | null>(null);
@@ -311,6 +314,31 @@ export default function AdminPanelsPage() {
     },
   });
 
+  const bulkStatusMutation = useMutation({
+    mutationFn: async ({ panelIds, status }: { panelIds: string[]; status: string }) => {
+      return apiRequest("PATCH", ADMIN_ROUTES.PANELS_BULK_STATUS, { panelIds, status });
+    },
+    onSuccess: async (response) => {
+      const result = await response.json();
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
+      setSelectedPanels(new Set());
+      setBulkStatus("");
+      toast({ title: `Updated ${result.updated} panels` });
+    },
+    onError: () => {
+      toast({ title: "Failed to update panels", variant: "destructive" });
+    },
+  });
+
+  const handleToggleSelection = useCallback((panelId: string, checked: boolean) => {
+    setSelectedPanels(prev => {
+      const newSet = new Set(prev);
+      if (checked) newSet.add(panelId);
+      else newSet.delete(panelId);
+      return newSet;
+    });
+  }, []);
+
   const getPanelTypeColor = useCallback((panelType: string | null | undefined): string | null => {
     if (!panelType || !panelTypes) return null;
     const pt = panelTypes.find(t => t.code === panelType || t.name === panelType || t.code.toUpperCase() === panelType.toUpperCase());
@@ -343,6 +371,15 @@ export default function AdminPanelsPage() {
     const levelB = b.level || "";
     return levelA.localeCompare(levelB, undefined, { numeric: true });
   }), [panels, filterJobId, jobFilter, factoryFilter, statusFilter, panelTypeFilter, levelFilter, searchTerm]);
+
+  const handleSelectAll = useCallback(() => {
+    if (!filteredPanels) return;
+    if (selectedPanels.size === filteredPanels.length) {
+      setSelectedPanels(new Set());
+    } else {
+      setSelectedPanels(new Set(filteredPanels.map(p => p.id)));
+    }
+  }, [filteredPanels, selectedPanels.size]);
 
   const panelsByJob = useMemo(() => filteredPanels?.reduce((acc, panel) => {
     const jobId = panel.jobId;
@@ -1291,6 +1328,8 @@ export default function AdminPanelsPage() {
       consolidationMode={consolidationMode}
       selectedConsolidationPanels={selectedConsolidationPanels}
       onToggleConsolidation={handleToggleConsolidation}
+      selectedPanels={selectedPanels}
+      onToggleSelection={handleToggleSelection}
       panelCounts={panelCounts}
       showJobColumn={options.showJobColumn}
       showFactoryColumn={options.showFactoryColumn}
@@ -1724,10 +1763,56 @@ export default function AdminPanelsPage() {
             </div>
           ) : (
           <>
+          {selectedPanels.size > 0 && !consolidationMode && (
+            <div className="flex items-center gap-3 p-3 bg-muted/50 border rounded-md mb-3" data-testid="bulk-action-toolbar">
+              <span className="text-sm font-medium" data-testid="text-selected-count">
+                {selectedPanels.size} panel{selectedPanels.size !== 1 ? "s" : ""} selected
+              </span>
+              <Select value={bulkStatus} onValueChange={setBulkStatus} data-testid="select-bulk-status">
+                <SelectTrigger className="w-[180px]" data-testid="trigger-bulk-status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NOT_STARTED" data-testid="option-bulk-not-started">Not Started</SelectItem>
+                  <SelectItem value="IN_PROGRESS" data-testid="option-bulk-in-progress">In Progress</SelectItem>
+                  <SelectItem value="COMPLETED" data-testid="option-bulk-completed">Completed</SelectItem>
+                  <SelectItem value="ON_HOLD" data-testid="option-bulk-on-hold">On Hold</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                disabled={!bulkStatus || bulkStatusMutation.isPending}
+                onClick={() => {
+                  if (bulkStatus) {
+                    bulkStatusMutation.mutate({ panelIds: Array.from(selectedPanels), status: bulkStatus });
+                  }
+                }}
+                data-testid="button-update-selected"
+              >
+                {bulkStatusMutation.isPending ? "Updating..." : "Update Selected"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setSelectedPanels(new Set()); setBulkStatus(""); }}
+                data-testid="button-clear-selection"
+              >
+                Clear
+              </Button>
+            </div>
+          )}
           <Table>
             <TableHeader>
               <TableRow>
-                {consolidationMode && <TableHead className="w-10"></TableHead>}
+                <TableHead className="w-10">
+                  {!consolidationMode && (
+                    <Checkbox
+                      checked={filteredPanels && filteredPanels.length > 0 && selectedPanels.size === filteredPanels.length}
+                      onCheckedChange={() => handleSelectAll()}
+                      data-testid="checkbox-select-all"
+                    />
+                  )}
+                </TableHead>
                 {!filterJobId && !groupByJob && !groupByPanelType && <TableHead>Job</TableHead>}
                 <TableHead>Factory</TableHead>
                 <TableHead>Panel Mark</TableHead>
@@ -1759,7 +1844,7 @@ export default function AdminPanelsPage() {
                           onClick={() => togglePanelTypeCollapse(panelType)}
                           data-testid={`row-type-group-${panelType}`}
                         >
-                          <TableCell colSpan={consolidationMode ? 17 : 16}>
+                          <TableCell colSpan={17}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                               <Layers className="h-4 w-4 text-primary" />
@@ -1778,7 +1863,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={consolidationMode ? 17 : 16} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={17} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -1794,7 +1879,7 @@ export default function AdminPanelsPage() {
                           onClick={() => toggleJobCollapse(jobId)}
                           data-testid={`row-job-group-${jobId}`}
                         >
-                          <TableCell colSpan={consolidationMode ? 17 : 16}>
+                          <TableCell colSpan={17}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                               <Layers className="h-4 w-4 text-primary" />
@@ -1814,7 +1899,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={consolidationMode ? 17 : 16} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={17} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -1830,7 +1915,7 @@ export default function AdminPanelsPage() {
                           onClick={() => toggleLevelCollapse(level)}
                           data-testid={`row-level-group-${level}`}
                         >
-                          <TableCell colSpan={consolidationMode ? 17 : 16}>
+                          <TableCell colSpan={17}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                               <Layers className="h-4 w-4 text-primary" />
@@ -1849,7 +1934,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={consolidationMode ? 17 : 16} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={17} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -1861,7 +1946,7 @@ export default function AdminPanelsPage() {
                   )}
                   {(!filteredPanels || filteredPanels.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={filterJobId ? (consolidationMode ? 16 : 15) : (consolidationMode ? 17 : 16)} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={filterJobId ? 16 : 17} className="text-center py-8 text-muted-foreground">
                         No panels found. Add a panel or import from Excel.
                       </TableCell>
                     </TableRow>
