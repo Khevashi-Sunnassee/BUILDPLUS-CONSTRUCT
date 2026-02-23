@@ -649,6 +649,10 @@ export const DOCUMENT_ROUTES = {
   DRAWING_PACKAGE_ANALYZE: '/api/documents/drawing-package/analyze',
   DRAWING_PACKAGE_REGISTER: '/api/documents/drawing-package/register',
 
+  // ZIP Bulk Upload
+  ZIP_UPLOAD_EXTRACT: '/api/documents/zip-upload/extract',
+  ZIP_UPLOAD_REGISTER: '/api/documents/zip-upload/register',
+
   // Knowledge Base integration
   ADD_TO_KB: (id: string | number) => `/api/documents/${id}/add-to-kb`,
   REMOVE_FROM_KB: (id: string | number) => `/api/documents/${id}/remove-from-kb`,

@@ -8,6 +8,7 @@ import emailRouter from "./documents/email";
 import bulkUploadRouter from "./documents/bulk-upload";
 import panelsRouter from "./documents/panels";
 import drawingPackageRouter from "./documents/drawing-package";
+import zipUploadRouter from "./documents/zip-upload";
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use(emailRouter);
 router.use(bulkUploadRouter);
 router.use(panelsRouter);
 router.use(drawingPackageRouter);
+router.use(zipUploadRouter);
 
 export default router;

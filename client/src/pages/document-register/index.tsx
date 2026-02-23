@@ -16,6 +16,7 @@ import {
   Mail,
   Files,
   File,
+  FileArchive,
   Pencil,
   Settings2,
 } from "lucide-react";
@@ -61,6 +62,7 @@ import { CreateBundleDialog, BundleViewDialog } from "./BundleDialogs";
 import { VisualComparisonDialog } from "./VisualComparisonDialog";
 import { BulkUploadDialog } from "./BulkUploadDialog";
 import { DrawingPackageDialog } from "./DrawingPackageDialog";
+import { ZipUploadDialog } from "./ZipUploadDialog";
 import { DocumentTable } from "./DocumentTable";
 import { BundleGridView } from "./BundleGridView";
 import { AddToKnowledgeBaseDialog } from "./AddToKnowledgeBaseDialog";
@@ -86,6 +88,7 @@ export default function DocumentRegister() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [isDrawingPackageOpen, setIsDrawingPackageOpen] = useState(false);
+  const [isZipUploadOpen, setIsZipUploadOpen] = useState(false);
   const [isVersionDialogOpen, setIsVersionDialogOpen] = useState(false);
   const [selectedDocumentForVersion, setSelectedDocumentForVersion] = useState<DocumentWithDetails | null>(null);
 
@@ -480,6 +483,10 @@ export default function DocumentRegister() {
                 <Layers className="h-4 w-4 mr-2" />
                 Drawing Package
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsZipUploadOpen(true)} data-testid="menu-zip-upload">
+                <FileArchive className="h-4 w-4 mr-2" />
+                Bulk Upload ZIP File
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -794,6 +801,12 @@ export default function DocumentRegister() {
         <DrawingPackageDialog
           open={isDrawingPackageOpen}
           onOpenChange={setIsDrawingPackageOpen}
+        />
+      )}
+      {isZipUploadOpen && (
+        <ZipUploadDialog
+          open={isZipUploadOpen}
+          onOpenChange={setIsZipUploadOpen}
         />
       )}
 
