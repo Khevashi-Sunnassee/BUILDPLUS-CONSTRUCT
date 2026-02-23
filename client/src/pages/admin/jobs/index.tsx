@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, Fragment, useMemo, useCallback } from "react";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -141,6 +142,7 @@ export default function AdminJobsPage() {
   const [importResult, setImportResult] = useState<any>(null);
   
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   const [phaseFilter, setPhaseFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [stateFilter, setStateFilter] = useState<string>("all");
@@ -204,8 +206,8 @@ export default function AdminJobsPage() {
         if (stateFilter === "none" && job.state) return false;
         if (stateFilter !== "none" && job.state !== stateFilter) return false;
       }
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
+      if (debouncedSearchQuery) {
+        const query = debouncedSearchQuery.toLowerCase();
         return (
           job.jobNumber.toLowerCase().includes(query) ||
           job.name.toLowerCase().includes(query) ||
@@ -235,7 +237,7 @@ export default function AdminJobsPage() {
           break;
       }
       return sortDirection === "asc" ? comparison : -comparison;
-    }), [jobs, phaseFilter, statusFilter, stateFilter, searchQuery, groupByState, sortField, sortDirection]);
+    }), [jobs, phaseFilter, statusFilter, stateFilter, debouncedSearchQuery, groupByState, sortField, sortDirection]);
 
   const groupedJobs = useMemo(() => groupByState
     ? filteredAndSortedJobs.reduce((acc, job) => {
