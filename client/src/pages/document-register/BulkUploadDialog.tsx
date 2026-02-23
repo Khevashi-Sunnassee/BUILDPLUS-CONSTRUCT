@@ -455,7 +455,7 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Files className="h-5 w-5" />
@@ -466,9 +466,11 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
+        <div className="flex-1 min-h-0 flex flex-col space-y-4 pr-1">
           <div
-            className={`border-2 border-dashed rounded-md p-6 text-center cursor-pointer transition-colors ${
+            className={`border-2 border-dashed rounded-md text-center cursor-pointer transition-colors flex-shrink-0 ${
+              files.length > 0 ? "p-3" : "p-6"
+            } ${
               isDragOver
                 ? "border-primary bg-primary/5"
                 : "border-muted-foreground/25 hover:border-primary"
@@ -479,13 +481,22 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
             onDrop={handleDrop}
             data-testid="bulk-upload-dropzone"
           >
-            <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">
-              Drag and drop files here, or click to browse
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Max 50 files, 25MB each
-            </p>
+            {files.length === 0 ? (
+              <>
+                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  Drag and drop files here, or click to browse
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Max 50 files, 25MB each
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <Upload className="h-3.5 w-3.5" />
+                Drop more files or click to add (max 50)
+              </p>
+            )}
             <input
               ref={fileInputRef}
               type="file"
@@ -497,8 +508,8 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
           </div>
 
           {files.length > 0 && (
-            <>
-              <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex flex-col flex-1 min-h-0 space-y-4">
+              <div className="flex items-center justify-between gap-2 flex-wrap flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">{files.length} file{files.length !== 1 ? "s" : ""}</Badge>
                   <span className="text-sm text-muted-foreground">
@@ -542,8 +553,8 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
                 </div>
               </div>
 
-              <div className="border rounded-md">
-                <ScrollArea className="max-h-[300px]">
+              <div className="border rounded-md flex-1 min-h-0 overflow-hidden">
+                <ScrollArea className="h-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -683,7 +694,7 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
               </div>
 
               {files.some((f) => f.duplicateInfo && !f.supersedeDocumentId && !f.skipUpload) && (
-                <div className="flex items-center gap-2 p-2 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+                <div className="flex items-center gap-2 p-2 rounded-md bg-yellow-500/10 border border-yellow-500/20 flex-shrink-0">
                   <AlertTriangle className="h-4 w-4 text-yellow-500 flex-shrink-0" />
                   <p className="text-sm text-muted-foreground">
                     Some files have duplicate document numbers. Hover over the warning icon to choose <strong>Supersede</strong> or <strong>Skip</strong> for each.
@@ -725,7 +736,7 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
                 </div>
               )}
 
-              <div className="space-y-3">
+              <div className="space-y-3 flex-shrink-0">
                 <Label className="text-sm font-medium">Shared Metadata (applied to all files)</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
@@ -884,7 +895,7 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </div>
 
