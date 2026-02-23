@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import { z } from "zod";
 import multer from "multer";
-import { db } from "../db";
+import { db, withRetry } from "../db";
 import {
   externalApiKeys,
   externalApiLogs,
@@ -432,7 +432,7 @@ externalApiRouter.post("/api/v1/external/auth/login", requireExternalApiKey, asy
     const { email, password } = parsed.data;
     const companyId = req.apiKey!.companyId;
 
-    const user = await storage.getUserByEmail(email);
+    const user = await withRetry(() => storage.getUserByEmail(email));
 
     if (!user || user.companyId !== companyId) {
       return res.status(401).json({ error: "Invalid email or password" });
@@ -442,7 +442,7 @@ externalApiRouter.post("/api/v1/external/auth/login", requireExternalApiKey, asy
       return res.status(403).json({ error: "User account is inactive" });
     }
 
-    const validPassword = await storage.validatePassword(user, password);
+    const validPassword = await withRetry(() => storage.validatePassword(user, password));
     if (!validPassword) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -496,7 +496,7 @@ externalApiRouter.get("/api/v1/external/jobs", requireExternalApiKey, requirePer
     const companyId = req.apiKey!.companyId;
     const status = req.query.status as string | undefined;
 
-    let allJobs = await db.select().from(jobs).where(eq(jobs.companyId, companyId)).orderBy(desc(jobs.createdAt)).limit(500);
+    let allJobs = await withRetry(() => db.select().from(jobs).where(eq(jobs.companyId, companyId)).orderBy(desc(jobs.createdAt)).limit(500));
 
     if (req.externalUser) {
       const allowedJobIds = await getAllowedJobIdsForUser(req.externalUser.id, req.externalUser.role);
@@ -524,11 +524,11 @@ externalApiRouter.get("/api/v1/external/jobs/:id", requireExternalApiKey, requir
   try {
     const companyId = req.apiKey!.companyId;
 
-    const [job] = await db
+    const [job] = await withRetry(() => db
       .select()
       .from(jobs)
       .where(sql`${jobs.id} = ${req.params.id} AND ${jobs.companyId} = ${companyId}`)
-      .limit(1);
+      .limit(1));
 
     if (!job) {
       return res.status(404).json({ error: "Job not found" });
@@ -597,7 +597,7 @@ externalApiRouter.get("/api/v1/external/documents", requireExternalApiKey, requi
       ? sql`${documents.companyId} = ${companyId} AND ${documents.jobId} = ${jobId}`
       : sql`${documents.companyId} = ${companyId}`;
 
-    let docs = await db
+    let docs = await withRetry(() => db
       .select({
         id: documents.id,
         documentNumber: documents.documentNumber,
@@ -627,7 +627,7 @@ externalApiRouter.get("/api/v1/external/documents", requireExternalApiKey, requi
       .where(whereClause)
       .orderBy(desc(documents.createdAt))
       .limit(limit)
-      .offset(offset);
+      .offset(offset));
 
     if (req.externalUser && allowedJobIds !== null) {
       docs = docs.filter(d => d.jobId && allowedJobIds!.has(d.jobId));
@@ -651,11 +651,11 @@ externalApiRouter.get("/api/v1/external/documents/:id/download", requireExternal
     const companyId = req.apiKey!.companyId;
     const docId = req.params.id;
 
-    const [document] = await db
+    const [document] = await withRetry(() => db
       .select()
       .from(documents)
       .where(sql`${documents.id} = ${docId} AND ${documents.companyId} = ${companyId}`)
-      .limit(1);
+      .limit(1));
 
     if (!document) {
       return res.status(404).json({ error: "Document not found" });
@@ -694,11 +694,11 @@ externalApiRouter.post("/api/v1/external/documents/:id/markup-version", requireE
     const docId = req.params.id;
     const notes = req.body?.notes || "";
 
-    const [document] = await db
+    const [document] = await withRetry(() => db
       .select()
       .from(documents)
       .where(sql`${documents.id} = ${docId} AND ${documents.companyId} = ${companyId}`)
-      .limit(1);
+      .limit(1));
 
     if (!document) {
       return res.status(404).json({ error: "Document not found" });
@@ -733,7 +733,7 @@ externalApiRouter.post("/api/v1/external/documents/:id/markup-version", requireE
     const minorNum = parseInt(versionParts[1]) || 0;
     const newVersion = `${majorNum}.${minorNum + 1}`;
 
-    const newDoc = await storage.createDocument({
+    const newDoc = await withRetry(() => storage.createDocument({
       companyId,
       jobId: document.jobId,
       documentNumber: document.documentNumber,
@@ -755,12 +755,12 @@ externalApiRouter.post("/api/v1/external/documents/:id/markup-version", requireE
       categoryId: document.categoryId,
       tags: document.tags,
       isConfidential: document.isConfidential ?? false,
-    });
+    }));
 
-    await db
+    await withRetry(() => db
       .update(documents)
       .set({ isLatestVersion: false })
-      .where(eq(documents.id, document.id));
+      .where(eq(documents.id, document.id)));
 
     logger.info({ docId, newDocId: newDoc.id, newVersion }, "External API: Markup version uploaded");
 

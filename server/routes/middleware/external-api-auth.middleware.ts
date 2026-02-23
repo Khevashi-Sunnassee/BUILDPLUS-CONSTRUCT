@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
-import { db } from "../../db";
+import { db, withRetry } from "../../db";
 import { externalApiKeys, externalApiLogs, jobMembers } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { storage } from "../../storage";
@@ -64,16 +64,18 @@ export async function requireExternalApiKey(req: Request, res: Response, next: N
   try {
     const keyHash = hashApiKey(rawKey);
 
-    const [apiKey] = await db
-      .select()
-      .from(externalApiKeys)
-      .where(
-        and(
-          eq(externalApiKeys.keyHash, keyHash),
-          eq(externalApiKeys.isActive, true)
+    const [apiKey] = await withRetry(() =>
+      db
+        .select()
+        .from(externalApiKeys)
+        .where(
+          and(
+            eq(externalApiKeys.keyHash, keyHash),
+            eq(externalApiKeys.isActive, true)
+          )
         )
-      )
-      .limit(1);
+        .limit(1)
+    );
 
     if (!apiKey) {
       return res.status(401).json({ error: "Invalid or inactive API key" });
@@ -111,7 +113,7 @@ export async function requireExternalApiKey(req: Request, res: Response, next: N
           });
         }
 
-        const user = await storage.getUser(decoded.userId);
+        const user = await withRetry(() => storage.getUser(decoded.userId));
         if (!user || !user.isActive) {
           return res.status(401).json({ error: "User account is inactive or not found" });
         }
@@ -204,9 +206,11 @@ export async function getAllowedJobIdsForUser(userId: string, role: string): Pro
     return null;
   }
 
-  const memberships = await db.select({ jobId: jobMembers.jobId })
-    .from(jobMembers)
-    .where(eq(jobMembers.userId, userId));
+  const memberships = await withRetry(() =>
+    db.select({ jobId: jobMembers.jobId })
+      .from(jobMembers)
+      .where(eq(jobMembers.userId, userId))
+  );
   return new Set(memberships.map(m => m.jobId));
 }
 
