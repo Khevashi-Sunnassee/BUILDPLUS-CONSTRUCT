@@ -4,6 +4,7 @@ import { db } from "../../db";
 import {
   jobActivities, jobActivityAssignees, jobActivityUpdates,
   jobActivityFiles, jobActivityChecklists,
+  checklistTemplates, checklistInstances,
 } from "@shared/schema";
 import { requireAuth } from "../middleware/auth.middleware";
 import logger from "../../lib/logger";
@@ -258,14 +259,131 @@ router.delete("/api/job-activity-files/:id", requireAuth, async (req, res) => {
 router.get("/api/job-activities/:activityId/checklists", requireAuth, async (req, res) => {
   try {
     const activityId = req.params.activityId as string;
-    const result = await db.select().from(jobActivityChecklists)
+    const companyId = req.companyId;
+
+    const [activityCheck] = await db.select({ id: jobActivities.id })
+      .from(jobActivities)
+      .where(and(eq(jobActivities.id, activityId), eq(jobActivities.companyId, companyId!)))
+      .limit(1);
+    if (!activityCheck) return res.status(404).json({ error: "Activity not found" });
+
+    const linked = await db.select().from(jobActivityChecklists)
       .where(eq(jobActivityChecklists.activityId, activityId))
       .orderBy(asc(jobActivityChecklists.sortOrder))
-      .limit(500);
-    res.json(result);
+      .limit(100);
+
+    const enriched = await Promise.all(linked.map(async (item) => {
+      let template = null;
+      let instance = null;
+
+      if (item.checklistTemplateRefId) {
+        const [tmpl] = await db.select().from(checklistTemplates)
+          .where(and(eq(checklistTemplates.id, item.checklistTemplateRefId), eq(checklistTemplates.companyId, companyId!)))
+          .limit(1);
+        template = tmpl || null;
+      }
+
+      if (item.instanceId) {
+        const [inst] = await db.select().from(checklistInstances)
+          .where(and(eq(checklistInstances.id, item.instanceId), eq(checklistInstances.companyId, companyId!)))
+          .limit(1);
+        instance = inst || null;
+      }
+
+      return {
+        ...item,
+        template: template ? { id: template.id, name: template.name, sections: template.sections, version: template.version } : null,
+        instance: instance ? { id: instance.id, status: instance.status, responses: instance.responses, completionRate: instance.completionRate } : null,
+      };
+    }));
+
+    res.json(enriched);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching activity checklists");
     res.status(500).json({ error: "Failed to fetch checklists" });
+  }
+});
+
+router.post("/api/job-activity-checklists/:id/save", requireAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const companyId = req.companyId;
+    const { responses, completionRate } = req.body;
+
+    if (!responses || typeof responses !== "object" || Array.isArray(responses)) {
+      return res.status(400).json({ error: "responses must be an object" });
+    }
+    const rate = typeof completionRate === "string" ? completionRate : String(completionRate || "0");
+    const parsedRate = parseFloat(rate);
+    if (isNaN(parsedRate) || parsedRate < 0 || parsedRate > 100) {
+      return res.status(400).json({ error: "completionRate must be a number between 0 and 100" });
+    }
+
+    const [actChecklist] = await db.select().from(jobActivityChecklists)
+      .where(eq(jobActivityChecklists.id, id))
+      .limit(1);
+    if (!actChecklist) return res.status(404).json({ error: "Activity checklist not found" });
+
+    const [activity] = await db.select({ jobId: jobActivities.jobId, companyId: jobActivities.companyId })
+      .from(jobActivities)
+      .where(and(eq(jobActivities.id, actChecklist.activityId), eq(jobActivities.companyId, companyId!)))
+      .limit(1);
+    if (!activity) return res.status(404).json({ error: "Activity not found" });
+
+    if (!actChecklist.checklistTemplateRefId) {
+      return res.status(400).json({ error: "Activity checklist has no linked template" });
+    }
+
+    let instanceId = actChecklist.instanceId;
+
+    if (!instanceId) {
+      const instanceNumber = `CHK-ACT-${Date.now()}`;
+      let templateVersion = 1;
+      const [tmpl] = await db.select({ version: checklistTemplates.version })
+        .from(checklistTemplates)
+        .where(and(eq(checklistTemplates.id, actChecklist.checklistTemplateRefId), eq(checklistTemplates.companyId, companyId!)))
+        .limit(1);
+      if (tmpl) templateVersion = tmpl.version;
+
+      const [newInstance] = await db.insert(checklistInstances).values({
+        companyId: companyId!,
+        templateId: actChecklist.checklistTemplateRefId,
+        templateVersion,
+        instanceNumber,
+        jobId: activity.jobId,
+        status: "in_progress",
+        responses: responses,
+        completionRate: rate,
+      }).returning();
+      instanceId = newInstance.id;
+
+      await db.update(jobActivityChecklists)
+        .set({ instanceId })
+        .where(eq(jobActivityChecklists.id, id));
+    } else {
+      await db.update(checklistInstances)
+        .set({
+          responses: responses,
+          completionRate: rate,
+          status: "in_progress",
+          updatedAt: new Date(),
+        })
+        .where(and(eq(checklistInstances.id, instanceId), eq(checklistInstances.companyId, companyId!)));
+    }
+
+    const isComplete = parsedRate >= 100;
+    await db.update(jobActivityChecklists)
+      .set({
+        isCompleted: isComplete,
+        completedAt: isComplete ? new Date() : null,
+        completedById: isComplete ? req.session.userId : null,
+      })
+      .where(eq(jobActivityChecklists.id, id));
+
+    res.json({ success: true, instanceId });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error saving activity checklist responses");
+    res.status(500).json({ error: "Failed to save checklist responses" });
   }
 });
 

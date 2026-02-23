@@ -896,6 +896,7 @@ export const PROJECT_ACTIVITIES_ROUTES = {
   ACTIVITY_MOVE: (id: string | number) => `/api/job-activities/${id}/move`,
   ACTIVITY_CHECKLISTS: (activityId: string | number) => `/api/job-activities/${activityId}/checklists`,
   ACTIVITY_CHECKLIST_TOGGLE: (checklistId: string | number) => `/api/job-activity-checklists/${checklistId}/toggle`,
+  ACTIVITY_CHECKLIST_SAVE: (checklistId: string | number) => `/api/job-activity-checklists/${checklistId}/save`,
   ACTIVITY_TASKS: (activityId: string | number) => `/api/job-activities/${activityId}/tasks`,
   ACTIVITY_TASKS_REORDER: (activityId: string | number) => `/api/job-activities/${activityId}/tasks/reorder`,
   JOB_ACTIVITIES_RECALCULATE: (jobId: string | number) => `/api/jobs/${jobId}/activities/recalculate`,

@@ -4308,6 +4308,7 @@ export const jobActivityChecklists = pgTable("job_activity_checklists", {
   activityId: varchar("activity_id", { length: 36 }).notNull().references(() => jobActivities.id, { onDelete: "cascade" }),
   checklistTemplateId: varchar("checklist_template_id", { length: 36 }).references(() => activityTemplateChecklists.id, { onDelete: "set null" }),
   checklistTemplateRefId: varchar("checklist_template_ref_id", { length: 36 }).references(() => checklistTemplates.id, { onDelete: "set null" }),
+  instanceId: varchar("instance_id", { length: 36 }).references(() => checklistInstances.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   isCompleted: boolean("is_completed").default(false).notNull(),
   completedAt: timestamp("completed_at"),
@@ -4318,6 +4319,7 @@ export const jobActivityChecklists = pgTable("job_activity_checklists", {
   activityIdx: index("job_activity_checklists_activity_idx").on(table.activityId),
   templateIdx: index("job_activity_checklists_template_idx").on(table.checklistTemplateId),
   checklistRefIdx: index("job_activity_checklists_checklist_ref_idx").on(table.checklistTemplateRefId),
+  instanceIdx: index("job_activity_checklists_instance_idx").on(table.instanceId),
 }));
 
 // Project Activities Insert Schemas and Types

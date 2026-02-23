@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -18,9 +18,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Clock, User, FileText, Loader2, Send, Paperclip,
+  Clock, User, FileText, Loader2, Send, Paperclip, Save, CheckCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
@@ -30,6 +29,18 @@ import {
   STATUS_OPTIONS,
   isDatePast,
 } from "@/lib/activity-constants";
+import { ChecklistForm, calculateCompletionRate } from "@/components/checklist/checklist-form";
+import type { ChecklistTemplate } from "@shared/schema";
+
+interface ActivityChecklistItem {
+  id: string;
+  name: string;
+  isCompleted: boolean;
+  checklistTemplateRefId: string | null;
+  instanceId: string | null;
+  template: { id: string; name: string; sections: unknown; version: number } | null;
+  instance: { id: string; status: string; responses: Record<string, unknown>; completionRate: string | null } | null;
+}
 
 interface ActivitySidebarProps {
   activity: ActivityWithAssignees | null;
@@ -60,18 +71,19 @@ export function ActivitySidebar({
     enabled: !!activity,
   });
 
-  const { data: checklistItems = [] } = useQuery<{ id: string; label: string; isChecked: boolean; checkedByName?: string }[]>({
+  const { data: checklistItems = [], isLoading: loadingChecklists } = useQuery<ActivityChecklistItem[]>({
     queryKey: [activity ? PROJECT_ACTIVITIES_ROUTES.ACTIVITY_CHECKLISTS(activity.id) : ""],
     enabled: !!activity && (activity.checklistTotal || 0) > 0,
   });
 
-  const toggleChecklistMutation = useMutation({
-    mutationFn: async (checklistId: string) => {
-      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_CHECKLIST_TOGGLE(checklistId));
+  const saveChecklistMutation = useMutation({
+    mutationFn: async ({ checklistId, responses, completionRate }: { checklistId: string; responses: Record<string, unknown>; completionRate: string }) => {
+      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_CHECKLIST_SAVE(checklistId), { responses, completionRate });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.ACTIVITY_CHECKLISTS(activity!.id)] });
       queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
+      toast({ title: "Saved", description: "Checklist progress saved" });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -429,33 +441,118 @@ export function ActivitySidebar({
           </TabsContent>
 
           <TabsContent value="checklist" className="mt-4">
-            <div className="space-y-2">
-              {checklistItems.length > 0 ? checklistItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-3 p-2 border rounded cursor-pointer hover-elevate"
-                  onClick={() => toggleChecklistMutation.mutate(item.id)}
-                  data-testid={`checklist-item-${item.id}`}
-                >
-                  <Checkbox
-                    checked={item.isChecked}
-                    onCheckedChange={() => toggleChecklistMutation.mutate(item.id)}
-                    data-testid={`checklist-checkbox-${item.id}`}
+            <ScrollArea className="h-[500px]">
+              <div className="space-y-4 pr-3">
+                {loadingChecklists ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                ) : checklistItems.length > 0 ? checklistItems.map((item) => (
+                  <ActivityChecklistCard
+                    key={item.id}
+                    item={item}
+                    onSave={(responses, completionRate) => {
+                      saveChecklistMutation.mutate({ checklistId: item.id, responses, completionRate });
+                    }}
+                    isSaving={saveChecklistMutation.isPending}
                   />
-                  <span className={cn("text-sm flex-1", item.isChecked && "line-through text-muted-foreground")}>
-                    {item.label}
-                  </span>
-                  {item.checkedByName && (
-                    <span className="text-xs text-muted-foreground">{item.checkedByName}</span>
-                  )}
-                </div>
-              )) : (
-                <p className="text-center text-muted-foreground text-sm py-8">No checklist items</p>
-              )}
-            </div>
+                )) : (
+                  <p className="text-center text-muted-foreground text-sm py-8">No checklists linked</p>
+                )}
+              </div>
+            </ScrollArea>
           </TabsContent>
         </Tabs>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function ActivityChecklistCard({
+  item,
+  onSave,
+  isSaving,
+}: {
+  item: ActivityChecklistItem;
+  onSave: (responses: Record<string, unknown>, completionRate: string) => void;
+  isSaving: boolean;
+}) {
+  const [responses, setResponses] = useState<Record<string, unknown>>(
+    (item.instance?.responses as Record<string, unknown>) || {}
+  );
+  const [hasChanges, setHasChanges] = useState(false);
+  const prevInstanceRef = useRef(item.instance);
+
+  useEffect(() => {
+    if (item.instance && item.instance !== prevInstanceRef.current) {
+      setResponses((item.instance.responses as Record<string, unknown>) || {});
+      setHasChanges(false);
+      prevInstanceRef.current = item.instance;
+    }
+  }, [item.instance]);
+
+  const handleChange = useCallback((newResponses: Record<string, unknown>) => {
+    setResponses(newResponses);
+    setHasChanges(true);
+  }, []);
+
+  if (!item.template) {
+    return (
+      <div className="p-3 border rounded bg-muted/30" data-testid={`checklist-item-${item.id}`}>
+        <p className="text-sm text-muted-foreground">{item.name} - Template not found</p>
+      </div>
+    );
+  }
+
+  const template = {
+    ...item.template,
+    sections: item.template.sections,
+  } as unknown as ChecklistTemplate;
+
+  const completionRate = calculateCompletionRate(template, responses);
+  const isComplete = item.isCompleted || completionRate >= 100;
+
+  return (
+    <div className="space-y-3" data-testid={`checklist-item-${item.id}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {isComplete ? (
+            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+          ) : (
+            <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          )}
+          <span className={cn("text-sm font-medium truncate", isComplete && "text-green-700 dark:text-green-400")}>
+            {item.template.name}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Badge variant={isComplete ? "default" : "secondary"} className="text-xs">
+            {Math.round(completionRate)}%
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const rate = calculateCompletionRate(template, responses);
+              onSave(responses, rate.toFixed(2));
+              setHasChanges(false);
+            }}
+            disabled={!hasChanges || isSaving}
+            data-testid={`button-save-checklist-${item.id}`}
+          >
+            {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Save className="h-3 w-3 mr-1" />}
+            Save
+          </Button>
+        </div>
+      </div>
+      <ChecklistForm
+        template={template}
+        responses={responses}
+        onChange={handleChange}
+        disabled={isComplete && !hasChanges}
+        showProgress={false}
+      />
+    </div>
   );
 }
