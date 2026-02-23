@@ -575,6 +575,9 @@ router.post("/api/employees/:employeeId/employments", requireRole("ADMIN", "MANA
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
+    if (parsed.data.startDate && parsed.data.endDate && new Date(parsed.data.endDate) < new Date(parsed.data.startDate)) {
+      return res.status(400).json({ error: "End date must be on or after the start date" });
+    }
     const createData = { ...parsed.data } as Record<string, unknown>;
     if (createData.departmentId) {
       const [dept] = await db.select({ id: departments.id, name: departments.name })
@@ -605,6 +608,11 @@ router.patch("/api/employees/:employeeId/employments/:id", requireRole("ADMIN", 
     const parsed = employmentSchema.partial().safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const startDate = parsed.data.startDate ?? existing.startDate;
+    const endDate = parsed.data.endDate ?? existing.endDate;
+    if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+      return res.status(400).json({ error: "End date must be on or after the start date" });
     }
     const updateData = { ...parsed.data } as Record<string, unknown>;
     if (updateData.departmentId !== undefined) {

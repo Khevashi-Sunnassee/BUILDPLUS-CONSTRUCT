@@ -13,6 +13,9 @@ router.get("/api/reports/cost-analysis", requireAuth, async (req, res) => {
   if (!startDate || !endDate) {
     return res.status(400).json({ error: "startDate and endDate required" });
   }
+  if (new Date(endDate) < new Date(startDate)) {
+    return res.status(400).json({ error: "End date must be on or after the start date" });
+  }
   
   const entries = await storage.getProductionEntriesInRange(startDate, endDate, req.companyId);
   const filteredEntries = jobId ? entries.filter(e => e.jobId === jobId) : entries;
@@ -134,6 +137,9 @@ router.get("/api/reports/cost-analysis-daily", requireAuth, async (req, res) => 
   
   if (!startDate || !endDate) {
     return res.status(400).json({ error: "startDate and endDate required" });
+  }
+  if (new Date(endDate) < new Date(startDate)) {
+    return res.status(400).json({ error: "End date must be on or after the start date" });
   }
   
   const entries = await storage.getProductionEntriesInRange(startDate, endDate, req.companyId);
@@ -281,6 +287,9 @@ router.get("/api/reports/labour-cost-analysis", requireAuth, async (req, res) =>
   
   if (!startDate || !endDate) {
     return res.status(400).json({ error: "startDate and endDate required" });
+  }
+  if (new Date(endDate) < new Date(startDate)) {
+    return res.status(400).json({ error: "End date must be on or after the start date" });
   }
   
   const entries = await storage.getProductionEntriesInRange(startDate, endDate, req.companyId);

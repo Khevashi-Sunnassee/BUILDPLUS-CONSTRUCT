@@ -1480,7 +1480,7 @@ function TaskDetailSheet({
             {...dateInputProps}
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            className="bg-white/10 border-white/20 text-white [color-scheme:dark]"
+            className="bg-white/10 border-white/20 text-white [color-scheme:dark] min-w-0 w-full"
             data-testid="input-task-due-date"
           />
         </div>

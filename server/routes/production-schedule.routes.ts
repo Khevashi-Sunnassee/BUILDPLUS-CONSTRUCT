@@ -219,6 +219,10 @@ router.get("/api/production-schedule/days", requireAuth, requirePermission("prod
     }
     
     const { startDate, endDate, factoryId, status } = parseResult.data;
+    
+    if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+      return res.status(400).json({ error: "End date must be on or after the start date" });
+    }
 
     const entries = await storage.getProductionEntriesInRange(startDate, endDate, req.companyId);
     

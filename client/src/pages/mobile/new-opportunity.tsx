@@ -579,7 +579,7 @@ export default function MobileNewOpportunity() {
             <FormField label="Submission Date" error={errors.submissionDate}>
               <input
                 type="datetime-local"
-                className={`${inputClass} [color-scheme:dark]`}
+                className={`${inputClass} [color-scheme:dark] min-w-0`}
                 value={form.submissionDate}
                 onChange={(e) => setForm((f) => ({ ...f, submissionDate: e.target.value }))}
                 data-testid="input-submissionDate"
@@ -590,7 +590,7 @@ export default function MobileNewOpportunity() {
               <input
                 type="date"
                 {...dateInputProps}
-                className={`${inputClass} [color-scheme:dark]`}
+                className={`${inputClass} [color-scheme:dark] min-w-0`}
                 value={form.estimatedStartDate}
                 onChange={(e) => setForm((f) => ({ ...f, estimatedStartDate: e.target.value }))}
                 data-testid="input-start-date"

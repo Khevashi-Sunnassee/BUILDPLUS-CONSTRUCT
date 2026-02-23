@@ -360,6 +360,12 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
       .limit(1);
     if (!existing) return res.status(404).json({ error: "Activity not found" });
 
+    const startDate = parsed.data.startDate ?? existing.startDate;
+    const endDate = parsed.data.endDate ?? existing.endDate;
+    if (startDate && endDate && new Date(endDate) < new Date(startDate)) {
+      return res.status(400).json({ error: "End date must be on or after the start date" });
+    }
+
     const updateData: Record<string, unknown> = { ...parsed.data, updatedAt: new Date() };
 
     if (updateData.predecessorSortOrder !== undefined) {

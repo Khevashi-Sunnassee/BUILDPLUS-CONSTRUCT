@@ -543,7 +543,7 @@ export default function MobilePmCallLogFormPage() {
                                 return updated;
                               });
                             }}
-                            className="bg-white/5 border-white/10 text-white"
+                            className="bg-white/5 border-white/10 text-white [color-scheme:dark] min-w-0 w-full"
                             data-testid={`input-confirmed-delivery-date-${idx}`}
                           />
                         </div>

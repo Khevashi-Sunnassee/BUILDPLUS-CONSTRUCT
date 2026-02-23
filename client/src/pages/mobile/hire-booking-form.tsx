@@ -209,6 +209,9 @@ export default function MobileHireBookingForm() {
     if (!form.rateAmount.trim()) newErrors.rateAmount = "Rate amount is required";
     if (!form.hireStartDate) newErrors.hireStartDate = "Start date is required";
     if (!form.hireEndDate) newErrors.hireEndDate = "End date is required";
+    if (form.hireStartDate && form.hireEndDate && form.hireEndDate < form.hireStartDate) {
+      newErrors.hireEndDate = "End date must be on or after the start date";
+    }
     if (form.hireSource === "external" && !form.supplierId) newErrors.supplierId = "Supplier is required for external hire";
     if (form.hireSource === "internal" && !form.assetId) newErrors.assetId = "Asset is required for internal hire";
     setErrors(newErrors);

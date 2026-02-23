@@ -97,7 +97,13 @@ const formSchema = z.object({
 .refine((data) => {
   if (data.hireSource === "internal" && !data.assetId) return false;
   return true;
-}, { message: "Asset is required for internal hire", path: ["assetId"] });
+}, { message: "Asset is required for internal hire", path: ["assetId"] })
+.refine((data) => {
+  if (data.hireStartDate && data.hireEndDate) {
+    return data.hireEndDate >= data.hireStartDate;
+  }
+  return true;
+}, { message: "End date must be on or after the start date", path: ["hireEndDate"] });
 
 type FormValues = z.infer<typeof formSchema>;
 

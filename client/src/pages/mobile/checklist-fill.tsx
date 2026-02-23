@@ -676,7 +676,7 @@ function MobileFieldRenderer({ field, value, onChange, disabled, onAssetSelected
           value={(value as string) || ""}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
-          className="w-full h-11 px-3 rounded-xl bg-white/10 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-400/50 disabled:opacity-50"
+          className="w-full h-11 px-3 rounded-xl bg-white/10 border border-white/10 text-white text-sm focus:outline-none focus:border-blue-400/50 disabled:opacity-50 [color-scheme:dark] min-w-0"
           data-testid={`mobile-field-date-${field.id}`}
         />
       );

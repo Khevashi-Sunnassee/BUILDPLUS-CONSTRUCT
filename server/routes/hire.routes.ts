@@ -200,6 +200,15 @@ router.post("/api/hire-bookings", requireAuth, async (req: Request, res: Respons
 
     const data = parsed.data;
 
+    const startDate = new Date(data.hireStartDate);
+    const endDate = new Date(data.hireEndDate);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({ error: "Invalid date format" });
+    }
+    if (endDate < startDate) {
+      return res.status(400).json({ error: "End date must be on or after the start date" });
+    }
+
     if (data.hireSource === "external" && !data.supplierId) {
       return res.status(400).json({ error: "Supplier is required for external hire" });
     }
@@ -304,6 +313,13 @@ router.patch("/api/hire-bookings/:id", requireAuth, async (req: Request, res: Re
     if (data.siteContactUserId !== undefined) updateData.siteContactUserId = data.siteContactUserId;
     if (data.hireStartDate !== undefined) updateData.hireStartDate = new Date(data.hireStartDate);
     if (data.hireEndDate !== undefined) updateData.hireEndDate = new Date(data.hireEndDate);
+    {
+      const resolvedStart = data.hireStartDate ? new Date(data.hireStartDate) : existing[0].hireStartDate;
+      const resolvedEnd = data.hireEndDate ? new Date(data.hireEndDate) : existing[0].hireEndDate;
+      if (resolvedStart && resolvedEnd && new Date(resolvedEnd) < new Date(resolvedStart)) {
+        return res.status(400).json({ error: "End date must be on or after the start date" });
+      }
+    }
     if (data.expectedReturnDate !== undefined) updateData.expectedReturnDate = data.expectedReturnDate ? new Date(data.expectedReturnDate) : null;
     if (data.rateType !== undefined) updateData.rateType = data.rateType;
     if (data.rateAmount !== undefined) updateData.rateAmount = data.rateAmount || null;

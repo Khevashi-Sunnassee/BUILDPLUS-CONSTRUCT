@@ -282,7 +282,7 @@ export default function MobileReturnLoadPage() {
                   {...dateInputProps}
                   value={returnDate}
                   onChange={(e) => setReturnDate(e.target.value)}
-                  className={inputClass}
+                  className={`${inputClass} [color-scheme:dark] min-w-0 w-full`}
                   data-testid="input-return-date"
                 />
               </FormRow>
