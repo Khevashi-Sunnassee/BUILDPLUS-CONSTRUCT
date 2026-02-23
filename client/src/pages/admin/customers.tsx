@@ -305,6 +305,7 @@ function CustomerDetailDialog({ customer, open, onOpenChange, onEdit }: {
 }
 
 export default function AdminCustomersPage() {
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
