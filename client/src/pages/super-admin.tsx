@@ -1,6 +1,6 @@
-import { useState, useCallback, Fragment } from "react";
+import { useState, useCallback, useMemo, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Building2, BookOpen, Shield, Database, Monitor, Settings2, Star, StarOff, Loader2, FileSearch, Key, Plus, Copy, Trash2, ToggleLeft, ToggleRight, Clock, Activity, AlertTriangle } from "lucide-react";
+import { Building2, BookOpen, Shield, Database, Monitor, Settings2, Star, StarOff, Loader2, FileSearch, Key, Plus, Copy, Trash2, ToggleLeft, ToggleRight, Clock, Activity, AlertTriangle, ChevronDown, ChevronRight, Layers } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -129,6 +129,48 @@ function SystemDefaultsManager({ companyId, companies }: { companyId: string; co
     queryKey: [`/api/super-admin/system-defaults/${selectedTable}`, { companyId }],
     enabled: !!selectedTable && !!companyId,
   });
+
+  const { data: entityTypes = [] } = useQuery<{ id: string; name: string; code: string; color: string | null }[]>({
+    queryKey: ["/api/checklist/entity-types"],
+    enabled: selectedTable === "checklistTemplates",
+  });
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const groupedRecords = useMemo(() => {
+    if (selectedTable !== "checklistTemplates" || records.length === 0) return null;
+
+    const groups: { typeId: string | null; typeName: string; records: SystemDefaultRecord[] }[] = [];
+    const byType: Record<string, SystemDefaultRecord[]> = {};
+    const unassigned: SystemDefaultRecord[] = [];
+
+    for (const r of records) {
+      if (r.entityTypeId) {
+        if (!byType[r.entityTypeId]) byType[r.entityTypeId] = [];
+        byType[r.entityTypeId].push(r);
+      } else {
+        unassigned.push(r);
+      }
+    }
+
+    for (const et of entityTypes) {
+      if (byType[et.id]) {
+        groups.push({ typeId: et.id, typeName: et.name, records: byType[et.id] });
+      }
+    }
+
+    for (const [typeId, recs] of Object.entries(byType)) {
+      if (!entityTypes.find(e => e.id === typeId)) {
+        groups.push({ typeId, typeName: "Unknown Type", records: recs });
+      }
+    }
+
+    if (unassigned.length > 0) {
+      groups.push({ typeId: null, typeName: "Unassigned", records: unassigned });
+    }
+
+    return groups;
+  }, [selectedTable, records, entityTypes]);
 
   const toggleMutation = useMutation({
     mutationFn: async ({ tableKey, id }: { tableKey: string; id: string }) => {
@@ -341,6 +383,112 @@ function SystemDefaultsManager({ companyId, companies }: { companyId: string; co
               <div className="text-center py-8 text-muted-foreground">
                 <Settings2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No records found for this table in the selected company</p>
+              </div>
+            ) : groupedRecords ? (
+              <div className="space-y-4">
+                {groupedRecords.map((group) => {
+                  const groupKey = group.typeId || "__unassigned__";
+                  const isCollapsed = collapsedGroups.has(groupKey);
+                  const groupDefaults = group.records.filter(r => r.isSystemDefault).length;
+                  return (
+                    <div key={groupKey} className="rounded-md border" data-testid={`group-${groupKey}`}>
+                      <button
+                        className="w-full flex items-center justify-between gap-3 px-4 py-3 bg-muted/50 cursor-pointer"
+                        onClick={() => {
+                          const next = new Set(collapsedGroups);
+                          if (next.has(groupKey)) next.delete(groupKey);
+                          else next.add(groupKey);
+                          setCollapsedGroups(next);
+                        }}
+                        data-testid={`button-toggle-group-${groupKey}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Layers className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-semibold text-sm">{group.typeName}</span>
+                          <Badge variant="secondary" className="text-xs">
+                            {group.records.length} template{group.records.length !== 1 ? "s" : ""}
+                          </Badge>
+                          {groupDefaults > 0 && (
+                            <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 text-xs">
+                              {groupDefaults} default{groupDefaults !== 1 ? "s" : ""}
+                            </Badge>
+                          )}
+                        </div>
+                        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </button>
+                      {!isCollapsed && (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-10">
+                                <Checkbox
+                                  checked={group.records.every(r => selectedIds.has(r.id))}
+                                  onCheckedChange={() => {
+                                    const allSelected = group.records.every(r => selectedIds.has(r.id));
+                                    const next = new Set(selectedIds);
+                                    group.records.forEach(r => { if (allSelected) next.delete(r.id); else next.add(r.id); });
+                                    setSelectedIds(next);
+                                  }}
+                                />
+                              </TableHead>
+                              <TableHead>Name</TableHead>
+                              <TableHead className="w-32 text-center">System Default</TableHead>
+                              <TableHead className="w-24 text-center">Status</TableHead>
+                              <TableHead className="w-24"></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {group.records.map((record) => (
+                              <TableRow key={record.id} data-testid={`row-default-${record.id}`}>
+                                <TableCell>
+                                  <Checkbox
+                                    checked={selectedIds.has(record.id)}
+                                    onCheckedChange={() => toggleSelectOne(record.id)}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <span className="font-medium">{record[nameField] || record.name || "—"}</span>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  {record.isSystemDefault ? (
+                                    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                                      <Star className="h-3 w-3 mr-1" />
+                                      Default
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">—</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  {record.isActive !== undefined && (
+                                    <Badge variant={record.isActive ? "outline" : "secondary"}>
+                                      {record.isActive ? "Active" : "Inactive"}
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => toggleMutation.mutate({ tableKey: selectedTable, id: record.id })}
+                                    disabled={toggleMutation.isPending}
+                                    data-testid={`button-toggle-default-${record.id}`}
+                                  >
+                                    {record.isSystemDefault ? (
+                                      <StarOff className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                      <Star className="h-4 w-4 text-amber-500" />
+                                    )}
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="rounded-md border">

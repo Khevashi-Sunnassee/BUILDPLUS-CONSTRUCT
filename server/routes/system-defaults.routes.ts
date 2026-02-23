@@ -103,8 +103,12 @@ router.patch("/api/super-admin/system-defaults/:tableKey/:id/toggle", requireSup
     if (!existing) return res.status(404).json({ error: "Record not found" });
 
     const newValue = !existing.isSystemDefault;
+    const updateData: Record<string, unknown> = { isSystemDefault: newValue };
+    if (tableKey === "checklistTemplates") {
+      updateData.isSystem = newValue;
+    }
     const [updated] = await db.update(config.table)
-      .set({ isSystemDefault: newValue })
+      .set(updateData)
       .where(and(eq(config.table.id, id), eq(config.table.companyId, companyId)))
       .returning();
 
@@ -125,9 +129,13 @@ router.post("/api/super-admin/system-defaults/bulk-toggle", requireSuperAdmin, a
     const config = SYSTEM_DEFAULT_TABLES[tableKey as string];
     if (!config) return res.status(404).json({ error: "Table not found" });
 
+    const bulkUpdateData: Record<string, unknown> = { isSystemDefault: !!isSystemDefault };
+    if (tableKey === "checklistTemplates") {
+      bulkUpdateData.isSystem = !!isSystemDefault;
+    }
     for (const id of ids) {
       await db.update(config.table)
-        .set({ isSystemDefault: !!isSystemDefault })
+        .set(bulkUpdateData)
         .where(and(eq(config.table.id, id), eq(config.table.companyId, companyId)));
     }
 
