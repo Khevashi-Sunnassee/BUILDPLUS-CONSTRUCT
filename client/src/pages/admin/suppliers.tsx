@@ -23,6 +23,7 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  Eye,
 } from "lucide-react";
 import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -148,6 +149,7 @@ export default function AdminSuppliersPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null);
   const [sortColumn, setSortColumn] = useState<string>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [searchQuery, setSearchQuery] = useState("");
@@ -660,6 +662,15 @@ export default function AdminSuppliersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="View supplier details"
+                          onClick={() => setDetailSupplier(supplier)}
+                          data-testid={`button-view-supplier-${supplier.id}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1223,6 +1234,90 @@ export default function AdminSuppliersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {detailSupplier && (
+        <Dialog open={!!detailSupplier} onOpenChange={(open) => { if (!open) setDetailSupplier(null); }}>
+          <DialogContent className="max-w-lg" data-testid="dialog-supplier-detail">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                {detailSupplier.name}
+              </DialogTitle>
+              <DialogDescription>
+                Supplier details
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-muted-foreground text-xs">Key Contact</p>
+                  <p className="font-medium">{detailSupplier.keyContact || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Email</p>
+                  <p className="font-medium">{detailSupplier.email || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Phone</p>
+                  <p className="font-medium">{detailSupplier.phone || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">ABN</p>
+                  <p className="font-medium">{detailSupplier.abn || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">ACN</p>
+                  <p className="font-medium">{detailSupplier.acn || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Payment Terms</p>
+                  <p className="font-medium">{detailSupplier.paymentTerms || "—"}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Address</p>
+                <p className="font-medium">
+                  {[detailSupplier.addressLine1, detailSupplier.addressLine2, detailSupplier.city, detailSupplier.state, detailSupplier.postcode, detailSupplier.country].filter(Boolean).join(", ") || "—"}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-muted-foreground text-xs">Default Cost Code</p>
+                  <p className="font-medium">
+                    {detailSupplier.defaultCostCodeId && costCodeMap[detailSupplier.defaultCostCodeId]
+                      ? `${costCodeMap[detailSupplier.defaultCostCodeId].code} - ${costCodeMap[detailSupplier.defaultCostCodeId].name}`
+                      : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Status</p>
+                  <Badge variant={detailSupplier.isActive ? "default" : "secondary"}>
+                    {detailSupplier.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {detailSupplier.availableForTender && <Badge variant="outline">Available for Tender</Badge>}
+                {detailSupplier.isEquipmentHire && <Badge variant="outline">Equipment Hire</Badge>}
+              </div>
+              {detailSupplier.notes && (
+                <div>
+                  <p className="text-muted-foreground text-xs">Notes</p>
+                  <p className="font-medium">{detailSupplier.notes}</p>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDetailSupplier(null)} data-testid="button-close-supplier-detail">
+                Close
+              </Button>
+              <Button onClick={() => { const s = detailSupplier; setDetailSupplier(null); openEditDialog(s); }} data-testid="button-edit-from-detail">
+                <Edit2 className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -22,6 +22,7 @@ import {
   ChevronRight,
   ExternalLink,
   Briefcase,
+  Eye,
 } from "lucide-react";
 import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -629,13 +630,7 @@ export default function AdminCustomersPage() {
                 {paginatedCustomers.map((customer) => (
                   <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
                     <TableCell className="font-medium" data-testid={`text-customer-name-${customer.id}`}>
-                      <button
-                        className="text-left hover:underline text-primary"
-                        onClick={() => setDetailCustomer(customer)}
-                        data-testid={`button-view-customer-${customer.id}`}
-                      >
-                        {customer.name}
-                      </button>
+                      {customer.name}
                     </TableCell>
                     <TableCell data-testid={`text-customer-contact-${customer.id}`}>
                       {customer.keyContact || "-"}
@@ -656,6 +651,15 @@ export default function AdminCustomersPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="View customer details"
+                          onClick={() => setDetailCustomer(customer)}
+                          data-testid={`button-view-customer-${customer.id}`}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

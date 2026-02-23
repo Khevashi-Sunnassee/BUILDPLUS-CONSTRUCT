@@ -23,6 +23,7 @@ import {
   Clock,
   Search,
   KeyRound,
+  Eye,
 } from "lucide-react";
 import { ADMIN_ROUTES, USER_ROUTES, INVITATION_ROUTES } from "@shared/api-routes";
 import { Factory as FactoryIcon } from "lucide-react";
@@ -85,7 +86,7 @@ import { FUNCTION_KEYS } from "@shared/schema";
 import type { PermissionLevel } from "@shared/schema";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp, Eye, EyeOff, Pencil, X } from "lucide-react";
+import { ChevronDown, ChevronUp, EyeOff, Pencil, X } from "lucide-react";
 import UserPermissionsPage from "./user-permissions";
 
 const INVITE_FUNCTION_LABELS: Record<string, string> = {
@@ -526,6 +527,7 @@ export default function AdminUsersPage() {
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [detailUser, setDetailUser] = useState<UserType | null>(null);
   const [workHoursDialogOpen, setWorkHoursDialogOpen] = useState(false);
   const [workHoursUser, setWorkHoursUser] = useState<UserType | null>(null);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -1039,6 +1041,15 @@ export default function AdminUsersPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="View user details"
+                            onClick={() => setDetailUser(user)}
+                            data-testid={`button-view-user-${user.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1871,6 +1882,77 @@ export default function AdminUsersPage() {
           userId={permissionsUserId}
           userName={permissionsUserName}
         />
+      )}
+
+      {detailUser && (
+        <Dialog open={!!detailUser} onOpenChange={(open) => { if (!open) setDetailUser(null); }}>
+          <DialogContent className="max-w-lg" data-testid="dialog-user-detail">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                {detailUser.name || "Unnamed User"}
+              </DialogTitle>
+              <DialogDescription>
+                User details
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-muted-foreground text-xs">Email</p>
+                  <p className="font-medium">{detailUser.email}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Phone</p>
+                  <p className="font-medium">{detailUser.phone || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Role</p>
+                  <div>{getRoleBadge(detailUser.role as Role)}</div>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">User Type</p>
+                  <Badge variant={detailUser.userType === "EMPLOYEE" ? "default" : "outline"}>
+                    {detailUser.userType === "EMPLOYEE" ? "Employee" : "External"}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Department</p>
+                  <p className="font-medium">
+                    {detailUser.userType === "EMPLOYEE" && detailUser.departmentId
+                      ? (departmentsList.find(d => d.id === detailUser.departmentId)?.name || "—")
+                      : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Status</p>
+                  <Badge variant={detailUser.isActive ? "outline" : "secondary"}>
+                    {detailUser.isActive ? "Active" : "Disabled"}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Created</p>
+                  <p className="font-medium">{format(new Date(detailUser.createdAt), "dd/MM/yyyy")}</p>
+                </div>
+                {detailUser.position && (
+                  <div>
+                    <p className="text-muted-foreground text-xs">Position</p>
+                    <p className="font-medium">{detailUser.position}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDetailUser(null)} data-testid="button-close-user-detail">
+                Close
+              </Button>
+              <Button onClick={() => { const u = detailUser; setDetailUser(null); openEditUser(u); }} data-testid="button-edit-from-detail">
+                <Edit2 className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

@@ -233,7 +233,7 @@ export default function MailRegisterPage() {
               {items.map((entry) => (
                 <TableRow
                   key={entry.id}
-                  className="cursor-pointer hover:bg-muted/50"
+                  className={`cursor-pointer ${entry.responseRequired === "YES" ? "bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50" : "hover:bg-muted/50"}`}
                   onClick={() => setSelectedMailId(entry.id)}
                   data-testid={`row-mail-${entry.id}`}
                 >
