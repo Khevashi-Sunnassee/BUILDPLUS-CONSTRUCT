@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, jobs, dailyLogs, logRows, globalSettings, workTypes, trailerTypes, entityTypes, entitySubtypes, checklistTemplates, checklistInstances, companies } from "@shared/schema";
+import { users, jobs, dailyLogs, logRows, globalSettings, workTypes, trailerTypes, entityTypes, entitySubtypes, checklistTemplates, checklistInstances, companies, permissionTypes, FUNCTION_KEYS, type PermissionLevel } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import logger from "./lib/logger";
@@ -70,6 +70,84 @@ export async function seedDatabase() {
       },
     ]);
     logger.info("Trailer types seeded");
+  }
+
+  const existingPermTypes = await db.select().from(permissionTypes);
+  if (existingPermTypes.length === 0) {
+    const allCompanies = await db.select().from(companies);
+    for (const company of allCompanies) {
+      const fullAccess: Record<string, PermissionLevel> = {};
+      const standardUser: Record<string, PermissionLevel> = {};
+      const viewOnly: Record<string, PermissionLevel> = {};
+      const productionTeam: Record<string, PermissionLevel> = {};
+      const officeAdmin: Record<string, PermissionLevel> = {};
+
+      const adminKeys = FUNCTION_KEYS.filter(k => k.startsWith("admin_"));
+      const productionKeys = ["panel_register", "checklists", "production_slots", "production_report", "logistics", "reo_scheduling"];
+      const financeKeys = ["sales_pipeline", "contract_hub", "progress_claims", "purchase_orders", "hire_bookings", "capex_requests", "weekly_wages", "budgets"];
+
+      for (const key of FUNCTION_KEYS) {
+        fullAccess[key] = "VIEW_AND_UPDATE";
+        viewOnly[key] = "VIEW";
+
+        if (adminKeys.includes(key)) {
+          standardUser[key] = "HIDDEN";
+          productionTeam[key] = "HIDDEN";
+          officeAdmin[key] = "VIEW_AND_UPDATE";
+        } else if (productionKeys.includes(key)) {
+          standardUser[key] = "VIEW";
+          productionTeam[key] = "VIEW_AND_UPDATE";
+          officeAdmin[key] = "VIEW";
+        } else if (financeKeys.includes(key)) {
+          standardUser[key] = "VIEW";
+          productionTeam[key] = "HIDDEN";
+          officeAdmin[key] = "VIEW_AND_UPDATE";
+        } else {
+          standardUser[key] = "VIEW_AND_UPDATE";
+          productionTeam[key] = "VIEW";
+          officeAdmin[key] = "VIEW_AND_UPDATE";
+        }
+      }
+
+      await db.insert(permissionTypes).values([
+        {
+          companyId: company.id,
+          name: "Full Access",
+          description: "Complete access to all modules including administration",
+          permissions: fullAccess,
+          isDefault: false,
+        },
+        {
+          companyId: company.id,
+          name: "Standard User",
+          description: "Standard operational access without admin functions",
+          permissions: standardUser,
+          isDefault: true,
+        },
+        {
+          companyId: company.id,
+          name: "View Only",
+          description: "Read-only access across all modules",
+          permissions: viewOnly,
+          isDefault: false,
+        },
+        {
+          companyId: company.id,
+          name: "Production Team",
+          description: "Full production and logistics access with limited admin",
+          permissions: productionTeam,
+          isDefault: false,
+        },
+        {
+          companyId: company.id,
+          name: "Office / Admin",
+          description: "Full office, finance, and administration access",
+          permissions: officeAdmin,
+          isDefault: false,
+        },
+      ]);
+    }
+    logger.info("Permission types seeded for all companies");
   }
 
   const existingUsers = await db.select().from(users);
