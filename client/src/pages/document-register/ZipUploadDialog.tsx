@@ -467,9 +467,9 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
 
               <div className="grid grid-cols-4 gap-3 flex-shrink-0">
                 <div>
-                  <Label className="text-xs">Document Type</Label>
+                  <Label className="text-xs">Document Type *</Label>
                   <Select value={typeId} onValueChange={(v) => setTypeId(v === clearValue ? "" : v)}>
-                    <SelectTrigger className="h-8 text-sm" data-testid="select-zip-type">
+                    <SelectTrigger className={`h-8 text-sm ${!typeId ? "border-destructive" : ""}`} data-testid="select-zip-type">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -484,9 +484,9 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
                 </div>
 
                 <div>
-                  <Label className="text-xs">Discipline</Label>
+                  <Label className="text-xs">Discipline *</Label>
                   <Select value={disciplineId} onValueChange={(v) => setDisciplineId(v === clearValue ? "" : v)}>
-                    <SelectTrigger className="h-8 text-sm" data-testid="select-zip-discipline">
+                    <SelectTrigger className={`h-8 text-sm ${!disciplineId ? "border-destructive" : ""}`} data-testid="select-zip-discipline">
                       <SelectValue placeholder="Select discipline" />
                     </SelectTrigger>
                     <SelectContent>
@@ -518,9 +518,9 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
                 </div>
 
                 <div>
-                  <Label className="text-xs">Job</Label>
+                  <Label className="text-xs">Job *</Label>
                   <Select value={jobId} onValueChange={(v) => setJobId(v === clearValue ? "" : v)}>
-                    <SelectTrigger className="h-8 text-sm" data-testid="select-zip-job">
+                    <SelectTrigger className={`h-8 text-sm ${!jobId ? "border-destructive" : ""}`} data-testid="select-zip-job">
                       <SelectValue placeholder="Select job" />
                     </SelectTrigger>
                     <SelectContent>
@@ -641,7 +641,7 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
                 </Button>
                 <Button
                   onClick={() => registerMutation.mutate()}
-                  disabled={selectedCount === 0 || registerMutation.isPending}
+                  disabled={selectedCount === 0 || registerMutation.isPending || !jobId || !typeId || !disciplineId}
                   data-testid="button-confirm-zip-upload"
                 >
                   {registerMutation.isPending ? (

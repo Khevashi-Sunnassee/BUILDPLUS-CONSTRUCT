@@ -301,6 +301,16 @@ router.post("/api/documents/zip-upload/register", requireAuth, zipUpload.single(
 
     const { typeId, disciplineId, categoryId, documentTypeStatusId, jobId, panelId, supplierId, purchaseOrderId, taskId, tags, isConfidential } = req.body;
 
+    if (!jobId) {
+      return res.status(400).json({ error: "Job is required" });
+    }
+    if (!typeId) {
+      return res.status(400).json({ error: "Document type is required" });
+    }
+    if (!disciplineId) {
+      return res.status(400).json({ error: "Discipline is required" });
+    }
+
     if (jobId) {
       const [jobRecord] = await db.select({ id: jobs.id })
         .from(jobs)

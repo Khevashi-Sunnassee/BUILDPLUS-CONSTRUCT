@@ -740,9 +740,9 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
                 <Label className="text-sm font-medium">Shared Metadata (applied to all files)</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Job</Label>
+                    <Label className="text-xs text-muted-foreground">Job *</Label>
                     <Select value={jobId} onValueChange={(v) => setJobId(v === clearValue ? "" : v)}>
-                      <SelectTrigger data-testid="bulk-select-job">
+                      <SelectTrigger data-testid="bulk-select-job" className={!jobId ? "border-destructive" : ""}>
                         <SelectValue placeholder="Select job" />
                       </SelectTrigger>
                       <SelectContent>
@@ -757,9 +757,9 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Document Type</Label>
+                    <Label className="text-xs text-muted-foreground">Document Type *</Label>
                     <Select value={typeId} onValueChange={(v) => setTypeId(v === clearValue ? "" : v)}>
-                      <SelectTrigger data-testid="bulk-select-type">
+                      <SelectTrigger data-testid="bulk-select-type" className={!typeId ? "border-destructive" : ""}>
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                       <SelectContent>
@@ -774,9 +774,9 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Discipline</Label>
+                    <Label className="text-xs text-muted-foreground">Discipline *</Label>
                     <Select value={disciplineId} onValueChange={(v) => setDisciplineId(v === clearValue ? "" : v)}>
-                      <SelectTrigger data-testid="bulk-select-discipline">
+                      <SelectTrigger data-testid="bulk-select-discipline" className={!disciplineId ? "border-destructive" : ""}>
                         <SelectValue placeholder="Select discipline" />
                       </SelectTrigger>
                       <SelectContent>
@@ -909,7 +909,8 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
               uploadMutation.isPending ||
               files.length === 0 ||
               files.filter((f) => !f.skipUpload).length === 0 ||
-              files.some((f) => f.duplicateInfo && !f.supersedeDocumentId && !f.skipUpload)
+              files.some((f) => f.duplicateInfo && !f.supersedeDocumentId && !f.skipUpload) ||
+              !jobId || !typeId || !disciplineId
             }
             data-testid="button-submit-bulk-upload"
           >
