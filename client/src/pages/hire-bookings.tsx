@@ -839,13 +839,13 @@ export default function HireBookingsPage() {
                   );
                 })}
                 <TableRow className="bg-muted/50 font-semibold border-t-2" data-testid="row-hire-totals">
-                  <TableCell colSpan={7} className="text-right text-sm">
+                  <TableCell colSpan={8} className="text-right text-sm">
                     Total ({filteredBookings.length} booking{filteredBookings.length !== 1 ? "s" : ""})
                   </TableCell>
                   <TableCell className="text-right text-sm font-bold whitespace-nowrap" data-testid="text-total-cost">
                     ${filteredBookings.reduce((sum, b) => sum + getBookingCost(b), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
-                  <TableCell colSpan={4} />
+                  <TableCell colSpan={3} />
                 </TableRow>
                 </>
               )}
