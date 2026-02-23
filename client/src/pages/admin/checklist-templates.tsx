@@ -779,7 +779,14 @@ export default function AdminChecklistTemplatesPage() {
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <CardTitle className="text-base truncate">{template.name}</CardTitle>
+              <div className="flex items-center gap-1.5">
+                <CardTitle className="text-base truncate">{template.name}</CardTitle>
+                {template.version > 1 && (
+                  <Badge variant="secondary" className="text-xs shrink-0">
+                    v{template.version}
+                  </Badge>
+                )}
+              </div>
               <CardDescription className="text-xs mt-1 line-clamp-2">
                 {template.description || "No description"}
               </CardDescription>

@@ -696,6 +696,8 @@ export const CHECKLIST_ROUTES = {
   // Templates
   TEMPLATES: '/api/checklist/templates',
   TEMPLATE_BY_ID: (id: string) => `/api/checklist/templates/${id}`,
+  TEMPLATE_VERSIONS: (id: string) => `/api/checklist/templates/${id}/versions`,
+  TEMPLATE_NEW_VERSION: (id: string) => `/api/checklist/templates/${id}/new-version`,
   TEMPLATE_DUPLICATE: (id: string) => `/api/checklist/templates/${id}/duplicate`,
   TEMPLATES_BY_TYPE: (entityTypeId: string, entitySubtypeId?: string) => 
     entitySubtypeId 

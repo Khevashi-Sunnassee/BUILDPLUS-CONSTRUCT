@@ -230,8 +230,18 @@ router.post("/api/checklist/instances", requireAuth, async (req: Request, res: R
 
     const instanceNumber = `CHK-${Date.now()}`;
 
+    let templateVersion = validation.data.templateVersion || 1;
+    if (validation.data.templateId) {
+      const [tmpl] = await db.select({ version: checklistTemplates.version })
+        .from(checklistTemplates)
+        .where(eq(checklistTemplates.id, validation.data.templateId));
+      if (tmpl) {
+        templateVersion = tmpl.version;
+      }
+    }
+
     const [created] = await db.insert(checklistInstances)
-      .values({ ...validation.data, instanceNumber })
+      .values({ ...validation.data, instanceNumber, templateVersion })
       .returning();
 
     res.status(201).json(created);

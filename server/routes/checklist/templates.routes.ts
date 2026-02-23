@@ -1,17 +1,18 @@
 import {
   Router, Request, Response,
-  eq, and, desc,
+  eq, and, desc, dsql,
   db,
   checklistTemplates,
   insertChecklistTemplateSchema,
   requireAuth, requireRole,
   logger,
 } from "./shared";
+import { users } from "@shared/schema";
 
 const router = Router();
 
 // ============================================================================
-// CHECKLIST TEMPLATES CRUD
+// CHECKLIST TEMPLATES CRUD (with version tracking)
 // ============================================================================
 
 router.get("/api/checklist/templates", requireAuth, async (req: Request, res: Response) => {
@@ -19,6 +20,17 @@ router.get("/api/checklist/templates", requireAuth, async (req: Request, res: Re
     const companyId = req.companyId;
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
+    }
+
+    const includeAllVersions = req.query.allVersions === "true";
+
+    if (includeAllVersions) {
+      const templates = await db.select()
+        .from(checklistTemplates)
+        .where(eq(checklistTemplates.companyId, companyId))
+        .orderBy(desc(checklistTemplates.createdAt))
+        .limit(500);
+      return res.json(templates);
     }
 
     const templates = await db.select()
@@ -118,6 +130,54 @@ router.get("/api/checklist/templates/:id", requireAuth, async (req: Request, res
   }
 });
 
+router.get("/api/checklist/templates/:id/versions", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    const templateId = String(req.params.id);
+
+    if (!companyId) {
+      return res.status(400).json({ error: "Company ID required" });
+    }
+
+    const [template] = await db.select()
+      .from(checklistTemplates)
+      .where(and(
+        eq(checklistTemplates.id, templateId),
+        eq(checklistTemplates.companyId, companyId!)
+      ));
+
+    if (!template) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+
+    const parentId = template.parentTemplateId || template.id;
+
+    const versions = await db
+      .select({
+        id: checklistTemplates.id,
+        version: checklistTemplates.version,
+        name: checklistTemplates.name,
+        isActive: checklistTemplates.isActive,
+        createdAt: checklistTemplates.createdAt,
+        createdBy: checklistTemplates.createdBy,
+        createdByName: users.name,
+      })
+      .from(checklistTemplates)
+      .leftJoin(users, eq(checklistTemplates.createdBy, users.id))
+      .where(and(
+        eq(checklistTemplates.companyId, companyId!),
+        dsql`(${checklistTemplates.parentTemplateId} = ${parentId} OR ${checklistTemplates.id} = ${parentId})`
+      ))
+      .orderBy(desc(checklistTemplates.version))
+      .limit(100);
+
+    res.json(versions);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Failed to fetch template versions");
+    res.status(500).json({ error: "Failed to fetch template versions" });
+  }
+});
+
 router.post("/api/checklist/templates", requireAuth, requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
@@ -135,6 +195,7 @@ router.post("/api/checklist/templates", requireAuth, requireRole("ADMIN", "MANAG
       ...body,
       companyId,
       createdBy: userId,
+      version: 1,
     });
 
     if (!validation.success) {
@@ -142,7 +203,13 @@ router.post("/api/checklist/templates", requireAuth, requireRole("ADMIN", "MANAG
     }
 
     const [created] = await db.insert(checklistTemplates).values(validation.data).returning();
-    res.status(201).json(created);
+
+    await db.update(checklistTemplates)
+      .set({ parentTemplateId: created.id })
+      .where(eq(checklistTemplates.id, created.id));
+
+    const [result] = await db.select().from(checklistTemplates).where(eq(checklistTemplates.id, created.id));
+    res.status(201).json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to create template");
     res.status(500).json({ error: "Failed to create template" });
@@ -183,6 +250,62 @@ router.put("/api/checklist/templates/:id", requireAuth, requireRole("ADMIN", "MA
   }
 });
 
+router.post("/api/checklist/templates/:id/new-version", requireAuth, requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    const userId = req.session.userId;
+    const templateId = String(req.params.id);
+
+    if (!companyId) {
+      return res.status(400).json({ error: "Company ID required" });
+    }
+
+    const [original] = await db.select()
+      .from(checklistTemplates)
+      .where(and(eq(checklistTemplates.id, templateId), eq(checklistTemplates.companyId, companyId!)));
+
+    if (!original) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+
+    const parentId = original.parentTemplateId || original.id;
+
+    const [maxVersionRow] = await db
+      .select({ maxVersion: dsql<number>`COALESCE(MAX(${checklistTemplates.version}), 0)` })
+      .from(checklistTemplates)
+      .where(and(
+        eq(checklistTemplates.companyId, companyId!),
+        dsql`(${checklistTemplates.parentTemplateId} = ${parentId} OR ${checklistTemplates.id} = ${parentId})`
+      ));
+
+    const newVersion = (maxVersionRow?.maxVersion || 0) + 1;
+
+    await db.update(checklistTemplates)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(
+        eq(checklistTemplates.companyId, companyId!),
+        dsql`(${checklistTemplates.parentTemplateId} = ${parentId} OR ${checklistTemplates.id} = ${parentId})`,
+        eq(checklistTemplates.isActive, true)
+      ));
+
+    const { id: _id, createdAt, updatedAt, ...templateData } = original;
+    const [newVersionTemplate] = await db.insert(checklistTemplates)
+      .values({
+        ...templateData,
+        version: newVersion,
+        parentTemplateId: parentId,
+        isActive: true,
+        createdBy: userId,
+      })
+      .returning();
+
+    res.status(201).json(newVersionTemplate);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Failed to create new template version");
+    res.status(500).json({ error: "Failed to create new template version" });
+  }
+});
+
 router.post("/api/checklist/templates/:id/duplicate", requireAuth, requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
@@ -201,16 +324,22 @@ router.post("/api/checklist/templates/:id/duplicate", requireAuth, requireRole("
       return res.status(404).json({ error: "Template not found" });
     }
 
-    const { id: _id, createdAt, updatedAt, ...templateData } = original;
+    const { id: _id, createdAt, updatedAt, parentTemplateId, ...templateData } = original;
     const [duplicated] = await db.insert(checklistTemplates)
       .values({
         ...templateData,
         name: `${original.name} (Copy)`,
+        version: 1,
         createdBy: userId,
       })
       .returning();
 
-    res.status(201).json(duplicated);
+    await db.update(checklistTemplates)
+      .set({ parentTemplateId: duplicated.id })
+      .where(eq(checklistTemplates.id, duplicated.id));
+
+    const [result] = await db.select().from(checklistTemplates).where(eq(checklistTemplates.id, duplicated.id));
+    res.status(201).json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to duplicate template");
     res.status(500).json({ error: "Failed to duplicate template" });

@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql as dsql } from "drizzle-orm";
 import { db } from "../../db";
 import {
   checklistTemplates,
@@ -9,7 +9,7 @@ import logger from "../../lib/logger";
 
 export { Router } from "express";
 export type { Request, Response } from "express";
-export { eq, and, desc } from "drizzle-orm";
+export { eq, and, desc, sql as dsql } from "drizzle-orm";
 export { db } from "../../db";
 export {
   entityTypes,

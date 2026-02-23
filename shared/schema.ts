@@ -2682,6 +2682,8 @@ export const checklistTemplates = pgTable("checklist_templates", {
   qrCodeExpiresAt: timestamp("qr_code_expires_at"),
   qrCodeGeneratedAt: timestamp("qr_code_generated_at"),
   qrCodeUsageCount: integer("qr_code_usage_count").default(0),
+  version: integer("version").default(1).notNull(),
+  parentTemplateId: varchar("parent_template_id", { length: 36 }),
   isActive: boolean("is_active").default(true).notNull(),
   isSystemDefault: boolean("is_system_default").default(false).notNull(),
   createdBy: varchar("created_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
@@ -2692,6 +2694,7 @@ export const checklistTemplates = pgTable("checklist_templates", {
   entityTypeIdx: index("checklist_templates_entity_type_idx").on(table.entityTypeId),
   entitySubtypeIdx: index("checklist_templates_entity_subtype_idx").on(table.entitySubtypeId),
   activeIdx: index("checklist_templates_active_idx").on(table.isActive),
+  parentTemplateIdx: index("checklist_templates_parent_idx").on(table.parentTemplateId),
 }));
 
 // Checklist Instances - Filled-out template responses
@@ -2699,6 +2702,7 @@ export const checklistInstances = pgTable("checklist_instances", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).references(() => companies.id, { onDelete: "cascade" }).notNull(),
   templateId: varchar("template_id", { length: 36 }).references(() => checklistTemplates.id, { onDelete: "cascade" }).notNull(),
+  templateVersion: integer("template_version").default(1),
   instanceNumber: varchar("instance_number", { length: 50 }),
   jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "cascade" }),
   panelId: varchar("panel_id", { length: 36 }).references(() => panelRegister.id, { onDelete: "cascade" }),

@@ -41,6 +41,8 @@ import {
   BarChart3,
   ChevronsUpDown,
   ChevronsDownUp,
+  History,
+  GitBranch,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -199,9 +201,24 @@ export default function TemplateEditorPage() {
   const [editingFieldWorkOrderEnabled, setEditingFieldWorkOrderEnabled] = useState(false);
   const [editingFieldWorkOrderTriggerValue, setEditingFieldWorkOrderTriggerValue] = useState<string>("");
 
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+
   const { data: template, isLoading } = useQuery<ChecklistTemplate>({
     queryKey: [CHECKLIST_ROUTES.TEMPLATE_BY_ID(id!)],
     enabled: !!id,
+  });
+
+  const { data: versionHistory } = useQuery<Array<{
+    id: string;
+    version: number;
+    name: string;
+    isActive: boolean;
+    createdAt: string;
+    createdBy: string | null;
+    createdByName: string | null;
+  }>>({
+    queryKey: [CHECKLIST_ROUTES.TEMPLATE_VERSIONS(id!)],
+    enabled: !!id && showVersionHistory,
   });
 
   useEffect(() => {
@@ -251,6 +268,22 @@ export default function TemplateEditorPage() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to save template", variant: "destructive" });
+    },
+  });
+
+  const createNewVersionMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", CHECKLIST_ROUTES.TEMPLATE_NEW_VERSION(id!));
+    },
+    onSuccess: async (res: Response) => {
+      const newVersion = await res.json();
+      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.TEMPLATES] });
+      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.TEMPLATE_VERSIONS(id!)] });
+      toast({ title: "Success", description: `Version ${newVersion.version} created` });
+      navigate(`/admin/checklist-templates/${newVersion.id}/edit`);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create new version", variant: "destructive" });
     },
   });
 
@@ -566,6 +599,9 @@ export default function TemplateEditorPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">{template.name}</h1>
+              <Badge variant="secondary" className="text-xs" data-testid="badge-template-version">
+                v{template.version || 1}
+              </Badge>
               <PageHelpButton pageHelpKey="page.admin.template-editor" />
             </div>
             <p className="text-muted-foreground">{template.description || "No description"}</p>
@@ -577,6 +613,29 @@ export default function TemplateEditorPage() {
               Unsaved Changes
             </Badge>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowVersionHistory(!showVersionHistory)}
+            data-testid="button-version-history"
+          >
+            <History className="h-4 w-4 mr-2" />
+            History
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => createNewVersionMutation.mutate()}
+            disabled={createNewVersionMutation.isPending}
+            data-testid="button-create-new-version"
+          >
+            {createNewVersionMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <GitBranch className="h-4 w-4 mr-2" />
+            )}
+            New Version
+          </Button>
           <Button
             onClick={() => saveTemplateMutation.mutate()}
             disabled={!hasChanges || saveTemplateMutation.isPending}
@@ -591,6 +650,62 @@ export default function TemplateEditorPage() {
           </Button>
         </div>
       </div>
+
+      {showVersionHistory && (
+        <Card className="mb-4" data-testid="panel-version-history">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Version History
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {versionHistory && versionHistory.length > 0 ? (
+              <div className="space-y-2">
+                {versionHistory.map((v) => (
+                  <div
+                    key={v.id}
+                    className={`flex items-center justify-between p-2 rounded-md border ${
+                      v.id === id ? "bg-primary/5 border-primary/20" : ""
+                    }`}
+                    data-testid={`version-row-${v.version}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Badge variant={v.isActive ? "default" : "secondary"} className="text-xs">
+                        v{v.version}
+                      </Badge>
+                      <span className="text-sm">{v.name}</span>
+                      {v.createdByName && (
+                        <span className="text-xs text-muted-foreground">by {v.createdByName}</span>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(v.createdAt).toLocaleDateString()}
+                      </span>
+                      {v.id === id && (
+                        <Badge variant="outline" className="text-xs">Current</Badge>
+                      )}
+                    </div>
+                    {v.id !== id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        asChild
+                        data-testid={`button-view-version-${v.version}`}
+                      >
+                        <Link href={`/admin/checklist-templates/${v.id}/edit`}>
+                          View
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No version history available.</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3 space-y-4">
