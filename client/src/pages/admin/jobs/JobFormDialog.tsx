@@ -72,6 +72,7 @@ import {
 } from "./types";
 import { AuditLogPanel } from "./AuditLogPanel";
 import { JobMembersPanel } from "./JobMembersPanel";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 interface JobFormDialogProps {
   open: boolean;
@@ -142,6 +143,7 @@ export function JobFormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <ErrorBoundary fallback={<div className="p-4 text-center"><p>Failed to load job form. Please close and try again.</p></div>}>
         <DialogHeader>
           <DialogTitle>{editingJob ? "Edit Job" : "Create New Job"}</DialogTitle>
           <DialogDescription>
@@ -1091,6 +1093,7 @@ export function JobFormDialog({
         )}
           </form>
         </Form>
+        </ErrorBoundary>
       </DialogContent>
     </Dialog>
   );
