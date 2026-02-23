@@ -1,8 +1,31 @@
 import { db } from "./db";
 import { users, jobs, dailyLogs, logRows, globalSettings, workTypes, trailerTypes, entityTypes, entitySubtypes, checklistTemplates, checklistInstances, companies, permissionTypes, FUNCTION_KEYS, type PermissionLevel } from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import logger from "./lib/logger";
+
+export async function ensureSuperAdmins() {
+  const envEmails = process.env.SUPER_ADMIN_EMAILS;
+  if (!envEmails) return;
+
+  const emails = envEmails.split(",").map(e => e.trim().toLowerCase()).filter(Boolean);
+  if (emails.length === 0) return;
+
+  const matchingUsers = await db.select({ id: users.id, email: users.email, isSuperAdmin: users.isSuperAdmin })
+    .from(users)
+    .where(inArray(users.email, emails));
+
+  const toUpdate = matchingUsers.filter(u => !u.isSuperAdmin);
+  if (toUpdate.length === 0) {
+    logger.info({ emails }, "[SuperAdmin] All configured super admins already have the flag set");
+    return;
+  }
+
+  for (const u of toUpdate) {
+    await db.update(users).set({ isSuperAdmin: true }).where(eq(users.id, u.id));
+    logger.info({ email: u.email }, "[SuperAdmin] Granted super admin access");
+  }
+}
 
 export async function seedDatabase() {
   logger.info("Checking if seed data exists...");

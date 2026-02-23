@@ -8,7 +8,7 @@ import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { seedDatabase, ensureSystemChecklistModules } from "./seed";
+import { seedDatabase, ensureSystemChecklistModules, ensureSuperAdmins } from "./seed";
 import { seedHelpEntries } from "./seed-help";
 import { runMigrations } from "./migrate";
 import logger from "./lib/logger";
@@ -516,6 +516,7 @@ async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean>
       await seedDatabase();
       await ensureSystemChecklistModules();
       await seedHelpEntries();
+      await ensureSuperAdmins();
       logger.info("Database initialization complete");
     }
   } catch (err) {
