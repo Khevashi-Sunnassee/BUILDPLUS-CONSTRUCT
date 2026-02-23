@@ -8,6 +8,13 @@ import {
 import { getExpiryBadgeVariant, statusLabel } from "./types";
 import type { LicencesTabProps } from "./types";
 
+function formatDaysLabel(diffDays: number | null): string | null {
+  if (diffDays === null) return null;
+  if (diffDays < 0) return `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? "s" : ""} overdue`;
+  if (diffDays === 0) return "Expires today";
+  return `${diffDays} day${diffDays !== 1 ? "s" : ""} remaining`;
+}
+
 export function LicencesTab({ licences, onAdd, onEdit, onDelete }: LicencesTabProps) {
   return (
     <>
@@ -36,17 +43,35 @@ export function LicencesTab({ licences, onAdd, onEdit, onDelete }: LicencesTabPr
               <TableBody>
                 {licences.map((lic) => {
                   const expiry = getExpiryBadgeVariant(lic.expiryDate);
+                  const isExpired = expiry.diffDays !== null && expiry.diffDays < 0;
+                  const isExpiringSoon = expiry.diffDays !== null && expiry.diffDays >= 0 && expiry.diffDays <= 30;
+                  const daysLabel = formatDaysLabel(expiry.diffDays);
                   return (
-                    <TableRow key={lic.id} data-testid={`row-licence-${lic.id}`}>
+                    <TableRow
+                      key={lic.id}
+                      className={isExpired ? "bg-red-50 dark:bg-red-950/20" : isExpiringSoon ? "bg-orange-50/50 dark:bg-orange-950/10" : ""}
+                      data-testid={`row-licence-${lic.id}`}
+                    >
                       <TableCell className="font-medium">{lic.licenceType}</TableCell>
                       <TableCell>{lic.licenceNumber || "-"}</TableCell>
                       <TableCell>{lic.issuingAuthority || "-"}</TableCell>
                       <TableCell>{lic.issueDate || "-"}</TableCell>
                       <TableCell>
                         {lic.expiryDate ? (
-                          <Badge variant={expiry.variant} data-testid={`badge-licence-expiry-${lic.id}`}>
-                            {expiry.label}
-                          </Badge>
+                          <div className="space-y-0.5">
+                            <Badge
+                              variant={expiry.variant}
+                              className={isExpiringSoon ? "border-orange-500 text-orange-600 dark:text-orange-400" : ""}
+                              data-testid={`badge-licence-expiry-${lic.id}`}
+                            >
+                              {expiry.label}
+                            </Badge>
+                            {daysLabel && (
+                              <p className={`text-xs ${isExpired ? "text-red-600 dark:text-red-400 font-medium" : isExpiringSoon ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground"}`} data-testid={`text-licence-days-${lic.id}`}>
+                                {daysLabel}
+                              </p>
+                            )}
+                          </div>
                         ) : "-"}
                       </TableCell>
                       <TableCell>

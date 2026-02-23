@@ -20,6 +20,7 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  ShieldAlert,
 } from "lucide-react";
 import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -78,6 +79,7 @@ import { EMPLOYEE_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { SortIcon } from "@/components/ui/sort-icon";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getComplianceStatus } from "./employee-detail/types";
 
 const employeeSchema = z.object({
   employeeNumber: z.string().min(1, "Employee number is required"),
@@ -166,6 +168,7 @@ export default function AdminEmployeesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingEmployeeId, setDeletingEmployeeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showExpiringSoon, setShowExpiringSoon] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -253,6 +256,13 @@ export default function AdminEmployeesPage() {
         (e.email && e.email.toLowerCase().includes(q))
       );
     }
+    if (showExpiringSoon) {
+      list = list.filter((e) => {
+        const empLicences = licencesByEmployee.get(e.id) || [];
+        const compliance = getComplianceStatus(empLicences);
+        return compliance.status === "expired" || compliance.status === "expiring";
+      });
+    }
     return [...list].sort((a, b) => {
       let aVal = "";
       let bVal = "";
@@ -267,7 +277,7 @@ export default function AdminEmployeesPage() {
       const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: "base" });
       return sortDirection === "asc" ? cmp : -cmp;
     });
-  }, [employeesList, searchQuery, sortColumn, sortDirection]);
+  }, [employeesList, searchQuery, showExpiringSoon, licencesByEmployee, sortColumn, sortDirection]);
 
   const totalPages = Math.ceil((filteredEmployees?.length || 0) / pageSize);
   const paginatedEmployees = useMemo(() => {
@@ -278,7 +288,7 @@ export default function AdminEmployeesPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, sortColumn, sortDirection]);
+  }, [searchQuery, showExpiringSoon, sortColumn, sortDirection]);
 
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
@@ -430,15 +440,26 @@ export default function AdminEmployeesPage() {
                 {filteredEmployees?.length || 0} employee{filteredEmployees?.length !== 1 ? "s" : ""}{searchQuery ? " matching search" : " configured"}
               </CardDescription>
             </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search employees..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-64"
-                data-testid="input-search-employees"
-              />
+            <div className="flex items-center gap-2">
+              <Button
+                variant={showExpiringSoon ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowExpiringSoon(!showExpiringSoon)}
+                data-testid="button-filter-expiring-soon"
+              >
+                <ShieldAlert className="h-4 w-4 mr-1.5" />
+                Expiring Soon
+              </Button>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search employees..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 w-64"
+                  data-testid="input-search-employees"
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -461,6 +482,7 @@ export default function AdminEmployeesPage() {
                     <span className="flex items-center">Phone<SortIcon column="phone" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
                   <TableHead>Licences / Tickets</TableHead>
+                  <TableHead>Compliance</TableHead>
                   <TableHead>Role Tags</TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")} data-testid="sort-employee-status">
                     <span className="flex items-center">Status<SortIcon column="status" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
@@ -523,6 +545,48 @@ export default function AdminEmployeesPage() {
                               </Badge>
                             )}
                           </div>
+                        );
+                      })()}
+                    </TableCell>
+                    <TableCell data-testid={`text-employee-compliance-${employee.id}`}>
+                      {(() => {
+                        const empLicences = licencesByEmployee.get(employee.id) || [];
+                        const compliance = getComplianceStatus(empLicences);
+                        if (compliance.status === "none") return <span className="text-muted-foreground text-xs">-</span>;
+                        if (compliance.status === "expired") {
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="destructive" className="text-xs" data-testid={`badge-compliance-${employee.id}`}>
+                                  Expired
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="font-medium">{compliance.earliestLicence?.licenceType}</p>
+                                <p className="text-red-400">Expired {Math.abs(compliance.diffDays!)} day{Math.abs(compliance.diffDays!) !== 1 ? "s" : ""} ago</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        }
+                        if (compliance.status === "expiring") {
+                          return (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="outline" className="text-xs border-orange-500 text-orange-600 dark:text-orange-400" data-testid={`badge-compliance-${employee.id}`}>
+                                  {compliance.diffDays} day{compliance.diffDays !== 1 ? "s" : ""}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="font-medium">{compliance.earliestLicence?.licenceType}</p>
+                                <p className="text-orange-400">Expires in {compliance.diffDays} day{compliance.diffDays !== 1 ? "s" : ""}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        }
+                        return (
+                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" data-testid={`badge-compliance-${employee.id}`}>
+                            Valid
+                          </Badge>
                         );
                       })()}
                     </TableCell>

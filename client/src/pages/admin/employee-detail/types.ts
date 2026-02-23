@@ -166,14 +166,42 @@ export const licenceSchema = z.object({
 
 export type LicenceFormData = z.infer<typeof licenceSchema>;
 
-export function getExpiryBadgeVariant(expiryDate: string | null | undefined): { variant: "default" | "secondary" | "destructive" | "outline"; label: string } {
-  if (!expiryDate) return { variant: "secondary", label: "No expiry" };
+export function getExpiryBadgeVariant(expiryDate: string | null | undefined): { variant: "default" | "secondary" | "destructive" | "outline"; label: string; diffDays: number | null } {
+  if (!expiryDate) return { variant: "secondary", label: "No expiry", diffDays: null };
   const now = new Date();
+  now.setHours(0, 0, 0, 0);
   const expiry = new Date(expiryDate);
+  expiry.setHours(0, 0, 0, 0);
   const diffDays = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return { variant: "destructive", label: expiryDate };
-  if (diffDays <= 30) return { variant: "outline", label: expiryDate };
-  return { variant: "default", label: expiryDate };
+  if (diffDays < 0) return { variant: "destructive", label: expiryDate, diffDays };
+  if (diffDays <= 30) return { variant: "outline", label: expiryDate, diffDays };
+  return { variant: "default", label: expiryDate, diffDays };
+}
+
+export function getComplianceStatus(licences: EmployeeLicence[]): { status: "expired" | "expiring" | "valid" | "none"; earliestLicence: EmployeeLicence | null; diffDays: number | null } {
+  if (!licences || licences.length === 0) return { status: "none", earliestLicence: null, diffDays: null };
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+
+  let earliest: EmployeeLicence | null = null;
+  let earliestDiff: number | null = null;
+
+  for (const lic of licences) {
+    if (!lic.expiryDate) continue;
+    const expiry = new Date(lic.expiryDate);
+    expiry.setHours(0, 0, 0, 0);
+    const diff = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (earliestDiff === null || diff < earliestDiff) {
+      earliestDiff = diff;
+      earliest = lic;
+    }
+  }
+
+  if (earliest === null) return { status: "valid", earliestLicence: null, diffDays: null };
+  if (earliestDiff! < 0) return { status: "expired", earliestLicence: earliest, diffDays: earliestDiff };
+  if (earliestDiff! <= 30) return { status: "expiring", earliestLicence: earliest, diffDays: earliestDiff };
+  return { status: "valid", earliestLicence: earliest, diffDays: earliestDiff };
 }
 
 export function statusLabel(s: string): string {
