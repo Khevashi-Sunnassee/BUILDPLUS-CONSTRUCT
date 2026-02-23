@@ -43,6 +43,7 @@ const createCapexSchema = z.object({
   siteReadiness: z.string().nullable().optional(),
   newWorkflowDescription: z.string().nullable().optional(),
   safetyConsiderations: z.string().nullable().optional(),
+  costCodeId: z.string().nullable().optional(),
   purchaseOrderId: z.string().nullable().optional(),
 });
 

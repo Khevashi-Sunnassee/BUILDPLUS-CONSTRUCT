@@ -1,7 +1,7 @@
 import { eq, and, desc, sql, asc } from "drizzle-orm";
 import { db } from "../db";
 import {
-  capexRequests, capexAuditEvents, users, jobs, departments, suppliers, factories, assets, purchaseOrders,
+  capexRequests, capexAuditEvents, users, jobs, departments, suppliers, factories, assets, purchaseOrders, costCodes,
   type CapexRequest, type InsertCapexRequest,
   type CapexAuditEvent, type InsertCapexAuditEvent,
   type User, type Job, type Supplier, type Asset,
@@ -19,6 +19,7 @@ export interface CapexRequestWithDetails extends CapexRequest {
   factory?: { id: string; name: string; code: string } | null;
   replacementAsset?: Asset | null;
   purchaseOrder?: { id: string; poNumber: string; status: string; total: string | null } | null;
+  costCode?: { id: string; code: string; name: string; description: string | null } | null;
 }
 
 async function getCapexWithDetails(capexId: string): Promise<CapexRequestWithDetails | undefined> {
@@ -88,6 +89,12 @@ async function getCapexWithDetails(capexId: string): Promise<CapexRequestWithDet
     purchaseOrder = po ? { id: po.id, poNumber: po.poNumber, status: po.status, total: po.total } : null;
   }
 
+  let costCode: { id: string; code: string; name: string; description: string | null } | null = null;
+  if (row.costCodeId) {
+    const [cc] = await db.select().from(costCodes).where(eq(costCodes.id, row.costCodeId));
+    costCode = cc ? { id: cc.id, code: cc.code, name: cc.name, description: cc.description } : null;
+  }
+
   return {
     ...row,
     requestedBy,
@@ -101,6 +108,7 @@ async function getCapexWithDetails(capexId: string): Promise<CapexRequestWithDet
     factory,
     replacementAsset,
     purchaseOrder,
+    costCode,
   };
 }
 

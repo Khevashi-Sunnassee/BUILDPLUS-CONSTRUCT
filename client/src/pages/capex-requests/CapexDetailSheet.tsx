@@ -190,6 +190,13 @@ export function CapexDetailSheet({ capex, onClose }: { capex: CapexRequestWithDe
             <div className="space-y-4">
               <DetailSection title="General Information">
                 <DetailRow label="CAPEX Number" value={capex.capexNumber} />
+                <DetailRow label="Cost Code" value={capex.costCode ? `${capex.costCode.code} — ${capex.costCode.name}` : "-"} />
+                {capex.costCode?.description && (
+                  <div className="flex gap-2 text-sm">
+                    <span className="text-muted-foreground min-w-[160px] shrink-0">Cost Code Description:</span>
+                    <span className="text-muted-foreground italic" data-testid="text-detail-cost-code-description">{capex.costCode.description}</span>
+                  </div>
+                )}
                 <DetailRow label="Job" value={capex.job ? `${capex.job.jobNumber} - ${capex.job.name}` : "-"} />
                 <DetailRow label="Department" value={capex.department?.name} />
                 <DetailRow label="Proposed Asset Manager" value={capex.proposedAssetManager?.name || capex.proposedAssetManager?.email} />

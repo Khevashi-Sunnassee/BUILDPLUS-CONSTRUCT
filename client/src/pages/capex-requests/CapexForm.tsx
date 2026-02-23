@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,12 +9,137 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, FileText, Package, Wrench, DollarSign, ShieldCheck, Building2, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Package, Wrench, DollarSign, ShieldCheck, Building2, Loader2, Search, Check, X, ChevronsUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ASSET_CATEGORIES, CAPEX_PURCHASE_REASONS } from "@shared/schema";
 import type { User, Job, Department, Supplier, Asset } from "@shared/schema";
 import type { CapexRequestWithDetails, ReplacementPrefill } from "./types";
+
+interface CostCodeOption {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+}
+
+const capexFormSchema = z.object({
+  costCodeId: z.string().min(1, "Please select a valid cost code"),
+  equipmentTitle: z.string().min(1, "Equipment title is required"),
+});
+
+function CostCodeCombobox({ value, onChange, costCodes, error }: { value: string; onChange: (val: string) => void; costCodes: CostCodeOption[]; error?: string }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const selectedCode = costCodes.find((c) => c.id === value);
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return costCodes;
+    const q = search.toLowerCase();
+    return costCodes.filter(
+      (c) =>
+        c.code.toLowerCase().includes(q) ||
+        c.name.toLowerCase().includes(q) ||
+        (c.description && c.description.toLowerCase().includes(q))
+    );
+  }, [search, costCodes]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`flex h-10 w-full items-center justify-between rounded-md border px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
+          error ? "border-destructive" : "border-input"
+        } bg-background`}
+        data-testid="combobox-cost-code"
+      >
+        <span className={selectedCode ? "text-foreground" : "text-muted-foreground"}>
+          {selectedCode ? `${selectedCode.code} — ${selectedCode.name}` : "Search and select cost code..."}
+        </span>
+        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg" data-testid="combobox-cost-code-dropdown">
+          <div className="flex items-center border-b px-3">
+            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+            <input
+              type="text"
+              placeholder="Search cost codes..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex h-9 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground"
+              data-testid="input-search-cost-code"
+              autoFocus
+            />
+            {value && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange("");
+                  setSearch("");
+                }}
+                className="ml-1 rounded-sm p-1 hover:bg-muted"
+                data-testid="button-clear-cost-code"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+          <div className="max-h-[200px] overflow-y-auto p-1">
+            {filtered.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">No cost codes found</p>
+            ) : (
+              filtered.map((cc) => (
+                <button
+                  key={cc.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(cc.id);
+                    setOpen(false);
+                    setSearch("");
+                  }}
+                  className={`relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground ${
+                    cc.id === value ? "bg-accent" : ""
+                  }`}
+                  data-testid={`option-cost-code-${cc.id}`}
+                >
+                  <Check className={`mr-2 h-4 w-4 ${cc.id === value ? "opacity-100" : "opacity-0"}`} />
+                  <div className="flex-1 text-left">
+                    <span className="font-medium">{cc.code}</span>
+                    <span className="ml-2 text-muted-foreground">{cc.name}</span>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {error && <p className="text-xs text-destructive mt-1" data-testid="text-cost-code-error">{error}</p>}
+
+      {selectedCode && selectedCode.description && (
+        <p className="text-xs text-muted-foreground mt-1 bg-muted/50 rounded px-2 py-1" data-testid="text-cost-code-description">
+          {selectedCode.description}
+        </p>
+      )}
+    </div>
+  );
+}
 
 function CollapsibleSection({ title, icon: Icon, defaultOpen = false, children }: { title: string; icon: React.ElementType; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -84,6 +210,7 @@ function CurrencyInput({ value, onChange, ...props }: { value: string; onChange:
 
 export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { capex?: CapexRequestWithDetails | null; onSave: () => void; onClose: () => void; replacementPrefill?: ReplacementPrefill | null }) {
   const { toast } = useToast();
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
     jobId: capex?.jobId || "",
@@ -116,6 +243,7 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
     siteReadiness: capex?.siteReadiness || "",
     newWorkflowDescription: capex?.newWorkflowDescription || "",
     safetyConsiderations: capex?.safetyConsiderations || "",
+    costCodeId: capex?.costCodeId || "",
   });
 
   const { data: jobsList = [] } = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
@@ -124,6 +252,28 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
   const { data: suppliersList = [] } = useQuery<Supplier[]>({ queryKey: ["/api/procurement/suppliers/active"] });
   const { data: assetsList = [] } = useQuery<Asset[]>({ queryKey: ["/api/admin/assets"], enabled: formData.isReplacement });
   const { data: factoriesList = [] } = useQuery<{ id: string; name: string; code: string }[]>({ queryKey: ["/api/factories"] });
+  const { data: costCodesList = [] } = useQuery<CostCodeOption[]>({ queryKey: ["/api/cost-codes"] });
+
+  const handleSave = () => {
+    const result = capexFormSchema.safeParse({
+      costCodeId: formData.costCodeId,
+      equipmentTitle: formData.equipmentTitle,
+    });
+
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as string;
+        errors[field] = err.message;
+      });
+      setValidationErrors(errors);
+      toast({ title: "Validation Error", description: "Please fix the highlighted fields", variant: "destructive" });
+      return;
+    }
+
+    setValidationErrors({});
+    saveMutation.mutate();
+  };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -137,6 +287,7 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
         replacementAssetId: formData.replacementAssetId || null,
         preferredSupplierId: formData.preferredSupplierId || null,
         factoryId: formData.factoryId || null,
+        costCodeId: formData.costCodeId || null,
       };
       if (capex) {
         await apiRequest("PUT", `/api/capex-requests/${capex.id}`, payload);
@@ -216,8 +367,30 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
             </Select>
           </div>
           <div>
+            <Label>Cost Code *</Label>
+            <CostCodeCombobox
+              value={formData.costCodeId}
+              onChange={(val) => {
+                update("costCodeId", val);
+                if (val) setValidationErrors((prev) => { const next = { ...prev }; delete next.costCodeId; return next; });
+              }}
+              costCodes={costCodesList}
+              error={validationErrors.costCodeId}
+            />
+          </div>
+          <div>
             <Label>Equipment Title *</Label>
-            <Input value={formData.equipmentTitle} onChange={(e) => update("equipmentTitle", e.target.value)} data-testid="input-equipment-title" required />
+            <Input
+              value={formData.equipmentTitle}
+              onChange={(e) => {
+                update("equipmentTitle", e.target.value);
+                if (e.target.value.trim()) setValidationErrors((prev) => { const next = { ...prev }; delete next.equipmentTitle; return next; });
+              }}
+              className={validationErrors.equipmentTitle ? "border-destructive" : ""}
+              data-testid="input-equipment-title"
+              required
+            />
+            {validationErrors.equipmentTitle && <p className="text-xs text-destructive mt-1">{validationErrors.equipmentTitle}</p>}
           </div>
           <div>
             <Label>Equipment Category</Label>
@@ -407,7 +580,7 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
       </CollapsibleSection>
 
       <div className="flex gap-2 pt-4">
-        <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !formData.equipmentTitle} data-testid="button-save-capex">
+        <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save-capex">
           {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           {capex ? "Update" : "Create"} Request
         </Button>

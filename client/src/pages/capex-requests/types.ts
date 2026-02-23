@@ -20,6 +20,7 @@ export interface CapexRequestWithDetails extends CapexRequest {
   factory?: { id: string; name: string; code: string } | null;
   replacementAsset?: Asset | null;
   purchaseOrder?: { id: string; poNumber: string; status: string; total: string | null } | null;
+  costCode?: { id: string; code: string; name: string; description: string | null } | null;
 }
 
 export interface CapexAuditMetadata {
