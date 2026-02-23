@@ -170,8 +170,8 @@ function TasksPageContent() {
         return true;
       }),
     })).filter((group) => {
-      const hasActiveFilter = taskTypeFilter !== "all" || jobFilter !== "all" || statusFilter !== "all" || dueDateFilter !== "all" || !showCompleted;
-      if (hasActiveFilter && group.tasks.length === 0) return false;
+      const hasNarrowingFilter = taskTypeFilter !== "all" || jobFilter !== "all" || statusFilter !== "all" || dueDateFilter !== "all";
+      if (hasNarrowingFilter && group.tasks.length === 0) return false;
       return true;
     });
   }, [groups, showCompleted, taskTypeFilter, jobFilter, statusFilter, dueDateFilter]);
