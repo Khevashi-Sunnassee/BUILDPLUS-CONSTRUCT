@@ -1,15 +1,20 @@
 import { useState, useCallback, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 import { AP_INVOICE_ROUTES } from "@shared/api-routes";
 import { useRoute, useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import {
   ArrowLeft, FileText, Clock, ChevronLeft, ChevronRight,
   Loader2, ZoomIn, ZoomOut, AlertTriangle, User, Calendar,
   DollarSign, ShieldCheck, ShieldAlert, Shield, Pause, Zap,
-  MessageSquare,
+  MessageSquare, Check, X,
 } from "lucide-react";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
@@ -597,16 +602,105 @@ function DetailsTab({ invoice, invoiceId }: { invoice: InvoiceDetail; invoiceId:
   );
 }
 
+interface ApprovalStep {
+  id: string;
+  stepIndex: number;
+  approverUserId: string;
+  status: string;
+  decisionAt: string | null;
+  note: string | null;
+  approverName: string | null;
+  approverEmail: string | null;
+}
+
 export default function MobileApInvoiceDetailPage() {
   const [, params] = useRoute("/mobile/ap-invoices/:id");
   const invoiceId = params?.id;
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<MobileTab>("invoice");
+  const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [approveNote, setApproveNote] = useState("");
+  const [rejectNote, setRejectNote] = useState("");
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   const { data: invoice, isLoading } = useQuery<InvoiceDetail>({
     queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId || "")],
     enabled: !!invoiceId,
   });
+
+  const { data: approvalPathData } = useQuery<{ steps: ApprovalStep[] } | ApprovalStep[]>({
+    queryKey: [AP_INVOICE_ROUTES.APPROVAL_PATH(invoiceId || "")],
+    enabled: !!invoiceId && !!user,
+  });
+
+  const approvalSteps: ApprovalStep[] = Array.isArray(approvalPathData)
+    ? approvalPathData
+    : (approvalPathData as any)?.steps || [];
+
+  const currentPendingStep = approvalSteps.find(s => s.status === "PENDING");
+  const isMyTurnToApprove = !!currentPendingStep && !!user && currentPendingStep.approverUserId === String(user.id);
+
+  const approveMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", AP_INVOICE_ROUTES.APPROVE(invoiceId!), { note: approveNote || undefined });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invoice approved" });
+      setShowApproveDialog(false);
+      setApproveNote("");
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId!)] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.APPROVAL_PATH(invoiceId!)] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.MY_APPROVALS] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Approval failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", AP_INVOICE_ROUTES.REJECT(invoiceId!), { note: rejectNote });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Invoice rejected" });
+      setShowRejectDialog(false);
+      setRejectNote("");
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId!)] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.APPROVAL_PATH(invoiceId!)] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.MY_APPROVALS] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Rejection failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const onHoldMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", AP_INVOICE_ROUTES.ON_HOLD(invoiceId!), {});
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: data.isOnHold ? "Invoice placed on hold" : "Invoice taken off hold" });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId!)] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.APPROVAL_PATH(invoiceId!)] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.MY_APPROVALS] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
+      queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.LIST] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to toggle hold", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const isBusy = approveMutation.isPending || rejectMutation.isPending || onHoldMutation.isPending;
 
   if (isLoading) {
     return (
@@ -660,52 +754,149 @@ export default function MobileApInvoiceDetailPage() {
   ];
 
   return (
-    <div className="flex flex-col h-screen-safe bg-[#070B12] overflow-hidden" data-testid="page-ap-invoice-detail">
-      <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/mobile/email-processing")}
-          className="text-white/70"
-          data-testid="button-back"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white truncate" data-testid="text-header-title">
-            {invoice.invoiceNumber || "Invoice"}
-          </p>
-        </div>
-        <Badge className={`${statusColor} no-default-hover-elevate no-default-active-elevate shrink-0`} data-testid="badge-header-status">
-          {displayStatus}
-        </Badge>
-      </div>
-
-      <div className="flex border-b border-white/10 flex-shrink-0" data-testid="tab-bar">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
-              activeTab === tab.key
-                ? "text-blue-400 border-b-2 border-blue-400"
-                : "text-white/50"
-            }`}
-            data-testid={`tab-${tab.key}`}
+    <>
+      <div className="flex flex-col h-screen-safe bg-[#070B12] overflow-hidden" data-testid="page-ap-invoice-detail">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/mobile/email-processing")}
+            className="text-white/70"
+            data-testid="button-back"
           >
-            {tab.label}
-          </button>
-        ))}
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white truncate" data-testid="text-header-title">
+              {invoice.invoiceNumber || "Invoice"}
+            </p>
+          </div>
+          <Badge className={`${statusColor} no-default-hover-elevate no-default-active-elevate shrink-0`} data-testid="badge-header-status">
+            {displayStatus}
+          </Badge>
+        </div>
+
+        <div className="flex border-b border-white/10 flex-shrink-0" data-testid="tab-bar">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
+                activeTab === tab.key
+                  ? "text-blue-400 border-b-2 border-blue-400"
+                  : "text-white/50"
+              }`}
+              data-testid={`tab-${tab.key}`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className={`flex-1 overflow-y-auto ${isMyTurnToApprove ? "pb-36" : "pb-24"}`}>
+          {activeTab === "invoice" && <InvoiceTab invoice={invoice} />}
+          {activeTab === "document" && <DocumentTab invoice={invoice} />}
+          {activeTab === "details" && <DetailsTab invoice={invoice} invoiceId={invoiceId!} />}
+        </div>
+
+        {isMyTurnToApprove && (
+          <div className="flex-shrink-0 border-t border-white/10 bg-[#070B12] px-4 py-3 space-y-2" style={{ paddingBottom: "max(calc(env(safe-area-inset-bottom, 0px) + 60px), 72px)" }} data-testid="approval-actions">
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 bg-green-600 text-white border-green-700"
+                onClick={() => setShowApproveDialog(true)}
+                disabled={isBusy}
+                data-testid="button-approve"
+              >
+                {approveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
+                Approve
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 text-white border-red-700"
+                onClick={() => setShowRejectDialog(true)}
+                disabled={isBusy}
+                data-testid="button-reject"
+              >
+                {rejectMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <X className="h-4 w-4 mr-1" />}
+                Reject
+              </Button>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full border-white/20 text-white"
+              onClick={() => onHoldMutation.mutate()}
+              disabled={isBusy}
+              data-testid="button-on-hold"
+            >
+              {onHoldMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Pause className="h-4 w-4 mr-1" />}
+              {invoice.isOnHold ? "Remove Hold" : "Place On Hold"}
+            </Button>
+          </div>
+        )}
+
+        <MobileBottomNav />
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-24">
-        {activeTab === "invoice" && <InvoiceTab invoice={invoice} />}
-        {activeTab === "document" && <DocumentTab invoice={invoice} />}
-        {activeTab === "details" && <DetailsTab invoice={invoice} invoiceId={invoiceId!} />}
-      </div>
+      <AlertDialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
+        <AlertDialogContent className="bg-[#0D1117] border-white/10 text-white max-w-[90vw]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Approve Invoice</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/60">
+              Approve {invoice.invoiceNumber || "this invoice"} for {formatCurrency(invoice.totalInc)}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Optional note..."
+            value={approveNote}
+            onChange={(e) => setApproveNote(e.target.value)}
+            className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[80px]"
+            data-testid="input-approve-note"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-white/10 text-white" data-testid="button-cancel-approve">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-green-600 text-white"
+              onClick={() => approveMutation.mutate()}
+              disabled={approveMutation.isPending}
+              data-testid="button-confirm-approve"
+            >
+              {approveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Approve
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      <MobileBottomNav />
-    </div>
+      <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <AlertDialogContent className="bg-[#0D1117] border-white/10 text-white max-w-[90vw]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject Invoice</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/60">
+              Reject {invoice.invoiceNumber || "this invoice"}? A reason is required.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Reason for rejection (required)..."
+            value={rejectNote}
+            onChange={(e) => setRejectNote(e.target.value)}
+            className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[80px]"
+            data-testid="input-reject-note"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-white/10 text-white" data-testid="button-cancel-reject">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white"
+              onClick={() => rejectMutation.mutate()}
+              disabled={rejectMutation.isPending || !rejectNote.trim()}
+              data-testid="button-confirm-reject"
+            >
+              {rejectMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Reject
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
