@@ -714,9 +714,10 @@ export default function AdminUsersPage() {
 
   const inviteMutation = useMutation({
     mutationFn: async (data: { email: string; role: string; userType: string; permissions?: Record<string, string> }) => {
-      return apiRequest("POST", INVITATION_ROUTES.ADMIN_CREATE, data);
+      const res = await apiRequest("POST", INVITATION_ROUTES.ADMIN_CREATE, data);
+      return res;
     },
-    onSuccess: (data: any) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USERS] });
       toast({ title: "Invitation sent", description: `An invitation email has been sent to ${inviteEmail}` });
       setInviteDialogOpen(false);
@@ -729,7 +730,20 @@ export default function AdminUsersPage() {
       setExpandedSections(new Set());
     },
     onError: (err: any) => {
-      toast({ title: "Failed to send invitation", description: err.message || "An error occurred", variant: "destructive" });
+      const msg = err.message || "An error occurred";
+      if (msg.includes("Rate limit exceeded")) {
+        const minutesMatch = msg.match(/(\d+)/);
+        const retryMinutes = minutesMatch ? Math.ceil(parseInt(minutesMatch[0]) / 60) : null;
+        toast({
+          title: "Too many invitations",
+          description: retryMinutes
+            ? `You've reached the invitation limit. Please try again in ${retryMinutes} minute${retryMinutes !== 1 ? "s" : ""}.`
+            : msg,
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Failed to send invitation", description: msg, variant: "destructive" });
+      }
     },
   });
 

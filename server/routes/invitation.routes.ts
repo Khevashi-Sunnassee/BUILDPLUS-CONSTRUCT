@@ -9,6 +9,24 @@ import logger from "../lib/logger";
 
 const router = Router();
 
+const inviteRateLimiter = new Map<string, { count: number; resetAt: number }>();
+const INVITE_LIMIT = 20;
+const INVITE_WINDOW_MS = 60 * 60 * 1000;
+
+function checkInviteRateLimit(userId: string): { allowed: boolean; retryAfterSeconds: number } {
+  const now = Date.now();
+  const entry = inviteRateLimiter.get(userId);
+  if (!entry || now >= entry.resetAt) {
+    inviteRateLimiter.set(userId, { count: 1, resetAt: now + INVITE_WINDOW_MS });
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+  if (entry.count >= INVITE_LIMIT) {
+    return { allowed: false, retryAfterSeconds: Math.ceil((entry.resetAt - now) / 1000) };
+  }
+  entry.count++;
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
 const createInvitationSchema = z.object({
   email: z.string().email("Valid email address is required"),
   companyId: z.string().optional(),
@@ -20,6 +38,16 @@ const createInvitationSchema = z.object({
 
 router.post("/api/admin/invitations", requireRole("ADMIN"), async (req, res) => {
   try {
+    const userId = req.session.userId!;
+    const { allowed, retryAfterSeconds } = checkInviteRateLimit(userId);
+    if (!allowed) {
+      res.set("Retry-After", String(retryAfterSeconds));
+      return res.status(429).json({
+        error: `Rate limit exceeded. You can send up to ${INVITE_LIMIT} invitations per hour.`,
+        retryAfterSeconds,
+      });
+    }
+
     const parsed = createInvitationSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid request" });
