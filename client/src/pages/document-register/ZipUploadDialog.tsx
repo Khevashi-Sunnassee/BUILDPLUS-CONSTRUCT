@@ -294,7 +294,7 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileArchive className="h-5 w-5" />
@@ -307,7 +307,7 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
+        <div className="flex-1 min-h-0 flex flex-col space-y-4 pr-1">
           {step === "upload" && (
             <div
               className={`border-2 border-dashed rounded-md p-10 text-center cursor-pointer transition-colors ${
@@ -349,8 +349,8 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
           )}
 
           {step === "review" && files.length > 0 && (
-            <>
-              <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex flex-col flex-1 min-h-0 space-y-4">
+              <div className="flex items-center justify-between gap-2 flex-wrap flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">{selectedCount} of {files.length} selected</Badge>
                   {zipFile && (
@@ -372,8 +372,8 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
                 </div>
               </div>
 
-              <div className="border rounded-md">
-                <ScrollArea className="max-h-[280px]">
+              <div className="border rounded-md flex-1 min-h-0 overflow-hidden">
+                <ScrollArea className="h-full">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -465,7 +465,7 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
                 </ScrollArea>
               </div>
 
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-4 gap-3 flex-shrink-0">
                 <div>
                   <Label className="text-xs">Document Type</Label>
                   <Select value={typeId} onValueChange={(v) => setTypeId(v === clearValue ? "" : v)}>
@@ -535,7 +535,7 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-4 gap-3 flex-shrink-0">
                 <div>
                   <Label className="text-xs">Panel</Label>
                   <Select value={panelId} onValueChange={(v) => setPanelId(v === clearValue ? "" : v)}>
@@ -605,7 +605,7 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-shrink-0">
                 <div className="flex-1">
                   <Label className="text-xs">Tags</Label>
                   <Input
@@ -625,7 +625,7 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
                   <Label className="text-xs">Confidential</Label>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </div>
 
