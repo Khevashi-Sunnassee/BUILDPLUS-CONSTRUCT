@@ -445,7 +445,7 @@ export default function MobileTenderEmailDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col min-h-screen bg-[#070B12]" data-testid="page-tender-email-detail-loading">
+      <div className="flex flex-col h-screen-safe bg-[#070B12] overflow-hidden" data-testid="page-tender-email-detail-loading">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10">
           <Skeleton className="h-8 w-8 rounded-lg bg-white/10" />
           <Skeleton className="h-5 w-48 bg-white/10" />
@@ -462,7 +462,7 @@ export default function MobileTenderEmailDetailPage() {
 
   if (!email) {
     return (
-      <div className="flex flex-col min-h-screen bg-[#070B12]" data-testid="page-tender-email-detail-not-found">
+      <div className="flex flex-col h-screen-safe bg-[#070B12] overflow-hidden" data-testid="page-tender-email-detail-not-found">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10">
           <Button
             variant="ghost"
@@ -495,8 +495,8 @@ export default function MobileTenderEmailDetailPage() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#070B12]" data-testid="page-tender-email-detail">
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10">
+    <div className="flex flex-col h-screen-safe bg-[#070B12] overflow-hidden" data-testid="page-tender-email-detail">
+      <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10">
         <Button
           variant="ghost"
           size="icon"
@@ -516,7 +516,7 @@ export default function MobileTenderEmailDetailPage() {
         </Badge>
       </div>
 
-      <div className="flex border-b border-white/10" data-testid="tab-bar">
+      <div className="flex border-b border-white/10 flex-shrink-0" data-testid="tab-bar">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -534,7 +534,7 @@ export default function MobileTenderEmailDetailPage() {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-20">
+      <div className="flex-1 overflow-y-auto pb-24">
         {activeTab === "email" && <EmailTab email={email} />}
         {activeTab === "documents" && <DocumentsTab email={email} />}
         {activeTab === "details" && <DetailsTab email={email} emailId={emailId!} />}
