@@ -76,12 +76,28 @@ import { PROCUREMENT_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { SortIcon } from "@/components/ui/sort-icon";
 
+function isValidAbn(raw: string): boolean {
+  const digits = raw.replace(/\s/g, "");
+  if (!/^\d{11}$/.test(digits)) return false;
+  const weights = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+  const nums = digits.split("").map(Number);
+  nums[0] -= 1;
+  const sum = nums.reduce((acc, d, i) => acc + d * weights[i], 0);
+  return sum % 89 === 0;
+}
+
 const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   keyContact: z.string().optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional(),
-  abn: z.string().optional(),
+  abn: z.string().optional().refine(
+    (val) => !val || /^\d{11}$/.test(val.replace(/\s/g, "")),
+    "ABN must be 11 digits"
+  ).refine(
+    (val) => !val || isValidAbn(val),
+    "ABN check digit is invalid"
+  ),
   acn: z.string().optional(),
   addressLine1: z.string().optional(),
   addressLine2: z.string().optional(),
