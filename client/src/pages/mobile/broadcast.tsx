@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { BROADCAST_ROUTES } from "@shared/api-routes";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import type { BroadcastTemplate, BroadcastMessageWithDetails } from "@shared/schema";
-import { Send, FileText, History, Mail, Phone, MessageCircle, Users, Plus, X, Loader2 } from "lucide-react";
+import { Send, FileText, History, Mail, Phone, MessageCircle, Users, Plus, X, Loader2, Search, Check, UserCheck, ChevronLeft } from "lucide-react";
 
 type ActiveTab = "send" | "templates" | "history";
 type ChannelStatus = { sms: boolean; whatsapp: boolean; email: boolean };
@@ -72,6 +72,9 @@ export default function MobileBroadcastPage() {
     { name: "", phone: "", email: "" },
   ]);
   const [showTemplateSheet, setShowTemplateSheet] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [showUserPicker, setShowUserPicker] = useState(false);
+  const [userSearch, setUserSearch] = useState("");
 
   const { data: channelStatus } = useQuery<ChannelStatus>({
     queryKey: [BROADCAST_ROUTES.CHANNELS_STATUS],
@@ -86,6 +89,41 @@ export default function MobileBroadcastPage() {
     queryKey: [BROADCAST_ROUTES.MESSAGES],
     select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
+
+  interface BroadcastRecipient {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    type: string;
+  }
+
+  const { data: recipientData } = useQuery<{ employees: BroadcastRecipient[] }>({
+    queryKey: [BROADCAST_ROUTES.RECIPIENTS],
+  });
+
+  const users = useMemo(() => {
+    if (!recipientData?.employees) return [];
+    return recipientData.employees;
+  }, [recipientData]);
+
+  const filteredUsers = useMemo(() => {
+    if (!userSearch.trim()) return users;
+    const q = userSearch.toLowerCase();
+    return users.filter(
+      (u) =>
+        (u.name && u.name.toLowerCase().includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q))
+    );
+  }, [users, userSearch]);
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId]
+    );
+  };
 
   const activeTemplates = templates.filter((t) => t.isActive);
 
@@ -105,6 +143,9 @@ export default function MobileBroadcastPage() {
           (c) => c.name || c.phone || c.email
         );
       }
+      if (recipientType === "SPECIFIC_USERS") {
+        payload.recipientIds = selectedUserIds;
+      }
       return apiRequest("POST", BROADCAST_ROUTES.SEND, payload);
     },
     onSuccess: () => {
@@ -115,6 +156,7 @@ export default function MobileBroadcastPage() {
       setSelectedChannels([]);
       setRecipientType("ALL_USERS");
       setCustomContacts([{ name: "", phone: "", email: "" }]);
+      setSelectedUserIds([]);
       setActiveTab("history");
     },
     onError: (error: Error) => {
@@ -167,6 +209,7 @@ export default function MobileBroadcastPage() {
     message.trim() &&
     selectedChannels.length > 0 &&
     (recipientType === "ALL_USERS" ||
+      (recipientType === "SPECIFIC_USERS" && selectedUserIds.length > 0) ||
       (recipientType === "CUSTOM_CONTACTS" &&
         customContacts.some((c) => c.name || c.phone || c.email)));
 
@@ -288,7 +331,7 @@ export default function MobileBroadcastPage() {
 
             <div>
               <div className="text-xs text-white/40 mb-2">Recipients</div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setRecipientType("ALL_USERS")}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium active:scale-[0.99] ${
@@ -300,6 +343,18 @@ export default function MobileBroadcastPage() {
                 >
                   <Users className="h-4 w-4" />
                   All Users
+                </button>
+                <button
+                  onClick={() => setRecipientType("SPECIFIC_USERS")}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium active:scale-[0.99] ${
+                    recipientType === "SPECIFIC_USERS"
+                      ? "bg-blue-500/20 text-blue-400"
+                      : "bg-white/10 text-white/60"
+                  }`}
+                  data-testid="button-recipient-specific"
+                >
+                  <UserCheck className="h-4 w-4" />
+                  Select Users
                 </button>
                 <button
                   onClick={() => setRecipientType("CUSTOM_CONTACTS")}
@@ -314,6 +369,49 @@ export default function MobileBroadcastPage() {
                 </button>
               </div>
             </div>
+
+            {recipientType === "SPECIFIC_USERS" && (
+              <div className="space-y-2">
+                <button
+                  onClick={() => { setShowUserPicker(true); setUserSearch(""); }}
+                  className="w-full rounded-2xl border border-dashed border-white/20 px-4 py-3 text-left active:scale-[0.99]"
+                  data-testid="button-open-user-picker"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-white/60">
+                      {selectedUserIds.length > 0
+                        ? `${selectedUserIds.length} user${selectedUserIds.length !== 1 ? "s" : ""} selected`
+                        : "Tap to select users"}
+                    </div>
+                    <Users className="h-4 w-4 text-white/40" />
+                  </div>
+                </button>
+
+                {selectedUserIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedUserIds.map((uid) => {
+                      const u = users.find((usr) => usr.id === uid);
+                      return (
+                        <span
+                          key={uid}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400"
+                          data-testid={`badge-selected-user-${uid}`}
+                        >
+                          {u?.name || u?.email || uid}
+                          <button
+                            onClick={() => toggleUserSelection(uid)}
+                            className="ml-0.5 active:scale-[0.9]"
+                            data-testid={`button-remove-user-${uid}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {recipientType === "CUSTOM_CONTACTS" && (
               <div className="space-y-3">
@@ -583,6 +681,109 @@ export default function MobileBroadcastPage() {
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {showUserPicker && (
+        <div className="fixed inset-0 z-50 bg-[#070B12] flex flex-col" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+          <div className="flex-shrink-0 border-b border-white/10 px-4 py-3 flex items-center gap-3">
+            <button
+              onClick={() => setShowUserPicker(false)}
+              className="text-white -ml-1 active:scale-[0.95]"
+              data-testid="button-close-user-picker"
+            >
+              <ChevronLeft className="h-6 w-6" />
+            </button>
+            <div className="flex-1">
+              <div className="text-lg font-bold text-white">Select Users</div>
+              <div className="text-xs text-white/50">
+                {selectedUserIds.length > 0
+                  ? `${selectedUserIds.length} selected`
+                  : `${users.length} users available`}
+              </div>
+            </div>
+            <button
+              onClick={() => setShowUserPicker(false)}
+              className="px-3 py-1.5 rounded-full bg-blue-500 text-white text-sm font-medium active:scale-[0.97]"
+              data-testid="button-done-user-picker"
+            >
+              Done
+            </button>
+          </div>
+
+          <div className="flex-shrink-0 px-4 py-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+              <input
+                type="text"
+                placeholder="Search users..."
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/30 outline-none focus:border-blue-500/50"
+                autoFocus
+                data-testid="input-user-search"
+              />
+            </div>
+          </div>
+
+          {selectedUserIds.length > 0 && (
+            <div className="flex-shrink-0 px-4 pb-2">
+              <button
+                onClick={() => setSelectedUserIds([])}
+                className="text-xs text-red-400 active:scale-[0.97]"
+                data-testid="button-clear-all-users"
+              >
+                Clear all ({selectedUserIds.length})
+              </button>
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto px-4 pb-8">
+            {filteredUsers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Users className="h-10 w-10 text-white/20 mb-2" />
+                <p className="text-sm text-white/40">
+                  {userSearch ? "No users match your search" : "No users available"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {filteredUsers.map((user) => {
+                  const isSelected = selectedUserIds.includes(user.id);
+                  return (
+                    <button
+                      key={user.id}
+                      onClick={() => toggleUserSelection(user.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left active:scale-[0.99] transition-colors ${
+                        isSelected ? "bg-blue-500/15 border border-blue-500/30" : "border border-transparent"
+                      }`}
+                      data-testid={`button-user-${user.id}`}
+                    >
+                      <div className={`flex h-8 w-8 items-center justify-center rounded-full flex-shrink-0 ${
+                        isSelected ? "bg-blue-500 text-white" : "bg-white/10 text-white/50"
+                      }`}>
+                        {isSelected ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <span className="text-xs font-medium">
+                            {(user.name || user.email || "?").charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-white truncate">
+                          {user.name || user.email || "Unknown"}
+                        </div>
+                        {user.email && (
+                          <div className="text-xs text-white/40 truncate">{user.email}</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
