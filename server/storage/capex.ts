@@ -175,11 +175,71 @@ export const capexMethods = {
   },
 
   async submitCapexRequest(id: string): Promise<CapexRequest | undefined> {
+    const [existing] = await db.select().from(capexRequests).where(eq(capexRequests.id, id));
+    if (!existing) return undefined;
+
+    const totalCost = parseFloat(existing.totalEquipmentCost || "0");
+    const requiredCount = this.getRequiredApprovalCount(totalCost);
+
     const [request] = await db.update(capexRequests)
-      .set({ status: "SUBMITTED", submittedAt: new Date(), updatedAt: new Date() })
+      .set({ status: "SUBMITTED", submittedAt: new Date(), approvals: [], approvalsRequired: requiredCount, updatedAt: new Date() })
       .where(eq(capexRequests.id, id))
       .returning();
     return request;
+  },
+
+  getRequiredApprovalCount(totalCost: number): number {
+    if (totalCost > 50000) return 3;
+    if (totalCost >= 5000) return 2;
+    return 1;
+  },
+
+  async addCapexApproval(id: string, userId: string, userName: string, comments?: string): Promise<{ request: CapexRequest; fullyApproved: boolean }> {
+    const [existing] = await db.select().from(capexRequests).where(eq(capexRequests.id, id));
+    if (!existing) throw new Error("CAPEX request not found");
+
+    if (existing.status !== "SUBMITTED") {
+      throw new Error("Only submitted requests can receive approvals");
+    }
+
+    const currentApprovals: Array<{ userId: string; userName: string; level: number; timestamp: string; comments?: string }> = (existing.approvals as Array<{ userId: string; userName: string; level: number; timestamp: string; comments?: string }>) || [];
+
+    if (currentApprovals.some(a => a.userId === userId)) {
+      throw new Error("You have already approved this request");
+    }
+
+    const requiredCount = existing.approvalsRequired || this.getRequiredApprovalCount(parseFloat(existing.totalEquipmentCost || "0"));
+    const newLevel = currentApprovals.length + 1;
+
+    const newApproval = {
+      userId,
+      userName,
+      level: newLevel,
+      timestamp: new Date().toISOString(),
+      ...(comments ? { comments } : {}),
+    };
+
+    const updatedApprovals = [...currentApprovals, newApproval];
+    const fullyApproved = updatedApprovals.length >= requiredCount;
+
+    const updateData: Record<string, unknown> = {
+      approvals: updatedApprovals,
+      approvalsRequired: requiredCount,
+      updatedAt: new Date(),
+    };
+
+    if (fullyApproved) {
+      updateData.status = "APPROVED";
+      updateData.approvedById = userId;
+      updateData.approvedAt = new Date();
+    }
+
+    const [request] = await db.update(capexRequests)
+      .set(updateData)
+      .where(eq(capexRequests.id, id))
+      .returning();
+
+    return { request, fullyApproved };
   },
 
   async approveCapexRequest(id: string, approvedById: string): Promise<CapexRequest | undefined> {
@@ -200,7 +260,7 @@ export const capexMethods = {
 
   async withdrawCapexRequest(id: string): Promise<CapexRequest | undefined> {
     const [request] = await db.update(capexRequests)
-      .set({ status: "DRAFT", submittedAt: null, updatedAt: new Date() })
+      .set({ status: "DRAFT", submittedAt: null, approvals: [], approvalsRequired: 1, updatedAt: new Date() })
       .where(eq(capexRequests.id, id))
       .returning();
     return request;

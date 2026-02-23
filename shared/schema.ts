@@ -4481,6 +4481,8 @@ export const capexRequests = pgTable("capex_requests", {
   siteReadiness: text("site_readiness"),
   newWorkflowDescription: text("new_workflow_description"),
   safetyConsiderations: text("safety_considerations"),
+  approvals: json("approvals").$type<Array<{ userId: string; userName: string; level: number; timestamp: string; comments?: string }>>().default([]),
+  approvalsRequired: integer("approvals_required").default(1),
   purchaseOrderId: varchar("purchase_order_id", { length: 36 }).references(() => purchaseOrders.id, { onDelete: "set null" }),
   requestedById: varchar("requested_by_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
   requestedDate: timestamp("requested_date").defaultNow().notNull(),

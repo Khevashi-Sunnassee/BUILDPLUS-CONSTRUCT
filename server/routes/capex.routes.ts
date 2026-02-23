@@ -301,26 +301,40 @@ router.post("/api/capex-requests/:id/approve", requireAuth, async (req, res) => 
       }
     }
 
+    const currentApprovals = (existing.approvals as Array<{ userId: string }>) || [];
+    if (currentApprovals.some(a => a.userId === userId)) {
+      return res.status(400).json({ error: "You have already approved this request" });
+    }
+
     const correlationId = crypto.randomUUID();
-    const request = await storage.approveCapexRequest(id, userId);
+    const userName = user.name || user.email || "Unknown";
+    const { fullyApproved } = await storage.addCapexApproval(id, userId, userName, parsed.data.comments);
+
+    const requiredCount = existing.approvalsRequired || storage.getRequiredApprovalCount(parseFloat(existing.totalEquipmentCost || "0"));
+    const currentLevel = currentApprovals.length + 1;
 
     await storage.createCapexAuditEvent({
       capexRequestId: id,
-      eventType: "approved",
+      eventType: fullyApproved ? "approved" : "approval_added",
       actorId: userId,
-      actorName: user.name || user.email || "Unknown",
-      metadata: { approvalMode: isAdmin ? "admin" : "capex_approver" },
+      actorName: userName,
+      metadata: {
+        approvalMode: isAdmin ? "admin" : "capex_approver",
+        approvalLevel: currentLevel,
+        approvalsRequired: requiredCount,
+        fullyApproved,
+      },
       correlationId,
     });
 
-    if (existing.purchaseOrderId) {
+    if (fullyApproved && existing.purchaseOrderId) {
       try {
         await storage.approvePurchaseOrder(existing.purchaseOrderId, userId);
         await storage.createCapexAuditEvent({
           capexRequestId: id,
           eventType: "linked_po_approved",
           actorId: userId,
-          actorName: user.name || user.email || "Unknown",
+          actorName: userName,
           metadata: { purchaseOrderId: existing.purchaseOrderId },
           correlationId,
         });
@@ -333,7 +347,7 @@ router.post("/api/capex-requests/:id/approve", requireAuth, async (req, res) => 
     res.json(detailed);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error approving CAPEX request");
-    res.status(500).json({ error: "Failed to approve CAPEX request" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to approve CAPEX request" });
   }
 });
 

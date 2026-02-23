@@ -455,6 +455,8 @@ export class DatabaseStorage implements IStorage {
   updateCapexRequest = capexMethods.updateCapexRequest;
   submitCapexRequest = capexMethods.submitCapexRequest;
   approveCapexRequest = capexMethods.approveCapexRequest;
+  addCapexApproval = capexMethods.addCapexApproval.bind(capexMethods);
+  getRequiredApprovalCount = capexMethods.getRequiredApprovalCount.bind(capexMethods);
   rejectCapexRequest = capexMethods.rejectCapexRequest;
   withdrawCapexRequest = capexMethods.withdrawCapexRequest;
   deleteCapexRequest = capexMethods.deleteCapexRequest;

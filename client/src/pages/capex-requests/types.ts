@@ -1,5 +1,13 @@
 import type { CapexRequest, User, Job, Supplier, Asset } from "@shared/schema";
 
+export interface CapexApprovalEntry {
+  userId: string;
+  userName: string;
+  level: number;
+  timestamp: string;
+  comments?: string;
+}
+
 export interface CapexRequestWithDetails extends CapexRequest {
   requestedBy: User;
   approvingManager?: User | null;
