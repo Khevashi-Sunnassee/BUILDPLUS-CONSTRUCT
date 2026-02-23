@@ -15,8 +15,31 @@ export async function ensureSuperAdmins() {
     .from(users)
     .where(inArray(users.email, emails));
 
+  const foundEmails = new Set(matchingUsers.map(u => u.email.toLowerCase()));
+  const missingEmails = emails.filter(e => !foundEmails.has(e));
+
+  if (missingEmails.length > 0) {
+    const existingCompanies = await db.select({ id: companies.id }).from(companies).limit(1);
+    const defaultCompanyId = existingCompanies[0]?.id;
+    if (defaultCompanyId) {
+      const defaultHash = await bcrypt.hash("admin123!", 10);
+      for (const email of missingEmails) {
+        await db.insert(users).values({
+          companyId: defaultCompanyId,
+          email,
+          name: "Super Admin",
+          passwordHash: defaultHash,
+          role: "ADMIN",
+          isActive: true,
+          isSuperAdmin: true,
+        });
+        logger.info({ email }, "[SuperAdmin] Created super admin account");
+      }
+    }
+  }
+
   const toUpdate = matchingUsers.filter(u => !u.isSuperAdmin);
-  if (toUpdate.length === 0) {
+  if (toUpdate.length === 0 && missingEmails.length === 0) {
     logger.info({ emails }, "[SuperAdmin] All configured super admins already have the flag set");
     return;
   }
