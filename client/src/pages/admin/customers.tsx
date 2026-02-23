@@ -312,6 +312,7 @@ export default function AdminCustomersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showActiveOnly, setShowActiveOnly] = useState(true);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -375,6 +376,9 @@ export default function AdminCustomersPage() {
 
   const filteredCustomers = useMemo(() => {
     let list = customersList || [];
+    if (showActiveOnly) {
+      list = list.filter((c) => c.isActive);
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       list = list.filter((c) =>
@@ -400,7 +404,7 @@ export default function AdminCustomersPage() {
       const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: "base" });
       return sortDirection === "asc" ? cmp : -cmp;
     });
-  }, [customersList, searchQuery, sortColumn, sortDirection]);
+  }, [customersList, searchQuery, showActiveOnly, sortColumn, sortDirection]);
 
   const totalPages = Math.ceil((filteredCustomers?.length || 0) / pageSize);
   const paginatedCustomers = useMemo(() => {
@@ -411,7 +415,7 @@ export default function AdminCustomersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, sortColumn, sortDirection]);
+  }, [searchQuery, showActiveOnly, sortColumn, sortDirection]);
 
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -584,18 +588,30 @@ export default function AdminCustomersPage() {
                 Customers
               </CardTitle>
               <CardDescription>
-                {filteredCustomers?.length || 0} customer{filteredCustomers?.length !== 1 ? "s" : ""}{searchQuery ? " matching search" : " configured"}
+                {filteredCustomers?.length || 0} {showActiveOnly ? "active " : ""}customer{filteredCustomers?.length !== 1 ? "s" : ""}{searchQuery ? " matching search" : " configured"}
               </CardDescription>
             </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search customers..."
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                className="pl-9 w-64"
-                data-testid="input-search-customers"
-              />
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search customers..."
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                  className="pl-9 w-64"
+                  data-testid="input-search-customers"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={showActiveOnly}
+                  onCheckedChange={setShowActiveOnly}
+                  data-testid="switch-active-only-customers"
+                />
+                <label className="text-sm text-muted-foreground whitespace-nowrap cursor-pointer" onClick={() => setShowActiveOnly(!showActiveOnly)}>
+                  Active only
+                </label>
+              </div>
             </div>
           </div>
         </CardHeader>
