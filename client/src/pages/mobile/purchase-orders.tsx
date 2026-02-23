@@ -333,24 +333,31 @@ function PODetailSheet({
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-white/60 mb-1 block">Created</label>
-                <p className="text-sm text-white">{format(new Date(po.createdAt), "dd MMM yyyy")}</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="min-w-0">
+                <label className="text-sm font-medium text-white/60 mb-1 block">Supplier</label>
+                <p className="text-sm text-white truncate">{po.supplier?.name || "-"}</p>
               </div>
-              {po.requiredByDate && (
-                <div>
-                  <label className="text-sm font-medium text-white/60 mb-1 block">Required By</label>
-                  <p className="text-sm text-white">{format(new Date(po.requiredByDate), "dd MMM yyyy")}</p>
-                </div>
-              )}
-              {po.requestedBy && (
-                <div>
-                  <label className="text-sm font-medium text-white/60 mb-1 block">Requested By</label>
-                  <p className="text-sm text-white">{po.requestedBy.name || po.requestedBy.email}</p>
-                </div>
-              )}
+              <div className="min-w-0">
+                <label className="text-sm font-medium text-white/60 mb-1 block">Job / Project</label>
+                <p className="text-sm text-white truncate">{po.projectName || "-"}</p>
+              </div>
+              <div className="min-w-0">
+                <label className="text-sm font-medium text-white/60 mb-1 block">Date</label>
+                <p className="text-sm text-white">
+                  {po.requiredByDate
+                    ? `Due ${format(new Date(po.requiredByDate), "dd MMM yyyy")}`
+                    : format(new Date(po.createdAt), "dd MMM yyyy")}
+                </p>
+              </div>
             </div>
+
+            {po.requestedBy && (
+              <div className="min-w-0">
+                <label className="text-sm font-medium text-white/60 mb-1 block">Requested By</label>
+                <p className="text-sm text-white truncate">{po.requestedBy.name || po.requestedBy.email}</p>
+              </div>
+            )}
 
             {po.capexRequestId && (
               <button
@@ -381,22 +388,32 @@ function PODetailSheet({
                 <label className="text-sm font-medium text-white/60 mb-2 block">
                   Items ({po.items.length})
                 </label>
-                <div className="space-y-2">
-                  {po.items.map((item) => (
-                    <div key={item.id} className="p-3 bg-white/5 rounded-lg border border-white/10">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate text-white">{item.description}</p>
-                          <p className="text-xs text-white/50">
-                            {item.quantity} x {formatCurrency(item.unitPrice)}
-                          </p>
-                        </div>
-                        <span className="text-sm font-medium flex-shrink-0 text-white">
-                          {formatCurrency(item.lineTotal)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+                <div className="overflow-x-auto -mx-2 px-2">
+                  <table className="w-full min-w-[500px] text-sm" data-testid="table-mobile-po-items">
+                    <thead>
+                      <tr className="border-b border-white/10 text-white/50">
+                        <th className="text-left py-2 pr-3 font-medium">Description</th>
+                        <th className="text-right py-2 px-2 font-medium whitespace-nowrap w-[60px]">Qty</th>
+                        <th className="text-right py-2 px-2 font-medium whitespace-nowrap w-[90px]">Unit Price</th>
+                        <th className="text-right py-2 pl-2 font-medium whitespace-nowrap w-[100px]">Line Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {po.items.map((item) => (
+                        <tr key={item.id} className="border-b border-white/5">
+                          <td className="py-2.5 pr-3 text-white min-w-0">
+                            <p className="truncate max-w-[200px] sm:max-w-none">{item.description}</p>
+                            {item.unitOfMeasure && (
+                              <span className="text-xs text-white/40">{item.unitOfMeasure}</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2 text-right text-white tabular-nums">{item.quantity}</td>
+                          <td className="py-2.5 px-2 text-right text-white tabular-nums whitespace-nowrap">{formatCurrency(item.unitPrice)}</td>
+                          <td className="py-2.5 pl-2 text-right font-medium text-white tabular-nums whitespace-nowrap">{formatCurrency(item.lineTotal)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -568,47 +585,47 @@ function SendPOSheet({
         </div>
 
         <div className="space-y-3">
-          <div>
+          <div className="min-w-0">
             <label className="text-sm font-medium text-white/60 mb-1.5 block">To</label>
             <Input
               type="email"
               placeholder="recipient@example.com"
               value={toEmail}
               onChange={(e) => setToEmail(e.target.value)}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-w-0"
               data-testid="input-send-to"
             />
           </div>
 
-          <div>
+          <div className="min-w-0">
             <label className="text-sm font-medium text-white/60 mb-1.5 block">Cc (optional)</label>
             <Input
               type="email"
               placeholder="cc@example.com"
               value={ccEmail}
               onChange={(e) => setCcEmail(e.target.value)}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-w-0"
               data-testid="input-send-cc"
             />
           </div>
 
-          <div>
+          <div className="min-w-0">
             <label className="text-sm font-medium text-white/60 mb-1.5 block">Subject</label>
             <Input
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-w-0"
               data-testid="input-send-subject"
             />
           </div>
 
-          <div>
+          <div className="min-w-0">
             <label className="text-sm font-medium text-white/60 mb-1.5 block">Message</label>
             <Textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={6}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/30 resize-none text-sm"
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/30 resize-none text-sm min-w-0"
               data-testid="input-send-message"
             />
           </div>
