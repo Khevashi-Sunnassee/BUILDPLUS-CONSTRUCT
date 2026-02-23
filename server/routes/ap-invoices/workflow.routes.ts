@@ -60,23 +60,34 @@ export function registerWorkflowRoutes(router: Router, deps: SharedDeps): void {
       }
 
       if (existing.invoiceNumber && existing.supplierId) {
+        const totalAmount = existing.totalInc || existing.totalEx || "0";
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+        const conditions = [
+          eq(apInvoices.companyId, companyId),
+          eq(apInvoices.invoiceNumber, existing.invoiceNumber!),
+          eq(apInvoices.supplierId, existing.supplierId!),
+          sql`${apInvoices.id} != ${id}`,
+          sql`${apInvoices.status} NOT IN ('REJECTED')`,
+        ];
+
+        if (parseFloat(totalAmount) > 0) {
+          conditions.push(
+            sql`COALESCE(${apInvoices.totalInc}, ${apInvoices.totalEx}, '0') = ${totalAmount}`
+          );
+        }
+
+        conditions.push(sql`${apInvoices.createdAt} >= ${twentyFourHoursAgo}`);
+
         const [duplicate] = await db
           .select({ id: apInvoices.id, invoiceNumber: apInvoices.invoiceNumber, status: apInvoices.status })
           .from(apInvoices)
-          .where(
-            and(
-              eq(apInvoices.companyId, companyId),
-              eq(apInvoices.invoiceNumber, existing.invoiceNumber),
-              eq(apInvoices.supplierId, existing.supplierId),
-              sql`${apInvoices.id} != ${id}`,
-              sql`${apInvoices.status} NOT IN ('REJECTED')`
-            )
-          )
+          .where(and(...conditions))
           .limit(1);
 
         if (duplicate) {
           return res.status(409).json({
-            error: `Potential duplicate: invoice ${existing.invoiceNumber} from this supplier already exists (ID: ${duplicate.id}, status: ${duplicate.status})`,
+            error: "A similar invoice was submitted recently. Please verify this is not a duplicate.",
             duplicateInvoiceId: duplicate.id,
             duplicateStatus: duplicate.status,
           });

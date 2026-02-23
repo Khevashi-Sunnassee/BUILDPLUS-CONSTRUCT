@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { useCtrlScrollZoom } from "@/hooks/use-ctrl-scroll-zoom";
@@ -1301,7 +1301,19 @@ export default function ApInvoiceDetailPage() {
 
   const confirmMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", AP_INVOICE_ROUTES.CONFIRM(invoiceId!));
+      const res = await fetch(AP_INVOICE_ROUTES.CONFIRM(invoiceId!), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-csrf-token": getCsrfToken() },
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const err = new Error(body.error || "Failed to confirm invoice");
+        (err as any).status = res.status;
+        (err as any).duplicateInvoiceId = body.duplicateInvoiceId;
+        throw err;
+      }
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.BY_ID(invoiceId!)] });
@@ -1309,8 +1321,17 @@ export default function ApInvoiceDetailPage() {
       queryClient.invalidateQueries({ queryKey: [AP_INVOICE_ROUTES.COUNTS] });
       toast({ title: "Invoice confirmed" });
     },
-    onError: (err: Error) => {
-      toast({ title: "Confirm failed", description: err.message, variant: "destructive" });
+    onError: (err: any) => {
+      if (err.status === 409) {
+        toast({
+          title: "Possible duplicate invoice",
+          description: err.message,
+          variant: "destructive",
+          duration: 8000,
+        });
+      } else {
+        toast({ title: "Confirm failed", description: err.message, variant: "destructive" });
+      }
     },
   });
 
