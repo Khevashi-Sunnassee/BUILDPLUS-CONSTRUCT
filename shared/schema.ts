@@ -5835,6 +5835,28 @@ export const insertReviewManualAssessmentSchema = createInsertSchema(reviewManua
 export type InsertReviewManualAssessment = z.infer<typeof insertReviewManualAssessmentSchema>;
 export type ReviewManualAssessment = typeof reviewManualAssessments.$inferSelect;
 
+export const reviewRecommendationStatusEnum = pgEnum("review_recommendation_status", ["PENDING", "IMPLEMENTED", "DISMISSED"]);
+
+export const reviewRecommendations = pgTable("review_recommendations", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  targetId: text("target_id").notNull().references(() => reviewTargets.id, { onDelete: "cascade" }),
+  dimension: text("dimension").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  agentPrompt: text("agent_prompt").notNull(),
+  priority: text("priority").notNull().default("medium"),
+  status: reviewRecommendationStatusEnum("status").notNull().default("PENDING"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  targetIdIdx: index("review_recommendations_target_id_idx").on(table.targetId),
+  statusIdx: index("review_recommendations_status_idx").on(table.status),
+}));
+
+export const insertReviewRecommendationSchema = createInsertSchema(reviewRecommendations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertReviewRecommendation = z.infer<typeof insertReviewRecommendationSchema>;
+export type ReviewRecommendation = typeof reviewRecommendations.$inferSelect;
+
 export const externalApiKeys = pgTable("external_api_keys", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),

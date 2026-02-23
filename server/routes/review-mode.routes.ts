@@ -7,7 +7,7 @@ import { requireSuperAdmin } from "./middleware/auth.middleware";
 import { reviewModeMethods } from "../storage/review-mode";
 import { generatePacket, packetToMarkdown, runReview, mergeTaskpacks, sanitizeContent } from "../services/review-engine";
 import { db } from "../db";
-import { reviewContextVersions, reviewManualAssessments } from "@shared/schema";
+import { reviewContextVersions, reviewManualAssessments, reviewRecommendations } from "@shared/schema";
 import { desc, sql } from "drizzle-orm";
 import logger from "../lib/logger";
 
@@ -503,7 +503,7 @@ router.post("/api/super-admin/review-mode/packets/:id/score", requireSuperAdmin,
 
     for (const key of breakdownKeys) {
       const vals = scores.map(s => s.breakdown?.[key]).filter((v: any) => typeof v === "number");
-      avgBreakdown[key] = vals.length > 0 ? Math.round(vals.reduce((a: number, b: number) => a + b, 0) / vals.length) : 3;
+      avgBreakdown[key] = vals.length > 0 ? Math.round(vals.reduce((a: number, b: number) => a + b, 0) / vals.length) : 5;
     }
 
     const overallScore = Math.round(
@@ -555,16 +555,16 @@ router.get("/api/super-admin/review-mode/taskpacks", requireSuperAdmin, async (r
 
 const createAuditSchema = z.object({
   targetId: z.string().min(1),
-  overallScore: z.number().min(1).max(5),
+  overallScore: z.number().min(1).max(10),
   scoreBreakdown: z.object({
-    functionality: z.number().min(1).max(5),
-    uiUx: z.number().min(1).max(5),
-    security: z.number().min(1).max(5),
-    performance: z.number().min(1).max(5),
-    codeQuality: z.number().min(1).max(5),
-    dataIntegrity: z.number().min(1).max(5),
-    errorHandling: z.number().min(1).max(5),
-    accessibility: z.number().min(1).max(5),
+    functionality: z.number().min(1).max(10),
+    uiUx: z.number().min(1).max(10),
+    security: z.number().min(1).max(10),
+    performance: z.number().min(1).max(10),
+    codeQuality: z.number().min(1).max(10),
+    dataIntegrity: z.number().min(1).max(10),
+    errorHandling: z.number().min(1).max(10),
+    accessibility: z.number().min(1).max(10),
     functionalityNotes: z.string().optional(),
     uiUxNotes: z.string().optional(),
     securityNotes: z.string().optional(),
@@ -784,9 +784,9 @@ function generateDefaultNotes(dimension: string, score: number, findingsMd: stri
   if (!guidance) return "";
 
   let notes = "";
-  if (score <= 2) {
+  if (score <= 4) {
     notes = guidance.low;
-  } else if (score <= 3) {
+  } else if (score <= 6) {
     notes = guidance.medium;
   } else {
     notes = guidance.high;
@@ -830,18 +830,18 @@ router.get("/api/super-admin/review-mode/queue", requireSuperAdmin, async (_req:
     const unreviewed = targets.filter(t => !t.lastReviewedAt);
 
     const dimensionKeys = ["functionality", "uiUx", "security", "performance", "codeQuality", "dataIntegrity", "errorHandling", "accessibility"];
-    const hasAnyDimensionBelow4 = (t: typeof targets[0]): boolean => {
+    const hasAnyDimensionBelowThreshold = (t: typeof targets[0]): boolean => {
       if (!t.latestScoreBreakdown || typeof t.latestScoreBreakdown !== "object") return false;
       const breakdown = t.latestScoreBreakdown as Record<string, unknown>;
       return dimensionKeys.some(key => {
         const val = breakdown[key];
         const numVal = typeof val === "number" ? val : typeof val === "string" ? Number(val) : NaN;
-        return !isNaN(numVal) && numVal < 4;
+        return !isNaN(numVal) && numVal < 8;
       });
     };
 
-    const needsWork = targets.filter(t => t.latestScore !== null && (t.latestScore < 4 || hasAnyDimensionBelow4(t))).sort((a, b) => (a.latestScore || 0) - (b.latestScore || 0));
-    const reviewed = targets.filter(t => t.latestScore !== null && t.latestScore >= 4 && !hasAnyDimensionBelow4(t)).sort((a, b) => (b.latestScore || 0) - (a.latestScore || 0));
+    const needsWork = targets.filter(t => t.latestScore !== null && (t.latestScore < 8 || hasAnyDimensionBelowThreshold(t))).sort((a, b) => (a.latestScore || 0) - (b.latestScore || 0));
+    const reviewed = targets.filter(t => t.latestScore !== null && t.latestScore >= 8 && !hasAnyDimensionBelowThreshold(t)).sort((a, b) => (b.latestScore || 0) - (a.latestScore || 0));
 
     res.json({
       unreviewed,
@@ -867,7 +867,7 @@ router.get("/api/super-admin/review-mode/queue", requireSuperAdmin, async (_req:
 const manualAssessmentSchema = z.object({
   targetId: z.string().min(1),
   percentComplete: z.number().min(0).max(100),
-  starRating: z.number().min(1).max(5),
+  starRating: z.number().min(1).max(10),
   comments: z.string().optional().nullable(),
 });
 
@@ -913,7 +913,7 @@ router.patch("/api/super-admin/review-mode/assessments/:id", requireSuperAdmin, 
   try {
     const updateSchema = z.object({
       percentComplete: z.number().min(0).max(100).optional(),
-      starRating: z.number().min(1).max(5).optional(),
+      starRating: z.number().min(1).max(10).optional(),
       comments: z.string().optional().nullable(),
     });
     const parsed = updateSchema.safeParse(req.body);
@@ -944,6 +944,141 @@ router.delete("/api/super-admin/review-mode/assessments/:id", requireSuperAdmin,
   } catch (error: any) {
     logger.error({ error: error.message }, "Failed to delete manual assessment");
     res.status(500).json({ error: "Failed to delete manual assessment" });
+  }
+});
+
+const recommendationSchema = z.object({
+  targetId: z.string().min(1),
+  dimension: z.string().min(1),
+  title: z.string().min(1).max(500),
+  description: z.string().min(1),
+  agentPrompt: z.string().min(1),
+  priority: z.enum(["low", "medium", "high"]).optional().default("medium"),
+});
+
+router.get("/api/super-admin/review-mode/recommendations", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const targetId = req.query.targetId as string | undefined;
+    const status = req.query.status as string | undefined;
+
+    let query = db.select().from(reviewRecommendations);
+    
+    if (targetId && status) {
+      query = query.where(sql`${reviewRecommendations.targetId} = ${targetId} AND ${reviewRecommendations.status} = ${status}`) as any;
+    } else if (targetId) {
+      query = query.where(sql`${reviewRecommendations.targetId} = ${targetId}`) as any;
+    } else if (status) {
+      query = query.where(sql`${reviewRecommendations.status} = ${status}`) as any;
+    }
+
+    const recommendations = await (query as any).orderBy(desc(reviewRecommendations.createdAt));
+    res.json(recommendations);
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to fetch recommendations");
+    res.status(500).json({ error: "Failed to fetch recommendations" });
+  }
+});
+
+router.post("/api/super-admin/review-mode/recommendations", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const parsed = recommendationSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+
+    const [rec] = await db.insert(reviewRecommendations).values(parsed.data).returning();
+    res.json(rec);
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to create recommendation");
+    res.status(500).json({ error: "Failed to create recommendation" });
+  }
+});
+
+router.post("/api/super-admin/review-mode/recommendations/bulk", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const parsed = z.array(recommendationSchema).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+
+    if (parsed.data.length === 0) return res.json({ created: 0 });
+
+    const created = await db.insert(reviewRecommendations).values(parsed.data).returning();
+    res.json({ created: created.length, recommendations: created });
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to bulk create recommendations");
+    res.status(500).json({ error: "Failed to bulk create recommendations" });
+  }
+});
+
+router.patch("/api/super-admin/review-mode/recommendations/:id", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const updateSchema = z.object({
+      status: z.enum(["PENDING", "IMPLEMENTED", "DISMISSED"]).optional(),
+      title: z.string().min(1).max(500).optional(),
+      description: z.string().min(1).optional(),
+      agentPrompt: z.string().min(1).optional(),
+      priority: z.enum(["low", "medium", "high"]).optional(),
+    });
+    const parsed = updateSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+
+    const [existing] = await db.select().from(reviewRecommendations).where(sql`${reviewRecommendations.id} = ${req.params.id}`);
+    if (!existing) return res.status(404).json({ error: "Recommendation not found" });
+
+    const [updated] = await db.update(reviewRecommendations)
+      .set({ ...parsed.data, updatedAt: new Date() })
+      .where(sql`${reviewRecommendations.id} = ${req.params.id}`)
+      .returning();
+
+    res.json(updated);
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to update recommendation");
+    res.status(500).json({ error: "Failed to update recommendation" });
+  }
+});
+
+router.delete("/api/super-admin/review-mode/recommendations/:id", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const [existing] = await db.select().from(reviewRecommendations).where(sql`${reviewRecommendations.id} = ${req.params.id}`);
+    if (!existing) return res.status(404).json({ error: "Recommendation not found" });
+
+    await db.delete(reviewRecommendations).where(sql`${reviewRecommendations.id} = ${req.params.id}`);
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to delete recommendation");
+    res.status(500).json({ error: "Failed to delete recommendation" });
+  }
+});
+
+router.get("/api/super-admin/review-mode/recommendations/summary", requireSuperAdmin, async (_req: Request, res: Response) => {
+  try {
+    const targets = await reviewModeMethods.getTargets();
+    const allRecs = await db.select().from(reviewRecommendations).orderBy(desc(reviewRecommendations.createdAt));
+
+    const targetMap = new Map(targets.map(t => [t.id, t]));
+    const grouped: Record<string, { target: any; recommendations: any[] }> = {};
+
+    for (const rec of allRecs) {
+      if (!grouped[rec.targetId]) {
+        const target = targetMap.get(rec.targetId);
+        grouped[rec.targetId] = {
+          target: target || { id: rec.targetId, pageTitle: "Unknown", routePath: "", module: "" },
+          recommendations: [],
+        };
+      }
+      grouped[rec.targetId].recommendations.push(rec);
+    }
+
+    const pages = Object.values(grouped).sort((a, b) => a.target.pageTitle.localeCompare(b.target.pageTitle));
+    const stats = {
+      totalRecommendations: allRecs.length,
+      pending: allRecs.filter(r => r.status === "PENDING").length,
+      implemented: allRecs.filter(r => r.status === "IMPLEMENTED").length,
+      dismissed: allRecs.filter(r => r.status === "DISMISSED").length,
+      pagesWithRecommendations: pages.length,
+    };
+
+    res.json({ pages, stats });
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to fetch recommendations summary");
+    res.status(500).json({ error: "Failed to fetch recommendations summary" });
   }
 });
 

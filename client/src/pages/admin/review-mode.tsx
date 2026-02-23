@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   ChevronLeft, Loader2, Monitor, Smartphone, Star, BarChart3,
   Search, CheckCircle2, XCircle, Clock, AlertTriangle, FileText,
-  Download, ArrowLeft, ChevronDown, ChevronRight, Plus, Pencil, Trash2, User
+  Download, ArrowLeft, ChevronDown, ChevronRight, Plus, Pencil, Trash2, User,
+  Lightbulb, Copy, Check, Eye, EyeOff, Sparkles
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,20 +91,21 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function StarRating({ score, size = "md" }: { score: number | null; size?: "sm" | "md" | "lg" }) {
+function ScoreDisplay({ score, size = "md" }: { score: number | null; size?: "sm" | "md" | "lg" }) {
   if (score === null || score === undefined) return <span className="text-muted-foreground text-xs">Not scored</span>;
-  const sizeClass = size === "sm" ? "h-3 w-3" : size === "lg" ? "h-6 w-6" : "h-4 w-4";
+  const color = score >= 8 ? "text-green-600" : score >= 6 ? "text-yellow-600" : "text-red-600";
+  const bgColor = score >= 8 ? "bg-green-100 dark:bg-green-900/30" : score >= 6 ? "bg-yellow-100 dark:bg-yellow-900/30" : "bg-red-100 dark:bg-red-900/30";
+  const fontSize = size === "sm" ? "text-xs" : size === "lg" ? "text-xl" : "text-sm";
+  const padding = size === "sm" ? "px-1.5 py-0.5" : size === "lg" ? "px-3 py-1" : "px-2 py-0.5";
   return (
-    <div className="flex items-center gap-0.5" data-testid={`star-rating-${score}`}>
-      {[1, 2, 3, 4, 5].map((s) => (
-        <Star
-          key={s}
-          className={`${sizeClass} ${s <= score ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/30"}`}
-        />
-      ))}
-      <span className={`ml-1 font-semibold ${size === "sm" ? "text-xs" : "text-sm"}`}>{score}/5</span>
+    <div className="flex items-center gap-1.5" data-testid={`score-display-${score}`}>
+      <span className={`${fontSize} font-bold ${color} ${bgColor} ${padding} rounded-md`}>{score}/10</span>
     </div>
   );
+}
+
+function StarRating({ score, size = "md" }: { score: number | null; size?: "sm" | "md" | "lg" }) {
+  return <ScoreDisplay score={score} size={size} />;
 }
 
 const DIMENSION_DEFINITIONS = [
@@ -129,8 +131,8 @@ function ScoreBreakdownCard({ breakdown, expandable = true }: { breakdown: any; 
         {DIMENSION_DEFINITIONS.map(({ key, label, notesKey }) => {
           const val = breakdown[key] ?? 0;
           const notes = breakdown[notesKey];
-          const color = val >= 4 ? "text-green-600" : val >= 3 ? "text-yellow-600" : "text-red-600";
-          const bgColor = val >= 4 ? "border-green-500/20" : val >= 3 ? "border-yellow-500/20" : "border-red-500/20";
+          const color = val >= 8 ? "text-green-600" : val >= 6 ? "text-yellow-600" : "text-red-600";
+          const bgColor = val >= 8 ? "border-green-500/20" : val >= 6 ? "border-yellow-500/20" : "border-red-500/20";
           const isExpanded = expandedDimension === key;
           const hasNotes = !!notes;
 
@@ -148,12 +150,7 @@ function ScoreBreakdownCard({ breakdown, expandable = true }: { breakdown: any; 
               data-testid={`dimension-card-${key}`}
             >
               <span className="text-xs text-muted-foreground">{label}</span>
-              <div className="flex items-center gap-1 mt-1">
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <Star key={s} className={`h-3 w-3 ${s <= val ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/20"}`} />
-                ))}
-              </div>
-              <span className={`text-sm font-bold ${color}`}>{val}/5</span>
+              <span className={`text-lg font-bold ${color} mt-1`}>{val}/10</span>
               {expandable && hasNotes && (
                 <span className="text-[10px] text-muted-foreground mt-1 flex items-center gap-0.5">
                   {isExpanded ? <ChevronDown className="h-2.5 w-2.5" /> : <ChevronRight className="h-2.5 w-2.5" />}
@@ -191,8 +188,8 @@ function DimensionNotesPanel({
 }) {
   const val = breakdown[dimension.key] ?? 0;
   const notes = breakdown[dimension.notesKey] || "";
-  const color = val >= 4 ? "text-green-600" : val >= 3 ? "text-yellow-600" : "text-red-600";
-  const bgClass = val >= 4 ? "border-green-500/30 bg-green-500/5" : val >= 3 ? "border-yellow-500/30 bg-yellow-500/5" : "border-red-500/30 bg-red-500/5";
+  const color = val >= 8 ? "text-green-600" : val >= 6 ? "text-yellow-600" : "text-red-600";
+  const bgClass = val >= 8 ? "border-green-500/30 bg-green-500/5" : val >= 6 ? "border-yellow-500/30 bg-yellow-500/5" : "border-red-500/30 bg-red-500/5";
 
   const sections = parseNoteSections(notes);
 
@@ -201,12 +198,7 @@ function DimensionNotesPanel({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h4 className="text-sm font-semibold">{dimension.label}</h4>
-          <span className={`text-sm font-bold ${color}`}>{val}/5</span>
-          <div className="flex items-center gap-0.5">
-            {[1, 2, 3, 4, 5].map((s) => (
-              <Star key={s} className={`h-3 w-3 ${s <= val ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground/20"}`} />
-            ))}
-          </div>
+          <span className={`text-sm font-bold ${color}`}>{val}/10</span>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-dimension-notes">
           <XCircle className="h-4 w-4" />
@@ -258,8 +250,8 @@ function parseNoteSections(notes: string): { heading: string | null; content: st
 
 function scoreColor(score: number | null): string {
   if (score === null) return "text-muted-foreground";
-  if (score >= 4) return "text-green-600";
-  if (score >= 3) return "text-yellow-600";
+  if (score >= 8) return "text-green-600";
+  if (score >= 6) return "text-yellow-600";
   return "text-red-600";
 }
 
@@ -410,7 +402,7 @@ function TargetList({ targets, search, onSelect }: { targets: ReviewTarget[]; se
   );
 }
 
-function DashboardView({ onSelectTarget, onDiscover }: { onSelectTarget: (t: ReviewTarget) => void; onDiscover: () => void }) {
+function DashboardView({ onSelectTarget, onDiscover, onRecommendations }: { onSelectTarget: (t: ReviewTarget) => void; onDiscover: () => void; onRecommendations: () => void }) {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
 
@@ -461,10 +453,16 @@ function DashboardView({ onSelectTarget, onDiscover }: { onSelectTarget: (t: Rev
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Review Scoreboard</h1>
           <p className="text-sm text-muted-foreground">Track agent-driven page audit progress</p>
         </div>
-        <Button onClick={onDiscover} data-testid="button-discover-pages">
-          <Download className="h-4 w-4 mr-2" />
-          Discover Pages
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={onRecommendations} data-testid="button-recommendations">
+            <Lightbulb className="h-4 w-4 mr-2" />
+            Recommendations
+          </Button>
+          <Button onClick={onDiscover} data-testid="button-discover-pages">
+            <Download className="h-4 w-4 mr-2" />
+            Discover Pages
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3" data-testid="stats-bar">
@@ -568,35 +566,42 @@ interface ManualAssessment {
   updatedAt: string;
 }
 
-function InteractiveStarRating({ value, onChange, size = "md" }: { value: number; onChange: (v: number) => void; size?: "sm" | "md" | "lg" }) {
-  const [hovered, setHovered] = useState<number | null>(null);
-  const sizeClass = size === "sm" ? "h-4 w-4" : size === "lg" ? "h-8 w-8" : "h-6 w-6";
+function InteractiveScoreRating({ value, onChange, size = "md" }: { value: number; onChange: (v: number) => void; size?: "sm" | "md" | "lg" }) {
+  const scores = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const btnSize = size === "lg" ? "h-9 w-9 text-sm" : size === "sm" ? "h-6 w-6 text-xs" : "h-7 w-7 text-xs";
   return (
-    <div className="flex items-center gap-1" data-testid="interactive-star-rating">
-      {[1, 2, 3, 4, 5].map((s) => (
-        <Star
-          key={s}
-          className={`${sizeClass} cursor-pointer transition-colors ${
-            s <= (hovered ?? value)
-              ? "fill-yellow-400 text-yellow-400"
-              : "text-muted-foreground/30 hover:text-yellow-300"
-          }`}
-          onClick={() => onChange(s)}
-          onMouseEnter={() => setHovered(s)}
-          onMouseLeave={() => setHovered(null)}
-          data-testid={`star-select-${s}`}
-        />
-      ))}
-      <span className="ml-2 font-semibold text-sm">{hovered ?? value}/5</span>
+    <div className="flex items-center gap-1 flex-wrap" data-testid="interactive-score-rating">
+      {scores.map((s) => {
+        const isSelected = s === value;
+        const color = s >= 8 ? "bg-green-500 text-white" : s >= 6 ? "bg-yellow-500 text-white" : s >= 4 ? "bg-orange-500 text-white" : "bg-red-500 text-white";
+        return (
+          <button
+            key={s}
+            type="button"
+            className={`${btnSize} rounded-md font-bold transition-all ${
+              isSelected ? `${color} ring-2 ring-offset-1 ring-primary` : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+            onClick={() => onChange(s)}
+            data-testid={`score-select-${s}`}
+          >
+            {s}
+          </button>
+        );
+      })}
+      <span className="ml-2 font-semibold text-sm">{value}/10</span>
     </div>
   );
+}
+
+function InteractiveStarRating({ value, onChange, size = "md" }: { value: number; onChange: (v: number) => void; size?: "sm" | "md" | "lg" }) {
+  return <InteractiveScoreRating value={value} onChange={onChange} size={size} />;
 }
 
 function ManualAssessmentSection({ targetId }: { targetId: string }) {
   const { toast } = useToast();
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingAssessment, setEditingAssessment] = useState<ManualAssessment | null>(null);
-  const [starRating, setStarRating] = useState(3);
+  const [starRating, setStarRating] = useState(5);
   const [percentComplete, setPercentComplete] = useState(50);
   const [comments, setComments] = useState("");
 
@@ -644,7 +649,7 @@ function ManualAssessmentSection({ targetId }: { targetId: string }) {
   });
 
   const resetForm = () => {
-    setStarRating(3);
+    setStarRating(5);
     setPercentComplete(50);
     setComments("");
   };
@@ -814,7 +819,7 @@ function ManualAssessmentSection({ targetId }: { targetId: string }) {
           </DialogHeader>
           <div className="space-y-6 py-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Star Rating</label>
+              <label className="text-sm font-medium mb-2 block">Score (1-10)</label>
               <InteractiveStarRating value={starRating} onChange={setStarRating} size="lg" />
             </div>
             <div>
@@ -1152,8 +1157,348 @@ function DiscoverView({ onBack }: { onBack: () => void }) {
   );
 }
 
+interface Recommendation {
+  id: string;
+  targetId: string;
+  dimension: string;
+  title: string;
+  description: string;
+  agentPrompt: string;
+  priority: string;
+  status: "PENDING" | "IMPLEMENTED" | "DISMISSED";
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface RecommendationsSummary {
+  pages: Array<{
+    target: ReviewTarget;
+    recommendations: Recommendation[];
+  }>;
+  stats: {
+    totalRecommendations: number;
+    pending: number;
+    implemented: number;
+    dismissed: number;
+    pagesWithRecommendations: number;
+  };
+}
+
+function RecommendationsView({ onBack }: { onBack: () => void }) {
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "IMPLEMENTED" | "DISMISSED">("ALL");
+  const [expandedPageId, setExpandedPageId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showPromptId, setShowPromptId] = useState<string | null>(null);
+
+  const { data: summary, isLoading } = useQuery<RecommendationsSummary>({
+    queryKey: [`${API_BASE}/recommendations/summary`],
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await apiRequest("PATCH", `${API_BASE}/recommendations/${id}`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/recommendations`] });
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/recommendations/summary`] });
+      toast({ title: "Recommendation updated" });
+    },
+    onError: () => toast({ title: "Failed to update", variant: "destructive" }),
+  });
+
+  const filteredPages = useMemo(() => {
+    if (!summary) return [];
+    let pages = summary.pages;
+
+    if (statusFilter !== "ALL") {
+      pages = pages
+        .map(p => ({
+          ...p,
+          recommendations: p.recommendations.filter(r => r.status === statusFilter),
+        }))
+        .filter(p => p.recommendations.length > 0);
+    }
+
+    if (search) {
+      const q = search.toLowerCase();
+      pages = pages
+        .map(p => ({
+          ...p,
+          recommendations: p.recommendations.filter(
+            r => r.title.toLowerCase().includes(q) || r.description.toLowerCase().includes(q) || r.dimension.toLowerCase().includes(q)
+          ),
+        }))
+        .filter(p => p.target.pageTitle.toLowerCase().includes(q) || p.recommendations.length > 0);
+    }
+
+    return pages;
+  }, [summary, search, statusFilter]);
+
+  const copyPrompt = (rec: Recommendation) => {
+    navigator.clipboard.writeText(rec.agentPrompt);
+    setCopiedId(rec.id);
+    toast({ title: "Copied to clipboard", description: "Paste this into a Replit Agent chat to implement." });
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const priorityColor = (p: string) => {
+    if (p === "high") return "text-red-600 bg-red-100 dark:bg-red-900/30";
+    if (p === "medium") return "text-yellow-600 bg-yellow-100 dark:bg-yellow-900/30";
+    return "text-blue-600 bg-blue-100 dark:bg-blue-900/30";
+  };
+
+  const statusBadge = (s: string) => {
+    if (s === "IMPLEMENTED") return <Badge variant="default" className="bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Done</Badge>;
+    if (s === "DISMISSED") return <Badge variant="secondary"><XCircle className="h-3 w-3 mr-1" />Dismissed</Badge>;
+    return <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+  };
+
+  const stats = summary?.stats;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Button variant="ghost" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-2" />Back to Scoreboard</Button>
+        <Skeleton className="h-20 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4" data-testid="recommendations-view">
+      <Button variant="ghost" onClick={onBack} data-testid="button-back-from-recs">
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Back to Scoreboard
+      </Button>
+
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-recs-title">
+            <Lightbulb className="h-6 w-6 text-yellow-500" />
+            Recommendations
+          </h1>
+          <p className="text-sm text-muted-foreground">Click any recommendation to see the exact agent instructions. Click "Implement" to copy them.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3" data-testid="recs-stats">
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-2xl font-bold" data-testid="stat-recs-total">{stats?.totalRecommendations ?? 0}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-xs text-muted-foreground">Pending</p>
+            <p className="text-2xl font-bold text-yellow-600" data-testid="stat-recs-pending">{stats?.pending ?? 0}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-xs text-muted-foreground">Implemented</p>
+            <p className="text-2xl font-bold text-green-600" data-testid="stat-recs-implemented">{stats?.implemented ?? 0}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-xs text-muted-foreground">Pages</p>
+            <p className="text-2xl font-bold" data-testid="stat-recs-pages">{stats?.pagesWithRecommendations ?? 0}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex-1 min-w-[200px] flex items-center gap-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search recommendations..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1"
+            data-testid="input-search-recs"
+          />
+        </div>
+        <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+          <TabsList>
+            <TabsTrigger value="ALL" data-testid="tab-recs-all">All</TabsTrigger>
+            <TabsTrigger value="PENDING" data-testid="tab-recs-pending">Pending</TabsTrigger>
+            <TabsTrigger value="IMPLEMENTED" data-testid="tab-recs-implemented">Done</TabsTrigger>
+            <TabsTrigger value="DISMISSED" data-testid="tab-recs-dismissed">Dismissed</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {filteredPages.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Lightbulb className="h-10 w-10 mx-auto mb-3 text-muted-foreground opacity-40" />
+            <p className="text-sm text-muted-foreground">
+              {search || statusFilter !== "ALL" ? "No recommendations match your filters." : "No recommendations yet. Run a full audit to generate them."}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3" data-testid="recs-page-list">
+          {filteredPages.map(({ target, recommendations }) => {
+            const isExpanded = expandedPageId === target.id;
+            const pendingCount = recommendations.filter(r => r.status === "PENDING").length;
+            return (
+              <Card key={target.id} data-testid={`recs-page-${target.id}`}>
+                <div
+                  className="flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => setExpandedPageId(isExpanded ? null : target.id)}
+                  data-testid={`button-expand-page-${target.id}`}
+                >
+                  {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium">{target.pageTitle}</div>
+                    <div className="text-xs text-muted-foreground">{target.routePath}</div>
+                  </div>
+                  <Badge variant="outline" className="text-xs">{target.module}</Badge>
+                  <ScoreDisplay score={target.latestScore} size="sm" />
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-medium">{recommendations.length}</span>
+                    <span className="text-xs text-muted-foreground">rec{recommendations.length !== 1 ? "s" : ""}</span>
+                    {pendingCount > 0 && (
+                      <Badge variant="outline" className="text-xs bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400">
+                        {pendingCount} pending
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                {isExpanded && (
+                  <div className="border-t px-4 pb-4 space-y-2">
+                    {recommendations.map((rec) => (
+                      <div key={rec.id} className="border rounded-lg p-3 mt-2" data-testid={`rec-item-${rec.id}`}>
+                        <div className="flex items-start gap-3">
+                          <Sparkles className="h-4 w-4 mt-0.5 text-yellow-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="font-medium text-sm">{rec.title}</span>
+                              <Badge variant="outline" className="text-[10px]">{rec.dimension}</Badge>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${priorityColor(rec.priority)}`}>
+                                {rec.priority}
+                              </span>
+                              {statusBadge(rec.status)}
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-2">{rec.description}</p>
+
+                            {showPromptId === rec.id && (
+                              <div className="bg-muted/50 border rounded-md p-3 mb-2" data-testid={`prompt-display-${rec.id}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-semibold text-muted-foreground uppercase">Agent Instructions</span>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 text-xs"
+                                    onClick={(e) => { e.stopPropagation(); copyPrompt(rec); }}
+                                    data-testid={`button-copy-prompt-${rec.id}`}
+                                  >
+                                    {copiedId === rec.id ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                                    {copiedId === rec.id ? "Copied!" : "Copy"}
+                                  </Button>
+                                </div>
+                                <pre className="text-xs whitespace-pre-wrap font-mono leading-relaxed">{rec.agentPrompt}</pre>
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                onClick={(e) => { e.stopPropagation(); setShowPromptId(showPromptId === rec.id ? null : rec.id); }}
+                                data-testid={`button-toggle-prompt-${rec.id}`}
+                              >
+                                {showPromptId === rec.id ? <EyeOff className="h-3 w-3 mr-1" /> : <Eye className="h-3 w-3 mr-1" />}
+                                {showPromptId === rec.id ? "Hide Instructions" : "View Instructions"}
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs bg-primary"
+                                onClick={(e) => { e.stopPropagation(); copyPrompt(rec); }}
+                                data-testid={`button-implement-${rec.id}`}
+                              >
+                                {copiedId === rec.id ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                                {copiedId === rec.id ? "Copied!" : "Implement"}
+                              </Button>
+
+                              {rec.status === "PENDING" && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 text-xs text-green-600"
+                                    onClick={(e) => { e.stopPropagation(); updateStatusMutation.mutate({ id: rec.id, status: "IMPLEMENTED" }); }}
+                                    disabled={updateStatusMutation.isPending}
+                                    data-testid={`button-mark-done-${rec.id}`}
+                                  >
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    Mark Done
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 text-xs text-muted-foreground"
+                                    onClick={(e) => { e.stopPropagation(); updateStatusMutation.mutate({ id: rec.id, status: "DISMISSED" }); }}
+                                    disabled={updateStatusMutation.isPending}
+                                    data-testid={`button-dismiss-${rec.id}`}
+                                  >
+                                    <XCircle className="h-3 w-3 mr-1" />
+                                    Dismiss
+                                  </Button>
+                                </>
+                              )}
+
+                              {rec.status === "IMPLEMENTED" && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 text-xs"
+                                  onClick={(e) => { e.stopPropagation(); updateStatusMutation.mutate({ id: rec.id, status: "PENDING" }); }}
+                                  disabled={updateStatusMutation.isPending}
+                                  data-testid={`button-reopen-${rec.id}`}
+                                >
+                                  Reopen
+                                </Button>
+                              )}
+
+                              {rec.status === "DISMISSED" && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 text-xs"
+                                  onClick={(e) => { e.stopPropagation(); updateStatusMutation.mutate({ id: rec.id, status: "PENDING" }); }}
+                                  disabled={updateStatusMutation.isPending}
+                                  data-testid={`button-restore-${rec.id}`}
+                                >
+                                  Restore
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ReviewModePage() {
-  const [view, setView] = useState<"dashboard" | "target-detail" | "discover">("dashboard");
+  const [view, setView] = useState<"dashboard" | "target-detail" | "discover" | "recommendations">("dashboard");
   const [selectedTarget, setSelectedTarget] = useState<ReviewTarget | null>(null);
 
   const handleSelectTarget = (target: ReviewTarget) => {
@@ -1172,6 +1517,7 @@ export default function ReviewModePage() {
         <DashboardView
           onSelectTarget={handleSelectTarget}
           onDiscover={() => setView("discover")}
+          onRecommendations={() => setView("recommendations")}
         />
       )}
       {view === "target-detail" && selectedTarget && (
@@ -1182,6 +1528,9 @@ export default function ReviewModePage() {
       )}
       {view === "discover" && (
         <DiscoverView onBack={handleBackToDashboard} />
+      )}
+      {view === "recommendations" && (
+        <RecommendationsView onBack={handleBackToDashboard} />
       )}
     </div>
   );
