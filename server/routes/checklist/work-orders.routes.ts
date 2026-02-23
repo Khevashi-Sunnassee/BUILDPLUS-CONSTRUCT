@@ -2,16 +2,13 @@ import {
   Router, Request, Response,
   eq, and, desc,
   db,
-  checklistInstances, checklistWorkOrders,
+  checklistInstances, checklistWorkOrders, checklistTemplates, users,
   requireAuth, requireRole,
   logger,
 } from "./shared";
+import { sql as dsql } from "drizzle-orm";
 
 const router = Router();
-
-// ============================================================================
-// REPORTING ENDPOINTS
-// ============================================================================
 
 router.get("/api/checklist/reports/summary", requireAuth, async (req: Request, res: Response) => {
   try {
@@ -49,10 +46,6 @@ router.get("/api/checklist/reports/summary", requireAuth, async (req: Request, r
   }
 });
 
-// ============================================================================
-// WORK ORDERS CRUD
-// ============================================================================
-
 router.get("/api/checklist/instances/:instanceId/work-orders", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
@@ -78,6 +71,38 @@ router.get("/api/checklist/instances/:instanceId/work-orders", requireAuth, asyn
   }
 });
 
+router.get("/api/checklist/work-orders/stats", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) {
+      return res.status(400).json({ error: "Company ID required" });
+    }
+
+    const orders = await db.select({
+      status: checklistWorkOrders.status,
+      priority: checklistWorkOrders.priority,
+    }).from(checklistWorkOrders)
+      .where(eq(checklistWorkOrders.companyId, companyId))
+      .limit(5000);
+
+    const stats = {
+      total: orders.length,
+      open: orders.filter(o => o.status === "open").length,
+      inProgress: orders.filter(o => o.status === "in_progress").length,
+      resolved: orders.filter(o => o.status === "resolved").length,
+      closed: orders.filter(o => o.status === "closed").length,
+      cancelled: orders.filter(o => o.status === "cancelled").length,
+      critical: orders.filter(o => o.priority === "critical").length,
+      high: orders.filter(o => o.priority === "high").length,
+    };
+
+    res.json(stats);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Failed to fetch work order stats");
+    res.status(500).json({ error: "Failed to fetch work order stats" });
+  }
+});
+
 router.get("/api/checklist/work-orders", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
@@ -87,7 +112,36 @@ router.get("/api/checklist/work-orders", requireAuth, async (req: Request, res: 
     }
 
     const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 500);
-    const orders = await db.select().from(checklistWorkOrders)
+
+    const orders = await db.select({
+      id: checklistWorkOrders.id,
+      companyId: checklistWorkOrders.companyId,
+      checklistInstanceId: checklistWorkOrders.checklistInstanceId,
+      fieldId: checklistWorkOrders.fieldId,
+      fieldName: checklistWorkOrders.fieldName,
+      sectionName: checklistWorkOrders.sectionName,
+      triggerValue: checklistWorkOrders.triggerValue,
+      result: checklistWorkOrders.result,
+      details: checklistWorkOrders.details,
+      photos: checklistWorkOrders.photos,
+      status: checklistWorkOrders.status,
+      priority: checklistWorkOrders.priority,
+      assignedTo: checklistWorkOrders.assignedTo,
+      resolvedBy: checklistWorkOrders.resolvedBy,
+      resolvedAt: checklistWorkOrders.resolvedAt,
+      resolutionNotes: checklistWorkOrders.resolutionNotes,
+      createdAt: checklistWorkOrders.createdAt,
+      updatedAt: checklistWorkOrders.updatedAt,
+      templateName: checklistTemplates.name,
+      instanceNumber: checklistInstances.instanceNumber,
+      instanceStatus: checklistInstances.status,
+      assignedUserName: users.name,
+      assignedUserEmail: users.email,
+    })
+      .from(checklistWorkOrders)
+      .leftJoin(checklistInstances, eq(checklistWorkOrders.checklistInstanceId, checklistInstances.id))
+      .leftJoin(checklistTemplates, eq(checklistInstances.templateId, checklistTemplates.id))
+      .leftJoin(users, eq(checklistWorkOrders.assignedTo, users.id))
       .where(eq(checklistWorkOrders.companyId, companyId!))
       .orderBy(desc(checklistWorkOrders.createdAt))
       .limit(safeLimit);
@@ -96,6 +150,48 @@ router.get("/api/checklist/work-orders", requireAuth, async (req: Request, res: 
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch all work orders");
     res.status(500).json({ error: "Failed to fetch work orders" });
+  }
+});
+
+router.get("/api/checklist/work-orders/:id/checklist-detail", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    const workOrderId = String(req.params.id);
+
+    if (!companyId) {
+      return res.status(400).json({ error: "Company ID required" });
+    }
+
+    const [workOrder] = await db.select()
+      .from(checklistWorkOrders)
+      .where(and(
+        eq(checklistWorkOrders.id, workOrderId),
+        eq(checklistWorkOrders.companyId, companyId!)
+      ))
+      .limit(1);
+
+    if (!workOrder) {
+      return res.status(404).json({ error: "Work order not found" });
+    }
+
+    const [instance] = await db.select()
+      .from(checklistInstances)
+      .where(eq(checklistInstances.id, workOrder.checklistInstanceId))
+      .limit(1);
+
+    if (!instance) {
+      return res.json({ workOrder, instance: null, template: null });
+    }
+
+    const [template] = await db.select()
+      .from(checklistTemplates)
+      .where(eq(checklistTemplates.id, instance.templateId))
+      .limit(1);
+
+    res.json({ workOrder, instance, template });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Failed to fetch checklist detail for work order");
+    res.status(500).json({ error: "Failed to fetch checklist detail" });
   }
 });
 
@@ -109,13 +205,14 @@ router.patch("/api/checklist/work-orders/:id", requireAuth, async (req: Request,
       return res.status(400).json({ error: "Company ID required" });
     }
 
-    const { status, resolutionNotes, priority, details } = req.body;
+    const { status, resolutionNotes, priority, details, assignedTo } = req.body;
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (status) updateData.status = status;
     if (resolutionNotes !== undefined) updateData.resolutionNotes = resolutionNotes;
     if (priority) updateData.priority = priority;
     if (details !== undefined) updateData.details = details;
+    if (assignedTo !== undefined) updateData.assignedTo = assignedTo || null;
 
     if (status === "resolved" || status === "closed") {
       updateData.resolvedBy = userId;

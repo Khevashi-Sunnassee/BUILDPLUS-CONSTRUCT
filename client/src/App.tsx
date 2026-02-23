@@ -102,6 +102,7 @@ const TemplateEditorPage = lazyWithRetry(() => import("@/pages/admin/template-ed
 const ChecklistsPage = lazyWithRetry(() => import("@/pages/checklists"));
 const ChecklistFillPage = lazyWithRetry(() => import("@/pages/checklist-fill"));
 const ChecklistReportsPage = lazyWithRetry(() => import("@/pages/checklist-reports"));
+const ChecklistWorkOrdersPage = lazyWithRetry(() => import("@/pages/checklist-work-orders"));
 const ProcurementReoSchedulingPage = lazyWithRetry(() => import("@/pages/procurement-reo-scheduling"));
 const BroadcastPage = lazyWithRetry(() => import("@/pages/broadcast"));
 const ContractHubPage = lazyWithRetry(() => import("@/pages/contract-hub"));
@@ -958,6 +959,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <ChecklistReportsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/work-orders">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <ChecklistWorkOrdersPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
