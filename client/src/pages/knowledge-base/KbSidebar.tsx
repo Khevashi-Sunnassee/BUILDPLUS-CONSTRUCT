@@ -27,6 +27,26 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 import type { KbProject, KbConversation, KbInvitation } from "./types";
 
+function HighlightedSnippet({ text, query }: { text: string; query: string }) {
+  const terms = query.trim().split(/\s+/).filter(t => t.length >= 2);
+  if (terms.length === 0) return <>{text}</>;
+  const pattern = terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const splitRegex = new RegExp(`(${pattern})`, "gi");
+  const testRegex = new RegExp(`^(?:${pattern})$`, "i");
+  const parts = text.split(splitRegex);
+  return (
+    <>
+      {parts.map((part, i) =>
+        testRegex.test(part) ? (
+          <mark key={i} style={{ backgroundColor: "rgba(250, 204, 21, 0.4)", borderRadius: "2px", padding: "0 1px" }}>{part}</mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
 const DEFAULT_PROJECT_COLORS = [
   "#6366f1", "#ec4899", "#f59e0b", "#10b981", "#3b82f6",
   "#8b5cf6", "#ef4444", "#14b8a6", "#f97316", "#06b6d4",
@@ -241,26 +261,38 @@ export function KbSidebar({
             </div>
           ) : searchResults && searchResults.length > 0 ? (
             <div className="space-y-1 max-h-48 overflow-y-auto">
-              {searchResults.map((result: any, idx: number) => (
-                <div
-                  key={result.id || idx}
-                  className="rounded-md border p-2 bg-muted/30 text-xs"
-                  data-testid={`kb-search-result-${idx}`}
-                >
-                  <p className="font-medium truncate">{result.documentTitle || result.title || "Document"}</p>
-                  {result.section && (
-                    <p className="text-[10px] text-muted-foreground truncate">{result.section}</p>
-                  )}
-                  {result.similarity != null && (
-                    <Badge variant="outline" className="text-[9px] h-4 px-1 mt-1">
-                      {typeof result.similarity === "number" ? `${Math.round(result.similarity * 100)}%` : result.similarity}
-                    </Badge>
-                  )}
-                  {result.content && (
-                    <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{result.content}</p>
-                  )}
-                </div>
-              ))}
+              {searchResults.map((result: any, idx: number) => {
+                const snippet = result.content
+                  ? result.content.slice(0, 150)
+                  : "";
+
+                return (
+                  <div
+                    key={result.id || idx}
+                    className="rounded-md border p-2 bg-muted/30 text-xs"
+                    data-testid={`kb-search-result-${idx}`}
+                  >
+                    <p className="font-medium truncate">{result.documentTitle || result.title || "Document"}</p>
+                    {result.section && (
+                      <p className="text-[10px] text-muted-foreground truncate">{result.section}</p>
+                    )}
+                    {result.similarity != null && (
+                      <Badge variant="outline" className="text-[9px] h-4 px-1 mt-1">
+                        {typeof result.similarity === "number" ? `${Math.round(result.similarity * 100)}%` : result.similarity}
+                      </Badge>
+                    )}
+                    {snippet && (
+                      <p
+                        className="text-[10px] text-muted-foreground mt-1 line-clamp-2 overflow-hidden"
+                        style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: 2, textOverflow: "ellipsis" }}
+                        data-testid={`kb-search-snippet-${idx}`}
+                      >
+                        <HighlightedSnippet text={snippet} query={debouncedSearch} />
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <p className="text-xs text-muted-foreground text-center py-3">No results found</p>
