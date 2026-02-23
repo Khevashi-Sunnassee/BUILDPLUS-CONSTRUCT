@@ -94,7 +94,7 @@ export function MessageComposer({ selectedConversationId, users }: MessageCompos
   }, [messageContent, pendingFiles, sendMessageMutation]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey || !e.shiftKey)) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -253,6 +253,7 @@ export function MessageComposer({ selectedConversationId, users }: MessageCompos
             size="icon"
             variant="ghost"
             onClick={() => fileInputRef.current?.click()}
+            aria-label="Attach file"
             data-testid="button-attach-file"
           >
             <Paperclip className="h-4 w-4" />
@@ -262,6 +263,7 @@ export function MessageComposer({ selectedConversationId, users }: MessageCompos
               size="icon"
               variant="ghost"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              aria-label="Emoji picker"
               data-testid="button-emoji-picker"
             >
               <Smile className="h-4 w-4" />
@@ -290,6 +292,7 @@ export function MessageComposer({ selectedConversationId, users }: MessageCompos
           <Button
             onClick={handleSendMessage}
             disabled={sendMessageMutation.isPending || isCompressing || (!messageContent.trim() && pendingFiles.length === 0)}
+            aria-label="Send message"
             data-testid="button-send-message"
           >
             <Send className="h-4 w-4" />
