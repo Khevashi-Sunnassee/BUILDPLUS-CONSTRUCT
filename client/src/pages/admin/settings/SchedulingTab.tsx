@@ -1,4 +1,15 @@
+import { useState } from "react";
 import { Save, Loader2, Calendar, Factory, AlertTriangle, RefreshCw } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,6 +111,9 @@ export function SchedulingTab({
   syncCfmeuCalendarMutation,
   syncAllCfmeuCalendarsMutation,
 }: SchedulingTabProps) {
+  const [showProductionDaysConfirm, setShowProductionDaysConfirm] = useState(false);
+  const [showDraftingDaysConfirm, setShowDraftingDaysConfirm] = useState(false);
+
   return (
     <TabsContent value="scheduling" className="space-y-6">
       <Card>
@@ -419,7 +433,7 @@ export function SchedulingTab({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => saveProductionWorkDaysMutation.mutate(productionWorkDays)}
+              onClick={() => setShowProductionDaysConfirm(true)}
               disabled={saveProductionWorkDaysMutation.isPending || JSON.stringify(productionWorkDays) === JSON.stringify(settings?.productionWorkDays)}
               data-testid="button-save-production-work-days"
             >
@@ -430,6 +444,28 @@ export function SchedulingTab({
               )}
               Save Production Days
             </Button>
+            <AlertDialog open={showProductionDaysConfirm} onOpenChange={setShowProductionDaysConfirm}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    Confirm Production Work Days Change
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Changing production work days will affect all future scheduling calculations including production slots and delivery dates. Existing schedules will not be automatically recalculated.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-production-days-confirm">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => saveProductionWorkDaysMutation.mutate(productionWorkDays)}
+                    data-testid="button-confirm-production-days-save"
+                  >
+                    Save Changes
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
 
           <div className="space-y-3 pt-4 border-t">
@@ -457,7 +493,7 @@ export function SchedulingTab({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => saveDraftingWorkDaysMutation.mutate(draftingWorkDays)}
+              onClick={() => setShowDraftingDaysConfirm(true)}
               disabled={saveDraftingWorkDaysMutation.isPending || JSON.stringify(draftingWorkDays) === JSON.stringify(settings?.draftingWorkDays)}
               data-testid="button-save-drafting-work-days"
             >
@@ -468,6 +504,28 @@ export function SchedulingTab({
               )}
               Save Drafting Days
             </Button>
+            <AlertDialog open={showDraftingDaysConfirm} onOpenChange={setShowDraftingDaysConfirm}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    Confirm Drafting Work Days Change
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Changing drafting work days will affect all future scheduling calculations for drafting timelines. Existing schedules will not be automatically recalculated.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-drafting-days-confirm">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => saveDraftingWorkDaysMutation.mutate(draftingWorkDays)}
+                    data-testid="button-confirm-drafting-days-save"
+                  >
+                    Save Changes
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
 
           <div className="space-y-3 pt-4 border-t">

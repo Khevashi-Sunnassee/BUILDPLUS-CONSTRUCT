@@ -1,5 +1,15 @@
 import { useState, useEffect } from "react";
-import { Save, Loader2, Upload, Trash2, Building2, FileText, Plus, Pencil, Users, Hash, MapPin, Phone } from "lucide-react";
+import { Save, Loader2, Upload, Trash2, Building2, FileText, Plus, Pencil, Users, Hash, MapPin, Phone, AlertTriangle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +78,8 @@ export function CompanyTab({
   setIncludePOTerms,
   saveIncludePOTermsMutation,
 }: CompanyTabProps) {
+  const [showJobNumberConfirm, setShowJobNumberConfirm] = useState(false);
+
   return (
     <TabsContent value="company" className="space-y-6">
       <Card>
@@ -338,7 +350,7 @@ export function CompanyTab({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => saveJobNumberSettingsMutation.mutate({ jobNumberPrefix, jobNumberMinDigits, jobNumberNextSequence })}
+              onClick={() => setShowJobNumberConfirm(true)}
               disabled={saveJobNumberSettingsMutation.isPending || (
                 jobNumberPrefix === (settings?.jobNumberPrefix || "") &&
                 jobNumberMinDigits === (settings?.jobNumberMinDigits || 3) &&
@@ -353,6 +365,28 @@ export function CompanyTab({
               )}
               Save
             </Button>
+            <AlertDialog open={showJobNumberConfirm} onOpenChange={setShowJobNumberConfirm}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-amber-500" />
+                    Confirm Job Number Settings Change
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Changing the job number prefix will affect all future job numbers. Existing jobs will not be updated. This may cause inconsistency in job numbering if changed mid-project.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-job-number-confirm">Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => saveJobNumberSettingsMutation.mutate({ jobNumberPrefix, jobNumberMinDigits, jobNumberNextSequence })}
+                    data-testid="button-confirm-job-number-save"
+                  >
+                    Save Changes
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </CardContent>
       </Card>

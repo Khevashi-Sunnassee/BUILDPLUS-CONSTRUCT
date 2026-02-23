@@ -1,4 +1,15 @@
-import { Save, Loader2, Globe, Clock } from "lucide-react";
+import { useState } from "react";
+import { Save, Loader2, Globe, Clock, AlertTriangle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,10 +42,25 @@ export interface TimeTrackingTabProps {
 }
 
 export function TimeTrackingTab({ form, onSubmit, updateMutation }: TimeTrackingTabProps) {
+  const [showTimezoneConfirm, setShowTimezoneConfirm] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState<SettingsFormData | null>(null);
+
+  const handleSubmitWithConfirm = (data: SettingsFormData) => {
+    setPendingFormData(data);
+    setShowTimezoneConfirm(true);
+  };
+
+  const handleConfirmedSubmit = () => {
+    if (pendingFormData) {
+      onSubmit(pendingFormData);
+      setPendingFormData(null);
+    }
+  };
+
   return (
     <TabsContent value="time-tracking" className="space-y-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(handleSubmitWithConfirm)} className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -181,6 +207,28 @@ export function TimeTrackingTab({ form, onSubmit, updateMutation }: TimeTracking
           </div>
         </form>
       </Form>
+      <AlertDialog open={showTimezoneConfirm} onOpenChange={setShowTimezoneConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Confirm Time Tracking Settings Change
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Changing the timezone will affect how all time entries are calculated and displayed across the system. Existing time records will be interpreted under the new timezone. Changes to capture settings will apply to all active agents.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-timezone-confirm">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmedSubmit}
+              data-testid="button-confirm-timezone-save"
+            >
+              Save Changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TabsContent>
   );
 }
