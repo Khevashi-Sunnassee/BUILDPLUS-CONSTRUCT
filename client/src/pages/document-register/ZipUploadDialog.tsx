@@ -65,6 +65,7 @@ interface ZipUploadDialogProps {
 
 interface ExtractedFile {
   fileName: string;
+  entryPath: string;
   fileSize: number;
   mimeType: string;
   title: string;
@@ -174,6 +175,7 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
 
       const metadata = selectedFiles.map((f) => ({
         fileName: f.fileName,
+        entryPath: f.entryPath,
         title: f.title,
         documentNumber: f.documentNumber,
         revision: f.revision,
@@ -225,8 +227,8 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
       toast({ title: "Invalid File", description: "Please select a ZIP file", variant: "destructive" });
       return;
     }
-    if (file.size > 200 * 1024 * 1024) {
-      toast({ title: "File Too Large", description: "ZIP file must be under 200MB", variant: "destructive" });
+    if (file.size > 3 * 1024 * 1024 * 1024) {
+      toast({ title: "File Too Large", description: "ZIP file must be under 3GB", variant: "destructive" });
       return;
     }
     setZipFile(file);
@@ -331,7 +333,7 @@ export function ZipUploadDialog({ open, onOpenChange }: ZipUploadDialogProps) {
                     Drag and drop a ZIP file here, or click to browse
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Max ZIP size: 200MB. Supported file types inside: PDF, DOC, XLS, images, CAD files, and more.
+                    Max ZIP size: 3GB. Supported file types inside: PDF, DOC, XLS, images, CAD files, and more.
                   </p>
                 </>
               )}

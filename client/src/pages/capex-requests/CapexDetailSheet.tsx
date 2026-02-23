@@ -157,7 +157,7 @@ export function CapexDetailSheet({ capex, onClose }: { capex: CapexRequestWithDe
         )}
       </div>
 
-      <ApprovalTimeline status={capex.status} submittedAt={capex.submittedAt ?? null} approvedAt={capex.approvedAt ?? null} rejectedAt={capex.rejectedAt ?? null} />
+      <ApprovalTimeline status={capex.status} submittedAt={capex.submittedAt ? String(capex.submittedAt) : null} approvedAt={capex.approvedAt ? String(capex.approvedAt) : null} rejectedAt={capex.rejectedAt ? String(capex.rejectedAt) : null} />
 
       {capex.status === "REJECTED" && capex.rejectionReason && (
         <Card className="border-destructive">

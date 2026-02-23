@@ -1,6 +1,9 @@
 import { Router, Request, Response } from "express";
 import crypto from "crypto";
-import AdmZip from "adm-zip";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import yauzl from "yauzl";
 import { storage, db } from "../../storage";
 import { eq, and } from "drizzle-orm";
 import { jobMembers, jobs } from "@shared/schema";
@@ -11,13 +14,25 @@ import multer from "multer";
 
 const router = Router();
 
-const MAX_ZIP_ENTRIES = 200;
-const MAX_UNCOMPRESSED_SIZE = 500 * 1024 * 1024;
-const MAX_SINGLE_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_ZIP_ENTRIES = 500;
+const MAX_UNCOMPRESSED_SIZE = 5 * 1024 * 1024 * 1024;
+const MAX_SINGLE_FILE_SIZE = 200 * 1024 * 1024;
+const MAX_ZIP_UPLOAD_SIZE = 3 * 1024 * 1024 * 1024;
+
+const diskStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    const tmpDir = path.join(os.tmpdir(), "buildplus-zip-uploads");
+    fs.mkdirSync(tmpDir, { recursive: true });
+    cb(null, tmpDir);
+  },
+  filename: (_req, file, cb) => {
+    cb(null, `${Date.now()}-${crypto.randomBytes(8).toString("hex")}-${file.originalname}`);
+  },
+});
 
 const zipUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 200 * 1024 * 1024 },
+  storage: diskStorage,
+  limits: { fileSize: MAX_ZIP_UPLOAD_SIZE },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype === "application/zip" || file.mimetype === "application/x-zip-compressed" || file.originalname.endsWith(".zip")) {
       cb(null, true);
@@ -26,6 +41,68 @@ const zipUpload = multer({
     }
   },
 });
+
+function cleanupTempFile(filePath: string | undefined) {
+  if (filePath) {
+    fs.unlink(filePath, (err) => {
+      if (err && err.code !== "ENOENT") {
+        logger.warn({ err, filePath }, "Failed to clean up temp ZIP file");
+      }
+    });
+  }
+}
+
+function openZip(filePath: string): Promise<yauzl.ZipFile> {
+  return new Promise((resolve, reject) => {
+    yauzl.open(filePath, { lazyEntries: true, validateEntrySizes: true, autoClose: false }, (err, zipfile) => {
+      if (err) return reject(err);
+      if (!zipfile) return reject(new Error("Failed to open ZIP file"));
+      resolve(zipfile);
+    });
+  });
+}
+
+function closeZip(zipfile: yauzl.ZipFile | null) {
+  if (zipfile) {
+    try { zipfile.close(); } catch { /* already closed */ }
+  }
+}
+
+function readEntryStream(zipfile: yauzl.ZipFile, entry: yauzl.Entry): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    zipfile.openReadStream(entry, (err, readStream) => {
+      if (err) return reject(err);
+      if (!readStream) return reject(new Error("Failed to open read stream"));
+
+      const chunks: Buffer[] = [];
+      let totalLength = 0;
+
+      readStream.on("data", (chunk: Buffer) => {
+        totalLength += chunk.length;
+        if (totalLength > MAX_SINGLE_FILE_SIZE) {
+          readStream.destroy(new Error(`File exceeds ${Math.round(MAX_SINGLE_FILE_SIZE / 1024 / 1024)}MB limit`));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      readStream.on("end", () => resolve(Buffer.concat(chunks)));
+      readStream.on("error", reject);
+    });
+  });
+}
+
+function collectAllEntries(zipfile: yauzl.ZipFile): Promise<yauzl.Entry[]> {
+  return new Promise((resolve, reject) => {
+    const entries: yauzl.Entry[] = [];
+    zipfile.on("entry", (entry: yauzl.Entry) => {
+      entries.push(entry);
+      zipfile.readEntry();
+    });
+    zipfile.on("end", () => resolve(entries));
+    zipfile.on("error", reject);
+    zipfile.readEntry();
+  });
+}
 
 function inferMetadataFromFilename(filename: string): { title: string; revision: string; documentNumber: string } {
   const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
@@ -86,7 +163,20 @@ function getMimeType(filename: string): string {
   return mimeMap[ext] || "application/octet-stream";
 }
 
+function getEntryFileName(entry: yauzl.Entry): string {
+  return entry.fileName.split("/").pop() || entry.fileName;
+}
+
+function isEntrySkippable(entry: yauzl.Entry): boolean {
+  if (/\/$/.test(entry.fileName)) return true;
+  const fileName = getEntryFileName(entry);
+  if (fileName.startsWith(".") || fileName.startsWith("__MACOSX") || entry.fileName.includes("__MACOSX/")) return true;
+  return false;
+}
+
 router.post("/api/documents/zip-upload/extract", requireAuth, zipUpload.single("file"), async (req: Request, res: Response) => {
+  const tempPath = req.file?.path;
+  let zipHandle: yauzl.ZipFile | null = null;
   try {
     const file = req.file;
     if (!file) {
@@ -95,22 +185,23 @@ router.post("/api/documents/zip-upload/extract", requireAuth, zipUpload.single("
 
     const companyId = req.companyId;
     if (!companyId) {
+      cleanupTempFile(tempPath);
       return res.status(400).json({ error: "Company context required" });
     }
 
     logger.info({ filename: file.originalname, fileSize: file.size }, "Extracting ZIP file for bulk document upload");
 
-    const zip = new AdmZip(file.buffer);
-    const entries = zip.getEntries();
+    zipHandle = await openZip(file.path);
+    const allEntries = await collectAllEntries(zipHandle);
 
-    const fileEntries = entries.filter(e => !e.isDirectory);
+    const fileEntries = allEntries.filter(e => !isEntrySkippable(e));
     if (fileEntries.length > MAX_ZIP_ENTRIES) {
       return res.status(400).json({ error: `ZIP contains too many files (${fileEntries.length}). Maximum is ${MAX_ZIP_ENTRIES}.` });
     }
 
     let totalUncompressedSize = 0;
     for (const entry of fileEntries) {
-      totalUncompressedSize += entry.header.size;
+      totalUncompressedSize += entry.uncompressedSize;
     }
     if (totalUncompressedSize > MAX_UNCOMPRESSED_SIZE) {
       return res.status(400).json({ error: `Total uncompressed size (${Math.round(totalUncompressedSize / 1024 / 1024)}MB) exceeds the ${Math.round(MAX_UNCOMPRESSED_SIZE / 1024 / 1024)}MB limit.` });
@@ -118,6 +209,7 @@ router.post("/api/documents/zip-upload/extract", requireAuth, zipUpload.single("
 
     const extractedFiles: Array<{
       fileName: string;
+      entryPath: string;
       fileSize: number;
       mimeType: string;
       title: string;
@@ -128,11 +220,8 @@ router.post("/api/documents/zip-upload/extract", requireAuth, zipUpload.single("
     }> = [];
 
     for (const entry of fileEntries) {
-      const entryName = entry.entryName;
-      const fileName = entryName.split("/").pop() || entryName;
-
-      if (fileName.startsWith(".") || fileName.startsWith("__MACOSX") || entryName.includes("__MACOSX/")) continue;
-      if (entry.header.size > MAX_SINGLE_FILE_SIZE) continue;
+      const fileName = getEntryFileName(entry);
+      if (entry.uncompressedSize > MAX_SINGLE_FILE_SIZE) continue;
 
       const mimeType = getMimeType(fileName);
       if (!ALLOWED_DOCUMENT_TYPES.includes(mimeType)) continue;
@@ -142,7 +231,8 @@ router.post("/api/documents/zip-upload/extract", requireAuth, zipUpload.single("
 
       extractedFiles.push({
         fileName,
-        fileSize: entry.header.size,
+        entryPath: entry.fileName,
+        fileSize: entry.uncompressedSize,
         mimeType,
         title: metadata.title,
         documentNumber: metadata.documentNumber,
@@ -154,20 +244,26 @@ router.post("/api/documents/zip-upload/extract", requireAuth, zipUpload.single("
 
     extractedFiles.sort((a, b) => a.fileName.localeCompare(b.fileName));
 
-    logger.info({ totalEntries: entries.length, extractedFiles: extractedFiles.length }, "ZIP extraction complete");
+    logger.info({ totalEntries: allEntries.length, extractedFiles: extractedFiles.length }, "ZIP extraction complete");
 
     res.json({
       zipFileName: file.originalname,
-      totalEntries: entries.length,
+      totalEntries: allEntries.length,
       files: extractedFiles,
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error extracting ZIP file");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to extract ZIP file" });
+  } finally {
+    closeZip(zipHandle);
+    cleanupTempFile(tempPath);
   }
 });
 
 router.post("/api/documents/zip-upload/register", requireAuth, zipUpload.single("file"), async (req: Request, res: Response) => {
+  const tempPath = req.file?.path;
+  let scanZip: yauzl.ZipFile | null = null;
+  let registerZip: yauzl.ZipFile | null = null;
   try {
     const file = req.file;
     if (!file) {
@@ -182,6 +278,7 @@ router.post("/api/documents/zip-upload/register", requireAuth, zipUpload.single(
     const metadataStr = req.body.metadata;
     let fileMetadata: Array<{
       fileName: string;
+      entryPath?: string;
       title: string;
       documentNumber: string;
       revision: string;
@@ -196,6 +293,10 @@ router.post("/api/documents/zip-upload/register", requireAuth, zipUpload.single(
 
     if (fileMetadata.length === 0) {
       return res.status(400).json({ error: "No files selected for upload" });
+    }
+
+    if (fileMetadata.length > MAX_ZIP_ENTRIES) {
+      return res.status(400).json({ error: `Too many files selected (${fileMetadata.length}). Maximum is ${MAX_ZIP_ENTRIES}.` });
     }
 
     const { typeId, disciplineId, categoryId, documentTypeStatusId, jobId, panelId, supplierId, purchaseOrderId, taskId, tags, isConfidential } = req.body;
@@ -222,30 +323,45 @@ router.post("/api/documents/zip-upload/register", requireAuth, zipUpload.single(
       }
     }
 
-    if (fileMetadata.length > MAX_ZIP_ENTRIES) {
-      return res.status(400).json({ error: `Too many files selected (${fileMetadata.length}). Maximum is ${MAX_ZIP_ENTRIES}.` });
-    }
-
     logger.info({ metadataCount: fileMetadata.length, zipFile: file.originalname }, "Starting ZIP bulk register");
 
-    const zip = new AdmZip(file.buffer);
+    scanZip = await openZip(file.path);
+    const allEntries = await collectAllEntries(scanZip);
+    closeZip(scanZip);
+    scanZip = null;
 
-    const allEntries = zip.getEntries().filter(e => !e.isDirectory);
     let totalSize = 0;
-    for (const e of allEntries) totalSize += e.header.size;
+    for (const e of allEntries) {
+      if (!/\/$/.test(e.fileName)) totalSize += e.uncompressedSize;
+    }
     if (totalSize > MAX_UNCOMPRESSED_SIZE) {
       return res.status(400).json({ error: `Total uncompressed size exceeds ${Math.round(MAX_UNCOMPRESSED_SIZE / 1024 / 1024)}MB limit.` });
+    }
+
+    const entryMap = new Map<string, yauzl.Entry>();
+    for (const e of allEntries) {
+      if (!/\/$/.test(e.fileName)) {
+        entryMap.set(e.fileName, e);
+      }
     }
 
     const uploaded: Record<string, unknown>[] = [];
     const errors: Array<{ fileName: string; error: string }> = [];
 
+    registerZip = await openZip(file.path);
+
     for (const meta of fileMetadata) {
       try {
-        const entry = zip.getEntries().find(e => {
-          const entryFileName = e.entryName.split("/").pop() || e.entryName;
-          return entryFileName === meta.fileName;
-        });
+        const lookupKey = meta.entryPath || meta.fileName;
+        let entry = entryMap.get(lookupKey);
+        if (!entry) {
+          for (const [fullPath, e] of entryMap) {
+            if (getEntryFileName(e) === meta.fileName) {
+              entry = e;
+              break;
+            }
+          }
+        }
 
         if (!entry) {
           errors.push({ fileName: meta.fileName, error: "File not found in ZIP archive" });
@@ -258,12 +374,12 @@ router.post("/api/documents/zip-upload/register", requireAuth, zipUpload.single(
           continue;
         }
 
-        if (entry.header.size > MAX_SINGLE_FILE_SIZE) {
+        if (entry.uncompressedSize > MAX_SINGLE_FILE_SIZE) {
           errors.push({ fileName: meta.fileName, error: `File exceeds the ${Math.round(MAX_SINGLE_FILE_SIZE / 1024 / 1024)}MB size limit` });
           continue;
         }
 
-        const fileBuffer = entry.getData();
+        const fileBuffer = await readEntryStream(registerZip, entry);
 
         if (!meta.title || meta.title.trim().length === 0) {
           meta.title = meta.fileName.replace(/\.[^/.]+$/, "");
@@ -324,7 +440,7 @@ router.post("/api/documents/zip-upload/register", requireAuth, zipUpload.single(
         });
 
         uploaded.push(document);
-        logger.info({ fileName: meta.fileName, documentId: (document as any).id }, "ZIP file registered successfully");
+        logger.info({ fileName: meta.fileName, documentId: (document as Record<string, unknown>).id }, "ZIP file registered successfully");
       } catch (fileError: unknown) {
         logger.error({ err: fileError, fileName: meta.fileName }, "Error uploading file from ZIP");
         errors.push({
@@ -339,6 +455,10 @@ router.post("/api/documents/zip-upload/register", requireAuth, zipUpload.single(
   } catch (error: unknown) {
     logger.error({ err: error }, "Error in ZIP bulk register");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to process ZIP upload" });
+  } finally {
+    closeZip(scanZip);
+    closeZip(registerZip);
+    cleanupTempFile(tempPath);
   }
 });
 
