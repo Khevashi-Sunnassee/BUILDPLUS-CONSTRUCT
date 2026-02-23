@@ -917,8 +917,13 @@ function ManualAssessmentSection({ targetId }: { targetId: string }) {
   );
 }
 
-function TargetDetailView({ target, onBack }: { target: ReviewTarget; onBack: () => void }) {
+function TargetDetailView({ target: initialTarget, onBack }: { target: ReviewTarget; onBack: () => void }) {
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
+
+  const { data: targets = [] } = useQuery<ReviewTarget[]>({
+    queryKey: [`${API_BASE}/targets`],
+  });
+  const target = targets.find(t => t.id === initialTarget.id) || initialTarget;
 
   const { data: audits = [], isLoading } = useQuery<ReviewAudit[]>({
     queryKey: [`${API_BASE}/audits`, { targetId: target.id }],

@@ -62,6 +62,130 @@ function findRelatedBackendRoutes(routePath: string): string[] {
   return related;
 }
 
+function getReachTargets(dimension: string, score: number, findings: string[]): string[] {
+  const targets: string[] = [];
+  if (score >= 10) return targets;
+  const findingsLower = findings.map(f => f.toLowerCase()).join(" ");
+
+  const dimTargets: Record<string, string[]> = {
+    "Functionality": [
+      "Add search and filter functionality for data lists",
+      "Implement sorting on table columns",
+      "Add data export/download capability (CSV/Excel)",
+      "Support bulk operations (multi-select, bulk edit/delete)",
+      "Add pagination for large datasets",
+      "Include tab-based layout to organise related content",
+      "Add modal dialogs for focused create/edit workflows",
+      "Implement form handling with proper submit/cancel",
+    ],
+    "UI/UX": [
+      "Add loading skeletons/spinners while data is fetching",
+      "Show toast notifications for success/error feedback on mutations",
+      "Add responsive breakpoints (sm/md/lg) for different screen sizes",
+      "Display meaningful empty states when no records exist",
+      "Use Badge components for status/category indicators",
+      "Add Card components for visually organised content",
+      "Include Lucide icons for visual affordance on actions",
+      "Use Select dropdowns and DatePicker for structured inputs",
+    ],
+    "Security": [
+      "Add Zod schema validation on form inputs before submission",
+      "Implement role-based UI rendering (show/hide by user role)",
+      "Add confirmation dialogs before destructive actions",
+      "Ensure user session/auth state is checked in component logic",
+      "Avoid dangerouslySetInnerHTML or sanitise content server-side",
+    ],
+    "Performance": [
+      "Use useMemo/useCallback for expensive computations",
+      "Add debouncing on search inputs to reduce API calls",
+      "Implement pagination to avoid loading all records at once",
+      "Split large files into sub-components for code splitting",
+      "Use proper query cache invalidation after mutations",
+    ],
+    "Code Quality": [
+      "Add data-testid attributes on interactive and display elements",
+      "Define TypeScript interfaces for all data structures",
+      "Eliminate 'any' type usage - replace with proper interfaces",
+      "Extract large files into modular sub-components",
+      "Reuse shared components/hooks from the project library",
+      "Export type aliases for reusability across components",
+    ],
+    "Data Integrity": [
+      "Add Zod schema validation on forms before API submission",
+      "Invalidate query cache after mutations for fresh data display",
+      "Add confirmation dialogs before destructive operations",
+      "Combine form validation with schema-defined constraints",
+    ],
+    "Error Handling": [
+      "Handle isError states from data fetching with user-visible messages",
+      "Add try-catch blocks for async operations",
+      "Show toast notifications for error feedback on mutations",
+      "Add loading states to prevent interaction during pending operations",
+      "Use conditional rendering to guard against null/undefined data",
+    ],
+    "Accessibility": [
+      "Add aria-label attributes on icon-only buttons and interactive elements",
+      "Support keyboard navigation (onKeyDown/tabIndex handlers)",
+      "Use semantic HTML elements (main, nav, section, article)",
+      "Add alt text on all images",
+      "Manage focus programmatically for modal/dialog flows",
+      "Add data-testid attributes for accessibility testing",
+    ],
+  };
+
+  const available = dimTargets[dimension] || [];
+  const keywordMap: Record<string, string[]> = {
+    "search and filter": ["search", "filter"],
+    "sorting": ["sort"],
+    "export": ["export", "download", "excel", "csv"],
+    "bulk operations": ["bulk", "selectall", "selectedids"],
+    "pagination": ["pagina"],
+    "tab-based": ["tab", "tabs", "tabslist", "multi-tab"],
+    "modal dialogs": ["dialog", "modal"],
+    "form handling": ["form", "useform"],
+    "loading": ["loading", "skeleton", "spinner"],
+    "toast": ["toast"],
+    "responsive": ["responsive", "breakpoint", "sm/md/lg"],
+    "empty state": ["empty state", "no records"],
+    "badge": ["badge"],
+    "card": ["card"],
+    "icon": ["icon", "lucide"],
+    "zod": ["zod", "validat", "safeParse"],
+    "role-based": ["role", "rbac", "isadmin"],
+    "confirmation": ["confirm"],
+    "usememo": ["usememo", "usecallback", "memo"],
+    "debounce": ["debounce"],
+    "invalidate": ["invalidat", "cache invalidat"],
+    "data-testid": ["testid", "data-testid"],
+    "typescript interface": ["interface", "typed"],
+    "any type": ["any"],
+    "try-catch": ["try-catch", "catch"],
+    "iserror": ["iserror", "error state"],
+    "aria-label": ["aria-label", "aria"],
+    "keyboard": ["keyboard", "onkeydown", "tabindex"],
+    "semantic html": ["semantic", "main", "nav", "section"],
+    "alt text": ["alt text", "alt="],
+    "focus": ["focus"],
+  };
+
+  for (const t of available) {
+    const tLower = t.toLowerCase();
+    let alreadyCovered = false;
+    for (const [, keywords] of Object.entries(keywordMap)) {
+      if (keywords.some(kw => tLower.includes(kw)) && keywords.some(kw => findingsLower.includes(kw))) {
+        alreadyCovered = true;
+        break;
+      }
+    }
+    if (!alreadyCovered) {
+      targets.push(t);
+    }
+    if (targets.length >= 4) break;
+  }
+
+  return targets;
+}
+
 function buildNotes(dimension: string, pageTitle: string, routePath: string, module: string, findings: string[], improvements: string[], score: number): string {
   const scoreLabel = score <= 4 ? "Needs Improvement" : score <= 6 ? "Adequate" : score >= 9 ? "Excellent" : "Good";
 
@@ -80,7 +204,18 @@ function buildNotes(dimension: string, pageTitle: string, routePath: string, mod
     md += "\n";
   }
 
-  if (score >= 8 && improvements.length === 0) {
+  if (score < 10) {
+    const nextTarget = score < 9 ? 9 : 10;
+    const reachTargets = getReachTargets(dimension, score, findings);
+    if (reachTargets.length > 0) {
+      md += `### How to Reach ${nextTarget}/10\n`;
+      md += `Current score is ${score}/10. To reach ${nextTarget}/10, implement the following:\n\n`;
+      for (const t of reachTargets) { md += `- [ ] ${t}\n`; }
+      md += "\n";
+    }
+  }
+
+  if (score >= 9 && improvements.length === 0) {
     md += `### Summary\nThis page meets quality standards for ${dimension.toLowerCase()}. Continue maintaining current patterns.\n`;
   }
 
