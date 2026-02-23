@@ -13,14 +13,17 @@ import {
   ChevronDown,
   ChevronRight,
   FolderOpen,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
 import type { KbProject, KbConversation, KbInvitation } from "./types";
 
@@ -62,6 +65,29 @@ export function KbSidebar({
 }: KbSidebarProps) {
   const { toast } = useToast();
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebouncedValue(searchQuery, 500);
+  const isSearchActive = debouncedSearch.trim().length >= 3;
+
+  const { data: searchResults, isLoading: searchLoading } = useQuery<any[]>({
+    queryKey: ["/api/kb/search", debouncedSearch, selectedProjectId],
+    queryFn: async () => {
+      const res = await fetch("/api/kb/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          query: debouncedSearch.trim(),
+          projectId: selectedProjectId,
+          topK: 8,
+        }),
+      });
+      if (!res.ok) throw new Error("Search failed");
+      return res.json();
+    },
+    enabled: isSearchActive,
+    staleTime: 60000,
+  });
 
   const { data: invitations = [] } = useQuery<KbInvitation[]>({
     queryKey: ["/api/kb/invitations"],
@@ -183,6 +209,65 @@ export function KbSidebar({
           <TooltipContent>New Chat</TooltipContent>
         </Tooltip>
       </div>
+
+      <div className="px-3 pt-2 pb-1">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search knowledge base..."
+            className="h-8 pl-8 text-xs"
+            data-testid="input-kb-search"
+          />
+        </div>
+        {searchQuery.trim().length > 0 && searchQuery.trim().length < 3 && (
+          <p className="text-[10px] text-muted-foreground mt-1" data-testid="text-kb-search-hint">
+            Type at least 3 characters to search
+          </p>
+        )}
+      </div>
+
+      {isSearchActive && (
+        <div className="px-2 pb-1">
+          <Separator className="mb-1" />
+          <div className="flex items-center gap-1.5 px-2 mb-1">
+            <Search className="h-3 w-3 text-primary" />
+            <span className="text-[10px] font-semibold uppercase text-muted-foreground">Search Results</span>
+          </div>
+          {searchLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : searchResults && searchResults.length > 0 ? (
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {searchResults.map((result: any, idx: number) => (
+                <div
+                  key={result.id || idx}
+                  className="rounded-md border p-2 bg-muted/30 text-xs"
+                  data-testid={`kb-search-result-${idx}`}
+                >
+                  <p className="font-medium truncate">{result.documentTitle || result.title || "Document"}</p>
+                  {result.section && (
+                    <p className="text-[10px] text-muted-foreground truncate">{result.section}</p>
+                  )}
+                  {result.similarity != null && (
+                    <Badge variant="outline" className="text-[9px] h-4 px-1 mt-1">
+                      {typeof result.similarity === "number" ? `${Math.round(result.similarity * 100)}%` : result.similarity}
+                    </Badge>
+                  )}
+                  {result.content && (
+                    <p className="text-[10px] text-muted-foreground mt-1 line-clamp-2">{result.content}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center py-3">No results found</p>
+          )}
+          <Separator className="mt-1" />
+        </div>
+      )}
 
       {pendingInvites.length > 0 && (
         <div className="px-2 pt-2 pb-1">
