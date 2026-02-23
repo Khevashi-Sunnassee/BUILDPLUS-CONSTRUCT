@@ -97,11 +97,31 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+const MAX_FILE_SIZE_MB = 50;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const ALLOWED_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+
 function UploadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [fileErrors, setFileErrors] = useState<string[]>([]);
+
+  const validateFiles = useCallback((selectedFiles: File[]): { valid: File[]; errors: string[] } => {
+    const valid: File[] = [];
+    const errors: string[] = [];
+    for (const f of selectedFiles) {
+      if (f.size > MAX_FILE_SIZE_BYTES) {
+        errors.push(`"${f.name}" exceeds ${MAX_FILE_SIZE_MB}MB limit (${(f.size / 1024 / 1024).toFixed(1)}MB)`);
+      } else if (!ALLOWED_MIME_TYPES.includes(f.type)) {
+        errors.push(`"${f.name}" is not a supported file type (PDF, JPG, PNG only)`);
+      } else {
+        valid.push(f);
+      }
+    }
+    return { valid, errors };
+  }, []);
 
   const handleUpload = async () => {
     if (files.length === 0) return;
@@ -114,9 +134,11 @@ function UploadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
       queryClient.invalidateQueries({ queryKey: [TENDER_INBOX_ROUTES.COUNTS] });
       toast({ title: "Tender documents uploaded successfully" });
       setFiles([]);
+      setFileErrors([]);
       onOpenChange(false);
-    } catch (err: any) {
-      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "An unexpected error occurred";
+      toast({ title: "Upload failed", description: message, variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -134,9 +156,9 @@ function UploadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
             onClick={() => fileInputRef.current?.click()}
             data-testid="dropzone-tender-upload"
           >
-            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+            <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" aria-hidden="true" />
             <p className="text-sm text-muted-foreground">Click to select tender documents</p>
-            <p className="text-xs text-muted-foreground mt-1">PDF, JPG, PNG accepted</p>
+            <p className="text-xs text-muted-foreground mt-1">PDF, JPG, PNG accepted (max {MAX_FILE_SIZE_MB}MB each)</p>
           </div>
           <input
             ref={fileInputRef}
@@ -145,15 +167,29 @@ function UploadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
             accept=".pdf,.jpg,.jpeg,.png"
             className="hidden"
             onChange={(e) => {
-              if (e.target.files) setFiles(Array.from(e.target.files));
+              if (e.target.files) {
+                const { valid, errors } = validateFiles(Array.from(e.target.files));
+                setFiles(valid);
+                setFileErrors(errors);
+                if (errors.length > 0) {
+                  toast({ title: "Some files were rejected", description: errors.join(". "), variant: "destructive" });
+                }
+              }
             }}
             data-testid="input-tender-file-upload"
           />
+          {fileErrors.length > 0 && (
+            <div className="text-xs text-destructive space-y-0.5" data-testid="text-file-errors">
+              {fileErrors.map((err, i) => (
+                <p key={i}>{err}</p>
+              ))}
+            </div>
+          )}
           {files.length > 0 && (
             <div className="space-y-1">
               {files.map((f, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   <span>{f.name}</span>
                   <span className="text-muted-foreground">({(f.size / 1024).toFixed(1)} KB)</span>
                 </div>
@@ -204,11 +240,25 @@ function TenderInboxSettingsDialog({ open, onOpenChange }: { open: boolean; onOp
     },
   });
 
-  const handleCopy = () => {
-    if (settings?.inboundEmailAddress) {
-      navigator.clipboard.writeText(settings.inboundEmailAddress);
+  const handleCopy = async () => {
+    if (!settings?.inboundEmailAddress) return;
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(settings.inboundEmailAddress);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = settings.inboundEmailAddress;
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: "Failed to copy to clipboard", variant: "destructive" });
     }
   };
 
