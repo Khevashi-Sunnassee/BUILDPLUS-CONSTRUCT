@@ -204,6 +204,13 @@ export default function MobileNewOpportunity() {
         errs.submissionDate = "Invalid date/time";
       }
     }
+    if (form.submissionDate && form.estimatedStartDate) {
+      const subDate = new Date(form.submissionDate);
+      const startDate = new Date(form.estimatedStartDate);
+      if (!isNaN(subDate.getTime()) && !isNaN(startDate.getTime()) && subDate >= startDate) {
+        errs.estimatedStartDate = "Start date must be after submission date";
+      }
+    }
     setErrors(errs);
     if (Object.keys(errs).length > 0) {
       const firstErrorKey = Object.keys(errs)[0];
@@ -576,26 +583,27 @@ export default function MobileNewOpportunity() {
             title="Timeline"
           />
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <FormField label="Submission Date" error={errors.submissionDate}>
-              <input
-                type="datetime-local"
-                className={`${inputClass} [color-scheme:dark] min-w-0`}
-                value={form.submissionDate}
-                onChange={(e) => setForm((f) => ({ ...f, submissionDate: e.target.value }))}
-                data-testid="input-submissionDate"
-              />
-              <p className="text-xs text-white/40 mt-1">When is the tender due for submission?</p>
-            </FormField>
-            <FormField label="Estimated Start Date">
-              <input
-                type="date"
-                {...dateInputProps}
-                className={`${inputClass} [color-scheme:dark] min-w-0`}
-                value={form.estimatedStartDate}
-                onChange={(e) => setForm((f) => ({ ...f, estimatedStartDate: e.target.value }))}
-                data-testid="input-start-date"
-              />
-            </FormField>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Submission Date" error={errors.submissionDate}>
+                <input
+                  type="datetime-local"
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors [color-scheme:dark] min-w-0"
+                  value={form.submissionDate}
+                  onChange={(e) => setForm((f) => ({ ...f, submissionDate: e.target.value }))}
+                  data-testid="input-submissionDate"
+                />
+              </FormField>
+              <FormField label="Est. Start Date" error={errors.estimatedStartDate}>
+                <input
+                  type="date"
+                  {...dateInputProps}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors [color-scheme:dark] min-w-0"
+                  value={form.estimatedStartDate}
+                  onChange={(e) => setForm((f) => ({ ...f, estimatedStartDate: e.target.value }))}
+                  data-testid="input-start-date"
+                />
+              </FormField>
+            </div>
           </div>
         </div>
 
