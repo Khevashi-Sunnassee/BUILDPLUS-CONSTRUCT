@@ -539,6 +539,8 @@ export default function AdminUsersPage() {
   });
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [userSearch, setUserSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [userTypeFilter, setUserTypeFilter] = useState<string>("all");
   const [permissionsUserId, setPermissionsUserId] = useState<string | null>(null);
   const [permissionsUserName, setPermissionsUserName] = useState<string>("");
 
@@ -866,6 +868,12 @@ export default function AdminUsersPage() {
         u.email.toLowerCase().includes(search)
       );
     }
+    if (roleFilter !== "all") {
+      filtered = filtered.filter(u => u.role === roleFilter);
+    }
+    if (userTypeFilter !== "all") {
+      filtered = filtered.filter(u => u.userType === userTypeFilter);
+    }
     filtered.sort((a, b) => {
       const aName = a.name || "";
       const bName = b.name || "";
@@ -876,7 +884,7 @@ export default function AdminUsersPage() {
       return a.email.localeCompare(b.email);
     });
     return filtered;
-  }, [users, userSearch]);
+  }, [users, userSearch, roleFilter, userTypeFilter]);
 
   const pendingInvitationsCount = useMemo(() => invitations.filter(i => i.status === "PENDING").length, [invitations]);
 
@@ -943,7 +951,7 @@ export default function AdminUsersPage() {
         <TabsContent value="users">
       <Card>
         <CardContent className="pt-6">
-          <div className="mb-4">
+          <div className="mb-4 flex items-center gap-3 flex-wrap">
             <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -954,6 +962,27 @@ export default function AdminUsersPage() {
                 data-testid="input-search-users"
               />
             </div>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-36" data-testid="select-filter-role">
+                <SelectValue placeholder="All Roles" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="ADMIN">Admin</SelectItem>
+                <SelectItem value="MANAGER">Manager</SelectItem>
+                <SelectItem value="USER">User</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={userTypeFilter} onValueChange={setUserTypeFilter}>
+              <SelectTrigger className="w-36" data-testid="select-filter-user-type">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                <SelectItem value="EXTERNAL">External</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           {sortedFilteredUsers.length > 0 ? (
             <div className="rounded-md border">
