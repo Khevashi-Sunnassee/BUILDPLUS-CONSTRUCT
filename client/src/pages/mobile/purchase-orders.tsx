@@ -9,9 +9,36 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
-import { ShoppingCart, Calendar, ChevronRight, ChevronLeft, Check, X, Send, Loader2, FileText, Mail, ArrowLeft } from "lucide-react";
+import {
+  ShoppingCart,
+  Calendar,
+  ChevronRight,
+  ChevronLeft,
+  Check,
+  X,
+  Send,
+  Loader2,
+  FileText,
+  Mail,
+  ArrowLeft,
+  Building2,
+  User,
+  MapPin,
+  StickyNote,
+  DollarSign,
+  Package,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -55,447 +82,413 @@ interface PurchaseOrder {
 const statusConfig: Record<string, { label: string; color: string }> = {
   DRAFT: { label: "Draft", color: "bg-slate-500/20 text-slate-400 border-slate-500/30" },
   PENDING: { label: "Pending", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
-  APPROVED: { label: "Approved", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+  SUBMITTED: { label: "Pending", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
+  APPROVED: { label: "Approved", color: "bg-green-500/20 text-green-400 border-green-500/30" },
   ORDERED: { label: "Ordered", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
-  RECEIVED: { label: "Received", color: "bg-green-500/20 text-green-400 border-green-500/30" },
+  RECEIVED: { label: "Received", color: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
   CANCELLED: { label: "Cancelled", color: "bg-red-500/20 text-red-400 border-red-500/30" },
   REJECTED: { label: "Rejected", color: "bg-red-500/20 text-red-400 border-red-500/30" },
 };
 
-export default function MobilePurchaseOrdersPage() {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [, navigate] = useLocation();
-  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
-  const [sendingPO, setSendingPO] = useState<PurchaseOrder | null>(null);
+function formatCurrency(amount: string | number | null) {
+  if (amount === null || amount === undefined) return "-";
+  const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
+  if (isNaN(numAmount)) return "-";
+  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(numAmount);
+}
 
-  const { data: purchaseOrders = [], isLoading } = useQuery<PurchaseOrder[]>({
-    queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS],
-    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
-  });
-
-  const { data: poDetails, isLoading: detailsLoading } = useQuery<PurchaseOrder>({
-    queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDER_BY_ID(selectedPO?.id || "")],
-    enabled: !!selectedPO?.id,
-  });
-
-  const approveMutation = useMutation({
-    mutationFn: async (poId: string) => {
-      return apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDER_APPROVE(poId), {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
-      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDER_BY_ID(selectedPO?.id || "")] });
-      setSelectedPO(null);
-    },
-    onError: () => {
-      toast({ title: "Failed to approve", variant: "destructive" });
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: async (poId: string) => {
-      return apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDER_REJECT(poId), { reason: "Rejected via mobile" });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
-      setSelectedPO(null);
-    },
-    onError: () => {
-      toast({ title: "Failed to reject", variant: "destructive" });
-    },
-  });
-
-  const pendingPOs = useMemo(() => purchaseOrders.filter(po => po.status === "PENDING"), [purchaseOrders]);
-  const activePOs = useMemo(() => purchaseOrders.filter(po => ["DRAFT", "APPROVED", "ORDERED"].includes(po.status)), [purchaseOrders]);
-  const completedPOs = useMemo(() => purchaseOrders.filter(po => po.status === "RECEIVED").slice(0, 5), [purchaseOrders]);
-
-  const formatCurrency = (amount: string | number | null) => {
-    if (amount === null) return "-";
-    const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(numAmount);
-  };
-
-  const canApprove = user?.role === "ADMIN" || user?.role === "MANAGER";
-
-  const handleSendPO = (po: PurchaseOrder) => {
-    setSelectedPO(null);
-    setTimeout(() => setSendingPO(po), 200);
-  };
-
+function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
   return (
-    <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Purchase Orders">
-      <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
-        <div className="flex items-center gap-2 px-4 py-4">
-          <Link href="/mobile/more">
-            <Button variant="ghost" size="icon" className="text-white -ml-2">
-              <ChevronLeft className="h-6 w-6" />
-            </Button>
-          </Link>
-          <div className="flex-1">
-            <div className="text-2xl font-bold" data-testid="text-po-title">Purchase Orders</div>
-            <div className="text-sm text-white/60">
-              {pendingPOs.length > 0 ? `${pendingPOs.length} pending approval` : `${activePOs.length} active`}
-            </div>
-          </div>
-        </div>
+    <div className="flex items-start gap-3 py-2.5">
+      <div className="text-white/40 mt-0.5">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs text-white/50">{label}</div>
+        <div className="text-sm text-white">{value || "—"}</div>
       </div>
-
-      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4">
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-20 rounded-2xl bg-white/10" />
-            ))}
-          </div>
-        ) : purchaseOrders.length === 0 ? (
-          <div className="text-center py-12">
-            <ShoppingCart className="h-12 w-12 mx-auto text-white/30 mb-3" />
-            <p className="text-white/60">No purchase orders yet</p>
-            <p className="text-sm text-white/40">Create POs from the desktop app</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {pendingPOs.length > 0 && (
-              <div>
-                <h2 className="text-sm font-semibold text-white/50 mb-3 uppercase tracking-wide">
-                  Pending Approval ({pendingPOs.length})
-                </h2>
-                <div className="space-y-3">
-                  {pendingPOs.map((po) => (
-                    <POCard key={po.id} po={po} onSelect={() => setSelectedPO(po)} formatCurrency={formatCurrency} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activePOs.length > 0 && (
-              <div>
-                <h2 className="text-sm font-semibold text-white/50 mb-3 uppercase tracking-wide">
-                  Active Orders
-                </h2>
-                <div className="space-y-3">
-                  {activePOs.map((po) => (
-                    <POCard key={po.id} po={po} onSelect={() => setSelectedPO(po)} formatCurrency={formatCurrency} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {completedPOs.length > 0 && (
-              <div>
-                <h2 className="text-sm font-semibold text-white/50 mb-3 uppercase tracking-wide">
-                  Recent Received
-                </h2>
-                <div className="space-y-3">
-                  {completedPOs.map((po) => (
-                    <POCard key={po.id} po={po} onSelect={() => setSelectedPO(po)} muted formatCurrency={formatCurrency} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <Sheet open={!!selectedPO} onOpenChange={(open) => !open && setSelectedPO(null)}>
-        <SheetContent side="bottom" className="h-[80vh] rounded-t-2xl bg-[#0D1117] border-white/10">
-          {selectedPO && (
-            <PODetailSheet 
-              po={poDetails || selectedPO}
-              isLoading={detailsLoading}
-              canApprove={canApprove && selectedPO.status === "PENDING"}
-              onApprove={() => approveMutation.mutate(selectedPO.id)}
-              onReject={() => rejectMutation.mutate(selectedPO.id)}
-              isApproving={approveMutation.isPending}
-              isRejecting={rejectMutation.isPending}
-              onClose={() => setSelectedPO(null)}
-              onSend={handleSendPO}
-              onViewCapex={(capexId) => navigate(`/mobile/capex-requests/${capexId}`)}
-              formatCurrency={formatCurrency}
-            />
-          )}
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={!!sendingPO} onOpenChange={(open) => !open && setSendingPO(null)}>
-        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl bg-[#0D1117] border-white/10">
-          {sendingPO && (
-            <SendPOSheet
-              po={sendingPO}
-              onClose={() => setSendingPO(null)}
-              formatCurrency={formatCurrency}
-            />
-          )}
-        </SheetContent>
-      </Sheet>
-
-      <MobileBottomNav />
     </div>
   );
 }
 
-function POCard({ po, onSelect, muted = false, formatCurrency }: { po: PurchaseOrder; onSelect: () => void; muted?: boolean; formatCurrency: (amount: string | number | null) => string }) {
+function POCard({ po, onSelect }: { po: PurchaseOrder; onSelect: () => void }) {
   const status = statusConfig[po.status] || statusConfig.DRAFT;
-  const total = po.total ? parseFloat(po.total) : null;
 
   return (
     <button
       onClick={onSelect}
-      className={cn(
-        "w-full p-4 rounded-2xl border border-white/10 text-left active:scale-[0.99]",
-        muted ? "bg-white/[0.03]" : "bg-white/5"
-      )}
+      className="w-full flex items-start gap-3 p-4 rounded-xl border border-white/10 bg-white/5 text-left active:scale-[0.99]"
       data-testid={`po-${po.id}`}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-sm truncate text-white">{po.poNumber}</h3>
-            {po.capexRequestId && (
-              <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-400 bg-amber-500/10 px-1.5 py-0" data-testid={`badge-capex-mobile-${po.id}`}>
-                CAPEX
-              </Badge>
-            )}
-          </div>
-          {po.supplier && (
-            <p className="text-xs text-white/50 truncate">{po.supplier.name}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Badge variant="outline" className={cn("text-xs border", status.color)}>
+      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20 flex-shrink-0 mt-0.5">
+        <ShoppingCart className="h-5 w-5 text-blue-400" />
+      </div>
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-semibold text-white truncate">{po.poNumber}</span>
+          <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 border", status.color)}>
             {status.label}
           </Badge>
-          <ChevronRight className="h-4 w-4 text-white/40" />
+          {po.capexRequestId && (
+            <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-400 bg-amber-500/10 px-1.5 py-0">
+              CAPEX
+            </Badge>
+          )}
+        </div>
+        <div className="text-xs text-white/60 truncate">
+          {po.supplier?.name || "No supplier"}
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-base font-bold text-white">
+            {formatCurrency(po.total)}
+          </span>
+          <span className="text-xs text-white/40">
+            {format(new Date(po.createdAt), "dd MMM yyyy")}
+          </span>
         </div>
       </div>
-      
-      <div className="flex items-center justify-between text-xs text-white/50">
-        <span className="flex items-center gap-1">
-          <Calendar className="h-3.5 w-3.5" />
-          {format(new Date(po.createdAt), "dd MMM")}
-        </span>
-        <span className="font-medium text-white">
-          {formatCurrency(total)}
-        </span>
-      </div>
+      <ChevronRight className="h-5 w-5 text-white/30 flex-shrink-0 mt-2" />
     </button>
   );
 }
 
-function PODetailSheet({ 
-  po, 
-  isLoading,
-  canApprove,
-  onApprove,
-  onReject,
-  isApproving,
-  isRejecting,
-  onClose,
+function PODetailView({
+  poId,
+  onBack,
   onSend,
-  onViewCapex,
-  formatCurrency,
-}: { 
-  po: PurchaseOrder;
-  isLoading: boolean;
-  canApprove: boolean;
-  onApprove: () => void;
-  onReject: () => void;
-  isApproving: boolean;
-  isRejecting: boolean;
-  onClose: () => void;
+}: {
+  poId: string;
+  onBack: () => void;
   onSend: (po: PurchaseOrder) => void;
-  onViewCapex: (capexId: string) => void;
-  formatCurrency: (amount: string | number | null) => string;
 }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [approveNote, setApproveNote] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
+  const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+
+  const { data: po, isLoading } = useQuery<PurchaseOrder>({
+    queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDER_BY_ID(poId)],
+    enabled: !!poId,
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDER_APPROVE(poId), {
+        note: approveNote || undefined,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Purchase order approved" });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDER_BY_ID(poId)] });
+      setShowApproveDialog(false);
+      setApproveNote("");
+    },
+    onError: (err: Error) => {
+      toast({ title: "Approval failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDER_REJECT(poId), {
+        reason: rejectReason,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Purchase order rejected" });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
+      setShowRejectDialog(false);
+      setRejectReason("");
+      onBack();
+    },
+    onError: (err: Error) => {
+      toast({ title: "Rejection failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const isBusy = approveMutation.isPending || rejectMutation.isPending;
+  const canApprove = (user?.role === "ADMIN" || user?.role === "MANAGER") &&
+    po && (po.status === "PENDING" || po.status === "SUBMITTED");
+  const canSend = po && po.status === "APPROVED";
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10">
+          <Button variant="ghost" size="icon" className="text-white -ml-2" onClick={onBack} data-testid="button-back-detail">
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+          <Skeleton className="h-5 w-32 bg-white/10" />
+        </div>
+        <div className="flex-1 p-4 space-y-4">
+          <Skeleton className="h-24 rounded-xl bg-white/10" />
+          <Skeleton className="h-32 rounded-xl bg-white/10" />
+          <Skeleton className="h-20 rounded-xl bg-white/10" />
+        </div>
+        <MobileBottomNav />
+      </div>
+    );
+  }
+
+  if (!po) {
+    return (
+      <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 py-3 border-b border-white/10">
+          <Button variant="ghost" size="icon" className="text-white -ml-2" onClick={onBack} data-testid="button-back-detail">
+            <ChevronLeft className="h-6 w-6" />
+          </Button>
+          <span className="font-medium">Not Found</span>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center text-white/40">
+          <ShoppingCart className="h-12 w-12 opacity-30 mb-2" />
+          <p className="text-sm">Purchase order not found</p>
+        </div>
+        <MobileBottomNav />
+      </div>
+    );
+  }
+
   const status = statusConfig[po.status] || statusConfig.DRAFT;
-  const canSend = ["APPROVED", "ORDERED"].includes(po.status);
 
   return (
-    <div className="flex flex-col h-full text-white">
-      <SheetHeader className="pb-4">
-        <div className="flex items-center gap-2">
-          <SheetTitle className="text-left flex-1 text-white">{po.poNumber}</SheetTitle>
-          <Badge variant="outline" className={cn("text-xs border", status.color)}>
-            {status.label}
-          </Badge>
+    <>
+      <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden">
+        <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+          <div className="flex items-center gap-3 px-4 py-3">
+            <Button variant="ghost" size="icon" className="text-white -ml-2" onClick={onBack} data-testid="button-back-detail">
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <div className="text-lg font-bold truncate" data-testid="text-po-detail-title">{po.poNumber}</div>
+              <div className="text-xs text-white/60">{po.supplier?.name || "No supplier"}</div>
+            </div>
+            <Badge variant="outline" className={cn("text-xs border flex-shrink-0", status.color)} data-testid="badge-po-status">
+              {status.label}
+            </Badge>
+          </div>
         </div>
-        {po.supplier && (
-          <p className="text-sm text-white/60 text-left">{po.supplier.name}</p>
-        )}
-      </SheetHeader>
 
-      <div className="flex-1 overflow-auto space-y-4">
-        {isLoading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-20 rounded-lg bg-white/10" />
-            <Skeleton className="h-32 rounded-lg bg-white/10" />
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="min-w-0">
-                <label className="text-sm font-medium text-white/60 mb-1 block">Supplier</label>
-                <p className="text-sm text-white truncate">{po.supplier?.name || "-"}</p>
-              </div>
-              <div className="min-w-0">
-                <label className="text-sm font-medium text-white/60 mb-1 block">Job / Project</label>
-                <p className="text-sm text-white truncate">{po.projectName || "-"}</p>
-              </div>
-              <div className="min-w-0">
-                <label className="text-sm font-medium text-white/60 mb-1 block">Date</label>
-                <p className="text-sm text-white">
-                  {po.requiredByDate
-                    ? `Due ${format(new Date(po.requiredByDate), "dd MMM yyyy")}`
-                    : format(new Date(po.createdAt), "dd MMM yyyy")}
-                </p>
-              </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-48">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-center">
+            <div className="text-xs text-white/50 mb-1">Total (inc. GST)</div>
+            <div className="text-3xl font-bold text-white" data-testid="text-po-total">
+              {formatCurrency(po.total)}
             </div>
+            <div className="flex items-center justify-center gap-4 mt-2 text-xs text-white/50">
+              <span>Ex: {formatCurrency(po.subtotal)}</span>
+              <span>Tax: {formatCurrency(po.taxAmount)}</span>
+            </div>
+          </div>
 
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <InfoRow
+              icon={<Building2 className="h-4 w-4" />}
+              label="Supplier"
+              value={po.supplier?.name}
+            />
+            <InfoRow
+              icon={<Package className="h-4 w-4" />}
+              label="Job / Project"
+              value={po.projectName}
+            />
+            <InfoRow
+              icon={<Calendar className="h-4 w-4" />}
+              label={po.requiredByDate ? "Required By" : "Created"}
+              value={
+                po.requiredByDate
+                  ? format(new Date(po.requiredByDate), "dd MMM yyyy")
+                  : format(new Date(po.createdAt), "dd MMM yyyy")
+              }
+            />
             {po.requestedBy && (
-              <div className="min-w-0">
-                <label className="text-sm font-medium text-white/60 mb-1 block">Requested By</label>
-                <p className="text-sm text-white truncate">{po.requestedBy.name || po.requestedBy.email}</p>
-              </div>
+              <InfoRow
+                icon={<User className="h-4 w-4" />}
+                label="Requested By"
+                value={po.requestedBy.name || po.requestedBy.email}
+              />
             )}
-
-            {po.capexRequestId && (
-              <button
-                className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20 w-full text-left active:scale-[0.99]"
-                data-testid="button-view-capex"
-                onClick={() => {
-                  onClose();
-                  setTimeout(() => onViewCapex(po.capexRequestId!), 150);
-                }}
-              >
-                <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400 bg-amber-500/10" data-testid="badge-capex-detail">
-                  CAPEX
-                </Badge>
-                <span className="text-sm text-amber-300/80 flex-1">View CAPEX request</span>
-                <ChevronRight className="h-4 w-4 text-amber-400/60" />
-              </button>
-            )}
-
             {po.deliveryAddress && (
-              <div>
-                <label className="text-sm font-medium text-white/60 mb-1 block">Delivery Address</label>
-                <p className="text-sm text-white">{po.deliveryAddress}</p>
-              </div>
+              <InfoRow
+                icon={<MapPin className="h-4 w-4" />}
+                label="Delivery Address"
+                value={po.deliveryAddress}
+              />
             )}
+          </div>
 
-            {po.items && po.items.length > 0 && (
-              <div>
-                <label className="text-sm font-medium text-white/60 mb-2 block">
-                  Items ({po.items.length})
-                </label>
-                <div className="overflow-x-auto -mx-2 px-2">
-                  <table className="w-full min-w-[500px] text-sm" data-testid="table-mobile-po-items">
-                    <thead>
-                      <tr className="border-b border-white/10 text-white/50">
-                        <th className="text-left py-2 pr-3 font-medium">Description</th>
-                        <th className="text-right py-2 px-2 font-medium whitespace-nowrap w-[60px]">Qty</th>
-                        <th className="text-right py-2 px-2 font-medium whitespace-nowrap w-[90px]">Unit Price</th>
-                        <th className="text-right py-2 pl-2 font-medium whitespace-nowrap w-[100px]">Line Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {po.items.map((item) => (
-                        <tr key={item.id} className="border-b border-white/5">
-                          <td className="py-2.5 pr-3 text-white min-w-0">
-                            <p className="truncate max-w-[200px] sm:max-w-none">{item.description}</p>
-                            {item.unitOfMeasure && (
-                              <span className="text-xs text-white/40">{item.unitOfMeasure}</span>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-2 text-right text-white tabular-nums">{item.quantity}</td>
-                          <td className="py-2.5 px-2 text-right text-white tabular-nums whitespace-nowrap">{formatCurrency(item.unitPrice)}</td>
-                          <td className="py-2.5 pl-2 text-right font-medium text-white tabular-nums whitespace-nowrap">{formatCurrency(item.lineTotal)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
+          {po.capexRequestId && (
+            <button
+              className="flex items-center gap-3 w-full p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-left active:scale-[0.99]"
+              data-testid="button-view-capex"
+              onClick={() => navigate(`/mobile/capex-requests/${po.capexRequestId}`)}
+            >
+              <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400 bg-amber-500/10">
+                CAPEX
+              </Badge>
+              <span className="text-sm text-amber-300/80 flex-1">View linked CAPEX request</span>
+              <ChevronRight className="h-4 w-4 text-amber-400/60" />
+            </button>
+          )}
 
-            <div className="p-4 bg-white/5 rounded-lg border border-white/10 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-white/60">Subtotal</span>
-                <span className="text-white">{formatCurrency(po.subtotal)}</span>
+          {po.items && po.items.length > 0 && (
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+              <div className="text-xs font-semibold uppercase tracking-wider text-white/40">
+                Items ({po.items.length})
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-white/60">Tax</span>
-                <span className="text-white">{formatCurrency(po.taxAmount)}</span>
-              </div>
-              <div className="flex justify-between text-base font-semibold border-t border-white/10 pt-2">
-                <span className="text-white">Total</span>
-                <span className="text-white">{formatCurrency(po.total)}</span>
+              <div className="space-y-2">
+                {po.items.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="rounded-lg border border-white/5 bg-white/[0.03] p-3 space-y-1"
+                    data-testid={`po-item-${idx}`}
+                  >
+                    <div className="text-sm text-white">{item.description}</div>
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-white/50">
+                        {item.quantity} {item.unitOfMeasure ? `${item.unitOfMeasure}` : ""} × {formatCurrency(item.unitPrice)}
+                      </span>
+                      <span className="font-semibold text-white">{formatCurrency(item.lineTotal)}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
+          )}
 
-            {po.notes && (
-              <div>
-                <label className="text-sm font-medium text-white/60 mb-1 block">Notes</label>
-                <p className="text-sm text-white">{po.notes}</p>
-              </div>
-            )}
-          </>
-        )}
+          {po.notes && (
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <InfoRow
+                icon={<StickyNote className="h-4 w-4" />}
+                label="Notes"
+                value={po.notes}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="flex-shrink-0 border-t border-white/10 bg-[#0D1117] px-4 py-3 space-y-2" style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 12px)" }}>
+          {canSend && (
+            <Button
+              className="w-full bg-blue-600 text-white"
+              onClick={() => onSend(po)}
+              data-testid="button-send-po"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Send Purchase Order
+            </Button>
+          )}
+          {canApprove && (
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 bg-green-600 text-white border-green-700"
+                onClick={() => setShowApproveDialog(true)}
+                disabled={isBusy}
+                data-testid="button-approve-po"
+              >
+                {approveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Check className="h-4 w-4 mr-1" />}
+                Approve
+              </Button>
+              <Button
+                className="flex-1 bg-red-600 text-white border-red-700"
+                onClick={() => setShowRejectDialog(true)}
+                disabled={isBusy}
+                data-testid="button-reject-po"
+              >
+                {rejectMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <X className="h-4 w-4 mr-1" />}
+                Reject
+              </Button>
+            </div>
+          )}
+          {!canApprove && !canSend && po.status !== "APPROVED" && (
+            <div className="text-center text-xs text-white/40 py-1">
+              {po.status === "REJECTED" ? "This purchase order has been rejected" :
+               po.status === "ORDERED" ? "This purchase order has been sent" :
+               po.status === "RECEIVED" ? "This purchase order has been received" :
+               po.status === "DRAFT" ? "This purchase order is still in draft" :
+               "No actions available"}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="pt-4 border-t border-white/10 mt-4 space-y-2">
-        {canSend && (
-          <Button 
-            className="w-full bg-blue-600"
-            onClick={() => onSend(po)}
-            data-testid="button-send-po"
-          >
-            <Send className="h-4 w-4 mr-2" />
-            Send Purchase Order
-          </Button>
-        )}
-        {canApprove && (
-          <div className="flex gap-2">
-            <Button 
-              className="flex-1 bg-green-600"
-              onClick={onApprove}
-              disabled={isApproving || isRejecting}
-              data-testid="button-approve-po"
+      <AlertDialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
+        <AlertDialogContent className="bg-[#0D1117] border-white/10 text-white max-w-[90vw]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Approve Purchase Order</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/60">
+              Approve {po.poNumber} for {formatCurrency(po.total)}?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Optional note..."
+            value={approveNote}
+            onChange={(e) => setApproveNote(e.target.value)}
+            className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[80px]"
+            data-testid="input-approve-note"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-white/10 text-white" data-testid="button-cancel-approve">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-green-600 text-white"
+              onClick={() => approveMutation.mutate()}
+              disabled={approveMutation.isPending}
+              data-testid="button-confirm-approve"
             >
-              <Check className="h-4 w-4 mr-2" />
-              {isApproving ? "Approving..." : "Approve"}
-            </Button>
-            <Button 
-              variant="destructive"
-              className="flex-1"
-              onClick={onReject}
-              disabled={isApproving || isRejecting}
-              data-testid="button-reject-po"
+              {approveMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Approve
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <AlertDialogContent className="bg-[#0D1117] border-white/10 text-white max-w-[90vw]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject Purchase Order</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/60">
+              Reject {po.poNumber}? A reason is required.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Reason for rejection (required)..."
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            className="bg-white/5 border-white/10 text-white placeholder:text-white/30 min-h-[80px]"
+            data-testid="input-reject-reason"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-white/10 text-white" data-testid="button-cancel-reject">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white"
+              onClick={() => rejectMutation.mutate()}
+              disabled={rejectMutation.isPending || !rejectReason.trim()}
+              data-testid="button-confirm-reject"
             >
-              <X className="h-4 w-4 mr-2" />
-              {isRejecting ? "Rejecting..." : "Reject"}
-            </Button>
-          </div>
-        )}
-        <Button variant="outline" className="w-full border-white/20 text-white" onClick={onClose} data-testid="button-close-po">
-          Close
-        </Button>
-      </div>
-    </div>
+              {rejectMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Reject
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
 
-function SendPOSheet({ 
-  po, 
-  onClose, 
-  formatCurrency 
-}: { 
-  po: PurchaseOrder; 
-  onClose: () => void;
-  formatCurrency: (amount: string | number | null) => string;
+function SendPOView({
+  po,
+  onBack,
+}: {
+  po: PurchaseOrder;
+  onBack: () => void;
 }) {
   const { toast } = useToast();
-  
+
   const { data: settings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
@@ -540,7 +533,9 @@ function SendPOSheet({
       return res.json();
     },
     onSuccess: () => {
-      onClose();
+      toast({ title: "Purchase order sent successfully" });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
+      onBack();
     },
     onError: (err: any) => {
       toast({ title: "Failed to send", description: err.message || "Could not send email", variant: "destructive" });
@@ -561,21 +556,23 @@ function SendPOSheet({
   };
 
   return (
-    <div className="flex flex-col h-full text-white">
-      <SheetHeader className="pb-4">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="text-white -ml-2" onClick={onClose} data-testid="button-back-from-send">
-            <ArrowLeft className="h-5 w-5" />
+    <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden">
+      <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+        <div className="flex items-center gap-3 px-4 py-3">
+          <Button variant="ghost" size="icon" className="text-white -ml-2" onClick={onBack} data-testid="button-back-from-send">
+            <ChevronLeft className="h-6 w-6" />
           </Button>
-          <SheetTitle className="text-left flex-1 text-white flex items-center gap-2">
-            <Mail className="h-5 w-5 text-blue-400" />
-            Send {po.poNumber}
-          </SheetTitle>
+          <div className="flex-1 min-w-0">
+            <div className="text-lg font-bold flex items-center gap-2">
+              <Mail className="h-5 w-5 text-blue-400" />
+              Send {po.poNumber}
+            </div>
+          </div>
         </div>
-      </SheetHeader>
+      </div>
 
-      <div className="flex-1 overflow-auto space-y-4">
-        <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20 flex items-center gap-3">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
           <FileText className="h-5 w-5 text-blue-400 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white">{po.poNumber}.pdf</p>
@@ -585,7 +582,7 @@ function SendPOSheet({
         </div>
 
         <div className="space-y-3">
-          <div className="min-w-0">
+          <div>
             <label className="text-sm font-medium text-white/60 mb-1.5 block">To</label>
             <Input
               type="email"
@@ -597,7 +594,7 @@ function SendPOSheet({
             />
           </div>
 
-          <div className="min-w-0">
+          <div>
             <label className="text-sm font-medium text-white/60 mb-1.5 block">Cc (optional)</label>
             <Input
               type="email"
@@ -609,7 +606,7 @@ function SendPOSheet({
             />
           </div>
 
-          <div className="min-w-0">
+          <div>
             <label className="text-sm font-medium text-white/60 mb-1.5 block">Subject</label>
             <Input
               value={subject}
@@ -619,7 +616,7 @@ function SendPOSheet({
             />
           </div>
 
-          <div className="min-w-0">
+          <div>
             <label className="text-sm font-medium text-white/60 mb-1.5 block">Message</label>
             <Textarea
               value={message}
@@ -632,10 +629,10 @@ function SendPOSheet({
         </div>
       </div>
 
-      <div className="pt-4 border-t border-white/10 mt-4 space-y-2">
-        <Button 
-          className="w-full bg-blue-600"
-          onClick={handleSend} 
+      <div className="flex-shrink-0 border-t border-white/10 bg-[#0D1117] px-4 py-3 space-y-2" style={{ paddingBottom: "max(env(safe-area-inset-bottom, 0px), 12px)" }}>
+        <Button
+          className="w-full bg-blue-600 text-white"
+          onClick={handleSend}
           disabled={sendMutation.isPending}
           data-testid="button-send-email"
         >
@@ -646,10 +643,150 @@ function SendPOSheet({
           )}
           {sendMutation.isPending ? "Sending..." : "Send Email with PDF"}
         </Button>
-        <Button variant="outline" className="w-full border-white/20 text-white" onClick={onClose} data-testid="button-cancel-send">
-          Cancel
-        </Button>
       </div>
+    </div>
+  );
+}
+
+type ViewState = { type: "list" } | { type: "detail"; poId: string } | { type: "send"; po: PurchaseOrder };
+
+export default function MobilePurchaseOrdersPage() {
+  const [view, setView] = useState<ViewState>({ type: "list" });
+
+  const { data: purchaseOrders = [], isLoading } = useQuery<PurchaseOrder[]>({
+    queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
+  });
+
+  const pendingPOs = useMemo(() =>
+    purchaseOrders.filter(po => po.status === "PENDING" || po.status === "SUBMITTED"),
+    [purchaseOrders]
+  );
+  const approvedPOs = useMemo(() =>
+    purchaseOrders.filter(po => po.status === "APPROVED"),
+    [purchaseOrders]
+  );
+  const activePOs = useMemo(() =>
+    purchaseOrders.filter(po => ["DRAFT", "ORDERED"].includes(po.status)),
+    [purchaseOrders]
+  );
+  const completedPOs = useMemo(() =>
+    purchaseOrders.filter(po => po.status === "RECEIVED").slice(0, 5),
+    [purchaseOrders]
+  );
+
+  if (view.type === "detail") {
+    return (
+      <PODetailView
+        poId={view.poId}
+        onBack={() => setView({ type: "list" })}
+        onSend={(po) => setView({ type: "send", po })}
+      />
+    );
+  }
+
+  if (view.type === "send") {
+    return (
+      <SendPOView
+        po={view.po}
+        onBack={() => setView({ type: "detail", poId: view.po.id })}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Purchase Orders">
+      <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+        <div className="flex items-center gap-2 px-4 py-4">
+          <Link href="/mobile/more">
+            <Button variant="ghost" size="icon" className="text-white -ml-2" data-testid="button-back-po-list">
+              <ChevronLeft className="h-6 w-6" />
+            </Button>
+          </Link>
+          <div className="flex-1">
+            <div className="text-2xl font-bold" data-testid="text-po-title">Purchase Orders</div>
+            <div className="text-sm text-white/60">
+              {pendingPOs.length > 0
+                ? `${pendingPOs.length} pending approval`
+                : `${purchaseOrders.length} total`}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4">
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-24 rounded-xl bg-white/10" />
+            ))}
+          </div>
+        ) : purchaseOrders.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-500/10 mb-4">
+              <ShoppingCart className="h-8 w-8 text-blue-400/60" />
+            </div>
+            <div className="text-lg font-semibold text-white/80">No purchase orders</div>
+            <div className="text-sm text-white/50 mt-1">Create POs from the desktop app</div>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {pendingPOs.length > 0 && (
+              <div>
+                <h2 className="text-xs font-semibold text-white/40 mb-3 uppercase tracking-wider">
+                  Pending Approval ({pendingPOs.length})
+                </h2>
+                <div className="space-y-2">
+                  {pendingPOs.map((po) => (
+                    <POCard key={po.id} po={po} onSelect={() => setView({ type: "detail", poId: po.id })} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {approvedPOs.length > 0 && (
+              <div>
+                <h2 className="text-xs font-semibold text-white/40 mb-3 uppercase tracking-wider">
+                  Approved — Ready to Send ({approvedPOs.length})
+                </h2>
+                <div className="space-y-2">
+                  {approvedPOs.map((po) => (
+                    <POCard key={po.id} po={po} onSelect={() => setView({ type: "detail", poId: po.id })} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activePOs.length > 0 && (
+              <div>
+                <h2 className="text-xs font-semibold text-white/40 mb-3 uppercase tracking-wider">
+                  Other Active ({activePOs.length})
+                </h2>
+                <div className="space-y-2">
+                  {activePOs.map((po) => (
+                    <POCard key={po.id} po={po} onSelect={() => setView({ type: "detail", poId: po.id })} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {completedPOs.length > 0 && (
+              <div>
+                <h2 className="text-xs font-semibold text-white/40 mb-3 uppercase tracking-wider">
+                  Recently Received
+                </h2>
+                <div className="space-y-2">
+                  {completedPOs.map((po) => (
+                    <POCard key={po.id} po={po} onSelect={() => setView({ type: "detail", poId: po.id })} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <MobileBottomNav />
     </div>
   );
 }
