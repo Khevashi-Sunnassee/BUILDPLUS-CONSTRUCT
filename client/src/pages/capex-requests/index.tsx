@@ -112,7 +112,7 @@ export default function CapexRequestsPage() {
       setDeleteDialogOpen(false);
       setDeletingCapex(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Failed to delete", description: error.message, variant: "destructive" });
     },
   });
@@ -223,7 +223,7 @@ export default function CapexRequestsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                {departmentsList.map((dept: any) => (
+                {departmentsList.map((dept: Department) => (
                   <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
                 ))}
               </SelectContent>

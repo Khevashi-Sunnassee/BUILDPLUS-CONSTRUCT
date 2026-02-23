@@ -62,7 +62,7 @@ export function CapexDetailSheet({ capex, onClose }: { capex: CapexRequestWithDe
   });
 
   const actionMutation = useMutation({
-    mutationFn: async ({ action, data }: { action: string; data?: any }) => {
+    mutationFn: async ({ action, data }: { action: string; data?: Record<string, string> }) => {
       const methodMap: Record<string, string> = {
         submit: "PUT",
         approve: "POST",
@@ -157,7 +157,7 @@ export function CapexDetailSheet({ capex, onClose }: { capex: CapexRequestWithDe
         )}
       </div>
 
-      <ApprovalTimeline status={capex.status} submittedAt={capex.submittedAt as any} approvedAt={capex.approvedAt as any} rejectedAt={capex.rejectedAt as any} />
+      <ApprovalTimeline status={capex.status} submittedAt={capex.submittedAt ?? null} approvedAt={capex.approvedAt ?? null} rejectedAt={capex.rejectedAt ?? null} />
 
       {capex.status === "REJECTED" && capex.rejectionReason && (
         <Card className="border-destructive">

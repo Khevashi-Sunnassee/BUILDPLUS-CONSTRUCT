@@ -14,13 +14,20 @@ export interface CapexRequestWithDetails extends CapexRequest {
   purchaseOrder?: { id: string; poNumber: string; status: string; total: string | null } | null;
 }
 
+export interface CapexAuditMetadata {
+  reason?: string;
+  previousStatus?: string;
+  newStatus?: string;
+  changes?: Record<string, { from: string; to: string }>;
+}
+
 export interface AuditEvent {
   id: string;
   capexRequestId: string;
   eventType: string;
   actorId: string;
   actorName: string | null;
-  metadata: Record<string, any> | null;
+  metadata: CapexAuditMetadata | null;
   createdAt: string;
 }
 

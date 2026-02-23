@@ -15,7 +15,7 @@ import { ASSET_CATEGORIES, CAPEX_PURCHASE_REASONS } from "@shared/schema";
 import type { User, Job, Department, Supplier, Asset } from "@shared/schema";
 import type { CapexRequestWithDetails, ReplacementPrefill } from "./types";
 
-function CollapsibleSection({ title, icon: Icon, defaultOpen = false, children }: { title: string; icon: any; defaultOpen?: boolean; children: React.ReactNode }) {
+function CollapsibleSection({ title, icon: Icon, defaultOpen = false, children }: { title: string; icon: React.ElementType; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -35,7 +35,7 @@ function CollapsibleSection({ title, icon: Icon, defaultOpen = false, children }
   );
 }
 
-function CurrencyInput({ value, onChange, ...props }: { value: string; onChange: (val: string) => void; [key: string]: any }) {
+function CurrencyInput({ value, onChange, ...props }: { value: string; onChange: (val: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "value">) {
   const [focused, setFocused] = useState(false);
   const [displayValue, setDisplayValue] = useState(value);
 
@@ -154,7 +154,7 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
     },
   });
 
-  const update = (field: string, value: any) => setFormData((prev) => ({ ...prev, [field]: value }));
+  const update = (field: string, value: string | boolean | string[]) => setFormData((prev) => ({ ...prev, [field]: value }));
 
   const toggleReason = (reason: string) => {
     setFormData((prev) => ({
@@ -174,7 +174,7 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
             <Select value={formData.jobId} onValueChange={(v) => update("jobId", v)}>
               <SelectTrigger data-testid="select-job"><SelectValue placeholder="Select job" /></SelectTrigger>
               <SelectContent>
-                {(Array.isArray(jobsList) ? jobsList : []).map((j: any) => (
+                {(Array.isArray(jobsList) ? jobsList : []).map((j: Job) => (
                   <SelectItem key={j.id} value={j.id}>{j.jobNumber} - {j.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -185,7 +185,7 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
             <Select value={formData.departmentId} onValueChange={(v) => update("departmentId", v)}>
               <SelectTrigger data-testid="select-department"><SelectValue placeholder="Select department" /></SelectTrigger>
               <SelectContent>
-                {(Array.isArray(departmentsList) ? departmentsList : []).map((d: any) => (
+                {(Array.isArray(departmentsList) ? departmentsList : []).map((d: Department) => (
                   <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -196,7 +196,7 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
             <Select value={formData.proposedAssetManagerId} onValueChange={(v) => update("proposedAssetManagerId", v)}>
               <SelectTrigger data-testid="select-asset-manager"><SelectValue placeholder="Select user" /></SelectTrigger>
               <SelectContent>
-                {(Array.isArray(usersList) ? usersList : []).map((u: any) => (
+                {(Array.isArray(usersList) ? usersList : []).map((u: User) => (
                   <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
                 ))}
               </SelectContent>
@@ -207,7 +207,7 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
             <Select value={formData.approvingManagerId} onValueChange={(v) => update("approvingManagerId", v)}>
               <SelectTrigger data-testid="select-approving-manager"><SelectValue placeholder="Select approving manager" /></SelectTrigger>
               <SelectContent>
-                {(Array.isArray(usersList) ? usersList : []).map((u: any) => (
+                {(Array.isArray(usersList) ? usersList : []).map((u: User) => (
                   <SelectItem key={u.id} value={u.id}>
                     {u.name || u.email} {u.role ? `(${u.role})` : ""}
                   </SelectItem>
@@ -273,7 +273,7 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
                 <Select value={formData.replacementAssetId} onValueChange={(v) => update("replacementAssetId", v)}>
                   <SelectTrigger data-testid="select-replacement-asset"><SelectValue placeholder="Select asset" /></SelectTrigger>
                   <SelectContent>
-                    {(Array.isArray(assetsList) ? assetsList : []).map((a: any) => (
+                    {(Array.isArray(assetsList) ? assetsList : []).map((a: Asset) => (
                       <SelectItem key={a.id} value={a.id}>{a.assetTag} - {a.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -351,7 +351,7 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
             <Select value={formData.preferredSupplierId} onValueChange={(v) => update("preferredSupplierId", v)}>
               <SelectTrigger data-testid="select-supplier"><SelectValue placeholder="Select supplier" /></SelectTrigger>
               <SelectContent>
-                {(Array.isArray(suppliersList) ? suppliersList : []).map((s: any) => (
+                {(Array.isArray(suppliersList) ? suppliersList : []).map((s: Supplier) => (
                   <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                 ))}
               </SelectContent>
@@ -377,7 +377,7 @@ export function CapexForm({ capex, onSave, onClose, replacementPrefill }: { cape
             <Select value={formData.factoryId} onValueChange={(v) => update("factoryId", v)}>
               <SelectTrigger data-testid="select-factory"><SelectValue placeholder="Select factory" /></SelectTrigger>
               <SelectContent>
-                {(Array.isArray(factoriesList) ? factoriesList : []).map((f: any) => (
+                {(Array.isArray(factoriesList) ? factoriesList : []).map((f: { id: string; name: string; code: string }) => (
                   <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                 ))}
               </SelectContent>
