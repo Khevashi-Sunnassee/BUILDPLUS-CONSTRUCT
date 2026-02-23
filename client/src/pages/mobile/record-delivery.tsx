@@ -122,6 +122,7 @@ export default function MobileRecordDeliveryPage() {
 
   const { data: loadLists = [], isLoading } = useQuery<LoadListWithDetails[]>({
     queryKey: [LOGISTICS_ROUTES.LOAD_LISTS],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: factories = [] } = useQuery<Factory[]>({

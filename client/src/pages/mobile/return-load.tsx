@@ -97,6 +97,7 @@ export default function MobileReturnLoadPage() {
 
   const { data: loadLists = [], isLoading } = useQuery<LoadListWithDetails[]>({
     queryKey: [LOGISTICS_ROUTES.LOAD_LISTS],
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const completedLoadLists = loadLists.filter(l => (l.status === "COMPLETE" || l.status === "DELIVERED") && !l.loadReturn);

@@ -186,6 +186,7 @@ export default function MobileDashboard() {
   const { data: loadLists = [] } = useQuery<LoadList[]>({
     queryKey: [LOGISTICS_ROUTES.LOAD_LISTS],
     enabled: showLogistics,
+    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
   const { data: purchaseOrders = [] } = useQuery<PurchaseOrder[]>({
