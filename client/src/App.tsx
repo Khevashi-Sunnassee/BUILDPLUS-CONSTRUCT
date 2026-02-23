@@ -52,12 +52,15 @@ const ManagerReviewPage = lazyWithRetry(() => import("@/pages/manager-review"));
 const ReportsPage = lazyWithRetry(() => import("@/pages/reports"));
 const AdminSettingsPage = lazyWithRetry(() => import("@/pages/admin/settings"));
 const AdminUsersPage = lazyWithRetry(() => import("@/pages/admin/users"));
+const UserDetailPage = lazyWithRetry(() => import("@/pages/admin/user-detail"));
 const AdminJobsPage = lazyWithRetry(() => import("@/pages/admin/jobs"));
 const AdminPanelsPage = lazyWithRetry(() => import("@/pages/admin/panels"));
 const AdminPanelTypesPage = lazyWithRetry(() => import("@/pages/admin/panel-types"));
 const AdminZonesPage = lazyWithRetry(() => import("@/pages/admin/zones"));
 const AdminCustomersPage = lazyWithRetry(() => import("@/pages/admin/customers"));
+const CustomerDetailPage = lazyWithRetry(() => import("@/pages/admin/customer-detail"));
 const AdminSuppliersPage = lazyWithRetry(() => import("@/pages/admin/suppliers"));
+const SupplierDetailPage = lazyWithRetry(() => import("@/pages/admin/supplier-detail"));
 const AdminEmployeesPage = lazyWithRetry(() => import("@/pages/admin/employees"));
 const EmployeeDetailPage = lazyWithRetry(() => import("@/pages/admin/employee-detail"));
 const AdminItemsPage = lazyWithRetry(() => import("@/pages/admin/items"));
@@ -710,6 +713,14 @@ function Router() {
         <Redirect to="/super-admin" />
       </Route>
 
+      <Route path="/admin/users/:id">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <UserDetailPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/admin/users">
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
@@ -783,10 +794,26 @@ function Router() {
       </Route>
 
 
+      <Route path="/admin/customers/:id">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <CustomerDetailPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/admin/customers">
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminCustomersPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/suppliers/:id">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <SupplierDetailPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

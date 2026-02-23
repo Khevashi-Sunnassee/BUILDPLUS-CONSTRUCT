@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -522,6 +523,7 @@ function ApplyPermissionTypeDialogInline({ open, onOpenChange, userId, userName 
 
 export default function AdminUsersPage() {
   useDocumentTitle("User Management");
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
@@ -1045,7 +1047,7 @@ export default function AdminUsersPage() {
                             variant="ghost"
                             size="icon"
                             aria-label="View user details"
-                            onClick={() => setDetailUser(user)}
+                            onClick={() => navigate(`/admin/users/${user.id}`)}
                             data-testid={`button-view-user-${user.id}`}
                           >
                             <Eye className="h-4 w-4" />

@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -140,6 +141,7 @@ interface ImportResult {
 
 export default function AdminSuppliersPage() {
   useDocumentTitle("Suppliers");
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
@@ -687,7 +689,7 @@ export default function AdminSuppliersPage() {
                           variant="ghost"
                           size="icon"
                           aria-label="View supplier details"
-                          onClick={() => setDetailSupplier(supplier)}
+                          onClick={() => navigate(`/admin/suppliers/${supplier.id}`)}
                           data-testid={`button-view-supplier-${supplier.id}`}
                         >
                           <Eye className="h-4 w-4" />

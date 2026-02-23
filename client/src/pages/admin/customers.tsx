@@ -678,7 +678,7 @@ export default function AdminCustomersPage() {
                           variant="ghost"
                           size="icon"
                           aria-label="View customer details"
-                          onClick={() => setDetailCustomer(customer)}
+                          onClick={() => navigate(`/admin/customers/${customer.id}`)}
                           data-testid={`button-view-customer-${customer.id}`}
                         >
                           <Eye className="h-4 w-4" />
