@@ -581,12 +581,12 @@ export default function MobileHireBookingForm() {
 
         <SectionHeader icon={<CalendarIcon className="h-4 w-4 text-blue-400" />} title="Dates & Rate" />
 
-        <div className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-3">
+        <div className="space-y-4">
           <FormField label="Start Date" required error={errors.hireStartDate}>
             <input
               type="date"
               {...dateInputProps}
-              className={`${inputClass} [color-scheme:dark] min-w-0`}
+              className="max-w-[70%] min-w-0 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white text-base focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors [color-scheme:dark]"
               value={form.hireStartDate}
               onChange={(e) => setForm(f => ({ ...f, hireStartDate: e.target.value }))}
               aria-required="true"
@@ -597,7 +597,7 @@ export default function MobileHireBookingForm() {
             <input
               type="date"
               {...dateInputProps}
-              className={`${inputClass} [color-scheme:dark] min-w-0`}
+              className="max-w-[70%] min-w-0 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white text-base focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors [color-scheme:dark]"
               value={form.hireEndDate}
               onChange={(e) => setForm(f => ({ ...f, hireEndDate: e.target.value }))}
               aria-required="true"

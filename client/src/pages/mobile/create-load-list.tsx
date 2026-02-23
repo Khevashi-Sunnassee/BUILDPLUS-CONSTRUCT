@@ -470,7 +470,7 @@ export default function MobileCreateLoadListPage() {
                 {...dateInputProps}
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                className="rounded-xl bg-white/5 border-white/10 text-white [color-scheme:dark] min-w-0"
+                className="rounded-xl bg-white/5 border-white/10 text-white [color-scheme:dark] min-w-0 max-w-[70%]"
                 aria-required="true"
                 data-testid="input-scheduled-date"
               />

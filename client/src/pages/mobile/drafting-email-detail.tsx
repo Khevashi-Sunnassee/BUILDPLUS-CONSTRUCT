@@ -719,7 +719,7 @@ function MobileCreateTaskPanel({ email, emailId }: { email: DraftingEmailDetail;
               {...dateInputProps}
               value={manualDueDate}
               onChange={(e) => { setManualDueDate(e.target.value); setManualAiReason(""); }}
-              className="bg-white/10 border-white/20 text-white text-sm [color-scheme:dark] min-w-0 w-full"
+              className="bg-white/10 border-white/20 text-white text-sm [color-scheme:dark] min-w-0 max-w-[70%]"
               data-testid="input-task-due-date-mobile"
             />
             <div className="flex items-center gap-1 mt-2 flex-wrap">

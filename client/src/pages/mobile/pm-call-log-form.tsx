@@ -393,7 +393,7 @@ export default function MobilePmCallLogFormPage() {
                 type="datetime-local"
                 value={callDateTime}
                 onChange={(e) => setCallDateTime(e.target.value)}
-                className="bg-white/5 border-white/10 text-white"
+                className="bg-white/5 border-white/10 text-white [color-scheme:dark] min-w-0 max-w-[70%]"
                 aria-required="true"
                 data-testid="input-call-datetime"
               />
@@ -543,7 +543,7 @@ export default function MobilePmCallLogFormPage() {
                                 return updated;
                               });
                             }}
-                            className="bg-white/5 border-white/10 text-white [color-scheme:dark] min-w-0 w-full"
+                            className="bg-white/5 border-white/10 text-white [color-scheme:dark] min-w-0 max-w-[70%]"
                             data-testid={`input-confirmed-delivery-date-${idx}`}
                           />
                         </div>

@@ -583,11 +583,11 @@ export default function MobileNewOpportunity() {
             title="Timeline"
           />
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 overflow-hidden">
-            <div className="grid grid-cols-2 gap-3 overflow-hidden">
+            <div className="space-y-3">
               <FormField label="Submission Date" error={errors.submissionDate}>
                 <input
                   type="datetime-local"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-white text-xs focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors [color-scheme:dark] min-w-0 max-w-full overflow-hidden"
+                  className="rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-white text-xs focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors [color-scheme:dark] min-w-0 max-w-[70%]"
                   value={form.submissionDate}
                   onChange={(e) => setForm((f) => ({ ...f, submissionDate: e.target.value }))}
                   data-testid="input-submissionDate"
@@ -597,7 +597,7 @@ export default function MobileNewOpportunity() {
                 <input
                   type="date"
                   {...dateInputProps}
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors [color-scheme:dark] min-w-0 max-w-full overflow-hidden"
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-white text-xs focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors [color-scheme:dark] min-w-0 max-w-[70%]"
                   value={form.estimatedStartDate}
                   onChange={(e) => setForm((f) => ({ ...f, estimatedStartDate: e.target.value }))}
                   data-testid="input-start-date"

@@ -317,7 +317,7 @@ export default function MobileRecordDeliveryPage() {
                     {...dateInputProps}
                     value={deliveryDate}
                     onChange={(e) => setDeliveryDate(e.target.value)}
-                    className={`${inputClass} [color-scheme:dark] min-w-0`}
+                    className={`${inputClass} [color-scheme:dark] min-w-0 max-w-[70%]`}
                     data-testid="input-delivery-date"
                   />
                 </FormRow>
