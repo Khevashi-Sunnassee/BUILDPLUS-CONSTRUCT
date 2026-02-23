@@ -779,13 +779,27 @@ export default function AdminJobsPage() {
     }
   };
 
-  const onSubmit = (data: JobFormData) => {
+  const onSubmit = async (data: JobFormData) => {
     if (editDialogTab === "levelCycleTimes") {
       return;
     }
     if (editingJob) {
       updateJobMutation.mutate({ id: editingJob.id, data });
     } else {
+      if (data.jobNumber && data.jobNumber.trim() !== "") {
+        try {
+          const res = await fetch(`/api/admin/jobs/check-number?jobNumber=${encodeURIComponent(data.jobNumber.trim())}`);
+          if (res.ok) {
+            const { exists } = await res.json();
+            if (exists) {
+              jobForm.setError("jobNumber", { type: "manual", message: "This job number is already in use" });
+              setEditDialogTab("details");
+              return;
+            }
+          }
+        } catch {
+        }
+      }
       createJobMutation.mutate(data);
     }
   };

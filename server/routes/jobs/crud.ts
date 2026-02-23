@@ -246,6 +246,23 @@ router.get("/api/admin/jobs/next-number", requireAuth, async (req: Request, res:
   }
 });
 
+router.get("/api/admin/jobs/check-number", requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!req.companyId) {
+      return res.status(403).json({ error: "Company context required" });
+    }
+    const { jobNumber } = req.query;
+    if (!jobNumber || typeof jobNumber !== "string") {
+      return res.status(400).json({ error: "jobNumber query parameter is required" });
+    }
+    const existing = await storage.getJobByNumber(jobNumber.trim());
+    const exists = !!existing && existing.companyId === req.companyId;
+    res.json({ exists });
+  } catch (error: unknown) {
+    res.status(500).json({ error: "Failed to check job number" });
+  }
+});
+
 router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     if (!req.companyId) {
