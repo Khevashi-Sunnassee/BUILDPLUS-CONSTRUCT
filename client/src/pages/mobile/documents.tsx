@@ -563,71 +563,47 @@ export default function MobileDocumentsPage() {
       </div>
 
       {(docTypes.length > 0 || jobs.length > 0) && (
-        <div className="flex-shrink-0 px-4 py-2 border-b border-white/10 space-y-2">
-          {jobs.length > 0 && (
-            <div className="flex items-center gap-2">
-              <Briefcase className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
-              <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
-                <button
-                  onClick={() => setSelectedJobId(null)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border active:scale-[0.99] ${
-                    selectedJobId === null
-                      ? "bg-blue-500/20 border-blue-400/30 text-blue-400"
-                      : "bg-white/5 border-white/10 text-white/60"
-                  }`}
-                  data-testid="filter-all-jobs"
+        <div className="flex-shrink-0 px-4 py-2 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            {jobs.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <Briefcase className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+                <select
+                  value={selectedJobId || ""}
+                  onChange={(e) => setSelectedJobId(e.target.value || null)}
+                  className="flex-1 min-w-0 h-9 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-medium px-3 appearance-none focus:outline-none focus:border-blue-400/50 [color-scheme:dark]"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.25em 1.25em', paddingRight: '2rem' }}
+                  data-testid="select-job-filter"
                 >
-                  All Jobs
-                </button>
-                {jobs.map((job) => (
-                  <button
-                    key={job.id}
-                    onClick={() => setSelectedJobId(selectedJobId === String(job.id) ? null : String(job.id))}
-                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border active:scale-[0.99] ${
-                      selectedJobId === String(job.id)
-                        ? "bg-blue-500/20 border-blue-400/30 text-blue-400"
-                        : "bg-white/5 border-white/10 text-white/60"
-                    }`}
-                    data-testid={`filter-job-${job.id}`}
-                  >
-                    {job.jobNumber}
-                  </button>
-                ))}
+                  <option value="">All Jobs</option>
+                  {jobs.map((job) => (
+                    <option key={job.id} value={String(job.id)}>
+                      {job.jobNumber} - {job.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
-          )}
-          {docTypes.length > 0 && (
-            <div className="flex items-center gap-2">
-              <Filter className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
-              <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
-                <button
-                  onClick={() => setSelectedTypeId(null)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border active:scale-[0.99] ${
-                    selectedTypeId === null
-                      ? "bg-blue-500/20 border-blue-400/30 text-blue-400"
-                      : "bg-white/5 border-white/10 text-white/60"
-                  }`}
-                  data-testid="filter-all-types"
+            )}
+            {docTypes.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <Filter className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+                <select
+                  value={selectedTypeId || ""}
+                  onChange={(e) => setSelectedTypeId(e.target.value || null)}
+                  className="flex-1 min-w-0 h-9 rounded-xl bg-white/10 border border-white/10 text-white text-xs font-medium px-3 appearance-none focus:outline-none focus:border-blue-400/50 [color-scheme:dark]"
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.25em 1.25em', paddingRight: '2rem' }}
+                  data-testid="select-type-filter"
                 >
-                  All Types
-                </button>
-                {docTypes.map((type) => (
-                  <button
-                    key={type.id}
-                    onClick={() => setSelectedTypeId(selectedTypeId === type.id ? null : type.id)}
-                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border active:scale-[0.99] ${
-                      selectedTypeId === type.id
-                        ? "bg-blue-500/20 border-blue-400/30 text-blue-400"
-                        : "bg-white/5 border-white/10 text-white/60"
-                    }`}
-                    data-testid={`filter-type-${type.id}`}
-                  >
-                    {type.typeName}
-                  </button>
-                ))}
+                  <option value="">All Types</option>
+                  {docTypes.map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.typeName}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
