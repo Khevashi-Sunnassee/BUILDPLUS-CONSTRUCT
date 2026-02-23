@@ -27,7 +27,38 @@ import {
 import { cn } from "@/lib/utils";
 import { dateInputProps } from "@/lib/validation";
 import { ASSET_ROUTES } from "@shared/api-routes";
-import type { ChecklistField, ChecklistFieldOption } from "@shared/schema";
+import type {
+  ChecklistField,
+  ChecklistFieldOption,
+  TextFieldConfig,
+  TextareaFieldConfig,
+  NumberFieldConfig,
+  RadioButtonFieldConfig,
+  DropdownFieldConfig,
+  CheckboxFieldConfig,
+  PassFailFieldConfig,
+  YesNoNaFieldConfig,
+  ConditionFieldConfig,
+  InspectionCheckFieldConfig,
+  DateFieldConfig,
+  TimeFieldConfig,
+  DateTimeFieldConfig,
+  AmountFieldConfig,
+  PercentageFieldConfig,
+  PriorityFieldConfig,
+  RatingFieldConfig,
+  PhotoFieldConfig,
+  MultiPhotoFieldConfig,
+  FileUploadFieldConfig,
+  SignatureFieldConfig,
+  ProgressBarFieldConfig,
+  MeasurementFieldConfig,
+  AssetSelectorFieldConfig,
+  JobSelectorFieldConfig,
+  CustomerSelectorFieldConfig,
+  SupplierSelectorFieldConfig,
+  StaffAssignmentFieldConfig,
+} from "@shared/schema";
 
 type SimpleAsset = {
   id: string;
@@ -42,15 +73,17 @@ type SimpleAsset = {
   registrationNumber: string | null;
 };
 
-interface FieldRendererProps {
-  field: ChecklistField;
+interface FieldRendererPropsBase<T extends ChecklistField = ChecklistField> {
+  field: T;
   value: unknown;
   onChange: (value: unknown) => void;
   disabled?: boolean;
   onAssetSelected?: (asset: SimpleAsset, sourceFieldId?: string) => void;
 }
 
-export function TextField({ field, value, onChange, disabled }: FieldRendererProps) {
+type FieldRendererProps = FieldRendererPropsBase;
+
+export function TextField({ field, value, onChange, disabled }: FieldRendererPropsBase<TextFieldConfig>) {
   return (
     <Input
       placeholder={field.placeholder || ""}
@@ -62,7 +95,7 @@ export function TextField({ field, value, onChange, disabled }: FieldRendererPro
   );
 }
 
-export function TextareaField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function TextareaField({ field, value, onChange, disabled }: FieldRendererPropsBase<TextareaFieldConfig>) {
   return (
     <Textarea
       placeholder={field.placeholder || ""}
@@ -75,7 +108,7 @@ export function TextareaField({ field, value, onChange, disabled }: FieldRendere
   );
 }
 
-export function NumberField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function NumberField({ field, value, onChange, disabled }: FieldRendererPropsBase<NumberFieldConfig>) {
   return (
     <Input
       type="number"
@@ -91,7 +124,7 @@ export function NumberField({ field, value, onChange, disabled }: FieldRendererP
   );
 }
 
-export function RadioButtonField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function RadioButtonField({ field, value, onChange, disabled }: FieldRendererPropsBase<RadioButtonFieldConfig>) {
   const options = field.options || [];
   return (
     <RadioGroup
@@ -110,7 +143,7 @@ export function RadioButtonField({ field, value, onChange, disabled }: FieldRend
   );
 }
 
-export function DropdownField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function DropdownField({ field, value, onChange, disabled }: FieldRendererPropsBase<DropdownFieldConfig>) {
   const options = field.options || [];
   return (
     <Select
@@ -132,7 +165,7 @@ export function DropdownField({ field, value, onChange, disabled }: FieldRendere
   );
 }
 
-export function CheckboxField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function CheckboxField({ field, value, onChange, disabled }: FieldRendererPropsBase<CheckboxFieldConfig>) {
   const options = field.options || [];
   const selectedValues = (value as string[]) || [];
 
@@ -162,7 +195,7 @@ export function CheckboxField({ field, value, onChange, disabled }: FieldRendere
   );
 }
 
-export function PassFailField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function PassFailField({ field, value, onChange, disabled }: FieldRendererPropsBase<PassFailFieldConfig>) {
   const currentValue = value as string | null;
   return (
     <div className="flex items-center gap-2" data-testid={`field-passfail-${field.id}`}>
@@ -194,7 +227,7 @@ export function PassFailField({ field, value, onChange, disabled }: FieldRendere
   );
 }
 
-export function YesNoNaField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function YesNoNaField({ field, value, onChange, disabled }: FieldRendererPropsBase<YesNoNaFieldConfig>) {
   const currentValue = value as string | null;
   return (
     <div className="flex items-center gap-2" data-testid={`field-yesnona-${field.id}`}>
@@ -235,7 +268,7 @@ export function YesNoNaField({ field, value, onChange, disabled }: FieldRenderer
   );
 }
 
-export function ConditionField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function ConditionField({ field, value, onChange, disabled }: FieldRendererPropsBase<ConditionFieldConfig>) {
   const currentValue = value as string | null;
   const defaultConditions = [
     { value: "good", label: "Good", variant: "default" as const },
@@ -279,7 +312,7 @@ export function ConditionField({ field, value, onChange, disabled }: FieldRender
   );
 }
 
-export function InspectionCheckField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function InspectionCheckField({ field, value, onChange, disabled }: FieldRendererPropsBase<InspectionCheckFieldConfig>) {
   const isChecked = value === true;
   return (
     <div className="flex items-center space-x-2" data-testid={`field-inspection-${field.id}`}>
@@ -295,7 +328,7 @@ export function InspectionCheckField({ field, value, onChange, disabled }: Field
   );
 }
 
-export function DateField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function DateField({ field, value, onChange, disabled }: FieldRendererPropsBase<DateFieldConfig>) {
   return (
     <Input
       type="date"
@@ -308,7 +341,7 @@ export function DateField({ field, value, onChange, disabled }: FieldRendererPro
   );
 }
 
-export function TimeField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function TimeField({ field, value, onChange, disabled }: FieldRendererPropsBase<TimeFieldConfig>) {
   return (
     <Input
       type="time"
@@ -320,7 +353,7 @@ export function TimeField({ field, value, onChange, disabled }: FieldRendererPro
   );
 }
 
-export function DateTimeField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function DateTimeField({ field, value, onChange, disabled }: FieldRendererPropsBase<DateTimeFieldConfig>) {
   return (
     <Input
       type="datetime-local"
@@ -332,7 +365,7 @@ export function DateTimeField({ field, value, onChange, disabled }: FieldRendere
   );
 }
 
-export function AmountField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function AmountField({ field, value, onChange, disabled }: FieldRendererPropsBase<AmountFieldConfig>) {
   return (
     <div className="relative">
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
@@ -351,7 +384,7 @@ export function AmountField({ field, value, onChange, disabled }: FieldRendererP
   );
 }
 
-export function PercentageField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function PercentageField({ field, value, onChange, disabled }: FieldRendererPropsBase<PercentageFieldConfig>) {
   return (
     <div className="relative">
       <Input
@@ -371,7 +404,7 @@ export function PercentageField({ field, value, onChange, disabled }: FieldRende
   );
 }
 
-export function PriorityField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function PriorityField({ field, value, onChange, disabled }: FieldRendererPropsBase<PriorityFieldConfig>) {
   const priorities = [
     { value: "low", label: "Low", variant: "secondary" as const },
     { value: "medium", label: "Medium", variant: "default" as const },
@@ -396,7 +429,7 @@ export function PriorityField({ field, value, onChange, disabled }: FieldRendere
   );
 }
 
-export function RatingField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function RatingField({ field, value, onChange, disabled }: FieldRendererPropsBase<RatingFieldConfig>) {
   const max = field.max ?? 5;
   const currentValue = (value as number) || 0;
 
@@ -423,7 +456,7 @@ export function RatingField({ field, value, onChange, disabled }: FieldRendererP
   );
 }
 
-export function PhotoField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function PhotoField({ field, value, onChange, disabled }: FieldRendererPropsBase<PhotoFieldConfig>) {
   const [preview, setPreview] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -478,7 +511,7 @@ export function PhotoField({ field, value, onChange, disabled }: FieldRendererPr
   );
 }
 
-export function MultiPhotoField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function MultiPhotoField({ field, value, onChange, disabled }: FieldRendererPropsBase<MultiPhotoFieldConfig>) {
   const photos = (value as Array<{ filename: string; base64: string; type: string }>) || [];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -542,7 +575,7 @@ export function MultiPhotoField({ field, value, onChange, disabled }: FieldRende
   );
 }
 
-export function ProgressBarField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function ProgressBarField({ field, value, onChange, disabled }: FieldRendererPropsBase<ProgressBarFieldConfig>) {
   const currentValue = (value as number) ?? 0;
   const min = field.min ?? 0;
   const max = field.max ?? 100;
@@ -571,7 +604,7 @@ export function ProgressBarField({ field, value, onChange, disabled }: FieldRend
   );
 }
 
-export function MeasurementField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function MeasurementField({ field, value, onChange, disabled }: FieldRendererPropsBase<MeasurementFieldConfig>) {
   const measurementValue = (value as { amount: number | null; unit: string }) || { amount: null, unit: "" };
 
   return (
@@ -614,7 +647,7 @@ export function MeasurementField({ field, value, onChange, disabled }: FieldRend
   );
 }
 
-export function FileUploadField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function FileUploadField({ field, value, onChange, disabled }: FieldRendererPropsBase<FileUploadFieldConfig>) {
   const fileInfo = value as { filename: string } | null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -663,7 +696,7 @@ export function FileUploadField({ field, value, onChange, disabled }: FieldRende
   );
 }
 
-export function SignatureField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function SignatureField({ field, value, onChange, disabled }: FieldRendererPropsBase<SignatureFieldConfig>) {
   const signatureData = value as { name: string; date: string } | null;
 
   if (signatureData) {
@@ -705,7 +738,7 @@ export function SignatureField({ field, value, onChange, disabled }: FieldRender
   );
 }
 
-export function AssetSelectorField({ field, value, onChange, disabled, onAssetSelected }: FieldRendererProps) {
+export function AssetSelectorField({ field, value, onChange, disabled, onAssetSelected }: FieldRendererPropsBase<AssetSelectorFieldConfig>) {
   const [searchQuery, setSearchQuery] = useState("");
   const { data: assets = [], isLoading } = useQuery<SimpleAsset[]>({
     queryKey: [ASSET_ROUTES.LIST_SIMPLE],
@@ -804,7 +837,7 @@ export function AssetSelectorField({ field, value, onChange, disabled, onAssetSe
   );
 }
 
-export function SelectorField({ field, value, onChange, disabled }: FieldRendererProps) {
+export function SelectorField({ field, value, onChange, disabled }: FieldRendererPropsBase<JobSelectorFieldConfig | CustomerSelectorFieldConfig | SupplierSelectorFieldConfig | StaffAssignmentFieldConfig>) {
   return (
     <Select
       value={(value as string) || ""}
@@ -830,64 +863,69 @@ export function renderField(
   disabled?: boolean,
   onAssetSelected?: (asset: SimpleAsset, sourceFieldId?: string) => void
 ) {
-  const props = { field, value, onChange, disabled };
+  const common = { value, onChange, disabled };
 
   switch (field.type) {
     case "text_field":
-      return <TextField {...props} />;
+      return <TextField field={field} {...common} />;
     case "textarea":
-      return <TextareaField {...props} />;
+      return <TextareaField field={field} {...common} />;
     case "number_field":
-      return <NumberField {...props} />;
+      return <NumberField field={field} {...common} />;
     case "radio_button":
-      return <RadioButtonField {...props} />;
+      return <RadioButtonField field={field} {...common} />;
     case "dropdown":
-      return <DropdownField {...props} />;
+      return <DropdownField field={field} {...common} />;
     case "checkbox":
-      return <CheckboxField {...props} />;
+      return <CheckboxField field={field} {...common} />;
     case "pass_fail_flag":
-      return <PassFailField {...props} />;
+      return <PassFailField field={field} {...common} />;
     case "yes_no_na":
-      return <YesNoNaField {...props} />;
+      return <YesNoNaField field={field} {...common} />;
     case "condition_option":
-      return <ConditionField {...props} />;
+      return <ConditionField field={field} {...common} />;
     case "inspection_check":
-      return <InspectionCheckField {...props} />;
+      return <InspectionCheckField field={field} {...common} />;
     case "date_field":
-      return <DateField {...props} />;
+      return <DateField field={field} {...common} />;
     case "time_field":
-      return <TimeField {...props} />;
+      return <TimeField field={field} {...common} />;
     case "datetime_field":
-      return <DateTimeField {...props} />;
+      return <DateTimeField field={field} {...common} />;
     case "amount_field":
-      return <AmountField {...props} />;
+      return <AmountField field={field} {...common} />;
     case "percentage_field":
-      return <PercentageField {...props} />;
+      return <PercentageField field={field} {...common} />;
     case "priority_level":
-      return <PriorityField {...props} />;
+      return <PriorityField field={field} {...common} />;
     case "rating_scale":
-      return <RatingField {...props} />;
+      return <RatingField field={field} {...common} />;
     case "photo_required":
-      return <PhotoField {...props} />;
+      return <PhotoField field={field} {...common} />;
     case "multi_photo":
-      return <MultiPhotoField {...props} />;
+      return <MultiPhotoField field={field} {...common} />;
     case "file_upload":
-      return <FileUploadField {...props} />;
+      return <FileUploadField field={field} {...common} />;
     case "signature_field":
-      return <SignatureField {...props} />;
+      return <SignatureField field={field} {...common} />;
     case "progress_bar":
-      return <ProgressBarField {...props} />;
+      return <ProgressBarField field={field} {...common} />;
     case "measurement_field":
-      return <MeasurementField {...props} />;
+      return <MeasurementField field={field} {...common} />;
     case "asset_selector":
-      return <AssetSelectorField {...props} onAssetSelected={onAssetSelected} />;
+      return <AssetSelectorField field={field} {...common} onAssetSelected={onAssetSelected} />;
     case "job_selector":
+      return <SelectorField field={field} {...common} />;
     case "customer_selector":
+      return <SelectorField field={field} {...common} />;
     case "supplier_selector":
+      return <SelectorField field={field} {...common} />;
     case "staff_assignment":
-      return <SelectorField {...props} />;
-    default:
-      return <TextField {...props} />;
+      return <SelectorField field={field} {...common} />;
+    default: {
+      const fallbackField = field as TextFieldConfig;
+      return <TextField field={fallbackField} {...common} />;
+    }
   }
 }
 

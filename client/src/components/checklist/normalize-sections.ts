@@ -1,4 +1,4 @@
-import type { ChecklistSection, ChecklistField, ChecklistFieldType } from "@shared/schema";
+import type { ChecklistSection, ChecklistField, ChecklistFieldType, ChecklistFieldOption } from "@shared/schema";
 
 interface LegacyField {
   id: string;
@@ -61,7 +61,7 @@ function normalizeFieldType(rawType: string | undefined): ChecklistFieldType {
   return LEGACY_TYPE_MAP[rawType] || rawType as ChecklistFieldType;
 }
 
-function normalizeOptions(raw: LegacyField["options"]): ChecklistField["options"] {
+function normalizeOptions(raw: LegacyField["options"]): ChecklistFieldOption[] | undefined {
   if (!raw || !Array.isArray(raw)) return undefined;
   return raw.map((opt) => {
     if (typeof opt === "string") {
@@ -75,23 +75,45 @@ function normalizeOptions(raw: LegacyField["options"]): ChecklistField["options"
   });
 }
 
-function normalizeField(raw: LegacyField): ChecklistField & { dependsOn?: string; dependsOnValue?: string } {
-  return {
+function normalizeField(raw: LegacyField): ChecklistField {
+  const type = normalizeFieldType(raw.type || raw.fieldType);
+  const base = {
     id: raw.id,
     name: raw.name || raw.label || "Unnamed Field",
-    type: normalizeFieldType(raw.type || raw.fieldType),
     required: raw.required || false,
     description: raw.description,
     placeholder: raw.placeholder,
     photoRequired: raw.photoRequired,
     instructions: raw.instructions,
-    options: normalizeOptions(raw.options),
-    min: raw.min,
-    max: raw.max,
-    step: raw.step,
     dependsOn: raw.dependsOn,
     dependsOnValue: raw.dependsOnValue,
   };
+
+  const options = normalizeOptions(raw.options);
+  const numericRange = { min: raw.min, max: raw.max, step: raw.step };
+
+  switch (type) {
+    case "number_field":
+      return { ...base, type, ...numericRange };
+    case "measurement_field":
+      return { ...base, type, ...numericRange };
+    case "progress_bar":
+      return { ...base, type, min: raw.min, max: raw.max };
+    case "percentage_field":
+      return { ...base, type, min: raw.min, max: raw.max };
+    case "rating_scale":
+      return { ...base, type, min: raw.min, max: raw.max };
+    case "radio_button":
+      return { ...base, type, options };
+    case "dropdown":
+      return { ...base, type, options };
+    case "checkbox":
+      return { ...base, type, options };
+    case "condition_option":
+      return { ...base, type, options };
+    default:
+      return { ...base, type } as ChecklistField;
+  }
 }
 
 export function normalizeSections(rawSections: unknown): ChecklistSection[] {

@@ -24,7 +24,10 @@ import { dateInputProps } from "@/lib/validation";
 import { CHECKLIST_ROUTES, ASSET_ROUTES } from "@shared/api-routes";
 import { normalizeSections } from "@/components/checklist/normalize-sections";
 import { calculateCompletionRate, getMissingRequiredFields, isFieldVisible } from "@/components/checklist/checklist-form";
-import type { ChecklistInstance, ChecklistTemplate, ChecklistSection, ChecklistField, ChecklistFieldOption } from "@shared/schema";
+import type {
+  ChecklistInstance, ChecklistTemplate, ChecklistSection, ChecklistField, ChecklistFieldOption,
+  RadioButtonFieldConfig, CheckboxFieldConfig, ConditionFieldConfig, RatingFieldConfig, ProgressBarFieldConfig,
+} from "@shared/schema";
 
 type SimpleAsset = {
   id: string;
@@ -778,7 +781,7 @@ function MobileFieldRenderer({ field, value, onChange, disabled, onAssetSelected
   }
 }
 
-function MobileRadioField({ field, value, onChange, disabled }: MobileFieldProps) {
+function MobileRadioField({ field, value, onChange, disabled }: Omit<MobileFieldProps, 'field'> & { field: RadioButtonFieldConfig }) {
   const selected = value as string | null;
   return (
     <div className="space-y-2" data-testid={`mobile-field-radio-${field.id}`}>
@@ -806,7 +809,7 @@ function MobileRadioField({ field, value, onChange, disabled }: MobileFieldProps
   );
 }
 
-function MobileCheckboxField({ field, value, onChange, disabled }: MobileFieldProps) {
+function MobileCheckboxField({ field, value, onChange, disabled }: Omit<MobileFieldProps, 'field'> & { field: CheckboxFieldConfig }) {
   const selected = (value as string[]) || [];
   const toggle = (v: string) => {
     if (selected.includes(v)) onChange(selected.filter(s => s !== v));
@@ -891,10 +894,10 @@ function MobileYesNoNaField({ field, value, onChange, disabled }: MobileFieldPro
   );
 }
 
-function MobileConditionField({ field, value, onChange, disabled }: MobileFieldProps) {
+function MobileConditionField({ field, value, onChange, disabled }: Omit<MobileFieldProps, 'field'> & { field: ConditionFieldConfig }) {
   const current = value as string | null;
   const conditions = (field.options && field.options.length > 0)
-    ? field.options.map(opt => ({ value: opt.value, label: opt.text || opt.value }))
+    ? field.options.map((opt: ChecklistFieldOption) => ({ value: opt.value, label: opt.text || opt.value }))
     : [
         { value: "good", label: "Good" },
         { value: "fair", label: "Fair" },
@@ -975,7 +978,7 @@ function MobilePriorityField({ field, value, onChange, disabled }: MobileFieldPr
   );
 }
 
-function MobileRatingField({ field, value, onChange, disabled }: MobileFieldProps) {
+function MobileRatingField({ field, value, onChange, disabled }: Omit<MobileFieldProps, 'field'> & { field: RatingFieldConfig }) {
   const max = field.max ?? 5;
   const current = (value as number) || 0;
   return (
@@ -1229,7 +1232,7 @@ function MobileSignatureField({ field, value, onChange, disabled }: MobileFieldP
   );
 }
 
-function MobileProgressField({ field, value, onChange, disabled }: MobileFieldProps) {
+function MobileProgressField({ field, value, onChange, disabled }: Omit<MobileFieldProps, 'field'> & { field: ProgressBarFieldConfig }) {
   const current = (value as number) ?? 0;
   const min = field.min ?? 0;
   const max = field.max ?? 100;

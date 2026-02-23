@@ -2845,46 +2845,6 @@ export const CHECKLIST_FIELD_TYPES = {
 
 export type ChecklistFieldType = typeof CHECKLIST_FIELD_TYPES[keyof typeof CHECKLIST_FIELD_TYPES];
 
-// Section Structure Type for Template Builder
-export type ChecklistSection = {
-  id: string;
-  name: string;
-  description?: string;
-  order: number;
-  allowRepeats?: boolean;
-  items: ChecklistField[];
-};
-
-// Field Structure Type for Template Builder
-export type ChecklistField = {
-  id: string;
-  name: string;
-  type: ChecklistFieldType;
-  description?: string;
-  placeholder?: string;
-  required?: boolean;
-  photoRequired?: boolean;
-  defaultValue?: unknown;
-  options?: ChecklistFieldOption[];
-  validation?: Record<string, unknown>;
-  conditions?: ChecklistFieldCondition[];
-  images?: ChecklistFieldImage[];
-  links?: ChecklistFieldLink[];
-  instructions?: string;
-  defaultWorkOrderTypeId?: string | null;
-  workOrderTriggers?: ChecklistWorkOrderTrigger[];
-  workOrderEnabled?: boolean;
-  workOrderTriggerValue?: string;
-  min?: number | null;
-  max?: number | null;
-  step?: number | null;
-  dependsOn?: string;
-  dependsOnValue?: string;
-  autoPopulateFrom?: string;
-  autoPopulateField?: string;
-  autoPopulateSourceFieldId?: string;
-};
-
 export type ChecklistFieldOption = {
   text: string;
   value: string;
@@ -2923,6 +2883,335 @@ export type ChecklistWorkOrderTrigger = {
   workOrderCategoryId?: string;
   assignToUserId?: string;
 };
+
+interface ChecklistFieldBase {
+  id: string;
+  name: string;
+  description?: string;
+  placeholder?: string;
+  required?: boolean;
+  photoRequired?: boolean;
+  defaultValue?: unknown;
+  validation?: Record<string, unknown>;
+  conditions?: ChecklistFieldCondition[];
+  images?: ChecklistFieldImage[];
+  links?: ChecklistFieldLink[];
+  instructions?: string;
+  defaultWorkOrderTypeId?: string | null;
+  workOrderTriggers?: ChecklistWorkOrderTrigger[];
+  workOrderEnabled?: boolean;
+  workOrderTriggerValue?: string;
+  dependsOn?: string;
+  dependsOnValue?: string;
+  autoPopulateFrom?: string;
+  autoPopulateField?: string;
+  autoPopulateSourceFieldId?: string;
+}
+
+export interface TextFieldConfig extends ChecklistFieldBase {
+  type: "text_field";
+}
+
+export interface TextareaFieldConfig extends ChecklistFieldBase {
+  type: "textarea";
+}
+
+export interface NumberFieldConfig extends ChecklistFieldBase {
+  type: "number_field";
+  min?: number | null;
+  max?: number | null;
+  step?: number | null;
+}
+
+export interface RadioButtonFieldConfig extends ChecklistFieldBase {
+  type: "radio_button";
+  options?: ChecklistFieldOption[];
+}
+
+export interface DropdownFieldConfig extends ChecklistFieldBase {
+  type: "dropdown";
+  options?: ChecklistFieldOption[];
+}
+
+export interface CheckboxFieldConfig extends ChecklistFieldBase {
+  type: "checkbox";
+  options?: ChecklistFieldOption[];
+}
+
+export interface PassFailFieldConfig extends ChecklistFieldBase {
+  type: "pass_fail_flag";
+}
+
+export interface YesNoNaFieldConfig extends ChecklistFieldBase {
+  type: "yes_no_na";
+}
+
+export interface ConditionFieldConfig extends ChecklistFieldBase {
+  type: "condition_option";
+  options?: ChecklistFieldOption[];
+}
+
+export interface InspectionCheckFieldConfig extends ChecklistFieldBase {
+  type: "inspection_check";
+}
+
+export interface DateFieldConfig extends ChecklistFieldBase {
+  type: "date_field";
+}
+
+export interface TimeFieldConfig extends ChecklistFieldBase {
+  type: "time_field";
+}
+
+export interface DateTimeFieldConfig extends ChecklistFieldBase {
+  type: "datetime_field";
+}
+
+export interface AmountFieldConfig extends ChecklistFieldBase {
+  type: "amount_field";
+}
+
+export interface PercentageFieldConfig extends ChecklistFieldBase {
+  type: "percentage_field";
+  min?: number | null;
+  max?: number | null;
+}
+
+export interface PriorityFieldConfig extends ChecklistFieldBase {
+  type: "priority_level";
+}
+
+export interface RatingFieldConfig extends ChecklistFieldBase {
+  type: "rating_scale";
+  min?: number | null;
+  max?: number | null;
+}
+
+export interface PhotoFieldConfig extends ChecklistFieldBase {
+  type: "photo_required";
+}
+
+export interface MultiPhotoFieldConfig extends ChecklistFieldBase {
+  type: "multi_photo";
+}
+
+export interface FileUploadFieldConfig extends ChecklistFieldBase {
+  type: "file_upload";
+}
+
+export interface SignatureFieldConfig extends ChecklistFieldBase {
+  type: "signature_field";
+}
+
+export interface ProgressBarFieldConfig extends ChecklistFieldBase {
+  type: "progress_bar";
+  min?: number | null;
+  max?: number | null;
+}
+
+export interface MeasurementFieldConfig extends ChecklistFieldBase {
+  type: "measurement_field";
+  min?: number | null;
+  max?: number | null;
+  step?: number | null;
+}
+
+export interface JobSelectorFieldConfig extends ChecklistFieldBase {
+  type: "job_selector";
+}
+
+export interface CustomerSelectorFieldConfig extends ChecklistFieldBase {
+  type: "customer_selector";
+}
+
+export interface SupplierSelectorFieldConfig extends ChecklistFieldBase {
+  type: "supplier_selector";
+}
+
+export interface StaffAssignmentFieldConfig extends ChecklistFieldBase {
+  type: "staff_assignment";
+}
+
+export interface AssetSelectorFieldConfig extends ChecklistFieldBase {
+  type: "asset_selector";
+}
+
+export type ChecklistField =
+  | TextFieldConfig
+  | TextareaFieldConfig
+  | NumberFieldConfig
+  | RadioButtonFieldConfig
+  | DropdownFieldConfig
+  | CheckboxFieldConfig
+  | PassFailFieldConfig
+  | YesNoNaFieldConfig
+  | ConditionFieldConfig
+  | InspectionCheckFieldConfig
+  | DateFieldConfig
+  | TimeFieldConfig
+  | DateTimeFieldConfig
+  | AmountFieldConfig
+  | PercentageFieldConfig
+  | PriorityFieldConfig
+  | RatingFieldConfig
+  | PhotoFieldConfig
+  | MultiPhotoFieldConfig
+  | FileUploadFieldConfig
+  | SignatureFieldConfig
+  | ProgressBarFieldConfig
+  | MeasurementFieldConfig
+  | JobSelectorFieldConfig
+  | CustomerSelectorFieldConfig
+  | SupplierSelectorFieldConfig
+  | StaffAssignmentFieldConfig
+  | AssetSelectorFieldConfig;
+
+export type ChecklistSection = {
+  id: string;
+  name: string;
+  description?: string;
+  order: number;
+  allowRepeats?: boolean;
+  items: ChecklistField[];
+};
+
+const checklistFieldOptionSchema = z.object({
+  text: z.string(),
+  value: z.string(),
+  color: z.string().optional(),
+});
+
+const checklistFieldConditionSchema = z.object({
+  id: z.string(),
+  field: z.string(),
+  operator: z.enum(["equals", "not_equals", "contains", "not_contains", "greater_than", "less_than", "is_empty", "is_not_empty"]),
+  value: z.union([z.string(), z.number(), z.boolean()]),
+  action: z.enum(["show", "hide"]),
+});
+
+const checklistFieldImageSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  alt: z.string().optional(),
+  description: z.string().optional(),
+});
+
+const checklistFieldLinkSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  text: z.string(),
+  description: z.string().optional(),
+});
+
+const checklistWorkOrderTriggerSchema = z.object({
+  id: z.string(),
+  operator: z.string(),
+  value: z.union([z.string(), z.number(), z.boolean()]),
+  workOrderTitle: z.string(),
+  workOrderDescription: z.string().optional(),
+  workOrderPriority: z.string().optional(),
+  workOrderCategoryId: z.string().optional(),
+  assignToUserId: z.string().optional(),
+});
+
+const checklistFieldBaseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  placeholder: z.string().optional(),
+  required: z.boolean().optional(),
+  photoRequired: z.boolean().optional(),
+  defaultValue: z.unknown().optional(),
+  validation: z.record(z.unknown()).optional(),
+  conditions: z.array(checklistFieldConditionSchema).optional(),
+  images: z.array(checklistFieldImageSchema).optional(),
+  links: z.array(checklistFieldLinkSchema).optional(),
+  instructions: z.string().optional(),
+  defaultWorkOrderTypeId: z.string().nullish(),
+  workOrderTriggers: z.array(checklistWorkOrderTriggerSchema).optional(),
+  workOrderEnabled: z.boolean().optional(),
+  workOrderTriggerValue: z.string().optional(),
+  dependsOn: z.string().optional(),
+  dependsOnValue: z.string().optional(),
+  autoPopulateFrom: z.string().optional(),
+  autoPopulateField: z.string().optional(),
+  autoPopulateSourceFieldId: z.string().optional(),
+});
+
+const numericRangeFields = {
+  min: z.number().nullish(),
+  max: z.number().nullish(),
+  step: z.number().nullish(),
+};
+
+export const textFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("text_field") });
+export const textareaFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("textarea") });
+export const numberFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("number_field"), ...numericRangeFields });
+export const radioButtonFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("radio_button"), options: z.array(checklistFieldOptionSchema).optional() });
+export const dropdownFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("dropdown"), options: z.array(checklistFieldOptionSchema).optional() });
+export const checkboxFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("checkbox"), options: z.array(checklistFieldOptionSchema).optional() });
+export const passFailFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("pass_fail_flag") });
+export const yesNoNaFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("yes_no_na") });
+export const conditionFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("condition_option"), options: z.array(checklistFieldOptionSchema).optional() });
+export const inspectionCheckFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("inspection_check") });
+export const dateFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("date_field") });
+export const timeFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("time_field") });
+export const dateTimeFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("datetime_field") });
+export const amountFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("amount_field") });
+export const percentageFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("percentage_field"), min: z.number().nullish(), max: z.number().nullish() });
+export const priorityFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("priority_level") });
+export const ratingFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("rating_scale"), min: z.number().nullish(), max: z.number().nullish() });
+export const photoFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("photo_required") });
+export const multiPhotoFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("multi_photo") });
+export const fileUploadFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("file_upload") });
+export const signatureFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("signature_field") });
+export const progressBarFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("progress_bar"), min: z.number().nullish(), max: z.number().nullish() });
+export const measurementFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("measurement_field"), ...numericRangeFields });
+export const jobSelectorFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("job_selector") });
+export const customerSelectorFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("customer_selector") });
+export const supplierSelectorFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("supplier_selector") });
+export const staffAssignmentFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("staff_assignment") });
+export const assetSelectorFieldSchema = checklistFieldBaseSchema.extend({ type: z.literal("asset_selector") });
+
+export const checklistFieldSchema = z.discriminatedUnion("type", [
+  textFieldSchema,
+  textareaFieldSchema,
+  numberFieldSchema,
+  radioButtonFieldSchema,
+  dropdownFieldSchema,
+  checkboxFieldSchema,
+  passFailFieldSchema,
+  yesNoNaFieldSchema,
+  conditionFieldSchema,
+  inspectionCheckFieldSchema,
+  dateFieldSchema,
+  timeFieldSchema,
+  dateTimeFieldSchema,
+  amountFieldSchema,
+  percentageFieldSchema,
+  priorityFieldSchema,
+  ratingFieldSchema,
+  photoFieldSchema,
+  multiPhotoFieldSchema,
+  fileUploadFieldSchema,
+  signatureFieldSchema,
+  progressBarFieldSchema,
+  measurementFieldSchema,
+  jobSelectorFieldSchema,
+  customerSelectorFieldSchema,
+  supplierSelectorFieldSchema,
+  staffAssignmentFieldSchema,
+  assetSelectorFieldSchema,
+]);
+
+export const checklistSectionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  order: z.number(),
+  allowRepeats: z.boolean().optional(),
+  items: z.array(checklistFieldSchema),
+});
 
 // ==================== BROADCAST MESSAGING SYSTEM ====================
 
