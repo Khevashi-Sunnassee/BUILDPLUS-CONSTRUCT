@@ -144,6 +144,7 @@ export default function AdminSuppliersPage() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingSupplierId, setDeletingSupplierId] = useState<string | null>(null);
+  const [activePOsError, setActivePOsError] = useState<{ message: string; pos: { poNumber: string; status: string }[] } | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -363,7 +364,19 @@ export default function AdminSuppliersPage() {
 
   const deleteSupplierMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", PROCUREMENT_ROUTES.SUPPLIER_BY_ID(id), {});
+      const res = await fetch(PROCUREMENT_ROUTES.SUPPLIER_BY_ID(id), {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "x-csrf-token": getCsrfToken() },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }));
+        const err: any = new Error(body.error || "Failed to delete supplier");
+        err.status = res.status;
+        err.activePOs = body.activePOs;
+        throw err;
+      }
+      return res;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.SUPPLIERS] });
@@ -372,7 +385,15 @@ export default function AdminSuppliersPage() {
       setDeletingSupplierId(null);
     },
     onError: (error: any) => {
-      toast({ title: "Failed to delete supplier", description: error.message, variant: "destructive" });
+      if (error.status === 409 && error.activePOs) {
+        setDeleteDialogOpen(false);
+        setActivePOsError({
+          message: error.message || "Cannot delete supplier with active purchase orders.",
+          pos: error.activePOs,
+        });
+      } else {
+        toast({ title: "Failed to delete supplier", description: error.message, variant: "destructive" });
+      }
     },
   });
 
@@ -1058,6 +1079,35 @@ export default function AdminSuppliersPage() {
               {deleteSupplierMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Delete
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!activePOsError} onOpenChange={(open) => { if (!open) setActivePOsError(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle data-testid="text-active-pos-title">Cannot Delete Supplier</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p data-testid="text-active-pos-message">{activePOsError?.message}</p>
+                {activePOsError?.pos && activePOsError.pos.length > 0 && (
+                  <div className="rounded-md border p-3 max-h-48 overflow-y-auto">
+                    <p className="text-sm font-medium mb-2">Affected Purchase Orders:</p>
+                    <ul className="space-y-1">
+                      {activePOsError.pos.map((po, i) => (
+                        <li key={i} className="flex items-center justify-between text-sm" data-testid={`text-active-po-${i}`}>
+                          <span className="font-mono">{po.poNumber}</span>
+                          <Badge variant="outline" className="text-xs">{po.status}</Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-close-active-pos">Close</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

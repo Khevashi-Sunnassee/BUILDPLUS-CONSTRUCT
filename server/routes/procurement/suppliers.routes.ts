@@ -3,6 +3,9 @@ import ExcelJS from "exceljs";
 import { storage } from "../../storage";
 import { requireAuth, requireRole } from "../middleware/auth.middleware";
 import logger from "../../lib/logger";
+import { db } from "../../db";
+import { purchaseOrders } from "@shared/schema";
+import { eq, and, notInArray } from "drizzle-orm";
 import {
   supplierSchema,
   SUPPLIER_TEMPLATE_COLUMNS,
@@ -308,9 +311,32 @@ router.patch("/api/procurement/suppliers/:id", requireRole("ADMIN", "MANAGER"), 
 router.delete("/api/procurement/suppliers/:id", requireRole("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
-    const existing = await storage.getSupplier(String(req.params.id));
+    const id = String(req.params.id);
+    const existing = await storage.getSupplier(id);
     if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Supplier not found" });
-    await storage.deleteSupplier(String(req.params.id));
+
+    const activePOs = await db.select({
+      poNumber: purchaseOrders.poNumber,
+      status: purchaseOrders.status,
+    })
+      .from(purchaseOrders)
+      .where(
+        and(
+          eq(purchaseOrders.supplierId, id),
+          eq(purchaseOrders.companyId, companyId!),
+          notInArray(purchaseOrders.status, ["RECEIVED"])
+        )
+      )
+      .limit(50);
+
+    if (activePOs.length > 0) {
+      return res.status(409).json({
+        error: `Cannot delete supplier with ${activePOs.length} active purchase order${activePOs.length !== 1 ? "s" : ""}. Complete or reassign these POs first.`,
+        activePOs: activePOs.map(po => ({ poNumber: po.poNumber, status: po.status })),
+      });
+    }
+
+    await storage.deleteSupplier(id);
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting supplier");
