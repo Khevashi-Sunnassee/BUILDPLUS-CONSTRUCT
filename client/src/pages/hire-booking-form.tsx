@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -46,6 +46,20 @@ interface Asset {
   category: string;
   status: string;
   chargeOutRate?: string;
+}
+
+interface BookingWithDetails extends HireBooking {
+  assetCategoryName: string;
+  supplier?: Supplier | null;
+  job?: Job | null;
+  requestedByEmployee?: Employee | null;
+}
+
+interface EmailFormState {
+  to: string;
+  cc: string;
+  subject: string;
+  message: string;
 }
 
 const formSchema = z.object({
@@ -111,6 +125,59 @@ const STATUS_LABELS: Record<string, string> = {
   CLOSED: "Closed",
 };
 
+const ACTION_DESCRIPTIONS: Record<string, { label: string; ariaLabel: string; dialogTitle: string; dialogDescription: string }> = {
+  submit: {
+    label: "Submit for Approval",
+    ariaLabel: "Submit this booking for approval, changing status from Draft to Requested",
+    dialogTitle: "Submit for Approval",
+    dialogDescription: "This will change the booking status from Draft to Requested and send it for approval.",
+  },
+  approve: {
+    label: "Approve",
+    ariaLabel: "Approve this booking request, changing status from Requested to Approved",
+    dialogTitle: "Approve Booking",
+    dialogDescription: "This will change the booking status from Requested to Approved.",
+  },
+  reject: {
+    label: "Reject",
+    ariaLabel: "Reject this booking request, changing status from Requested to Cancelled",
+    dialogTitle: "Reject Booking",
+    dialogDescription: "This will reject the booking and change its status to Cancelled.",
+  },
+  book: {
+    label: "Mark as Booked",
+    ariaLabel: "Mark this booking as booked with the supplier, changing status from Approved to Booked",
+    dialogTitle: "Confirm Booking",
+    dialogDescription: "This will change the booking status from Approved to Booked, indicating the equipment has been reserved.",
+  },
+  "on-hire": {
+    label: "Mark as On Hire",
+    ariaLabel: "Mark this equipment as currently on hire, changing status from Booked to On Hire",
+    dialogTitle: "Mark as On Hire",
+    dialogDescription: "This will change the booking status from Booked to On Hire, indicating the equipment is actively in use.",
+  },
+  return: {
+    label: "Mark as Returned",
+    ariaLabel: "Mark this equipment as returned, changing status to Returned",
+    dialogTitle: "Mark as Returned",
+    dialogDescription: "This will change the booking status to Returned, indicating the equipment has been sent back.",
+  },
+  cancel: {
+    label: "Cancel Booking",
+    ariaLabel: "Cancel this booking entirely, changing status to Cancelled",
+    dialogTitle: "Cancel Booking",
+    dialogDescription: "This will cancel the booking. This action may not be reversible.",
+  },
+  close: {
+    label: "Close",
+    ariaLabel: "Close this booking, changing status from Returned to Closed",
+    dialogTitle: "Close Booking",
+    dialogDescription: "This will close the booking, indicating all processes are complete.",
+  },
+};
+
+const NON_EDITABLE_STATUSES = new Set(["CANCELLED", "CLOSED"]);
+
 export default function HireBookingFormPage() {
   const [, params] = useRoute("/hire-bookings/:id");
   const [, navigate] = useLocation();
@@ -121,12 +188,9 @@ export default function HireBookingFormPage() {
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const autoPrintDone = useRef(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
-  const [emailTo, setEmailTo] = useState("");
-  const [emailCc, setEmailCc] = useState("");
-  const [emailSubject, setEmailSubject] = useState("");
-  const [emailMessage, setEmailMessage] = useState("");
+  const [emailForm, setEmailForm] = useState<EmailFormState>({ to: "", cc: "", subject: "", message: "" });
 
-  const { data: existingBooking, isLoading: bookingLoading } = useQuery<HireBooking & { assetCategoryName: string; supplier?: any; job?: any; requestedByEmployee?: any }>({
+  const { data: existingBooking, isLoading: bookingLoading } = useQuery<BookingWithDetails>({
     queryKey: [HIRE_ROUTES.LIST, bookingId],
     queryFn: async () => {
       if (!bookingId) return null;
@@ -157,6 +221,13 @@ export default function HireBookingFormPage() {
   const { data: assetsList = [] } = useQuery<Asset[]>({
     queryKey: [ASSET_ROUTES.LIST],
   });
+
+  const { data: factoriesList = [] } = useQuery<Factory[]>({
+    queryKey: [FACTORIES_ROUTES.LIST],
+  });
+
+  const bookingNumber = existingBooking?.bookingNumber || nextNumber?.bookingNumber || "HIRE-######";
+  const canEdit = isNew || (existingBooking ? !NON_EDITABLE_STATUSES.has(existingBooking.status) : false);
 
   useEffect(() => {
     if (existingBooking && !autoPrintDone.current) {
@@ -201,17 +272,40 @@ export default function HireBookingFormPage() {
     },
   });
 
-  const hireSource = form.watch("hireSource");
-  const deliveryRequired = form.watch("deliveryRequired");
-  const pickupRequired = form.watch("pickupRequired");
-  const selectedAssetId = form.watch("assetId");
-  const hireLocationMode = form.watch("hireLocationMode");
-
-  const { data: factoriesList = [] } = useQuery<Factory[]>({
-    queryKey: [FACTORIES_ROUTES.LIST],
-  });
+  const watchedFields = form.watch(["hireSource", "deliveryRequired", "pickupRequired", "assetId", "hireLocationMode"]);
+  const hireSource = watchedFields[0];
+  const deliveryRequired = watchedFields[1];
+  const pickupRequired = watchedFields[2];
+  const selectedAssetId = watchedFields[3];
+  const hireLocationMode = watchedFields[4];
 
   const activeFactories = useMemo(() => factoriesList.filter(f => f.isActive), [factoriesList]);
+
+  const sortedEmployees = useMemo(() =>
+    [...employeesList].sort((a, b) => {
+      const aName = `${a.firstName} ${a.lastName}`.toLowerCase();
+      const bName = `${b.firstName} ${b.lastName}`.toLowerCase();
+      return aName.localeCompare(bName);
+    }),
+    [employeesList]
+  );
+
+  const sortedJobs = useMemo(() =>
+    [...jobsList].sort((a, b) => (a.jobNumber || a.name || "").localeCompare(b.jobNumber || b.name || "")),
+    [jobsList]
+  );
+
+  const sortedSuppliers = useMemo(() =>
+    [...suppliers].sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+    [suppliers]
+  );
+
+  const internalAssets = useMemo(() => {
+    if (hireSource !== "internal") return [];
+    return [...assetsList]
+      .filter((a) => a.status === "active")
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [assetsList, hireSource]);
 
   useEffect(() => {
     if (existingBooking && !isNew) {
@@ -252,7 +346,7 @@ export default function HireBookingFormPage() {
     if (hireSource === "internal" && selectedAssetId) {
       const asset = assetsList.find((a) => a.id === selectedAssetId);
       if (asset) {
-        const catIndex = ASSET_CATEGORIES.indexOf(asset.category as any);
+        const catIndex = ASSET_CATEGORIES.indexOf(asset.category as typeof ASSET_CATEGORIES[number]);
         if (catIndex >= 0) {
           form.setValue("assetCategoryIndex", catIndex);
         }
@@ -266,31 +360,24 @@ export default function HireBookingFormPage() {
     }
   }, [selectedAssetId, hireSource, assetsList, form]);
 
-  const internalAssets = useMemo(() => {
-    return assetsList.filter((a) => a.status === "active");
-  }, [assetsList]);
-
   const saveMutation = useMutation({
     mutationFn: async (data: FormValues) => {
       const resolvedLocation = data.hireLocationMode === "factory" && data.hireLocationFactoryId
         ? activeFactories.find(f => f.id === data.hireLocationFactoryId)?.name || data.hireLocation || null
         : data.hireLocation || null;
 
-      const payload: Record<string, any> = {
-        ...data,
-        hireStartDate: data.hireStartDate.toISOString(),
-        hireEndDate: data.hireEndDate.toISOString(),
-        expectedReturnDate: data.expectedReturnDate?.toISOString() || null,
-        assetId: data.hireSource === "internal" ? data.assetId : null,
-        supplierId: data.hireSource === "external" ? data.supplierId : null,
+      const { hireLocationMode: _, hireStartDate, hireEndDate, expectedReturnDate, ...formFields } = data;
+      const payload = {
+        ...formFields,
+        hireStartDate: hireStartDate.toISOString(),
+        hireEndDate: hireEndDate.toISOString(),
+        expectedReturnDate: expectedReturnDate?.toISOString() || null,
+        assetId: data.hireSource === "internal" ? data.assetId || null : null,
+        supplierId: data.hireSource === "external" ? data.supplierId || null : null,
         hireLocation: resolvedLocation,
         hireLocationFactoryId: data.hireLocationMode === "factory" ? (data.hireLocationFactoryId || null) : null,
+        ...((!isNew && selectedStatus) ? { status: selectedStatus } : {}),
       };
-      delete payload.hireLocationMode;
-
-      if (!isNew && selectedStatus) {
-        payload.status = selectedStatus;
-      }
 
       if (isNew) {
         return apiRequest("POST", HIRE_ROUTES.LIST, payload);
@@ -333,6 +420,9 @@ export default function HireBookingFormPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [HIRE_ROUTES.LIST] });
+      if (bookingId) {
+        queryClient.invalidateQueries({ queryKey: [HIRE_ROUTES.LIST, bookingId] });
+      }
       toast({ title: "Status updated" });
       setActionDialog(null);
     },
@@ -345,60 +435,71 @@ export default function HireBookingFormPage() {
     mutationFn: async () => {
       if (!bookingId) throw new Error("Save the booking first");
       return apiRequest("POST", HIRE_ROUTES.SEND_EMAIL(bookingId), {
-        to: emailTo,
-        cc: emailCc || undefined,
-        subject: emailSubject || undefined,
-        message: emailMessage || undefined,
+        to: emailForm.to,
+        cc: emailForm.cc || undefined,
+        subject: emailForm.subject || undefined,
+        message: emailForm.message || undefined,
       });
     },
     onSuccess: () => {
       toast({ title: "Email sent successfully" });
       setEmailDialogOpen(false);
-      setEmailTo("");
-      setEmailCc("");
-      setEmailSubject("");
-      setEmailMessage("");
+      setEmailForm({ to: "", cc: "", subject: "", message: "" });
     },
     onError: (error: Error) => {
       toast({ title: "Failed to send email", description: error.message, variant: "destructive" });
     },
   });
 
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     window.print();
-  };
+  }, []);
 
-  const handleOpenEmailDialog = () => {
+  const handleOpenEmailDialog = useCallback(() => {
     const supplierEmail = existingBooking?.supplier?.email || "";
-    const bn = existingBooking?.bookingNumber || bookingNumber;
-    setEmailTo(supplierEmail);
-    setEmailSubject(`Equipment Hire Booking ${bn}`);
-    setEmailMessage("");
-    setEmailCc("");
+    setEmailForm({
+      to: supplierEmail,
+      cc: "",
+      subject: `Equipment Hire Booking ${bookingNumber}`,
+      message: "",
+    });
     setEmailDialogOpen(true);
-  };
+  }, [existingBooking, bookingNumber]);
 
-  const onSubmit = (data: FormValues) => {
+  const onSubmit = useCallback((data: FormValues) => {
     saveMutation.mutate(data);
-  };
+  }, [saveMutation]);
 
-  const canEdit = true;
-  const bookingNumber = existingBooking?.bookingNumber || nextNumber?.bookingNumber || "HIRE-######";
+  const handleActionDialogOpen = useCallback((action: string) => {
+    setActionDialog(action);
+  }, []);
+
+  const updateEmailField = useCallback((field: keyof EmailFormState, value: string) => {
+    setEmailForm(prev => ({ ...prev, [field]: value }));
+  }, []);
 
   if (!isNew && bookingLoading) {
     return (
       <div className="p-6 space-y-4" role="main" aria-label="Hire Booking Form" aria-busy="true">
-        <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-[600px] w-full" />
+        <Skeleton className="h-10 w-48" aria-label="Loading booking title" />
+        <Skeleton className="h-[600px] w-full" aria-label="Loading booking form" />
       </div>
     );
   }
 
+  const currentActionMeta = actionDialog ? ACTION_DESCRIPTIONS[actionDialog] : null;
+
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto hire-booking-print-area" role="main" aria-label="Hire Booking Form">
+    <div className="p-6 space-y-6 max-w-5xl mx-auto hire-booking-print-area" role="main" aria-label={isNew ? "Create new hire booking" : `Hire booking ${bookingNumber}`}>
       <div className="flex items-center gap-4 flex-wrap no-print">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/hire-bookings")} data-testid="button-back-hire">
-          <ArrowLeft className="h-4 w-4" />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate("/hire-bookings")}
+          aria-label="Go back to hire bookings list"
+          data-testid="button-back-hire"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-2">
@@ -407,83 +508,83 @@ export default function HireBookingFormPage() {
             </h1>
             <PageHelpButton pageHelpKey="page.hire-booking-form" />
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground" id="hire-form-description">
             {isNew ? "Create a new equipment hire booking" : "View and manage this hire booking"}
           </p>
         </div>
         {existingBooking && (
-          <Badge className={STATUS_COLORS[existingBooking.status]} data-testid="badge-booking-status">
+          <Badge className={STATUS_COLORS[existingBooking.status]} data-testid="badge-booking-status" aria-label={`Current status: ${STATUS_LABELS[existingBooking.status] || existingBooking.status}`}>
             {STATUS_LABELS[existingBooking.status] || existingBooking.status}
           </Badge>
         )}
       </div>
 
       {existingBooking && !isNew && (
-        <div className="flex items-center gap-2 flex-wrap no-print">
+        <nav className="flex items-center gap-2 flex-wrap no-print" aria-label="Booking actions" role="toolbar">
           {existingBooking.status === "DRAFT" && (
-            <Button onClick={() => setActionDialog("submit")} data-testid="button-submit-booking">
-              <Send className="h-4 w-4 mr-2" /> Submit for Approval
+            <Button onClick={() => handleActionDialogOpen("submit")} aria-label={ACTION_DESCRIPTIONS.submit.ariaLabel} data-testid="button-submit-booking">
+              <Send className="h-4 w-4 mr-2" aria-hidden="true" /> Submit for Approval
             </Button>
           )}
           {existingBooking.status === "REQUESTED" && (
             <>
-              <Button onClick={() => setActionDialog("approve")} data-testid="button-approve-booking">
-                <Check className="h-4 w-4 mr-2" /> Approve
+              <Button onClick={() => handleActionDialogOpen("approve")} aria-label={ACTION_DESCRIPTIONS.approve.ariaLabel} data-testid="button-approve-booking">
+                <Check className="h-4 w-4 mr-2" aria-hidden="true" /> Approve
               </Button>
-              <Button variant="destructive" onClick={() => setActionDialog("reject")} data-testid="button-reject-booking">
-                <X className="h-4 w-4 mr-2" /> Reject
+              <Button variant="destructive" onClick={() => handleActionDialogOpen("reject")} aria-label={ACTION_DESCRIPTIONS.reject.ariaLabel} data-testid="button-reject-booking">
+                <X className="h-4 w-4 mr-2" aria-hidden="true" /> Reject
               </Button>
             </>
           )}
           {existingBooking.status === "APPROVED" && (
-            <Button onClick={() => setActionDialog("book")} data-testid="button-book-booking">
-              <Package className="h-4 w-4 mr-2" /> Mark as Booked
+            <Button onClick={() => handleActionDialogOpen("book")} aria-label={ACTION_DESCRIPTIONS.book.ariaLabel} data-testid="button-book-booking">
+              <Package className="h-4 w-4 mr-2" aria-hidden="true" /> Mark as Booked
             </Button>
           )}
           {existingBooking.status === "BOOKED" && (
-            <Button onClick={() => setActionDialog("on-hire")} data-testid="button-onhire-booking">
-              <Truck className="h-4 w-4 mr-2" /> Mark as On Hire
+            <Button onClick={() => handleActionDialogOpen("on-hire")} aria-label={ACTION_DESCRIPTIONS["on-hire"].ariaLabel} data-testid="button-onhire-booking">
+              <Truck className="h-4 w-4 mr-2" aria-hidden="true" /> Mark as On Hire
             </Button>
           )}
           {["ON_HIRE", "PICKED_UP"].includes(existingBooking.status) && (
-            <Button onClick={() => setActionDialog("return")} data-testid="button-return-booking">
-              <RotateCcw className="h-4 w-4 mr-2" /> Mark as Returned
+            <Button onClick={() => handleActionDialogOpen("return")} aria-label={ACTION_DESCRIPTIONS.return.ariaLabel} data-testid="button-return-booking">
+              <RotateCcw className="h-4 w-4 mr-2" aria-hidden="true" /> Mark as Returned
             </Button>
           )}
           {existingBooking.status === "RETURNED" && (
-            <Button onClick={() => setActionDialog("close")} data-testid="button-close-booking">
-              <Lock className="h-4 w-4 mr-2" /> Close
+            <Button onClick={() => handleActionDialogOpen("close")} aria-label={ACTION_DESCRIPTIONS.close.ariaLabel} data-testid="button-close-booking">
+              <Lock className="h-4 w-4 mr-2" aria-hidden="true" /> Close
             </Button>
           )}
           {!["CANCELLED", "CLOSED", "RETURNED"].includes(existingBooking.status) && (
-            <Button variant="outline" onClick={() => setActionDialog("cancel")} data-testid="button-cancel-booking">
-              <X className="h-4 w-4 mr-2" /> Cancel Booking
+            <Button variant="outline" onClick={() => handleActionDialogOpen("cancel")} aria-label={ACTION_DESCRIPTIONS.cancel.ariaLabel} data-testid="button-cancel-booking">
+              <X className="h-4 w-4 mr-2" aria-hidden="true" /> Cancel Booking
             </Button>
           )}
-          <Separator orientation="vertical" className="h-6 mx-1" />
-          <Button variant="outline" onClick={handlePrint} data-testid="button-print-booking">
-            <Printer className="h-4 w-4 mr-2" /> Print
+          <Separator orientation="vertical" className="h-6 mx-1" aria-hidden="true" />
+          <Button variant="outline" onClick={handlePrint} aria-label={`Print booking ${bookingNumber}`} data-testid="button-print-booking">
+            <Printer className="h-4 w-4 mr-2" aria-hidden="true" /> Print
           </Button>
-          <Button variant="outline" onClick={handleOpenEmailDialog} data-testid="button-email-booking">
-            <Mail className="h-4 w-4 mr-2" /> Email
+          <Button variant="outline" onClick={handleOpenEmailDialog} aria-label={`Email booking ${bookingNumber} details`} data-testid="button-email-booking">
+            <Mail className="h-4 w-4 mr-2" aria-hidden="true" /> Email
           </Button>
-        </div>
+        </nav>
       )}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" aria-label="Hire booking form">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" aria-label="Hire booking form" aria-describedby="hire-form-description">
           <Card>
             <CardHeader>
-              <CardTitle>Booking Details</CardTitle>
+              <CardTitle id="booking-details-heading">Booking Details</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6" role="group" aria-labelledby="booking-details-heading">
               <div className="flex items-center gap-4 flex-wrap">
-                <div className="font-mono text-lg font-bold" data-testid="text-booking-number">{bookingNumber}</div>
+                <div className="font-mono text-lg font-bold" data-testid="text-booking-number" aria-label={`Booking number: ${bookingNumber}`}>{bookingNumber}</div>
                 {existingBooking && !isNew && (
                   <div className="flex items-center gap-2">
-                    <Label className="text-sm text-muted-foreground">Status:</Label>
-                    <Select value={selectedStatus || existingBooking.status} onValueChange={setSelectedStatus}>
-                      <SelectTrigger className="w-[180px]" data-testid="select-booking-status">
+                    <Label className="text-sm text-muted-foreground" id="status-select-label">Status:</Label>
+                    <Select value={selectedStatus || existingBooking.status} onValueChange={setSelectedStatus} disabled={!canEdit} aria-labelledby="status-select-label">
+                      <SelectTrigger className="w-[180px]" data-testid="select-booking-status" aria-label="Change booking status">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -509,7 +610,7 @@ export default function HireBookingFormPage() {
                         disabled={!canEdit}
                       >
                         <FormControl>
-                          <SelectTrigger data-testid="select-hire-source">
+                          <SelectTrigger data-testid="select-hire-source" aria-label="Select equipment source: internal or external">
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
@@ -535,7 +636,7 @@ export default function HireBookingFormPage() {
                         disabled={!canEdit}
                       >
                         <FormControl>
-                          <SelectTrigger data-testid="select-asset-category">
+                          <SelectTrigger data-testid="select-asset-category" aria-label="Select asset category">
                             <SelectValue placeholder="Select category" />
                           </SelectTrigger>
                         </FormControl>
@@ -566,12 +667,12 @@ export default function HireBookingFormPage() {
                         disabled={!canEdit}
                       >
                         <FormControl>
-                          <SelectTrigger data-testid="select-internal-asset">
+                          <SelectTrigger data-testid="select-internal-asset" aria-label="Select an internal asset to assign to this booking">
                             <SelectValue placeholder="Select an asset you own" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {[...internalAssets].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((asset) => (
+                          {internalAssets.map((asset) => (
                             <SelectItem key={asset.id} value={asset.id}>
                               {asset.assetTag} - {asset.name} ({asset.category})
                             </SelectItem>
@@ -597,12 +698,12 @@ export default function HireBookingFormPage() {
                         disabled={!canEdit}
                       >
                         <FormControl>
-                          <SelectTrigger data-testid="select-supplier">
+                          <SelectTrigger data-testid="select-supplier" aria-label="Select the hire company supplier">
                             <SelectValue placeholder="Select hire company" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {[...suppliers].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((s) => (
+                          {sortedSuppliers.map((s) => (
                             <SelectItem key={s.id} value={s.id}>
                               {s.name}
                             </SelectItem>
@@ -627,6 +728,7 @@ export default function HireBookingFormPage() {
                         placeholder="Describe the equipment to be hired"
                         disabled={!canEdit}
                         aria-required="true"
+                        aria-label="Equipment description"
                         data-testid="input-equipment-description"
                       />
                     </FormControl>
@@ -647,12 +749,12 @@ export default function HireBookingFormPage() {
                       disabled={!canEdit}
                     >
                       <FormControl>
-                        <SelectTrigger data-testid="select-job">
+                        <SelectTrigger data-testid="select-job" aria-label="Select the project or job for this hire">
                           <SelectValue placeholder="Select job" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {[...jobsList].sort((a, b) => (a.jobNumber || a.name || '').localeCompare(b.jobNumber || b.name || '')).map((j) => (
+                        {sortedJobs.map((j) => (
                           <SelectItem key={j.id} value={j.id}>
                             {j.jobNumber} - {j.name}
                           </SelectItem>
@@ -676,6 +778,7 @@ export default function HireBookingFormPage() {
                         value={field.value || ""}
                         placeholder="e.g. 1234-001"
                         disabled={!canEdit}
+                        aria-label="Cost code, optional"
                         data-testid="input-cost-code"
                       />
                     </FormControl>
@@ -697,6 +800,7 @@ export default function HireBookingFormPage() {
                           value={field.value || ""}
                           placeholder="Supplier booking reference number"
                           disabled={!canEdit}
+                          aria-label="Supplier reference number, optional"
                           data-testid="input-supplier-reference"
                         />
                       </FormControl>
@@ -710,9 +814,9 @@ export default function HireBookingFormPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>People</CardTitle>
+              <CardTitle id="people-heading">People</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4" role="group" aria-labelledby="people-heading">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
@@ -726,12 +830,12 @@ export default function HireBookingFormPage() {
                         disabled={!canEdit}
                       >
                         <FormControl>
-                          <SelectTrigger data-testid="select-requested-by">
+                          <SelectTrigger data-testid="select-requested-by" aria-label="Select the employee who requested this hire">
                             <SelectValue placeholder="Select employee" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {[...employeesList].sort((a, b) => { const aName = `${a.firstName} ${a.lastName}`.toLowerCase(); const bName = `${b.firstName} ${b.lastName}`.toLowerCase(); return aName.localeCompare(bName); }).map((e) => (
+                          {sortedEmployees.map((e) => (
                             <SelectItem key={e.id} value={e.id}>
                               {e.firstName} {e.lastName} ({e.employeeNumber})
                             </SelectItem>
@@ -755,12 +859,12 @@ export default function HireBookingFormPage() {
                         disabled={!canEdit}
                       >
                         <FormControl>
-                          <SelectTrigger data-testid="select-responsible-person">
+                          <SelectTrigger data-testid="select-responsible-person" aria-label="Select the person responsible for this equipment">
                             <SelectValue placeholder="Select employee" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {[...employeesList].sort((a, b) => { const aName = `${a.firstName} ${a.lastName}`.toLowerCase(); const bName = `${b.firstName} ${b.lastName}`.toLowerCase(); return aName.localeCompare(bName); }).map((e) => (
+                          {sortedEmployees.map((e) => (
                             <SelectItem key={e.id} value={e.id}>
                               {e.firstName} {e.lastName} ({e.employeeNumber})
                             </SelectItem>
@@ -784,12 +888,12 @@ export default function HireBookingFormPage() {
                         disabled={!canEdit}
                       >
                         <FormControl>
-                          <SelectTrigger data-testid="select-site-contact">
+                          <SelectTrigger data-testid="select-site-contact" aria-label="Select site contact person, optional">
                             <SelectValue placeholder="Select employee" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {[...employeesList].sort((a, b) => { const aName = `${a.firstName} ${a.lastName}`.toLowerCase(); const bName = `${b.firstName} ${b.lastName}`.toLowerCase(); return aName.localeCompare(bName); }).map((e) => (
+                          {sortedEmployees.map((e) => (
                             <SelectItem key={e.id} value={e.id}>
                               {e.firstName} {e.lastName} ({e.employeeNumber})
                             </SelectItem>
@@ -806,29 +910,30 @@ export default function HireBookingFormPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Hire Period & Rates</CardTitle>
+              <CardTitle id="hire-period-heading">Hire Period & Rates</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4" role="group" aria-labelledby="hire-period-heading">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="hireStartDate"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Hire Start Date</FormLabel>
+                      <FormLabel id="start-date-label">Hire Start Date</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
-                            <Button variant="outline" className="justify-start text-left font-normal" disabled={!canEdit} data-testid="button-start-date">
-                              <CalendarIcon className="mr-2 h-4 w-4" />
+                            <Button variant="outline" className="justify-start text-left font-normal" disabled={!canEdit} data-testid="button-start-date" aria-labelledby="start-date-label" aria-describedby="start-date-desc">
+                              <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
                               {field.value ? format(field.value, "dd/MM/yyyy") : "Select date"}
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" selected={field.value} onSelect={field.onChange} data-testid="calendar-start-date" />
+                          <Calendar mode="single" selected={field.value} onSelect={field.onChange} data-testid="calendar-start-date" aria-label="Pick hire start date" />
                         </PopoverContent>
                       </Popover>
+                      <span id="start-date-desc" className="sr-only">The date the hire period begins</span>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -839,20 +944,21 @@ export default function HireBookingFormPage() {
                   name="hireEndDate"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Hire End Date</FormLabel>
+                      <FormLabel id="end-date-label">Hire End Date</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
-                            <Button variant="outline" className="justify-start text-left font-normal" disabled={!canEdit} data-testid="button-end-date">
-                              <CalendarIcon className="mr-2 h-4 w-4" />
+                            <Button variant="outline" className="justify-start text-left font-normal" disabled={!canEdit} data-testid="button-end-date" aria-labelledby="end-date-label" aria-describedby="end-date-desc">
+                              <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
                               {field.value ? format(field.value, "dd/MM/yyyy") : "Select date"}
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" selected={field.value} onSelect={field.onChange} data-testid="calendar-end-date" />
+                          <Calendar mode="single" selected={field.value} onSelect={field.onChange} data-testid="calendar-end-date" aria-label="Pick hire end date" />
                         </PopoverContent>
                       </Popover>
+                      <span id="end-date-desc" className="sr-only">The date the hire period ends</span>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -863,20 +969,21 @@ export default function HireBookingFormPage() {
                   name="expectedReturnDate"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Expected Return Date (Optional)</FormLabel>
+                      <FormLabel id="return-date-label">Expected Return Date (Optional)</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
-                            <Button variant="outline" className="justify-start text-left font-normal" disabled={!canEdit} data-testid="button-return-date">
-                              <CalendarIcon className="mr-2 h-4 w-4" />
+                            <Button variant="outline" className="justify-start text-left font-normal" disabled={!canEdit} data-testid="button-return-date" aria-labelledby="return-date-label" aria-describedby="return-date-desc">
+                              <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
                               {field.value ? format(field.value, "dd/MM/yyyy") : "Select date"}
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar mode="single" selected={field.value || undefined} onSelect={(d) => field.onChange(d || null)} data-testid="calendar-return-date" />
+                          <Calendar mode="single" selected={field.value || undefined} onSelect={(d) => field.onChange(d || null)} data-testid="calendar-return-date" aria-label="Pick expected return date" />
                         </PopoverContent>
                       </Popover>
+                      <span id="return-date-desc" className="sr-only">The expected date for equipment return, optional</span>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -892,7 +999,7 @@ export default function HireBookingFormPage() {
                       <FormLabel>Rate Type</FormLabel>
                       <Select value={field.value} onValueChange={field.onChange} disabled={!canEdit}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-rate-type">
+                          <SelectTrigger data-testid="select-rate-type" aria-label="Select hire rate type">
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
@@ -923,6 +1030,7 @@ export default function HireBookingFormPage() {
                           placeholder="0.00"
                           disabled={!canEdit}
                           aria-required="true"
+                          aria-label="Rate amount in dollars"
                           data-testid="input-rate-amount"
                         />
                       </FormControl>
@@ -939,7 +1047,7 @@ export default function HireBookingFormPage() {
                       <FormLabel>Charge Rule</FormLabel>
                       <Select value={field.value} onValueChange={field.onChange} disabled={!canEdit}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-charge-rule">
+                          <SelectTrigger data-testid="select-charge-rule" aria-label="Select how hire charges are calculated">
                             <SelectValue />
                           </SelectTrigger>
                         </FormControl>
@@ -969,6 +1077,7 @@ export default function HireBookingFormPage() {
                           onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
                           disabled={!canEdit}
                           aria-required="true"
+                          aria-label="Number of equipment units"
                           data-testid="input-quantity"
                         />
                       </FormControl>
@@ -979,8 +1088,8 @@ export default function HireBookingFormPage() {
               </div>
 
               <div className="space-y-3">
-                <FormLabel className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
+                <FormLabel className="flex items-center gap-2" id="hire-location-label">
+                  <MapPin className="h-4 w-4" aria-hidden="true" />
                   Hire Location
                 </FormLabel>
                 <FormField
@@ -1001,6 +1110,8 @@ export default function HireBookingFormPage() {
                           }}
                           className="flex items-center gap-4"
                           data-testid="radio-hire-location-mode"
+                          aria-labelledby="hire-location-label"
+                          aria-describedby="hire-location-desc"
                         >
                           <div className="flex items-center gap-2">
                             <RadioGroupItem value="manual" id="loc-manual" data-testid="radio-location-manual" />
@@ -1012,6 +1123,7 @@ export default function HireBookingFormPage() {
                           </div>
                         </RadioGroup>
                       </FormControl>
+                      <span id="hire-location-desc" className="sr-only">Choose how to specify the equipment hire location</span>
                     </FormItem>
                   )}
                 />
@@ -1028,6 +1140,7 @@ export default function HireBookingFormPage() {
                             value={field.value || ""}
                             placeholder="Enter hire location address..."
                             disabled={!canEdit}
+                            aria-label="Hire location address"
                             data-testid="input-hire-location"
                           />
                         </FormControl>
@@ -1049,7 +1162,7 @@ export default function HireBookingFormPage() {
                           disabled={!canEdit}
                         >
                           <FormControl>
-                            <SelectTrigger data-testid="select-hire-location-factory">
+                            <SelectTrigger data-testid="select-hire-location-factory" aria-label="Select factory as hire location">
                               <SelectValue placeholder="Select a factory..." />
                             </SelectTrigger>
                           </FormControl>
@@ -1073,9 +1186,9 @@ export default function HireBookingFormPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Delivery & Pickup</CardTitle>
+              <CardTitle id="delivery-heading">Delivery & Pickup</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4" role="group" aria-labelledby="delivery-heading">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <FormField
@@ -1088,10 +1201,12 @@ export default function HireBookingFormPage() {
                             checked={field.value}
                             onCheckedChange={field.onChange}
                             disabled={!canEdit}
+                            aria-label="Toggle delivery required"
+                            aria-describedby="delivery-switch-desc"
                             data-testid="switch-delivery-required"
                           />
                         </FormControl>
-                        <FormLabel className="!mt-0">Delivery Required</FormLabel>
+                        <FormLabel className="!mt-0" id="delivery-switch-desc">Delivery Required</FormLabel>
                       </FormItem>
                     )}
                   />
@@ -1109,6 +1224,7 @@ export default function HireBookingFormPage() {
                                 value={field.value || ""}
                                 placeholder="Delivery address"
                                 disabled={!canEdit}
+                                aria-label="Delivery address"
                                 data-testid="input-delivery-address"
                               />
                             </FormControl>
@@ -1131,6 +1247,7 @@ export default function HireBookingFormPage() {
                                 step="0.01"
                                 placeholder="0.00"
                                 disabled={!canEdit}
+                                aria-label="Delivery cost in dollars"
                                 data-testid="input-delivery-cost"
                               />
                             </FormControl>
@@ -1153,10 +1270,12 @@ export default function HireBookingFormPage() {
                             checked={field.value}
                             onCheckedChange={field.onChange}
                             disabled={!canEdit}
+                            aria-label="Toggle pickup required"
+                            aria-describedby="pickup-switch-desc"
                             data-testid="switch-pickup-required"
                           />
                         </FormControl>
-                        <FormLabel className="!mt-0">Pickup Required</FormLabel>
+                        <FormLabel className="!mt-0" id="pickup-switch-desc">Pickup Required</FormLabel>
                       </FormItem>
                     )}
                   />
@@ -1176,6 +1295,7 @@ export default function HireBookingFormPage() {
                               step="0.01"
                               placeholder="0.00"
                               disabled={!canEdit}
+                              aria-label="Pickup cost in dollars"
                               data-testid="input-pickup-cost"
                             />
                           </FormControl>
@@ -1191,9 +1311,9 @@ export default function HireBookingFormPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Notes</CardTitle>
+              <CardTitle id="notes-heading">Notes</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent role="group" aria-labelledby="notes-heading">
               <FormField
                 control={form.control}
                 name="notes"
@@ -1206,6 +1326,7 @@ export default function HireBookingFormPage() {
                         placeholder="Additional notes..."
                         rows={4}
                         disabled={!canEdit}
+                        aria-label="Additional notes for this hire booking"
                         data-testid="input-notes"
                       />
                     </FormControl>
@@ -1217,15 +1338,15 @@ export default function HireBookingFormPage() {
           </Card>
 
           {canEdit && (
-            <div className="flex items-center justify-end gap-2 no-print">
-              <Button variant="outline" type="button" onClick={() => navigate("/hire-bookings")} data-testid="button-cancel-form">
+            <div className="flex items-center justify-end gap-2 no-print" role="group" aria-label="Form actions">
+              <Button variant="outline" type="button" onClick={() => navigate("/hire-bookings")} aria-label="Cancel and return to bookings list" data-testid="button-cancel-form">
                 Cancel
               </Button>
-              <Button type="submit" disabled={saveMutation.isPending} data-testid="button-save-hire">
+              <Button type="submit" disabled={saveMutation.isPending} aria-label={isNew ? "Create new hire booking" : "Save changes to hire booking"} data-testid="button-save-hire">
                 {saveMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
                 ) : (
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-4 w-4 mr-2" aria-hidden="true" />
                 )}
                 {isNew ? "Create Booking" : "Save Changes"}
               </Button>
@@ -1235,30 +1356,25 @@ export default function HireBookingFormPage() {
       </Form>
 
       <AlertDialog open={!!actionDialog} onOpenChange={(open) => !open && setActionDialog(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent role="alertdialog" aria-labelledby="action-dialog-title" aria-describedby="action-dialog-description">
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {actionDialog === "submit" && "Submit for Approval"}
-              {actionDialog === "approve" && "Approve Booking"}
-              {actionDialog === "reject" && "Reject Booking"}
-              {actionDialog === "book" && "Confirm Booking"}
-              {actionDialog === "on-hire" && "Mark as On Hire"}
-              {actionDialog === "return" && "Mark as Returned"}
-              {actionDialog === "cancel" && "Cancel Booking"}
-              {actionDialog === "close" && "Close Booking"}
+            <AlertDialogTitle id="action-dialog-title">
+              {currentActionMeta?.dialogTitle || "Confirm Action"}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to proceed with this action for booking <strong>{bookingNumber}</strong>?
+            <AlertDialogDescription id="action-dialog-description">
+              {currentActionMeta?.dialogDescription || "Are you sure you want to proceed?"}{" "}
+              Booking: <strong>{bookingNumber}</strong>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-dialog">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-dialog" aria-label="Cancel this action and close dialog">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (actionDialog) statusMutation.mutate(actionDialog);
               }}
               disabled={statusMutation.isPending}
               data-testid="button-confirm-dialog"
+              aria-label={currentActionMeta ? `Confirm: ${currentActionMeta.dialogTitle}` : "Confirm action"}
             >
               {statusMutation.isPending ? "Processing..." : "Confirm"}
             </AlertDialogAction>
@@ -1267,65 +1383,75 @@ export default function HireBookingFormPage() {
       </AlertDialog>
 
       <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg" aria-labelledby="email-dialog-title" aria-describedby="email-dialog-description">
           <DialogHeader>
-            <DialogTitle>Email Hire Booking</DialogTitle>
-            <DialogDescription>
+            <DialogTitle id="email-dialog-title">Email Hire Booking</DialogTitle>
+            <DialogDescription id="email-dialog-description">
               Send booking {bookingNumber} details to the hire company or any recipient.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1">
-              <Label>To (required)</Label>
+              <Label htmlFor="email-to">To (required)</Label>
               <Input
-                value={emailTo}
-                onChange={(e) => setEmailTo(e.target.value)}
+                id="email-to"
+                value={emailForm.to}
+                onChange={(e) => updateEmailField("to", e.target.value)}
                 placeholder="recipient@example.com"
+                aria-required="true"
+                aria-label="Recipient email address"
                 data-testid="input-email-to"
               />
             </div>
             <div className="space-y-1">
-              <Label>CC (optional)</Label>
+              <Label htmlFor="email-cc">CC (optional)</Label>
               <Input
-                value={emailCc}
-                onChange={(e) => setEmailCc(e.target.value)}
+                id="email-cc"
+                value={emailForm.cc}
+                onChange={(e) => updateEmailField("cc", e.target.value)}
                 placeholder="cc@example.com"
+                aria-label="CC email address, optional"
                 data-testid="input-email-cc"
               />
             </div>
             <div className="space-y-1">
-              <Label>Subject</Label>
+              <Label htmlFor="email-subject">Subject</Label>
               <Input
-                value={emailSubject}
-                onChange={(e) => setEmailSubject(e.target.value)}
+                id="email-subject"
+                value={emailForm.subject}
+                onChange={(e) => updateEmailField("subject", e.target.value)}
                 placeholder="Equipment Hire Booking"
+                aria-label="Email subject line"
                 data-testid="input-email-subject"
               />
             </div>
             <div className="space-y-1">
-              <Label>Message (optional)</Label>
+              <Label htmlFor="email-message">Message (optional)</Label>
               <Textarea
-                value={emailMessage}
-                onChange={(e) => setEmailMessage(e.target.value)}
+                id="email-message"
+                value={emailForm.message}
+                onChange={(e) => updateEmailField("message", e.target.value)}
                 placeholder="Additional message to include..."
                 rows={3}
+                aria-label="Email message body, optional"
                 data-testid="input-email-message"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEmailDialogOpen(false)} data-testid="button-cancel-email">
+            <Button variant="outline" onClick={() => setEmailDialogOpen(false)} aria-label="Cancel sending email" data-testid="button-cancel-email">
               Cancel
             </Button>
             <Button
               onClick={() => sendEmailMutation.mutate()}
-              disabled={!emailTo || sendEmailMutation.isPending}
+              disabled={!emailForm.to || sendEmailMutation.isPending}
+              aria-label={`Send email to ${emailForm.to || "recipient"}`}
               data-testid="button-send-email"
             >
               {sendEmailMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
               ) : (
-                <Send className="h-4 w-4 mr-2" />
+                <Send className="h-4 w-4 mr-2" aria-hidden="true" />
               )}
               Send Email
             </Button>
