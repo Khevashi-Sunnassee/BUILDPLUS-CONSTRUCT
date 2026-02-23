@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, Fragment, useCallback, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -102,8 +102,7 @@ export default function AdminPanelsPage() {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [viewMode, setViewMode] = useState<"list" | "summary">("list");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(100);
+  const PAGE_SIZE = 100;
   const [collapsedJobs, setCollapsedJobs] = useState<Set<string>>(new Set());
   const [collapsedPanelTypes, setCollapsedPanelTypes] = useState<Set<string>>(new Set());
   const [collapsedLevels, setCollapsedLevels] = useState<Set<string>>(new Set());
@@ -147,7 +146,6 @@ export default function AdminPanelsPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
-      setCurrentPage(1);
     }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
@@ -168,27 +166,49 @@ export default function AdminPanelsPage() {
     }));
   }, [buildFormData.loadWidth, buildFormData.loadHeight, buildFormData.panelThickness]);
 
-  const queryParams = new URLSearchParams({
-    page: currentPage.toString(),
-    limit: pageSize.toString(),
-  });
-  if (jobFilter !== "all") queryParams.set("jobId", jobFilter);
-  if (factoryFilter !== "all") queryParams.set("factoryId", factoryFilter);
-  if (debouncedSearch) queryParams.set("search", debouncedSearch);
-  if (statusFilter !== "all") queryParams.set("status", statusFilter);
+  const buildQueryParams = (page: number) => {
+    const qp = new URLSearchParams({
+      page: page.toString(),
+      limit: PAGE_SIZE.toString(),
+    });
+    if (jobFilter !== "all") qp.set("jobId", jobFilter);
+    if (factoryFilter !== "all") qp.set("factoryId", factoryFilter);
+    if (debouncedSearch) qp.set("search", debouncedSearch);
+    if (statusFilter !== "all") qp.set("status", statusFilter);
+    return qp;
+  };
 
-  const { data: panelData, isLoading: panelsLoading, isError, error, refetch } = useQuery<PaginatedResponse>({
-    queryKey: [ADMIN_ROUTES.PANELS, currentPage, pageSize, jobFilter, factoryFilter, debouncedSearch, statusFilter],
-    queryFn: async () => {
-      const res = await fetch(`${ADMIN_ROUTES.PANELS}?${queryParams.toString()}`, { credentials: "include" });
+  const {
+    data: panelData,
+    isLoading: panelsLoading,
+    isError,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<PaginatedResponse>({
+    queryKey: [ADMIN_ROUTES.PANELS, PAGE_SIZE, jobFilter, factoryFilter, debouncedSearch, statusFilter],
+    queryFn: async ({ pageParam }) => {
+      const qp = buildQueryParams(pageParam as number);
+      const res = await fetch(`${ADMIN_ROUTES.PANELS}?${qp.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch panels");
       return res.json();
     },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      if (lastPage.page < lastPage.totalPages) {
+        return lastPage.page + 1;
+      }
+      return undefined;
+    },
   });
 
-  const panels = panelData?.panels;
-  const totalPages = panelData?.totalPages || 1;
-  const totalPanels = panelData?.total || 0;
+  const panels = useMemo(
+    () => panelData?.pages.flatMap((page) => page.panels),
+    [panelData]
+  );
+  const totalPanels = panelData?.pages[0]?.total || 0;
 
   const panelIds = panels?.map(p => p.id) || [];
   const { data: panelCounts } = useQuery<Record<string, { messageCount: number; documentCount: number }>>({
@@ -1852,65 +1872,26 @@ export default function AdminPanelsPage() {
           </Table>
 
           {viewMode === "list" && (
-            <div className="flex items-center justify-between mt-4 px-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Showing {filteredPanels && filteredPanels.length > 0 ? `${((currentPage - 1) * pageSize) + 1}-${Math.min(currentPage * pageSize, filteredPanels.length)}` : "0"} of {filteredPanels?.length || 0} panels{filteredPanels && panels && filteredPanels.length < panels.length ? ` (${panels.length} total)` : ""}</span>
-                <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(parseInt(v)); setCurrentPage(1); }}>
-                  <SelectTrigger className="w-[80px] h-8" data-testid="select-page-size">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                    <SelectItem value="200">200</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span>per page</span>
+            <div className="flex flex-col items-center gap-3 mt-4 px-2">
+              <div className="text-sm text-muted-foreground">
+                Showing {panels?.length || 0} of {totalPanels} panels
+                {filteredPanels && panels && filteredPanels.length < panels.length ? ` (${filteredPanels.length} matching filters)` : ""}
               </div>
-              <div className="flex items-center gap-2">
+              {hasNextPage && (
                 <Button
                   variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  data-testid="button-first-page"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  data-testid="button-load-more"
                 >
-                  First
+                  {isFetchingNextPage ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 mr-2" />
+                  )}
+                  Load More
                 </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  data-testid="button-prev-page"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm px-2">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  data-testid="button-next-page"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                  data-testid="button-last-page"
-                >
-                  Last
-                </Button>
-              </div>
+              )}
             </div>
           )}
           </>
