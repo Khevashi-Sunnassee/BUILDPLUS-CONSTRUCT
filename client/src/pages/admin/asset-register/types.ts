@@ -181,10 +181,48 @@ export interface ChartDataItem {
   cumulativeValue: number;
 }
 
+function normalizeDepreciationMethod(method: string | null | undefined): string {
+  if (!method) return "straight_line";
+  const lower = method.toLowerCase().replace(/\s+/g, "_");
+  if (lower === "diminishing_value" || lower === "diminishing value") return "diminishing_value";
+  if (lower === "units_of_production" || lower === "units of production") return "units_of_production";
+  return "straight_line";
+}
+
+export function calculateBookValue(asset: Asset): number | null {
+  const purchasePrice = asset.purchasePrice ? parseFloat(String(asset.purchasePrice)) : null;
+  const usefulLife = asset.usefulLifeYears;
+  const purchaseDate = asset.purchaseDate;
+  if (purchasePrice == null || !usefulLife || usefulLife <= 0 || !purchaseDate) return null;
+  const start = new Date(purchaseDate);
+  if (isNaN(start.getTime())) return null;
+  const yearsOwned = Math.max(0, (Date.now() - start.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+  const method = normalizeDepreciationMethod(asset.depreciationMethod);
+  if (method === "diminishing_value") {
+    const rate = 2 / usefulLife;
+    let value = purchasePrice;
+    const fullYears = Math.floor(yearsOwned);
+    const partialYear = yearsOwned - fullYears;
+    for (let i = 0; i < fullYears && value > 0; i++) {
+      value -= value * rate;
+    }
+    if (partialYear > 0 && value > 0) {
+      value -= value * rate * partialYear;
+    }
+    return Math.max(0, value);
+  }
+  if (method === "units_of_production") {
+    return null;
+  }
+  const depreciation = (purchasePrice / usefulLife) * yearsOwned;
+  return Math.max(0, purchasePrice - depreciation);
+}
+
 export interface AssetStats {
   total: number;
   totalPurchasePrice: number;
   totalCurrentValue: number;
+  totalBookValue: number;
   active: number;
   leased: number;
 }

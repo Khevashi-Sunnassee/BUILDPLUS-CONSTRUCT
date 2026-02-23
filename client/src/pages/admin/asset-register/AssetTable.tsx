@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/table";
 import type { Asset } from "@shared/schema";
 import type { AssetTableProps, SortField, SortDir } from "./types";
-import { formatCurrency, formatDate, daysSinceDate, GROUP_COLORS } from "./types";
+import { formatCurrency, formatDate, daysSinceDate, calculateBookValue, GROUP_COLORS } from "./types";
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
   if (!status) return <span className="text-muted-foreground">-</span>;
@@ -127,6 +127,12 @@ export function AssetTable({
       </TableCell>
       <TableCell className="text-right font-mono text-sm" data-testid={`text-asset-current-value-${asset.id}`}>
         {formatCurrency(asset.currentValue)}
+      </TableCell>
+      <TableCell className="text-right font-mono text-sm" data-testid={`text-asset-book-value-${asset.id}`}>
+        {(() => {
+          const bv = calculateBookValue(asset);
+          return bv !== null ? formatCurrency(bv) : "-";
+        })()}
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
@@ -234,6 +240,7 @@ export function AssetTable({
         <SortableHeader label="Purchase Price" field="purchasePrice" currentSort={sortField} currentDir={sortDir} onSort={handleSort} />
       </TableHead>
       <TableHead className="text-right">Current Value</TableHead>
+      <TableHead className="text-right">Book Value</TableHead>
       <TableHead className="text-right w-[160px]">Actions</TableHead>
     </TableRow>
   );
@@ -291,7 +298,7 @@ export function AssetTable({
           <TableBody>
             {filteredAndSortedAssets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                   {assets && assets.length > 0
                     ? "No assets match the current filters"
                     : "No assets found"}

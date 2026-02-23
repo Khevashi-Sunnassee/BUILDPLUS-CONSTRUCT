@@ -1,11 +1,11 @@
-import { Package, DollarSign, Activity, Truck, TrendingDown } from "lucide-react";
+import { Package, DollarSign, Activity, Truck, TrendingDown, BookOpen } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { AssetStatsCardsProps } from "./types";
 import { formatCurrency } from "./types";
 
 export function AssetStatsCards({ stats }: AssetStatsCardsProps) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between gap-2">
@@ -36,6 +36,17 @@ export function AssetStatsCards({ stats }: AssetStatsCardsProps) {
           </div>
           <div className="text-xl font-bold mt-1" data-testid="stat-total-current-value">
             {formatCurrency(stats.totalCurrentValue)}
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Total Book Value</span>
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <div className="text-xl font-bold mt-1" data-testid="stat-total-book-value">
+            {formatCurrency(stats.totalBookValue)}
           </div>
         </CardContent>
       </Card>

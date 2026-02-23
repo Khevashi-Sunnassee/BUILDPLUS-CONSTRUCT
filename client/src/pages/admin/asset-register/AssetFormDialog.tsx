@@ -405,16 +405,27 @@ export function AssetFormDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Depreciation Method</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={(() => {
+                          const v = field.value;
+                          if (!v) return v;
+                          const lower = v.toLowerCase().replace(/\s+/g, "_");
+                          if (lower === "straight_line") return "straight_line";
+                          if (lower === "diminishing_value") return "diminishing_value";
+                          if (lower === "units_of_production") return "units_of_production";
+                          return v;
+                        })()}
+                      >
                         <FormControl>
                           <SelectTrigger data-testid="select-asset-depreciation-method">
                             <SelectValue placeholder="Select method" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Straight Line">Straight Line</SelectItem>
-                          <SelectItem value="Diminishing Value">Diminishing Value</SelectItem>
-                          <SelectItem value="Units of Production">Units of Production</SelectItem>
+                          <SelectItem value="straight_line">Straight Line</SelectItem>
+                          <SelectItem value="diminishing_value">Diminishing Value</SelectItem>
+                          <SelectItem value="units_of_production">Units of Production</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

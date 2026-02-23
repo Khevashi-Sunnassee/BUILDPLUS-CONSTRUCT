@@ -30,6 +30,7 @@ import { AssetTable } from "./AssetTable";
 import { ServiceCallsTab } from "./ServiceCallsTab";
 import { AssetFormDialog } from "./AssetFormDialog";
 import { AssetImportDialog, AssetDeleteDialog, ServiceChecklistDialog } from "./AssetDialogs";
+import { calculateBookValue } from "./types";
 
 export default function AssetRegisterPage() {
   useDocumentTitle("Asset Register");
@@ -334,7 +335,7 @@ export default function AssetRegisterPage() {
   }, [filteredAndSortedAssets, groupByMode]);
 
   const stats = useMemo(() => {
-    if (!assets) return { total: 0, totalPurchasePrice: 0, totalCurrentValue: 0, active: 0, leased: 0 };
+    if (!assets) return { total: 0, totalPurchasePrice: 0, totalCurrentValue: 0, totalBookValue: 0, active: 0, leased: 0 };
     return {
       total: assets.length,
       totalPurchasePrice: assets.reduce((sum, a) => {
@@ -344,6 +345,10 @@ export default function AssetRegisterPage() {
       totalCurrentValue: assets.reduce((sum, a) => {
         const val = a.currentValue ? parseFloat(String(a.currentValue)) : 0;
         return sum + (isNaN(val) ? 0 : val);
+      }, 0),
+      totalBookValue: assets.reduce((sum, a) => {
+        const bv = calculateBookValue(a);
+        return sum + (bv ?? 0);
       }, 0),
       active: assets.filter((a) => a.status === "active").length,
       leased: assets.filter((a) => a.fundingMethod === "leased").length,
