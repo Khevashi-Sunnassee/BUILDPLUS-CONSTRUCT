@@ -436,7 +436,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
                   name="typeId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Document Type</FormLabel>
+                      <FormLabel>Document Type *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-type">
@@ -461,7 +461,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
                   name="disciplineId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Discipline</FormLabel>
+                      <FormLabel>Discipline *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-discipline">
@@ -541,7 +541,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
                   name="jobId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Job</FormLabel>
+                      <FormLabel>Job *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-job">
