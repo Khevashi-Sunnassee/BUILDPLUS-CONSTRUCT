@@ -457,6 +457,7 @@ export default function AdminEmployeesPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 w-64"
+                  autoFocus
                   data-testid="input-search-employees"
                 />
               </div>
@@ -466,7 +467,7 @@ export default function AdminEmployeesPage() {
         <CardContent>
           {filteredEmployees && filteredEmployees.length > 0 ? (
             <>
-            <Table>
+            <Table role="grid">
               <TableHeader>
                 <TableRow>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("employeeNumber")} data-testid="sort-employee-number">
@@ -492,7 +493,18 @@ export default function AdminEmployeesPage() {
               </TableHeader>
               <TableBody>
                 {paginatedEmployees.map((employee) => (
-                  <TableRow key={employee.id} data-testid={`row-employee-${employee.id}`}>
+                  <TableRow
+                    key={employee.id}
+                    role="row"
+                    tabIndex={0}
+                    aria-label={`${employee.firstName} ${employee.lastName}`}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setLocation(`/admin/employees/${employee.id}`);
+                      }
+                    }}
+                    data-testid={`row-employee-${employee.id}`}
+                  >
                     <TableCell className="font-mono text-sm" data-testid={`text-employee-number-${employee.id}`}>
                       {employee.employeeNumber}
                     </TableCell>
