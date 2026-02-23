@@ -56,9 +56,15 @@ export function validateContentType(req: Request, res: Response, next: NextFunct
   const method = req.method.toUpperCase();
   if (["POST", "PUT", "PATCH"].includes(method)) {
     const contentType = req.headers["content-type"];
-    if (contentType && !req.is("json") && !req.is("multipart/form-data") && !req.is("application/x-www-form-urlencoded")) {
-      logger.warn({ method, path: req.path, contentType }, "Unexpected content type");
-      return res.status(415).json({ error: "Unsupported content type" });
+    if (contentType) {
+      const ct = contentType.toLowerCase();
+      const isAllowed = ct.includes("application/json") ||
+        ct.includes("multipart/form-data") ||
+        ct.includes("application/x-www-form-urlencoded");
+      if (!isAllowed) {
+        logger.warn({ method, path: req.path, contentType }, "Unexpected content type");
+        return res.status(415).json({ error: "Unsupported content type" });
+      }
     }
   }
   next();
