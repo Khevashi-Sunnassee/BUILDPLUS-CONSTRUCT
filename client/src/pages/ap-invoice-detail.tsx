@@ -53,8 +53,8 @@ interface InvoiceDetail {
   createdByUser?: { id: string; name: string; email: string } | null;
   documents?: Array<{ id: string; fileName: string; mimeType: string; storageKey: string; fileSize?: number }>;
   extractedFields?: Array<{ id: string; fieldKey: string; fieldValue: string | null; confidence: number | null; bboxJson?: any }>;
-  splits?: Array<any>;
-  approvals?: Array<any>;
+  splits?: InvoiceSplit[];
+  approvals?: ApprovalPathStep[];
   activity?: Array<{ id: string; activityType: string; message: string; actorName?: string; createdAt: string; metaJson?: any }>;
   comments?: Array<{ id: string; userId: string; userName?: string; body: string; createdAt: string }>;
 }
@@ -194,6 +194,8 @@ function EditableField({ label, value, fieldKey, onSave, onFocus, type = "text" 
       className="flex items-start gap-2 py-1.5 px-2 rounded-md hover-elevate cursor-pointer group"
       onFocus={() => onFocus(fieldKey)}
       onClick={() => { onFocus(fieldKey); if (!editing) setEditing(true); }}
+      role="button"
+      aria-label={`Edit ${label}`}
       data-testid={`field-${fieldKey}`}
     >
       <span className="text-sm text-muted-foreground whitespace-nowrap min-w-[100px] pt-0.5">{label}</span>
@@ -207,6 +209,7 @@ function EditableField({ label, value, fieldKey, onSave, onFocus, type = "text" 
             onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setEditValue(value); setEditing(false); } }}
             className="h-7 text-sm flex-1"
             autoFocus
+            aria-label={label}
             data-testid={`input-${fieldKey}`}
           />
         </div>
@@ -407,8 +410,8 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplier
   });
 
   const totalAmount = useMemo(() => splits.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0), [splits]);
-  const variance = invoiceTotal - totalAmount;
-  const allocatedPercent = invoiceTotal > 0 ? (totalAmount / invoiceTotal) * 100 : 0;
+  const variance = useMemo(() => invoiceTotal - totalAmount, [invoiceTotal, totalAmount]);
+  const allocatedPercent = useMemo(() => invoiceTotal > 0 ? (totalAmount / invoiceTotal) * 100 : 0, [invoiceTotal, totalAmount]);
 
   const doSave = useCallback((updatedSplits: InvoiceSplit[], updateSupplierDefault: boolean) => {
     saveMutation.mutate({ splits: updatedSplits, updateSupplierDefault });
@@ -561,7 +564,7 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplier
                       />
                     </TableCell>
                     <TableCell>
-                      <Button size="icon" variant="ghost" onClick={() => removeSplit(i)} data-testid={`button-remove-split-${i}`}>
+                      <Button size="icon" variant="ghost" onClick={() => removeSplit(i)} aria-label={`Remove split ${i + 1}`} data-testid={`button-remove-split-${i}`}>
                         <X className="h-3 w-3" />
                       </Button>
                     </TableCell>
@@ -717,6 +720,7 @@ function CommentsSection({ invoiceId }: { invoiceId: string }) {
             size="icon"
             onClick={handleSubmitComment}
             disabled={!commentText.trim() || addCommentMutation.isPending}
+            aria-label="Send comment"
             data-testid="button-send-comment"
           >
             {addCommentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -862,19 +866,22 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon"
             onClick={() => setZoom(z => Math.max(0.5, z - 0.25))}
+            aria-label="Zoom out"
             data-testid="button-zoom-out">
             <ZoomOut className="h-3.5 w-3.5" />
           </Button>
-          <span className="text-xs text-muted-foreground w-10 text-center">
+          <span className="text-xs text-muted-foreground w-10 text-center" aria-live="polite">
             {Math.round(zoom * 100)}%
           </span>
           <Button variant="ghost" size="icon"
             onClick={() => setZoom(z => Math.min(5, z + 0.25))}
+            aria-label="Zoom in"
             data-testid="button-zoom-in">
             <ZoomIn className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon"
             onClick={() => setZoom(1)}
+            aria-label="Reset zoom"
             data-testid="button-zoom-reset">
             <span className="text-[10px]">1:1</span>
           </Button>
@@ -916,7 +923,7 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
                 ? `data:${doc.mimeType};base64,${currentPageData.thumbnail}`
                 : `data:image/png;base64,${currentPageData.thumbnail}`
               }
-              alt={`Page ${currentPage}`}
+              alt={`Invoice document preview - page ${currentPage} of ${numPages || 1}`}
               className="border shadow-sm bg-white w-full"
               draggable={false}
               data-testid="img-page-preview"
@@ -956,11 +963,11 @@ function PdfViewer({ invoice, focusedField }: { invoice: InvoiceDetail; focusedF
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {numPages > 1 ? (
             <>
-              <Button variant="ghost" size="icon" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} data-testid="button-prev-page">
+              <Button variant="ghost" size="icon" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} aria-label="Previous page" data-testid="button-prev-page">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span>Page {currentPage} of {numPages}</span>
-              <Button variant="ghost" size="icon" onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))} disabled={currentPage >= numPages} data-testid="button-next-page">
+              <Button variant="ghost" size="icon" onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))} disabled={currentPage >= numPages} aria-label="Next page" data-testid="button-next-page">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </>
@@ -1168,7 +1175,7 @@ export default function ApInvoiceDetailPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  useDocumentTitle("Invoice Detail");
+  useDocumentTitle("AP Invoice Detail | BuildPlus");
 
   const { user } = useAuth();
   const [focusedField, setFocusedField] = useState<string | null>(null);
@@ -1453,7 +1460,7 @@ export default function ApInvoiceDetailPage() {
     );
   }
 
-  const invoiceTotal = parseFloat(String(invoice.totalInc || "0"));
+  const invoiceTotal = useMemo(() => parseFloat(String(invoice.totalInc || "0")), [invoice.totalInc]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-73px)]" data-testid="page-invoice-detail">
@@ -1543,11 +1550,14 @@ export default function ApInvoiceDetailPage() {
         </div>
       </div>
 
-      <div className="md:hidden flex border-b bg-background">
+      <div className="md:hidden flex border-b bg-background" role="tablist" aria-label="Invoice view tabs">
         <button
           type="button"
           className={`flex-1 py-2.5 text-sm font-medium text-center border-b-2 transition-colors ${mobileTab === "document" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}
           onClick={() => setMobileTab("document")}
+          aria-label="View document"
+          aria-selected={mobileTab === "document"}
+          role="tab"
           data-testid="tab-mobile-document"
         >
           <FileText className="h-4 w-4 inline-block mr-1.5" />
@@ -1557,6 +1567,9 @@ export default function ApInvoiceDetailPage() {
           type="button"
           className={`flex-1 py-2.5 text-sm font-medium text-center border-b-2 transition-colors ${mobileTab === "details" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}
           onClick={() => setMobileTab("details")}
+          aria-label="View invoice details"
+          aria-selected={mobileTab === "details"}
+          role="tab"
           data-testid="tab-mobile-details"
         >
           <Pencil className="h-4 w-4 inline-block mr-1.5" />

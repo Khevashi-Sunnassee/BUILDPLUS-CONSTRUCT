@@ -75,6 +75,7 @@ import type { Job, PanelRegister, WorkType } from "@shared/schema";
 import { isJobVisibleInDropdowns } from "@shared/job-phases";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { dateInputProps } from "@/lib/validation";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 interface LogRowWithTimes {
   id: string;
@@ -132,6 +133,7 @@ export default function ManualEntryPage() {
   const { user } = useAuth();
   const today = format(new Date(), "yyyy-MM-dd");
   
+  useDocumentTitle("Manual Time Entry");
   const canApproveForProduction = user?.role === "MANAGER" || user?.role === "ADMIN";
   
   // Parse date, logId, jobId, panelId, panelMark and startTimer from URL query parameters if present
@@ -1004,7 +1006,7 @@ export default function ManualEntryPage() {
   return (
     <div className="space-y-4" role="main" aria-label="Manual Entry">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => logIdFromUrl ? navigate(`/daily-reports/${logIdFromUrl}`) : navigate("/daily-reports")} data-testid="button-back">
+        <Button variant="ghost" size="icon" onClick={() => logIdFromUrl ? navigate(`/daily-reports/${logIdFromUrl}`) : navigate("/daily-reports")} aria-label="Back to daily reports" data-testid="button-back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
@@ -1248,6 +1250,7 @@ export default function ManualEntryPage() {
                         size="sm"
                         onClick={() => pauseTimerMutation.mutate(activeTimer.id)}
                         disabled={pauseTimerMutation.isPending}
+                        aria-label="Pause timer"
                         data-testid="button-pause-timer-header"
                       >
                         <Pause className="h-4 w-4" />
@@ -1261,6 +1264,7 @@ export default function ManualEntryPage() {
                         size="sm"
                         onClick={() => resumeTimerMutation.mutate(activeTimer.id)}
                         disabled={resumeTimerMutation.isPending}
+                        aria-label="Resume timer"
                         data-testid="button-resume-timer-header"
                       >
                         <Play className="h-4 w-4" />
@@ -1292,6 +1296,7 @@ export default function ManualEntryPage() {
                           size="sm"
                           onClick={() => cancelTimerMutation.mutate(activeTimer.id)}
                           disabled={cancelTimerMutation.isPending}
+                          aria-label="Cancel timer"
                           data-testid="button-cancel-timer-header"
                         >
                           <XCircle className="h-4 w-4" />
@@ -1686,16 +1691,16 @@ export default function ManualEntryPage() {
                       <span className={`text-sm font-medium shrink-0 ${getAuditActionColor(log.action)}`}>
                         {formatAuditAction(log.action)}
                       </span>
-                      {log.changedFields && log.changedFields.totalElapsedMs && (
+                      {log.changedFields && typeof log.changedFields.totalElapsedMs === "number" ? (
                         <span className="text-xs text-red-500 font-mono font-semibold shrink-0">
                           {formatTimer(log.changedFields.totalElapsedMs)}
                         </span>
-                      )}
-                      {log.changedFields && log.changedFields.durationMinutes && (
+                      ) : null}
+                      {log.changedFields && log.changedFields.durationMinutes != null ? (
                         <Badge variant="outline" className="text-xs shrink-0">
-                          {log.changedFields.durationMinutes} min
+                          {String(log.changedFields.durationMinutes)} min
                         </Badge>
-                      )}
+                      ) : null}
                     </div>
                     <span className="text-xs text-muted-foreground shrink-0">
                       {format(new Date(log.createdAt), "MMM d, h:mm a")}
@@ -1807,6 +1812,7 @@ export default function ManualEntryPage() {
                       variant="ghost"
                       size="icon"
                       onClick={() => setPdfFile(null)}
+                      aria-label="Remove PDF file"
                       data-testid="button-remove-pdf"
                     >
                       <XCircle className="h-4 w-4" />

@@ -285,6 +285,7 @@ function DocumentsPanel({ email }: { email: DraftingEmailDetail }) {
               variant="ghost"
               size="icon"
               onClick={() => handleViewDocument(doc.id)}
+              aria-label={`View document ${doc.fileName}`}
               data-testid={`button-view-doc-${doc.id}`}
             >
               <Eye className="h-3.5 w-3.5" />
@@ -298,11 +299,11 @@ function DocumentsPanel({ email }: { email: DraftingEmailDetail }) {
           <div className="p-2 bg-muted/30 flex items-center justify-between gap-2 flex-wrap">
             <span className="text-xs text-muted-foreground">Page Thumbnails</span>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={() => setZoom(z => Math.max(0.5, z - 0.25))} data-testid="button-zoom-out">
+              <Button variant="ghost" size="icon" onClick={() => setZoom(z => Math.max(0.5, z - 0.25))} aria-label="Zoom out" data-testid="button-zoom-out">
                 <ZoomOut className="h-3.5 w-3.5" />
               </Button>
               <span className="text-xs text-muted-foreground w-10 text-center">{Math.round(zoom * 100)}%</span>
-              <Button variant="ghost" size="icon" onClick={() => setZoom(z => Math.min(5, z + 0.25))} data-testid="button-zoom-in">
+              <Button variant="ghost" size="icon" onClick={() => setZoom(z => Math.min(5, z + 0.25))} aria-label="Zoom in" data-testid="button-zoom-in">
                 <ZoomIn className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -333,11 +334,11 @@ function DocumentsPanel({ email }: { email: DraftingEmailDetail }) {
           </div>
           {numPages > 1 && (
             <div className="p-2 border-t bg-muted/30 flex items-center justify-center gap-3">
-              <Button variant="ghost" size="icon" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} data-testid="button-prev-page">
+              <Button variant="ghost" size="icon" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} aria-label="Previous page" data-testid="button-prev-page">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-sm text-muted-foreground" data-testid="text-page-info">Page {currentPage} of {numPages}</span>
-              <Button variant="ghost" size="icon" disabled={currentPage >= numPages} onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))} data-testid="button-next-page">
+              <Button variant="ghost" size="icon" disabled={currentPage >= numPages} onClick={() => setCurrentPage(p => Math.min(numPages, p + 1))} aria-label="Next page" data-testid="button-next-page">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
@@ -533,7 +534,7 @@ function JobMatchPanel({ email, emailId }: { email: DraftingEmailDetail; emailId
                 </span>
               )}
             </div>
-            <Button variant="ghost" size="icon" asChild data-testid="button-view-job">
+            <Button variant="ghost" size="icon" asChild aria-label="View matched job" data-testid="button-view-job">
               <a href={`/admin/jobs`}>
                 <ExternalLink className="h-3.5 w-3.5" />
               </a>
@@ -1133,7 +1134,7 @@ function LinkedTasksPanel({ emailId }: { emailId: string }) {
                   </p>
                 )}
               </div>
-              <Button variant="ghost" size="icon" asChild data-testid={`button-view-task-${task.id}`}>
+              <Button variant="ghost" size="icon" asChild aria-label={`View task ${task.title}`} data-testid={`button-view-task-${task.id}`}>
                 <a href="/tasks">
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
@@ -1397,9 +1398,9 @@ export default function DraftingEmailDetailPage() {
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-73px)]" data-testid="page-drafting-email-detail">
+    <div className="flex flex-col h-[calc(100vh-73px)]" role="main" aria-label="Drafting Email Detail" data-testid="page-drafting-email-detail">
       <div className="flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 border-b bg-background flex-wrap">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/drafting-emails")} data-testid="button-back">
+        <Button variant="ghost" size="sm" onClick={() => navigate("/drafting-emails")} aria-label="Back to drafting emails" data-testid="button-back">
           <ArrowLeft className="h-4 w-4 mr-1" />
           <span className="hidden sm:inline">Back</span>
         </Button>
@@ -1481,6 +1482,8 @@ export default function DraftingEmailDetailPage() {
           type="button"
           className={`flex-1 py-2.5 text-sm font-medium text-center border-b-2 transition-colors ${mobileTab === "email" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}
           onClick={() => setMobileTab("email")}
+          aria-label="View email body"
+          aria-selected={mobileTab === "email"}
           data-testid="tab-mobile-email"
         >
           <Mail className="h-4 w-4 inline-block mr-1.5" />
@@ -1490,6 +1493,8 @@ export default function DraftingEmailDetailPage() {
           type="button"
           className={`flex-1 py-2.5 text-sm font-medium text-center border-b-2 transition-colors ${mobileTab === "details" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"}`}
           onClick={() => setMobileTab("details")}
+          aria-label="View email details"
+          aria-selected={mobileTab === "details"}
           data-testid="tab-mobile-details"
         >
           <Pencil className="h-4 w-4 inline-block mr-1.5" />
@@ -1511,6 +1516,7 @@ export default function DraftingEmailDetailPage() {
           size="icon"
           className="absolute top-2 right-2 z-10 h-7 w-7 bg-background/80 backdrop-blur-sm border shadow-sm"
           onClick={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+          aria-label={rightPanelCollapsed ? "Expand details panel" : "Collapse details panel"}
           data-testid="btn-toggle-details-panel"
         >
           {rightPanelCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}

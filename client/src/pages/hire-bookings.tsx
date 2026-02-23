@@ -451,7 +451,7 @@ export default function HireBookingsPage() {
         </Tabs>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4" aria-live="polite">
         <Card data-testid="stat-total-bookings">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Bookings</CardTitle>
@@ -531,6 +531,7 @@ export default function HireBookingsPage() {
             variant={showGraphs ? "default" : "outline"}
             size="sm"
             onClick={() => setShowGraphs(!showGraphs)}
+            aria-label={showGraphs ? "Hide cost graphs" : "View cost graphs"}
             data-testid="button-toggle-graphs"
           >
             <BarChart3 className="h-4 w-4 mr-2" />
@@ -549,7 +550,7 @@ export default function HireBookingsPage() {
                 <p className="text-xs text-muted-foreground">Cost per day based on equipment on hire (last 30 days to next 60 days)</p>
               </CardHeader>
               <CardContent>
-                <div className="h-[250px]" data-testid="chart-daily-hire">
+                <div className="h-[250px]" data-testid="chart-daily-hire" role="img" aria-label="Daily hire charges bar chart">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dailyChartData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -590,7 +591,7 @@ export default function HireBookingsPage() {
                 <p className="text-xs text-muted-foreground">Total hire cost per month across all bookings</p>
               </CardHeader>
               <CardContent>
-                <div className="h-[250px]" data-testid="chart-monthly-hire">
+                <div className="h-[250px]" data-testid="chart-monthly-hire" role="img" aria-label="Monthly hire cost bar chart">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={monthlyChartData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -710,6 +711,7 @@ export default function HireBookingsPage() {
                                 size="icon"
                                 variant="ghost"
                                 onClick={() => navigate(`/hire-bookings/${booking.id}`)}
+                                aria-label={`View booking ${booking.bookingNumber}`}
                                 data-testid={`button-view-hire-${booking.id}`}
                               >
                                 <Eye className="h-4 w-4" />
@@ -723,6 +725,7 @@ export default function HireBookingsPage() {
                                 size="icon"
                                 variant="ghost"
                                 onClick={() => handlePrint(booking)}
+                                aria-label={`Print booking ${booking.bookingNumber}`}
                                 data-testid={`button-print-hire-${booking.id}`}
                               >
                                 <Printer className="h-4 w-4" />
@@ -736,6 +739,7 @@ export default function HireBookingsPage() {
                                 size="icon"
                                 variant="ghost"
                                 onClick={() => handleOpenEmail(booking)}
+                                aria-label={`Email booking ${booking.bookingNumber}`}
                                 data-testid={`button-email-hire-${booking.id}`}
                               >
                                 <Mail className="h-4 w-4" />
@@ -750,6 +754,7 @@ export default function HireBookingsPage() {
                                   size="icon"
                                   variant="ghost"
                                   onClick={() => setActionDialog({ type: "submit", booking })}
+                                  aria-label={`Submit booking ${booking.bookingNumber} for approval`}
                                   data-testid={`button-submit-hire-${booking.id}`}
                                 >
                                   <ArrowRight className="h-4 w-4" />
@@ -766,6 +771,7 @@ export default function HireBookingsPage() {
                                     size="icon"
                                     variant="ghost"
                                     onClick={() => setActionDialog({ type: "approve", booking })}
+                                    aria-label={`Approve booking ${booking.bookingNumber}`}
                                     data-testid={`button-approve-hire-${booking.id}`}
                                   >
                                     <Check className="h-4 w-4" />
@@ -779,6 +785,7 @@ export default function HireBookingsPage() {
                                     size="icon"
                                     variant="ghost"
                                     onClick={() => setActionDialog({ type: "reject", booking })}
+                                    aria-label={`Reject booking ${booking.bookingNumber}`}
                                     data-testid={`button-reject-hire-${booking.id}`}
                                   >
                                     <X className="h-4 w-4" />
@@ -795,6 +802,7 @@ export default function HireBookingsPage() {
                                   size="icon"
                                   variant="ghost"
                                   onClick={() => setActionDialog({ type: "book", booking })}
+                                  aria-label={`Mark booking ${booking.bookingNumber} as booked`}
                                   data-testid={`button-book-hire-${booking.id}`}
                                 >
                                   <Package className="h-4 w-4" />
@@ -810,6 +818,7 @@ export default function HireBookingsPage() {
                                   size="icon"
                                   variant="ghost"
                                   onClick={() => setActionDialog({ type: "on-hire", booking })}
+                                  aria-label={`Mark booking ${booking.bookingNumber} as on hire`}
                                   data-testid={`button-onhire-hire-${booking.id}`}
                                 >
                                   <Truck className="h-4 w-4" />
@@ -825,6 +834,7 @@ export default function HireBookingsPage() {
                                   size="icon"
                                   variant="ghost"
                                   onClick={() => setActionDialog({ type: "return", booking })}
+                                  aria-label={`Mark booking ${booking.bookingNumber} as returned`}
                                   data-testid={`button-return-hire-${booking.id}`}
                                 >
                                   <RotateCcw className="h-4 w-4" />

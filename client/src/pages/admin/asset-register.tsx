@@ -291,6 +291,8 @@ function FormSection({ title, defaultOpen, children }: { title: string; defaultO
         type="button"
         className="flex items-center gap-2 w-full p-3 cursor-pointer font-medium text-sm text-left"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-label={`${open ? "Collapse" : "Expand"} ${title} section`}
         data-testid={`section-toggle-${title.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
       >
         <ChevronDown className={`h-4 w-4 transition-transform ${open ? "" : "-rotate-90"}`} />
@@ -321,6 +323,7 @@ function SortableHeader({ label, field, currentSort, currentDir, onSort }: {
       type="button"
       className="flex items-center gap-1 cursor-pointer text-left whitespace-nowrap"
       onClick={() => onSort(field)}
+      aria-label={`Sort by ${label}${active ? (currentDir === "asc" ? ", currently ascending" : ", currently descending") : ""}`}
       data-testid={`button-sort-${field}`}
     >
       {label}
@@ -919,6 +922,7 @@ export default function AssetRegisterPage() {
                   e.stopPropagation();
                   openEditDialog(asset);
                 }}
+                aria-label={`Edit asset ${asset.name || asset.assetTag}`}
                 data-testid={`button-edit-asset-${asset.id}`}
               >
                 <Pencil className="h-4 w-4" />
@@ -944,6 +948,7 @@ export default function AssetRegisterPage() {
                   });
                   navigate(`/capex-requests?${params.toString()}`);
                 }}
+                aria-label={`Create CAPEX replacement request for ${asset.name || asset.assetTag}`}
                 data-testid={`button-replace-asset-${asset.id}`}
               >
                 <RefreshCw className="h-4 w-4" />
@@ -962,6 +967,7 @@ export default function AssetRegisterPage() {
                   serviceChecklistMutation.mutate(asset);
                 }}
                 disabled={serviceChecklistMutation.isPending && serviceChecklistAssetId === asset.id}
+                aria-label={`Open service checklist for ${asset.name || asset.assetTag}`}
                 data-testid={`button-repair-asset-${asset.id}`}
               >
                 {serviceChecklistMutation.isPending && serviceChecklistAssetId === asset.id ? (
@@ -983,6 +989,7 @@ export default function AssetRegisterPage() {
                   setDeletingAssetId(asset.id);
                   setDeleteDialogOpen(true);
                 }}
+                aria-label={`Delete asset ${asset.name || asset.assetTag}`}
                 data-testid={`button-delete-asset-${asset.id}`}
               >
                 <Trash2 className="h-4 w-4" />
@@ -1048,7 +1055,7 @@ export default function AssetRegisterPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3" aria-live="polite">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between gap-2">

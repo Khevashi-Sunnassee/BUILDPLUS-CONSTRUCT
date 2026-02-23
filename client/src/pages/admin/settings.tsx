@@ -910,12 +910,13 @@ export default function AdminSettingsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={closeDeptDialog} data-testid="button-dept-cancel">
+            <Button variant="outline" onClick={closeDeptDialog} aria-label="Cancel department changes" data-testid="button-dept-cancel">
               Cancel
             </Button>
             <Button
               onClick={() => saveDeptMutation.mutate()}
               disabled={!deptName.trim() || !deptCode.trim() || saveDeptMutation.isPending}
+              aria-label={editingDept ? "Update department" : "Create department"}
               data-testid="button-dept-save"
             >
               {saveDeptMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -934,13 +935,14 @@ export default function AdminSettingsPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDeptDialog(false)} data-testid="button-delete-dept-cancel">
+            <Button variant="outline" onClick={() => setShowDeleteDeptDialog(false)} aria-label="Cancel department deletion" data-testid="button-delete-dept-cancel">
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={() => deletingDept && deleteDeptMutation.mutate(deletingDept.id)}
               disabled={deleteDeptMutation.isPending}
+              aria-label={`Delete department ${deletingDept?.name || ""}`}
               data-testid="button-delete-dept-confirm"
             >
               {deleteDeptMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

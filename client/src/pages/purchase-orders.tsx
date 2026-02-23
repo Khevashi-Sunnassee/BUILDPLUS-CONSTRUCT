@@ -30,7 +30,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useDocumentTitle } from "@/hooks/use-document-title";
 import type { PurchaseOrder, PurchaseOrderItem, User, Supplier } from "@shared/schema";
 import { PROCUREMENT_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 
@@ -206,7 +205,7 @@ async function generatePoPdf(
       pdf.addImage(logoToUse, fmt, margin, 5, logoW, logoH);
       headerTextX = margin + logoW + 5;
     } catch (e) {
-      // skip logo
+      console.error("Logo embedding error:", e);
     }
   }
 
@@ -824,7 +823,7 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
 }
 
 export default function PurchaseOrdersPage() {
-  useDocumentTitle("Purchase Orders");
+  useEffect(() => { document.title = "Purchase Orders | BuildPlus"; }, []);
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
@@ -841,14 +840,14 @@ export default function PurchaseOrdersPage() {
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
-  const toggleSort = (field: SortField) => {
+  const toggleSort = useCallback((field: SortField) => {
     if (sortField === field) {
       setSortDirection(prev => prev === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
       setSortDirection("asc");
     }
-  };
+  }, [sortField]);
 
   const { data: purchaseOrders = [], isLoading, isError, error, refetch } = useQuery<PurchaseOrderWithDetails[]>({
     queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS],
@@ -1002,12 +1001,12 @@ export default function PurchaseOrdersPage() {
     };
   }, [purchaseOrders]);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setSearchQuery("");
     setSupplierFilter("all");
     setStatusFilter("ALL");
     setCapexFilter("all");
-  };
+  }, []);
 
   const hasActiveFilters = searchQuery.trim() || supplierFilter !== "all" || statusFilter !== "ALL" || capexFilter !== "all";
 
@@ -1051,7 +1050,8 @@ export default function PurchaseOrdersPage() {
       const pdf = await generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo, poTermsData);
       pdf.save(`${poDetail.poNumber || "PurchaseOrder"}.pdf`);
     } catch (error) {
-      toast({ title: "Failed to generate PDF", variant: "destructive" });
+      console.error("PDF generation error:", error);
+      toast({ title: "Failed to generate PDF", description: error instanceof Error ? error.message : "An unexpected error occurred while generating the PDF", variant: "destructive" });
     }
   }, [settings, poTermsData, toast]);
 
@@ -1219,7 +1219,7 @@ export default function PurchaseOrdersPage() {
             </div>
           ) : (
             <>
-            <p className="text-sm text-muted-foreground mb-3">
+            <p className="text-sm text-muted-foreground mb-3" aria-live="polite">
               Showing {filteredOrders.length} of {purchaseOrders.length} purchase orders
             </p>
             <Table data-testid="table-purchase-orders">
@@ -1240,6 +1240,10 @@ export default function PurchaseOrdersPage() {
                       data-testid={col.testId}
                       className="cursor-pointer select-none"
                       onClick={() => toggleSort(col.field)}
+                      aria-label={`Sort by ${col.label}`}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(col.field); } }}
                     >
                       <div className="flex items-center gap-1">
                         {col.label}
@@ -1307,6 +1311,7 @@ export default function PurchaseOrdersPage() {
                               variant="ghost"
                               onClick={() => navigate(`/purchase-orders/${po.id}`)}
                               data-testid={`button-view-${po.id}`}
+                              aria-label={`View purchase order ${po.poNumber}`}
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
@@ -1321,6 +1326,7 @@ export default function PurchaseOrdersPage() {
                                 variant="ghost"
                                 onClick={() => handleOpenEmailDialog(po)}
                                 data-testid={`button-email-${po.id}`}
+                                aria-label={`Send email for purchase order ${po.poNumber}`}
                               >
                                 <Mail className="h-4 w-4" />
                               </Button>
@@ -1335,6 +1341,7 @@ export default function PurchaseOrdersPage() {
                               variant="ghost"
                               onClick={() => handlePrint(po)}
                               data-testid={`button-print-${po.id}`}
+                              aria-label={`Print purchase order ${po.poNumber}`}
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
@@ -1349,6 +1356,7 @@ export default function PurchaseOrdersPage() {
                                 variant="ghost"
                                 onClick={() => navigate(`/purchase-orders/${po.id}`)}
                                 data-testid={`button-edit-${po.id}`}
+                                aria-label={`Edit purchase order ${po.poNumber}`}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -1367,6 +1375,7 @@ export default function PurchaseOrdersPage() {
                                   setDeleteDialogOpen(true);
                                 }}
                                 data-testid={`button-delete-${po.id}`}
+                                aria-label={`Delete purchase order ${po.poNumber}`}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>

@@ -28,6 +28,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { Supplier, Job, Employee, HireBooking } from "@shared/schema";
 import { ASSET_CATEGORIES } from "@shared/schema";
 import { HIRE_ROUTES, PROCUREMENT_ROUTES, JOBS_ROUTES, EMPLOYEE_ROUTES, ASSET_ROUTES, FACTORIES_ROUTES } from "@shared/api-routes";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 interface Factory {
   id: string;
@@ -188,6 +189,8 @@ export default function HireBookingFormPage() {
   const [, params] = useRoute("/hire-bookings/:id");
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const isNewForTitle = params?.id === "new";
+  useDocumentTitle(isNewForTitle ? "New Hire Booking" : "Hire Booking");
   const isNew = params?.id === "new";
   const bookingId = isNew ? null : params?.id;
   const [actionDialog, setActionDialog] = useState<string | null>(null);

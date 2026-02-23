@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import {
@@ -186,11 +186,24 @@ function SendMessageTab({
     queryKey: [BROADCAST_ROUTES.RECIPIENTS],
   });
 
-  const activeTemplates = templates.filter((t) => t.isActive);
-  const activeUsers = users.filter((u: User) => u.isActive);
+  const activeTemplates = useMemo(() => templates.filter((t) => t.isActive), [templates]);
+  const activeUsers = useMemo(() => users.filter((u: User) => u.isActive), [users]);
 
   const sendMutation = useMutation({
     mutationFn: async () => {
+      if (recipientType === "CUSTOM_CONTACTS") {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const phoneRegex = /^[0-9+\-\s()]{6,20}$/;
+        const filledContacts = customContacts.filter((c) => c.name || c.phone || c.email);
+        for (const c of filledContacts) {
+          if (c.email && !emailRegex.test(c.email)) {
+            throw new Error(`Invalid email format: ${c.email}`);
+          }
+          if (c.phone && !phoneRegex.test(c.phone)) {
+            throw new Error(`Invalid phone format: ${c.phone}`);
+          }
+        }
+      }
       const payload: Record<string, unknown> = {
         subject,
         message,
@@ -246,7 +259,7 @@ function SendMessageTab({
     },
   });
 
-  const handleTemplateSelect = (templateId: string) => {
+  const handleTemplateSelect = useCallback((templateId: string) => {
     setSelectedTemplateId(templateId);
     if (templateId === "none") {
       setSelectedTemplateId("");
@@ -260,33 +273,33 @@ function SendMessageTab({
         setSelectedChannels(template.defaultChannels);
       }
     }
-  };
+  }, [activeTemplates]);
 
-  const toggleChannel = (channel: string) => {
+  const toggleChannel = useCallback((channel: string) => {
     setSelectedChannels((prev) =>
       prev.includes(channel)
         ? prev.filter((c) => c !== channel)
         : [...prev, channel]
     );
-  };
+  }, []);
 
-  const toggleUser = (userId: string) => {
+  const toggleUser = useCallback((userId: string) => {
     setSelectedUserIds((prev) =>
       prev.includes(userId)
         ? prev.filter((id) => id !== userId)
         : [...prev, userId]
     );
-  };
+  }, []);
 
-  const addCustomContact = () => {
+  const addCustomContact = useCallback(() => {
     setCustomContacts((prev) => [...prev, { name: "", phone: "", email: "" }]);
-  };
+  }, []);
 
-  const removeCustomContact = (index: number) => {
+  const removeCustomContact = useCallback((index: number) => {
     setCustomContacts((prev) => prev.filter((_, i) => i !== index));
-  };
+  }, []);
 
-  const updateCustomContact = (
+  const updateCustomContact = useCallback((
     index: number,
     field: keyof CustomContact,
     value: string
@@ -294,7 +307,7 @@ function SendMessageTab({
     setCustomContacts((prev) =>
       prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
     );
-  };
+  }, []);
 
   const canSend =
     message.trim() &&
@@ -323,7 +336,7 @@ function SendMessageTab({
               value={selectedTemplateId || "none"}
               onValueChange={handleTemplateSelect}
             >
-              <SelectTrigger data-testid="select-template">
+              <SelectTrigger data-testid="select-template" aria-label="Select broadcast template">
                 <SelectValue placeholder="Select a template..." />
               </SelectTrigger>
               <SelectContent>
@@ -345,6 +358,8 @@ function SendMessageTab({
               placeholder="Message subject..."
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
+              maxLength={200}
+              aria-label="Broadcast subject"
             />
           </div>
 
@@ -356,6 +371,8 @@ function SendMessageTab({
               placeholder="Type your message here..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
+              maxLength={5000}
+              aria-label="Broadcast message"
               className="min-h-[150px]"
             />
           </div>
@@ -515,7 +532,7 @@ function SendMessageTab({
                     ))}
                   </div>
                   {selectedUserIds.length > 0 && (
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <p className="text-sm text-muted-foreground mt-2" aria-live="polite">
                       {selectedUserIds.length} user(s) selected
                     </p>
                   )}
@@ -552,7 +569,7 @@ function SendMessageTab({
                     ))}
                   </div>
                   {selectedCustomerIds.length > 0 && (
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <p className="text-sm text-muted-foreground mt-2" aria-live="polite">
                       {selectedCustomerIds.length} customer(s) selected
                     </p>
                   )}
@@ -589,7 +606,7 @@ function SendMessageTab({
                     ))}
                   </div>
                   {selectedSupplierIds.length > 0 && (
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <p className="text-sm text-muted-foreground mt-2" aria-live="polite">
                       {selectedSupplierIds.length} supplier(s) selected
                     </p>
                   )}
@@ -626,7 +643,7 @@ function SendMessageTab({
                     ))}
                   </div>
                   {selectedEmployeeIds.length > 0 && (
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <p className="text-sm text-muted-foreground mt-2" aria-live="polite">
                       {selectedEmployeeIds.length} employee(s) selected
                     </p>
                   )}
@@ -651,28 +668,37 @@ function SendMessageTab({
                           onChange={(e) =>
                             updateCustomContact(index, "name", e.target.value)
                           }
+                          maxLength={100}
+                          aria-label={`Contact ${index + 1} name`}
                         />
                       </div>
                       <div className="flex-1 min-w-[120px] space-y-1">
                         <Label className="text-xs">Phone</Label>
                         <Input
                           data-testid={`input-contact-phone-${index}`}
-                          placeholder="Phone"
+                          placeholder="+61400000000"
                           value={contact.phone}
-                          onChange={(e) =>
-                            updateCustomContact(index, "phone", e.target.value)
-                          }
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9+\-\s()]/g, '');
+                            updateCustomContact(index, "phone", val);
+                          }}
+                          maxLength={20}
+                          aria-label={`Contact ${index + 1} phone`}
+                          type="tel"
                         />
                       </div>
                       <div className="flex-1 min-w-[120px] space-y-1">
                         <Label className="text-xs">Email</Label>
                         <Input
                           data-testid={`input-contact-email-${index}`}
-                          placeholder="Email"
+                          placeholder="name@example.com"
                           value={contact.email}
                           onChange={(e) =>
                             updateCustomContact(index, "email", e.target.value)
                           }
+                          maxLength={254}
+                          aria-label={`Contact ${index + 1} email`}
+                          type="email"
                         />
                       </div>
                       <Button
@@ -681,6 +707,7 @@ function SendMessageTab({
                         data-testid={`button-remove-contact-${index}`}
                         onClick={() => removeCustomContact(index)}
                         disabled={customContacts.length <= 1}
+                        aria-label={`Remove contact ${index + 1}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -700,7 +727,15 @@ function SendMessageTab({
             )}
           </div>
 
-          <div className="flex justify-end pt-2">
+          {!canSend && message.trim() && (
+            <p className="text-sm text-destructive" role="alert" aria-live="assertive">
+              {selectedChannels.length === 0
+                ? "Please select at least one channel."
+                : "Please select at least one recipient."}
+            </p>
+          )}
+
+          <div className="flex justify-end pt-2" aria-live="polite">
             <Button
               data-testid="button-send-broadcast"
               disabled={!canSend || sendMutation.isPending}
@@ -926,6 +961,7 @@ function TemplatesTab() {
                     variant="ghost"
                     data-testid={`button-edit-template-${template.id}`}
                     onClick={() => openEditDialog(template)}
+                    aria-label={`Edit template ${template.name}`}
                   >
                     <Edit2 className="h-4 w-4" />
                   </Button>
@@ -937,6 +973,7 @@ function TemplatesTab() {
                       setDeletingId(template.id);
                       setDeleteDialogOpen(true);
                     }}
+                    aria-label={`Delete template ${template.name}`}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -998,6 +1035,7 @@ function TemplatesTab() {
                 placeholder="Template name"
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
+                maxLength={100}
               />
             </div>
             <div className="space-y-2">
@@ -1008,6 +1046,7 @@ function TemplatesTab() {
                 placeholder="e.g. Announcements, Reminders"
                 value={formCategory}
                 onChange={(e) => setFormCategory(e.target.value)}
+                maxLength={50}
               />
             </div>
             <div className="space-y-2">
@@ -1018,6 +1057,7 @@ function TemplatesTab() {
                 placeholder="Message subject"
                 value={formSubject}
                 onChange={(e) => setFormSubject(e.target.value)}
+                maxLength={200}
               />
             </div>
             <div className="space-y-2">
@@ -1028,6 +1068,7 @@ function TemplatesTab() {
                 placeholder="Type your template message..."
                 value={formMessage}
                 onChange={(e) => setFormMessage(e.target.value)}
+                maxLength={5000}
                 className="min-h-[120px]"
               />
             </div>
@@ -1261,6 +1302,7 @@ function HistoryTab() {
                       variant="ghost"
                       data-testid={`button-view-broadcast-${broadcast.id}`}
                       onClick={() => openDetail(broadcast.id)}
+                      aria-label={`View broadcast details for ${broadcast.subject || 'broadcast'}`}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -1374,6 +1416,7 @@ function HistoryTab() {
                                   data-testid={`button-resend-${delivery.id}`}
                                   disabled={resendMutation.isPending && resendingDeliveryId === delivery.id}
                                   onClick={() => resendMutation.mutate(delivery.id)}
+                                  aria-label={`Resend to ${delivery.recipientName || 'recipient'}`}
                                 >
                                   {resendMutation.isPending && resendingDeliveryId === delivery.id ? (
                                     <Loader2 className="h-3 w-3 animate-spin" />
@@ -1411,6 +1454,7 @@ function HistoryTab() {
 export default function BroadcastPage() {
   useDocumentTitle("Broadcast");
   const [activeTab, setActiveTab] = useState("send");
+  const handleSent = useCallback(() => setActiveTab("history"), []);
 
   return (
     <div className="space-y-6" role="main" aria-label="Broadcast">
@@ -1440,7 +1484,7 @@ export default function BroadcastPage() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="send" className="mt-4">
-          <SendMessageTab onSent={() => setActiveTab("history")} />
+          <SendMessageTab onSent={handleSent} />
         </TabsContent>
         <TabsContent value="templates" className="mt-4">
           <TemplatesTab />
