@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useLocation } from "wouter";
 import { SuburbLookup } from "@/components/suburb-lookup";
 import {
   Users,
@@ -19,6 +20,8 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
+  Briefcase,
 } from "lucide-react";
 import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -71,7 +74,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Customer } from "@shared/schema";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { Customer, Job } from "@shared/schema";
 import { PROCUREMENT_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { SortIcon } from "@/components/ui/sort-icon";
@@ -137,10 +141,173 @@ interface ImportResult {
   };
 }
 
+function CustomerDetailDialog({ customer, open, onOpenChange, onEdit }: {
+  customer: Customer;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onEdit: (customer: Customer) => void;
+}) {
+  const [, navigate] = useLocation();
+
+  const { data: jobs, isLoading: jobsLoading } = useQuery<Job[]>({
+    queryKey: ["/api/admin/jobs", { customerId: customer.id }],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/jobs?customerId=${customer.id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch jobs");
+      return res.json();
+    },
+    enabled: open,
+  });
+
+  const jobCount = jobs?.length ?? 0;
+
+  const formatCurrency = (val: string | null | undefined) => {
+    if (!val) return "-";
+    const num = parseFloat(val);
+    if (isNaN(num)) return "-";
+    return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(num);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center justify-between pr-6">
+            <div>
+              <DialogTitle data-testid="text-customer-detail-name">{customer.name}</DialogTitle>
+              <DialogDescription>
+                {[customer.city, customer.state].filter(Boolean).join(", ") || "Customer details"}
+              </DialogDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => { onOpenChange(false); onEdit(customer); }} data-testid="button-edit-from-detail">
+              <Edit2 className="h-4 w-4 mr-1" /> Edit
+            </Button>
+          </div>
+        </DialogHeader>
+
+        <Tabs defaultValue="details">
+          <TabsList className="w-full">
+            <TabsTrigger value="details" className="flex-1" data-testid="tab-customer-details">Details</TabsTrigger>
+            <TabsTrigger value="jobs" className="flex-1 gap-1.5" data-testid="tab-customer-jobs">
+              Jobs
+              {!jobsLoading && (
+                <Badge variant={jobCount > 0 ? "default" : "secondary"} className="ml-1 h-5 min-w-[20px] px-1.5 text-xs" data-testid="badge-job-count">
+                  {jobCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="details" className="mt-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs mb-0.5">Key Contact</p>
+                <p className="font-medium" data-testid="text-detail-contact">{customer.keyContact || "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs mb-0.5">Email</p>
+                <p className="font-medium" data-testid="text-detail-email">{customer.email || "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs mb-0.5">Phone</p>
+                <p className="font-medium" data-testid="text-detail-phone">{customer.phone || "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs mb-0.5">Payment Terms</p>
+                <p className="font-medium" data-testid="text-detail-terms">{customer.paymentTerms || "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs mb-0.5">ABN</p>
+                <p className="font-medium font-mono" data-testid="text-detail-abn">{customer.abn || "-"}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs mb-0.5">ACN</p>
+                <p className="font-medium font-mono" data-testid="text-detail-acn">{customer.acn || "-"}</p>
+              </div>
+            </div>
+            {(customer.addressLine1 || customer.city) && (
+              <div className="text-sm">
+                <p className="text-muted-foreground text-xs mb-0.5">Address</p>
+                <p className="font-medium" data-testid="text-detail-address">
+                  {[customer.addressLine1, customer.addressLine2].filter(Boolean).join(", ")}
+                  {customer.addressLine1 && <br />}
+                  {[customer.city, customer.state, customer.postcode].filter(Boolean).join(" ")}
+                  {customer.country && customer.country !== "Australia" && `, ${customer.country}`}
+                </p>
+              </div>
+            )}
+            {customer.notes && (
+              <div className="text-sm">
+                <p className="text-muted-foreground text-xs mb-0.5">Notes</p>
+                <p className="font-medium whitespace-pre-wrap" data-testid="text-detail-notes">{customer.notes}</p>
+              </div>
+            )}
+            <div className="text-sm">
+              <Badge variant={customer.isActive ? "default" : "secondary"} data-testid="badge-detail-status">
+                {customer.isActive ? "Active" : "Inactive"}
+              </Badge>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="jobs" className="mt-4">
+            {jobsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ) : jobs && jobs.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Job #</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Est. Value</TableHead>
+                    <TableHead className="w-10"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {jobs.map((job) => (
+                    <TableRow
+                      key={job.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => { onOpenChange(false); navigate(`/admin/jobs`); }}
+                      data-testid={`row-customer-job-${job.id}`}
+                    >
+                      <TableCell className="font-mono text-sm" data-testid={`text-job-number-${job.id}`}>{job.jobNumber}</TableCell>
+                      <TableCell className="font-medium" data-testid={`text-job-name-${job.id}`}>{job.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs" data-testid={`badge-job-status-${job.id}`}>{job.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-sm" data-testid={`text-job-value-${job.id}`}>
+                        {formatCurrency(job.estimatedValue)}
+                      </TableCell>
+                      <TableCell>
+                        <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Briefcase className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                <p className="text-sm">No jobs linked to this customer</p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AdminCustomersPage() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -462,7 +629,13 @@ export default function AdminCustomersPage() {
                 {paginatedCustomers.map((customer) => (
                   <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
                     <TableCell className="font-medium" data-testid={`text-customer-name-${customer.id}`}>
-                      {customer.name}
+                      <button
+                        className="text-left hover:underline text-primary"
+                        onClick={() => setDetailCustomer(customer)}
+                        data-testid={`button-view-customer-${customer.id}`}
+                      >
+                        {customer.name}
+                      </button>
                     </TableCell>
                     <TableCell data-testid={`text-customer-contact-${customer.id}`}>
                       {customer.keyContact || "-"}
@@ -954,6 +1127,15 @@ export default function AdminCustomersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {detailCustomer && (
+        <CustomerDetailDialog
+          customer={detailCustomer}
+          open={!!detailCustomer}
+          onOpenChange={(open) => { if (!open) setDetailCustomer(null); }}
+          onEdit={(c) => { setDetailCustomer(null); openEditDialog(c); }}
+        />
+      )}
     </div>
   );
 }

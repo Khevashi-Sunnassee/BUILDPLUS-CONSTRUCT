@@ -181,19 +181,23 @@ router.get("/api/admin/jobs", requireAuth, async (req: Request, res: Response) =
     if (!user) return res.status(401).json({ error: "Unauthorized" });
     
     const allJobs = await storage.getAllJobs(req.companyId);
-    const serialized = serializeJobsPhase(allJobs);
+    let serialized = serializeJobsPhase(allJobs);
     
-    if (user.role === "ADMIN" || user.role === "MANAGER") {
-      return res.json(serialized);
+    if (user.role !== "ADMIN" && user.role !== "MANAGER") {
+      const memberships = await db.select({ jobId: jobMembers.jobId })
+        .from(jobMembers)
+        .where(eq(jobMembers.userId, user.id))
+        .limit(1000);
+      const allowedJobIds = new Set(memberships.map(m => m.jobId));
+      serialized = serialized.filter((job) => allowedJobIds.has(job.id));
+    }
+
+    const { customerId } = req.query;
+    if (customerId && typeof customerId === "string") {
+      serialized = serialized.filter((job) => job.customerId === customerId);
     }
     
-    const memberships = await db.select({ jobId: jobMembers.jobId })
-      .from(jobMembers)
-      .where(eq(jobMembers.userId, user.id))
-      .limit(1000);
-    const allowedJobIds = new Set(memberships.map(m => m.jobId));
-    
-    res.json(serialized.filter((job) => allowedJobIds.has(job.id)));
+    res.json(serialized);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching jobs");
     res.status(500).json({ error: "Failed to fetch jobs" });
