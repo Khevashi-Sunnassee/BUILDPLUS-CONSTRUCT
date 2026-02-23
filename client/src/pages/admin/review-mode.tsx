@@ -356,8 +356,8 @@ function ReanalyseButton({ targetId, size = "sm" }: { targetId: string; size?: "
       const prev = data.previousScore;
       const curr = data.overallScore;
       const change = prev !== null && prev !== undefined
-        ? curr > prev ? ` (improved from ${prev} to ${curr})` : curr < prev ? ` (dropped from ${prev} to ${curr})` : ` (unchanged at ${curr})`
-        : ` (score: ${curr}/5)`;
+        ? curr > prev ? ` (improved from ${prev} to ${curr}/10)` : curr < prev ? ` (dropped from ${prev} to ${curr}/10)` : ` (unchanged at ${curr}/10)`
+        : ` (score: ${curr}/10)`;
       toast({ title: `Re-analysis complete${change}` });
     },
     onError: () => {

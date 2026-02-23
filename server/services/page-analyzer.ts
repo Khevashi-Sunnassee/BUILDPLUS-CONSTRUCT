@@ -63,10 +63,10 @@ function findRelatedBackendRoutes(routePath: string): string[] {
 }
 
 function buildNotes(dimension: string, pageTitle: string, routePath: string, module: string, findings: string[], improvements: string[], score: number): string {
-  const scoreLabel = score <= 2 ? "Needs Improvement" : score <= 3 ? "Adequate" : score >= 5 ? "Excellent" : "Good";
+  const scoreLabel = score <= 4 ? "Needs Improvement" : score <= 6 ? "Adequate" : score >= 9 ? "Excellent" : "Good";
 
   let md = `## ${dimension} — ${pageTitle}\n`;
-  md += `**Route:** \`${routePath}\` | **Module:** ${module} | **Score: ${score}/5 (${scoreLabel})**\n\n`;
+  md += `**Route:** \`${routePath}\` | **Module:** ${module} | **Score: ${score}/10 (${scoreLabel})**\n\n`;
 
   if (findings.length > 0) {
     md += "### What's Working Well\n";
@@ -80,7 +80,7 @@ function buildNotes(dimension: string, pageTitle: string, routePath: string, mod
     md += "\n";
   }
 
-  if (score >= 4 && improvements.length === 0) {
+  if (score >= 8 && improvements.length === 0) {
     md += `### Summary\nThis page meets quality standards for ${dimension.toLowerCase()}. Continue maintaining current patterns.\n`;
   }
 
@@ -97,16 +97,66 @@ function getDefaultScores(pageTitle: string, module: string, routePath: string):
   };
 }
 
+function resolveLocalImports(entryAbsPath: string, entryCode: string): { allCode: string; localFileCount: number; totalLines: number; entryLines: number } {
+  const entryDir = path.dirname(entryAbsPath);
+  const entryLines = entryCode.split("\n").length;
+  const localImportPattern = /from\s+["'](\.\/[^"']+|\.\.\/[^"']+)["']/g;
+  const localFiles: string[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = localImportPattern.exec(entryCode)) !== null) {
+    const importPath = match[1];
+    const extensions = [".tsx", ".ts", ".jsx", ".js", "/index.tsx", "/index.ts"];
+    for (const ext of extensions) {
+      const candidate = path.resolve(entryDir, importPath.endsWith(ext) ? importPath : importPath + ext);
+      try {
+        if (fs.existsSync(candidate)) {
+          if (!localFiles.includes(candidate)) localFiles.push(candidate);
+          break;
+        }
+      } catch {
+        // skip
+      }
+    }
+  }
+
+  const pageDirName = path.basename(entryAbsPath, path.extname(entryAbsPath));
+  const siblingDir = path.resolve(entryDir, pageDirName);
+  try {
+    if (fs.statSync(siblingDir).isDirectory()) {
+      const dirFiles = fs.readdirSync(siblingDir).filter(f => /\.(tsx?|jsx?)$/.test(f));
+      for (const f of dirFiles) {
+        const fullPath = path.resolve(siblingDir, f);
+        if (!localFiles.includes(fullPath)) localFiles.push(fullPath);
+      }
+    }
+  } catch {
+    // no sibling directory
+  }
+
+  let allCode = entryCode;
+  for (const fp of localFiles) {
+    try {
+      allCode += "\n" + fs.readFileSync(fp, "utf-8");
+    } catch {
+      // skip unreadable files
+    }
+  }
+
+  return { allCode, localFileCount: localFiles.length, totalLines: allCode.split("\n").length, entryLines };
+}
+
 export function analyzePageCode(filePath: string, routePath: string, pageTitle: string, module: string): AuditScores {
   const absPath = path.resolve(process.cwd(), filePath);
-  let code = "";
+  let entryCode = "";
   try {
-    code = fs.readFileSync(absPath, "utf-8");
+    entryCode = fs.readFileSync(absPath, "utf-8");
   } catch {
     return getDefaultScores(pageTitle, module, routePath);
   }
 
-  const lines = code.split("\n").length;
+  const { allCode: code, localFileCount, totalLines: lines, entryLines } = resolveLocalImports(absPath, entryCode);
+  const isModularized = localFileCount > 0;
   const isMobile = routePath.startsWith("/mobile");
   const isAdmin = routePath.startsWith("/admin") || routePath.startsWith("/super-admin");
   const pageType = classifyPageType(routePath, pageTitle, code);
@@ -257,10 +307,17 @@ export function analyzePageCode(filePath: string, routePath: string, pageTitle: 
   if (hasPagination) { performance += 0.2; perfFindings.push("Paginates data to avoid loading all records at once"); }
   if (hasDebounce) { performance += 0.2; perfFindings.push("Debounces input to reduce excessive API calls during typing"); }
   if (hasInvalidateQueries) { performance += 0.1; perfFindings.push("Properly invalidates TanStack Query cache after mutations for fresh data"); }
-  if (lines > 1000) { performance -= 0.3; perfImprovements.push(`File has ${lines} lines - consider splitting into sub-components for faster rendering and code splitting`); }
-  else if (lines > 600) { perfImprovements.push(`File has ${lines} lines - moderate size, could benefit from extracting reusable sub-components`); }
-  else { perfFindings.push(`Compact file size (${lines} lines) keeps bundle impact low`); }
-  if (!hasUseMemo && lines > 400 && hasUseQuery) { perfImprovements.push("No memoization in a data-fetching component - computed values may recalculate on every render"); }
+  if (isModularized) {
+    perfFindings.push(`Well-modularized: entry file is ${entryLines} lines with ${localFileCount} local sub-component file(s) (${lines} total lines across all files)`);
+    if (entryLines <= 800) { performance += 0.15; }
+  } else if (lines > 1000) {
+    performance -= 0.3; perfImprovements.push(`File has ${lines} lines - consider splitting into sub-components for faster rendering and code splitting`);
+  } else if (lines > 600) {
+    perfImprovements.push(`File has ${lines} lines - moderate size, could benefit from extracting reusable sub-components`);
+  } else {
+    perfFindings.push(`Compact file size (${lines} lines) keeps bundle impact low`);
+  }
+  if (!hasUseMemo && entryLines > 400 && hasUseQuery) { perfImprovements.push("No memoization in a data-fetching component - computed values may recalculate on every render"); }
   if (!hasPagination && hasTable) { perfImprovements.push("Table renders without pagination - large datasets could cause UI lag"); }
   if (!hasDebounce && hasSearch) { perfImprovements.push("Search input lacks debouncing - may trigger excessive API calls on each keystroke"); }
 
@@ -271,8 +328,14 @@ export function analyzePageCode(filePath: string, routePath: string, pageTitle: 
   else { codeQuality -= 0.2; cqImprovements.push(`${anyCount} 'any' type usages weaken type safety - replace with proper interfaces`); }
   if (hasDataTestId) { codeQuality += 0.2; cqFindings.push(`${testIdCount} data-testid attribute(s) enable automated testing`); }
   else { cqImprovements.push("No data-testid attributes - automated UI testing cannot target specific elements"); }
-  if (lines < 400) { codeQuality += 0.2; cqFindings.push("Well-scoped component at reasonable size"); }
-  else if (lines > 800) { cqImprovements.push(`${lines}-line file should be split into smaller, focused sub-components`); }
+  if (isModularized) {
+    codeQuality += 0.3;
+    cqFindings.push(`Well-structured: entry file (${entryLines} lines) delegates to ${localFileCount} local sub-component(s) for separation of concerns`);
+  } else if (lines < 400) {
+    codeQuality += 0.2; cqFindings.push("Well-scoped component at reasonable size");
+  } else if (lines > 800) {
+    cqImprovements.push(`${lines}-line file should be split into smaller, focused sub-components`);
+  }
   if (componentImports.length > 0) { cqFindings.push(`Reuses ${componentImports.length} shared component(s)/hook(s) from the project library`); }
 
   if (hasValidation) { dataIntegrity += 0.4; diFindings.push("Client-side Zod validation ensures data meets schema requirements before API submission"); }
@@ -302,25 +365,25 @@ export function analyzePageCode(filePath: string, routePath: string, pageTitle: 
   if (!hasKeyboardNav && hasTable) { a11yImprovements.push("Data table lacks explicit keyboard navigation support"); }
   if (!hasSemanticHtml) { a11yImprovements.push("No semantic HTML landmarks (main, section, nav) - assistive technology cannot identify page regions"); }
 
-  const clamp = (n: number) => Math.max(1, Math.min(5, Math.round(n)));
+  const toTen = (n: number) => Math.max(1, Math.min(10, Math.round(n) * 2));
 
   return {
-    functionality: clamp(functionality),
-    uiUx: clamp(uiUx),
-    security: clamp(security),
-    performance: clamp(performance),
-    codeQuality: clamp(codeQuality),
-    dataIntegrity: clamp(dataIntegrity),
-    errorHandling: clamp(errorHandling),
-    accessibility: clamp(accessibility),
-    functionalityNotes: buildNotes("Functionality", pageTitle, routePath, module, fnFindings, fnImprovements, clamp(functionality)),
-    uiUxNotes: buildNotes("UI/UX", pageTitle, routePath, module, uiFindings, uiImprovements, clamp(uiUx)),
-    securityNotes: buildNotes("Security", pageTitle, routePath, module, secFindings, secImprovements, clamp(security)),
-    performanceNotes: buildNotes("Performance", pageTitle, routePath, module, perfFindings, perfImprovements, clamp(performance)),
-    codeQualityNotes: buildNotes("Code Quality", pageTitle, routePath, module, cqFindings, cqImprovements, clamp(codeQuality)),
-    dataIntegrityNotes: buildNotes("Data Integrity", pageTitle, routePath, module, diFindings, diImprovements, clamp(dataIntegrity)),
-    errorHandlingNotes: buildNotes("Error Handling", pageTitle, routePath, module, ehFindings, ehImprovements, clamp(errorHandling)),
-    accessibilityNotes: buildNotes("Accessibility", pageTitle, routePath, module, a11yFindings, a11yImprovements, clamp(accessibility)),
+    functionality: toTen(functionality),
+    uiUx: toTen(uiUx),
+    security: toTen(security),
+    performance: toTen(performance),
+    codeQuality: toTen(codeQuality),
+    dataIntegrity: toTen(dataIntegrity),
+    errorHandling: toTen(errorHandling),
+    accessibility: toTen(accessibility),
+    functionalityNotes: buildNotes("Functionality", pageTitle, routePath, module, fnFindings, fnImprovements, toTen(functionality)),
+    uiUxNotes: buildNotes("UI/UX", pageTitle, routePath, module, uiFindings, uiImprovements, toTen(uiUx)),
+    securityNotes: buildNotes("Security", pageTitle, routePath, module, secFindings, secImprovements, toTen(security)),
+    performanceNotes: buildNotes("Performance", pageTitle, routePath, module, perfFindings, perfImprovements, toTen(performance)),
+    codeQualityNotes: buildNotes("Code Quality", pageTitle, routePath, module, cqFindings, cqImprovements, toTen(codeQuality)),
+    dataIntegrityNotes: buildNotes("Data Integrity", pageTitle, routePath, module, diFindings, diImprovements, toTen(dataIntegrity)),
+    errorHandlingNotes: buildNotes("Error Handling", pageTitle, routePath, module, ehFindings, ehImprovements, toTen(errorHandling)),
+    accessibilityNotes: buildNotes("Accessibility", pageTitle, routePath, module, a11yFindings, a11yImprovements, toTen(accessibility)),
   };
 }
 
@@ -339,15 +402,16 @@ export function generateFindingsSummary(pageTitle: string, routePath: string, mo
   const overall = Math.round(dims.reduce((a, d) => a + d.score, 0) / dims.length);
 
   let md = `# Code Audit Report: ${pageTitle}\n`;
-  md += `**Route:** \`${routePath}\` | **Module:** ${module} | **Overall: ${overall}/5**\n\n`;
+  md += `**Route:** \`${routePath}\` | **Module:** ${module} | **Overall: ${overall}/10**\n\n`;
   md += "## Dimension Scores\n";
   for (const d of dims) {
-    const bar = "█".repeat(d.score) + "░".repeat(5 - d.score);
-    md += `| ${d.name.padEnd(16)} | ${bar} | ${d.score}/5 |\n`;
+    const filled = Math.round(d.score / 2);
+    const bar = "█".repeat(filled) + "░".repeat(5 - filled);
+    md += `| ${d.name.padEnd(16)} | ${bar} | ${d.score}/10 |\n`;
   }
 
-  const strong = dims.filter(d => d.score >= 4).map(d => d.name);
-  const weak = dims.filter(d => d.score <= 3).map(d => d.name);
+  const strong = dims.filter(d => d.score >= 8).map(d => d.name);
+  const weak = dims.filter(d => d.score <= 6).map(d => d.name);
 
   if (strong.length > 0) {
     md += `\n## Strengths\n${strong.map(s => `- ${s}`).join("\n")}\n`;
