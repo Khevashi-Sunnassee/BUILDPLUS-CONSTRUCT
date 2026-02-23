@@ -4,7 +4,7 @@ import {
   ChevronLeft, Loader2, Monitor, Smartphone, Star, BarChart3,
   Search, CheckCircle2, XCircle, Clock, AlertTriangle, FileText,
   Download, ArrowLeft, ChevronDown, ChevronRight, Plus, Pencil, Trash2, User,
-  Lightbulb, Copy, Check, Eye, EyeOff, Sparkles
+  Lightbulb, Copy, Check, Eye, EyeOff, Sparkles, RefreshCw
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -342,6 +342,51 @@ function LatestScoreCard({ target, audits }: { target: ReviewTarget; audits: Rev
   );
 }
 
+function ReanalyseButton({ targetId, size = "sm" }: { targetId: string; size?: "sm" | "default" }) {
+  const { toast } = useToast();
+  const reanalyseMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `${API_BASE}/targets/${targetId}/reanalyse`);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/targets`] });
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/audits`] });
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/queue`] });
+      const prev = data.previousScore;
+      const curr = data.overallScore;
+      const change = prev !== null && prev !== undefined
+        ? curr > prev ? ` (improved from ${prev} to ${curr})` : curr < prev ? ` (dropped from ${prev} to ${curr})` : ` (unchanged at ${curr})`
+        : ` (score: ${curr}/5)`;
+      toast({ title: `Re-analysis complete${change}` });
+    },
+    onError: () => {
+      toast({ title: "Re-analysis failed", variant: "destructive" });
+    },
+  });
+
+  return (
+    <Button
+      variant="outline"
+      size={size === "sm" ? "icon" : "sm"}
+      onClick={(e) => {
+        e.stopPropagation();
+        reanalyseMutation.mutate();
+      }}
+      disabled={reanalyseMutation.isPending}
+      title="Re-analyse this page"
+      data-testid={`button-reanalyse-${targetId}`}
+    >
+      {reanalyseMutation.isPending ? (
+        <Loader2 className={`${size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4 mr-1"} animate-spin`} />
+      ) : (
+        <RefreshCw className={`${size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4 mr-1"}`} />
+      )}
+      {size !== "sm" && (reanalyseMutation.isPending ? "Analysing..." : "Re-analyse")}
+    </Button>
+  );
+}
+
 function TargetRow({ target, onClick }: { target: ReviewTarget; onClick: () => void }) {
   return (
     <div
@@ -367,6 +412,7 @@ function TargetRow({ target, onClick }: { target: ReviewTarget; onClick: () => v
           ? new Date(target.lastReviewedAt).toLocaleDateString()
           : "Never"}
       </div>
+      <ReanalyseButton targetId={target.id} size="sm" />
       <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
     </div>
   );
@@ -880,10 +926,13 @@ function TargetDetailView({ target, onBack }: { target: ReviewTarget; onBack: ()
 
   return (
     <div className="space-y-4" data-testid="target-detail-view">
-      <Button variant="ghost" onClick={onBack} data-testid="button-back-dashboard">
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Scoreboard
-      </Button>
+      <div className="flex items-center justify-between gap-2">
+        <Button variant="ghost" onClick={onBack} data-testid="button-back-dashboard">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Scoreboard
+        </Button>
+        <ReanalyseButton targetId={target.id} size="default" />
+      </div>
 
       <Card>
         <CardHeader>

@@ -6,6 +6,7 @@ import * as path from "path";
 import { requireSuperAdmin } from "./middleware/auth.middleware";
 import { reviewModeMethods } from "../storage/review-mode";
 import { generatePacket, packetToMarkdown, runReview, mergeTaskpacks, sanitizeContent } from "../services/review-engine";
+import { analyzePageCode, generateFindingsSummary } from "../services/page-analyzer";
 import { db } from "../db";
 import { reviewContextVersions, reviewManualAssessments, reviewRecommendations } from "@shared/schema";
 import { desc, sql } from "drizzle-orm";
@@ -626,6 +627,76 @@ router.get("/api/super-admin/review-mode/audits", requireSuperAdmin, async (req:
   } catch (error: any) {
     logger.error({ error: error.message }, "Failed to fetch audits");
     res.status(500).json({ error: "Failed to fetch audits" });
+  }
+});
+
+router.post("/api/super-admin/review-mode/targets/:id/reanalyse", requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const targetId = req.params.id as string;
+    const target = await reviewModeMethods.getTarget(targetId);
+    if (!target) return res.status(404).json({ error: "Target not found" });
+
+    const scores = analyzePageCode(
+      target.frontendEntryFile,
+      target.routePath,
+      target.pageTitle,
+      target.module
+    );
+
+    const overallScore = Math.round(
+      (scores.functionality + scores.uiUx + scores.security + scores.performance +
+       scores.codeQuality + scores.dataIntegrity + scores.errorHandling + scores.accessibility) / 8
+    );
+
+    const scoreBreakdown = {
+      functionality: scores.functionality,
+      uiUx: scores.uiUx,
+      security: scores.security,
+      performance: scores.performance,
+      codeQuality: scores.codeQuality,
+      dataIntegrity: scores.dataIntegrity,
+      errorHandling: scores.errorHandling,
+      accessibility: scores.accessibility,
+      functionalityNotes: scores.functionalityNotes,
+      uiUxNotes: scores.uiUxNotes,
+      securityNotes: scores.securityNotes,
+      performanceNotes: scores.performanceNotes,
+      codeQualityNotes: scores.codeQualityNotes,
+      dataIntegrityNotes: scores.dataIntegrityNotes,
+      errorHandlingNotes: scores.errorHandlingNotes,
+      accessibilityNotes: scores.accessibilityNotes,
+    };
+
+    const findingsMd = generateFindingsSummary(target.pageTitle, target.routePath, target.module, scores);
+
+    const audit = await reviewModeMethods.createAudit({
+      targetId,
+      overallScore,
+      scoreBreakdown,
+      findingsMd,
+      fixesAppliedMd: null,
+      issuesFound: 0,
+      issuesFixed: 0,
+      status: "REVIEWED",
+    });
+
+    await reviewModeMethods.updateTarget(targetId, {
+      latestScore: overallScore,
+      latestScoreBreakdown: scoreBreakdown,
+      lastReviewedAt: new Date(),
+    });
+
+    logger.info({ targetId, overallScore, pageTitle: target.pageTitle }, "Page re-analysed successfully");
+
+    res.json({
+      audit,
+      overallScore,
+      scoreBreakdown,
+      previousScore: target.latestScore,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to re-analyse page");
+    res.status(500).json({ error: "Failed to re-analyse page" });
   }
 });
 
