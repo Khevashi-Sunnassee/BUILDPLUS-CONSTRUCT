@@ -255,6 +255,7 @@ export default function AdminChecklistTemplatesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.ENTITY_TYPES] });
+      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.TEMPLATES] });
       setDeleteEntityTypeDialogOpen(false);
       setDeletingEntityTypeId(null);
       toast({ title: "Success", description: "Checklist type deleted successfully" });
@@ -851,15 +852,17 @@ export default function AdminChecklistTemplatesPage() {
             </Button>
             {!template.isSystem && (
               <Button
-                variant="ghost"
+                variant="destructive"
                 size="sm"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setDeletingTemplateId(template.id);
                   setDeleteTemplateDialogOpen(true);
                 }}
                 data-testid={`button-delete-template-${template.id}`}
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                Delete
               </Button>
             )}
           </div>
@@ -1012,27 +1015,44 @@ export default function AdminChecklistTemplatesPage() {
                   open={!isCollapsed}
                   onOpenChange={() => toggleTypeCollapse(typeKey)}
                 >
-                  <CollapsibleTrigger asChild>
-                    <button
-                      className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-md border ${colors.border} ${colors.bg} transition-colors cursor-pointer`}
-                      data-testid={`button-toggle-type-${typeKey}`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className={`h-3 w-3 rounded-full shrink-0 ${colors.dot}`} />
-                        <span className={`font-semibold text-sm ${colors.text}`}>
-                          {group.typeName}
-                        </span>
-                        <Badge variant="secondary" className="text-xs">
-                          {group.templates.length} template{group.templates.length !== 1 ? "s" : ""}
-                        </Badge>
-                      </div>
-                      {isCollapsed ? (
-                        <ChevronRight className={`h-4 w-4 shrink-0 ${colors.text}`} />
-                      ) : (
-                        <ChevronDown className={`h-4 w-4 shrink-0 ${colors.text}`} />
-                      )}
-                    </button>
-                  </CollapsibleTrigger>
+                  <div className={`flex items-center gap-1 rounded-md border ${colors.border} ${colors.bg}`}>
+                    <CollapsibleTrigger asChild>
+                      <button
+                        className="flex-1 flex items-center justify-between gap-3 px-4 py-3 transition-colors cursor-pointer"
+                        data-testid={`button-toggle-type-${typeKey}`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className={`h-3 w-3 rounded-full shrink-0 ${colors.dot}`} />
+                          <span className={`font-semibold text-sm ${colors.text}`}>
+                            {group.typeName}
+                          </span>
+                          <Badge variant="secondary" className="text-xs">
+                            {group.templates.length} template{group.templates.length !== 1 ? "s" : ""}
+                          </Badge>
+                        </div>
+                        {isCollapsed ? (
+                          <ChevronRight className={`h-4 w-4 shrink-0 ${colors.text}`} />
+                        ) : (
+                          <ChevronDown className={`h-4 w-4 shrink-0 ${colors.text}`} />
+                        )}
+                      </button>
+                    </CollapsibleTrigger>
+                    {group.typeId && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 mr-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletingEntityTypeId(group.typeId);
+                          setDeleteEntityTypeDialogOpen(true);
+                        }}
+                        data-testid={`button-delete-group-${typeKey}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                   <CollapsibleContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-3">
                       {group.templates.map((template) => renderTemplateCard(template))}
