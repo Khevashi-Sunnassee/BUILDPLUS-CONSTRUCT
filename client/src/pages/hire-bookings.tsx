@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { dateInputProps } from "@/lib/validation";
-import { format, parseISO, isBefore, startOfDay, eachDayOfInterval, addDays, eachMonthOfInterval, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { format, parseISO, isBefore, startOfDay, eachDayOfInterval, addDays, eachMonthOfInterval, startOfMonth, endOfMonth, isWithinInterval, differenceInCalendarDays } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -213,6 +213,20 @@ export default function HireBookingsPage() {
     }
   };
 
+  const getBookingCost = (booking: HireBookingWithDetails): number => {
+    const dailyRate = getDailyRate(booking);
+    if (dailyRate === 0) return 0;
+    const start = startOfDay(new Date(booking.hireStartDate));
+    let end: Date;
+    if (["ON_HIRE", "PICKED_UP"].includes(booking.status)) {
+      end = startOfDay(new Date());
+    } else {
+      end = startOfDay(new Date(booking.expectedReturnDate || booking.hireEndDate));
+    }
+    const days = Math.max(differenceInCalendarDays(end, start) + 1, 1);
+    return Math.round(dailyRate * days * 100) / 100;
+  };
+
   const activeStatuses = ["APPROVED", "BOOKED", "PICKED_UP", "ON_HIRE", "RETURNED", "CLOSED"];
 
   const { dailyChartData, monthlyChartData } = useMemo(() => {
@@ -278,6 +292,27 @@ export default function HireBookingsPage() {
     const overdueItems = bookings.filter(b => isOverdue(b));
     const pendingApproval = bookings.filter(b => b.status === "REQUESTED").length;
     const draftCount = bookings.filter(b => b.status === "DRAFT").length;
+
+    const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+    let currentMonthSpend = 0;
+    const costableStatuses = ["APPROVED", "BOOKED", "PICKED_UP", "ON_HIRE", "RETURNED", "CLOSED"];
+    bookings.filter(b => costableStatuses.includes(b.status)).forEach(b => {
+      const bStart = startOfDay(new Date(b.hireStartDate));
+      const bEnd = startOfDay(new Date(
+        ["ON_HIRE", "PICKED_UP"].includes(b.status)
+          ? new Date()
+          : (b.expectedReturnDate || b.hireEndDate)
+      ));
+      const overlapStart = new Date(Math.max(bStart.getTime(), monthStart.getTime()));
+      const overlapEnd = new Date(Math.min(bEnd.getTime(), monthEnd.getTime()));
+      if (overlapStart <= overlapEnd) {
+        const overlapDays = differenceInCalendarDays(overlapEnd, overlapStart) + 1;
+        currentMonthSpend += getDailyRate(b) * overlapDays;
+      }
+    });
+
     return {
       totalBookings: bookings.length,
       activeCount: activeItems.length,
@@ -285,6 +320,7 @@ export default function HireBookingsPage() {
       draftCount,
       totalDailyCost: Math.round(totalDailyCost * 100) / 100,
       overdueCount: overdueItems.length,
+      currentMonthSpend: Math.round(currentMonthSpend * 100) / 100,
     };
   }, [bookings]);
 
@@ -415,7 +451,7 @@ export default function HireBookingsPage() {
         </Tabs>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-4">
         <Card data-testid="stat-total-bookings">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Bookings</CardTitle>
@@ -462,6 +498,17 @@ export default function HireBookingsPage() {
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-daily-cost">
               ${dashboardStats.totalDailyCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          </CardContent>
+        </Card>
+        <Card data-testid="stat-monthly-spend">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Spend ({format(new Date(), "MMM")})</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-monthly-spend">
+              ${dashboardStats.currentMonthSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </CardContent>
         </Card>
@@ -580,6 +627,7 @@ export default function HireBookingsPage() {
                 <TableHead>Hire Period</TableHead>
                 <TableHead>Return Due</TableHead>
                 <TableHead>Rate</TableHead>
+                <TableHead className="text-right">Cost</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Requested By</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -588,12 +636,13 @@ export default function HireBookingsPage() {
             <TableBody>
               {filteredBookings.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                     {searchQuery ? "No bookings match your search" : "No hire bookings found. Create your first booking."}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredBookings.map((booking) => {
+                <>
+                {filteredBookings.map((booking) => {
                   const overdue = isOverdue(booking);
                   const returnDate = booking.expectedReturnDate || booking.hireEndDate;
                   return (
@@ -632,6 +681,9 @@ export default function HireBookingsPage() {
                       </TableCell>
                       <TableCell className="text-sm whitespace-nowrap">
                         ${parseFloat(booking.rateAmount || "0").toFixed(2)} / {booking.rateType}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium whitespace-nowrap" data-testid={`text-cost-${booking.id}`}>
+                        ${getBookingCost(booking).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell>
                         <Badge className={STATUS_COLORS[booking.status] || ""} data-testid={`badge-status-${booking.id}`}>
@@ -785,7 +837,17 @@ export default function HireBookingsPage() {
                       </TableCell>
                     </TableRow>
                   );
-                })
+                })}
+                <TableRow className="bg-muted/50 font-semibold border-t-2" data-testid="row-hire-totals">
+                  <TableCell colSpan={7} className="text-right text-sm">
+                    Total ({filteredBookings.length} booking{filteredBookings.length !== 1 ? "s" : ""})
+                  </TableCell>
+                  <TableCell className="text-right text-sm font-bold whitespace-nowrap" data-testid="text-total-cost">
+                    ${filteredBookings.reduce((sum, b) => sum + getBookingCost(b), 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </TableCell>
+                  <TableCell colSpan={4} />
+                </TableRow>
+                </>
               )}
             </TableBody>
           </Table>
