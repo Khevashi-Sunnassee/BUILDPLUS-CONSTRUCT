@@ -1,6 +1,6 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Edit2, Building2, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Edit2, Building2, ShoppingCart, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,10 @@ interface PurchaseOrder {
   id: string;
   poNumber: string;
   status: string;
-  totalAmount?: string;
+  total?: string;
+  subtotal?: string;
+  taxAmount?: string;
+  supplierId?: string;
   createdAt: string;
 }
 
@@ -27,11 +30,30 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
   );
 }
 
-function formatCurrency(amount?: string) {
-  if (!amount) return "-";
+function formatCurrency(amount?: string | null) {
+  if (!amount || amount === "0") return "-";
   const num = parseFloat(amount);
   if (isNaN(num)) return "-";
   return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(num);
+}
+
+function getStatusBadge(status: string) {
+  switch (status) {
+    case "DRAFT":
+      return <Badge variant="secondary">Draft</Badge>;
+    case "SUBMITTED":
+      return <Badge className="bg-blue-600">Submitted</Badge>;
+    case "APPROVED":
+      return <Badge className="bg-orange-500">Approved</Badge>;
+    case "REJECTED":
+      return <Badge variant="destructive">Rejected</Badge>;
+    case "RECEIVED":
+      return <Badge className="bg-green-600">Received</Badge>;
+    case "RECEIVED_IN_PART":
+      return <Badge className="bg-green-700">Received in Part</Badge>;
+    default:
+      return <Badge variant="outline">{status}</Badge>;
+  }
 }
 
 function formatDate(dateStr: string) {
@@ -128,6 +150,13 @@ export default function SupplierDetailPage() {
           <TabsTrigger value="purchase-orders" data-testid="tab-purchase-orders">
             <ShoppingCart className="h-4 w-4 mr-2" />
             Purchase Orders
+            <Badge variant={purchaseOrders.length > 0 ? "default" : "secondary"} className="ml-1.5 h-5 min-w-[20px] px-1.5 text-xs" data-testid="badge-po-count">
+              {purchaseOrders.length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="tenders" data-testid="tab-tenders">
+            <FileText className="h-4 w-4 mr-2" />
+            Tenders
           </TabsTrigger>
         </TabsList>
 
@@ -221,12 +250,12 @@ export default function SupplierDetailPage() {
                   </TableHeader>
                   <TableBody>
                     {purchaseOrders.map((po) => (
-                      <TableRow key={po.id} data-testid={`row-po-${po.id}`}>
+                      <TableRow key={po.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setLocation(`/purchase-orders/${po.id}`)} data-testid={`row-po-${po.id}`}>
                         <TableCell data-testid={`text-po-number-${po.id}`}>{po.poNumber}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" data-testid={`badge-po-status-${po.id}`}>{po.status}</Badge>
+                        <TableCell data-testid={`badge-po-status-${po.id}`}>
+                          {getStatusBadge(po.status)}
                         </TableCell>
-                        <TableCell data-testid={`text-po-total-${po.id}`}>{formatCurrency(po.totalAmount)}</TableCell>
+                        <TableCell data-testid={`text-po-total-${po.id}`}>{formatCurrency(po.total)}</TableCell>
                         <TableCell data-testid={`text-po-date-${po.id}`}>{formatDate(po.createdAt)}</TableCell>
                       </TableRow>
                     ))}
@@ -242,6 +271,16 @@ export default function SupplierDetailPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="tenders" className="space-y-4">
+          <Card>
+            <CardContent className="py-12 text-center">
+              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground" data-testid="text-no-tenders">No tender participations for this supplier</p>
+              <p className="text-xs text-muted-foreground mt-2">Tender memberships can be managed from the Tenders page</p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
       </Tabs>

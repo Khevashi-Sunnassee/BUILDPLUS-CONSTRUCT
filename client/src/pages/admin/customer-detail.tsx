@@ -26,6 +26,36 @@ function formatCurrency(val: string | null | undefined) {
   return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(num);
 }
 
+function getJobStatusBadge(status: string) {
+  switch (status) {
+    case "ACTIVE":
+    case "IN_PROGRESS":
+    case "STARTED":
+      return <Badge className="bg-green-600 text-xs">{status.replace(/_/g, " ")}</Badge>;
+    case "COMPLETED":
+      return <Badge className="bg-blue-600 text-xs">Completed</Badge>;
+    case "ON_HOLD":
+      return <Badge className="bg-amber-500 text-xs">On Hold</Badge>;
+    case "PENDING_START":
+      return <Badge className="bg-yellow-500 text-xs">Pending Start</Badge>;
+    case "OPPORTUNITY":
+    case "QUOTING":
+      return <Badge variant="outline" className="text-xs">{status.replace(/_/g, " ")}</Badge>;
+    case "WON":
+    case "CONTRACTED":
+      return <Badge className="bg-emerald-600 text-xs">{status.replace(/_/g, " ")}</Badge>;
+    case "LOST":
+    case "CANCELLED":
+      return <Badge variant="destructive" className="text-xs">{status.replace(/_/g, " ")}</Badge>;
+    case "ARCHIVED":
+      return <Badge variant="secondary" className="text-xs">Archived</Badge>;
+    case "DEFECT_LIABILITY_PERIOD":
+      return <Badge className="bg-purple-600 text-xs">DLP</Badge>;
+    default:
+      return <Badge variant="outline" className="text-xs">{status}</Badge>;
+  }
+}
+
 export default function CustomerDetailPage() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/admin/customers/:id");
@@ -183,14 +213,14 @@ export default function CustomerDetailPage() {
                     {jobs.map((job) => (
                       <TableRow
                         key={job.id}
-                        className="cursor-pointer"
-                        onClick={() => setLocation("/admin/jobs")}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setLocation(`/admin/jobs/${job.id}/programme`)}
                         data-testid={`row-customer-job-${job.id}`}
                       >
                         <TableCell className="font-mono text-sm" data-testid={`text-job-number-${job.id}`}>{job.jobNumber}</TableCell>
                         <TableCell className="font-medium" data-testid={`text-job-name-${job.id}`}>{job.name}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs" data-testid={`badge-job-status-${job.id}`}>{job.status}</Badge>
+                        <TableCell data-testid={`badge-job-status-${job.id}`}>
+                          {getJobStatusBadge(job.status)}
                         </TableCell>
                         <TableCell className="text-right text-sm" data-testid={`text-job-value-${job.id}`}>
                           {formatCurrency(job.estimatedValue)}
