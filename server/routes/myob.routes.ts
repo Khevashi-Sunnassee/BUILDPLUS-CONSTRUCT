@@ -326,4 +326,66 @@ router.get("/api/myob/profit-and-loss", requireAuth, async (req: Request, res: R
   }
 });
 
+router.get("/api/myob/monthly-pnl", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const months = parseInt(req.query.months as string) || 12;
+    const reportingBasis = (req.query.reportingBasis as string) || "Accrual";
+    const yearEndAdjust = req.query.yearEndAdjust === "true";
+    const endDateParam = req.query.endDate as string | undefined;
+
+    const allowedBasis = ["Accrual", "Cash"];
+    if (!allowedBasis.includes(reportingBasis)) {
+      return res.status(400).json({ error: "reportingBasis must be 'Accrual' or 'Cash'" });
+    }
+
+    if (months < 1 || months > 24) {
+      return res.status(400).json({ error: "months must be between 1 and 24" });
+    }
+
+    const endDate = endDateParam ? new Date(endDateParam) : new Date();
+    const monthRanges: { start: string; end: string; label: string }[] = [];
+
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date(endDate.getFullYear(), endDate.getMonth() - i, 1);
+      const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      const end = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+      const label = d.toLocaleDateString("en-AU", { month: "short", year: "numeric" });
+      monthRanges.push({ start, end, label });
+    }
+
+    const myob = createMyobClient(companyId);
+
+    const results = await Promise.all(
+      monthRanges.map(async (range) => {
+        try {
+          const params = new URLSearchParams({
+            StartDate: range.start,
+            EndDate: range.end,
+            ReportingBasis: reportingBasis,
+            YearEndAdjust: String(yearEndAdjust),
+          });
+          const data = await myob.getProfitAndLoss(params.toString());
+          return { ...range, data, error: null };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Unknown error";
+          logger.warn({ month: range.label, err: message }, "[MYOB] Monthly P&L fetch failed for month");
+          return { ...range, data: null, error: message };
+        }
+      })
+    );
+
+    res.json({
+      months: results,
+      reportingBasis,
+      yearEndAdjust,
+    });
+  } catch (err) {
+    handleMyobError(err, res, "monthly-pnl");
+  }
+});
+
 export { router as myobRouter };

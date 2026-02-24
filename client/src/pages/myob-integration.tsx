@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Search, Link2, Unlink, Building2, Users, Truck, FileText, Package, DollarSign, RefreshCw, Loader2, ExternalLink, CheckCircle2, XCircle, AlertTriangle, ClipboardList, TrendingUp, TrendingDown, BarChart3, Calendar } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, LineChart, Line, Legend, Cell } from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MYOB_ROUTES } from "@shared/api-routes";
@@ -542,6 +543,7 @@ function MyobDataTable({
   );
 }
 
+
 interface PnlAccount {
   AccountTotal: number;
   Account: {
@@ -558,6 +560,34 @@ interface PnlData {
   ReportingBasis: string;
   YearEndAdjust: boolean;
   AccountsBreakdown: PnlAccount[];
+}
+
+interface MonthlyPnlEntry {
+  start: string;
+  end: string;
+  label: string;
+  data: PnlData | null;
+  error: string | null;
+}
+
+interface MonthlyPnlResponse {
+  months: MonthlyPnlEntry[];
+  reportingBasis: string;
+  yearEndAdjust: boolean;
+}
+
+function extractMonthlyTotals(entry: MonthlyPnlEntry) {
+  if (!entry.data) return { income: 0, cos: 0, grossProfit: 0, expenses: 0, netProfit: 0 };
+  const accounts = entry.data.AccountsBreakdown || [];
+  const income = accounts.filter((a) => a.Account.DisplayID.startsWith("4-")).reduce((s, a) => s + a.AccountTotal, 0);
+  const cos = accounts.filter((a) => a.Account.DisplayID.startsWith("5-")).reduce((s, a) => s + Math.abs(a.AccountTotal), 0);
+  const grossProfit = income - cos;
+  const expenses = accounts.filter((a) => {
+    const d = a.Account.DisplayID;
+    return d.startsWith("6-") || d.startsWith("7-") || d.startsWith("8-") || d.startsWith("9-");
+  }).reduce((s, a) => s + Math.abs(a.AccountTotal), 0);
+  const netProfit = grossProfit - expenses;
+  return { income, cos, grossProfit, expenses, netProfit };
 }
 
 function getFinancialYearDates() {
@@ -585,10 +615,9 @@ function getPresetDates(preset: string) {
       return { start: start.toISOString().split("T")[0], end: end.toISOString().split("T")[0] };
     }
     case "this-quarter": {
-      const qStart = Math.floor(m / 3) * 3;
-      const start = new Date(y, qStart, 1);
-      const end = new Date(y, qStart + 3, 0);
-      return { start: start.toISOString().split("T")[0], end: end.toISOString().split("T")[0] };
+      const qStart = new Date(y, Math.floor(m / 3) * 3, 1);
+      const qEnd = new Date(y, Math.floor(m / 3) * 3 + 3, 0);
+      return { start: qStart.toISOString().split("T")[0], end: qEnd.toISOString().split("T")[0] };
     }
     case "this-fy": {
       const fy = getFinancialYearDates();
@@ -604,68 +633,132 @@ function getPresetDates(preset: string) {
 }
 
 function ProfitAndLossTab() {
-  const fyDates = getFinancialYearDates();
-  const [startDate, setStartDate] = useState(fyDates.start);
-  const [endDate, setEndDate] = useState(fyDates.end);
   const [reportingBasis, setReportingBasis] = useState("Accrual");
   const [yearEndAdjust, setYearEndAdjust] = useState(false);
+  const [monthCount, setMonthCount] = useState("12");
+  const [dashboardView, setDashboardView] = useState<"dashboard" | "detailed">("dashboard");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
-  const pnlUrl = `${MYOB_ROUTES.PROFIT_AND_LOSS}?startDate=${startDate}&endDate=${endDate}&reportingBasis=${reportingBasis}&yearEndAdjust=${yearEndAdjust}`;
+  const monthlyUrl = `${MYOB_ROUTES.MONTHLY_PNL}?months=${monthCount}&reportingBasis=${reportingBasis}&yearEndAdjust=${yearEndAdjust}`;
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useQuery<PnlData>({
-    queryKey: [MYOB_ROUTES.PROFIT_AND_LOSS, startDate, endDate, reportingBasis, yearEndAdjust],
+  const { data: monthlyData, isLoading, isError, error, refetch, isFetching } = useQuery<MonthlyPnlResponse>({
+    queryKey: [MYOB_ROUTES.MONTHLY_PNL, monthCount, reportingBasis, yearEndAdjust],
     queryFn: async () => {
-      const res = await apiRequest("GET", pnlUrl);
+      const res = await apiRequest("GET", monthlyUrl);
       return res.json();
     },
   });
 
-  const accounts = data?.AccountsBreakdown || [];
+  const months = monthlyData?.months || [];
+  const monthlyTotals = months.map((m) => ({ ...extractMonthlyTotals(m), label: m.label }));
 
-  const incomeAccounts = accounts.filter((a) => a.Account.DisplayID.startsWith("4-"));
-  const cosAccounts = accounts.filter((a) => a.Account.DisplayID.startsWith("5-"));
-  const expenseAccounts = accounts.filter((a) =>
-    a.Account.DisplayID.startsWith("6-") || a.Account.DisplayID.startsWith("7-") || a.Account.DisplayID.startsWith("8-") || a.Account.DisplayID.startsWith("9-")
+  useEffect(() => {
+    if (selectedMonth !== null && selectedMonth >= months.length) {
+      setSelectedMonth(null);
+    }
+  }, [months.length, selectedMonth]);
+
+  const totalsAgg = monthlyTotals.reduce(
+    (acc, m) => ({
+      income: acc.income + m.income,
+      cos: acc.cos + m.cos,
+      grossProfit: acc.grossProfit + m.grossProfit,
+      expenses: acc.expenses + m.expenses,
+      netProfit: acc.netProfit + m.netProfit,
+    }),
+    { income: 0, cos: 0, grossProfit: 0, expenses: 0, netProfit: 0 }
   );
-  const otherAccounts = accounts.filter((a) => {
+
+  const grossMarginPct = totalsAgg.income > 0 ? (totalsAgg.grossProfit / totalsAgg.income) * 100 : 0;
+  const netMarginPct = totalsAgg.income > 0 ? (totalsAgg.netProfit / totalsAgg.income) * 100 : 0;
+
+  const chartData = monthlyTotals.map((m) => ({
+    name: m.label,
+    Income: Math.round(m.income),
+    Expenses: Math.round(m.cos + m.expenses),
+    "Net Profit": Math.round(m.netProfit),
+    "Gross Profit": Math.round(m.grossProfit),
+  }));
+
+  const marginChartData = monthlyTotals.map((m) => ({
+    name: m.label,
+    "Gross Margin %": m.income > 0 ? parseFloat(((m.grossProfit / m.income) * 100).toFixed(1)) : 0,
+    "Net Margin %": m.income > 0 ? parseFloat(((m.netProfit / m.income) * 100).toFixed(1)) : 0,
+  }));
+
+  const expenseBreakdownData = (() => {
+    const categoryMap = new Map<string, number>();
+    months.forEach((m) => {
+      if (!m.data) return;
+      m.data.AccountsBreakdown.forEach((a) => {
+        const d = a.Account.DisplayID;
+        if (d.startsWith("5-") || d.startsWith("6-") || d.startsWith("7-") || d.startsWith("8-") || d.startsWith("9-")) {
+          const existing = categoryMap.get(a.Account.Name) || 0;
+          categoryMap.set(a.Account.Name, existing + Math.abs(a.AccountTotal));
+        }
+      });
+    });
+    return Array.from(categoryMap.entries())
+      .map(([name, value]) => ({ name, value: Math.round(value) }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  })();
+
+  const incomeBreakdownData = (() => {
+    const categoryMap = new Map<string, number>();
+    months.forEach((m) => {
+      if (!m.data) return;
+      m.data.AccountsBreakdown.forEach((a) => {
+        if (a.Account.DisplayID.startsWith("4-")) {
+          const existing = categoryMap.get(a.Account.Name) || 0;
+          categoryMap.set(a.Account.Name, existing + a.AccountTotal);
+        }
+      });
+    });
+    return Array.from(categoryMap.entries())
+      .map(([name, value]) => ({ name, value: Math.round(value) }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  })();
+
+  const prevMonthIdx = monthlyTotals.length >= 2 ? monthlyTotals.length - 2 : null;
+  const currMonthIdx = monthlyTotals.length >= 1 ? monthlyTotals.length - 1 : null;
+  const momChange = prevMonthIdx !== null && currMonthIdx !== null && monthlyTotals[prevMonthIdx].income > 0
+    ? ((monthlyTotals[currMonthIdx].netProfit - monthlyTotals[prevMonthIdx].netProfit) / Math.abs(monthlyTotals[prevMonthIdx].netProfit || 1)) * 100
+    : null;
+
+  const selectedMonthData = selectedMonth !== null && months[selectedMonth]?.data ? months[selectedMonth].data : null;
+
+  const detailAccounts = selectedMonthData?.AccountsBreakdown || [];
+  const detailIncome = detailAccounts.filter((a) => a.Account.DisplayID.startsWith("4-"));
+  const detailCos = detailAccounts.filter((a) => a.Account.DisplayID.startsWith("5-"));
+  const detailExpenses = detailAccounts.filter((a) => {
     const d = a.Account.DisplayID;
-    return !d.startsWith("4-") && !d.startsWith("5-") && !d.startsWith("6-") && !d.startsWith("7-") && !d.startsWith("8-") && !d.startsWith("9-");
+    return d.startsWith("6-") || d.startsWith("7-") || d.startsWith("8-") || d.startsWith("9-");
   });
 
   const filterAccounts = (list: PnlAccount[]) => {
     if (!searchTerm) return list;
     const term = searchTerm.toLowerCase();
     return list.filter(
-      (a) =>
-        a.Account.Name.toLowerCase().includes(term) ||
-        a.Account.DisplayID.toLowerCase().includes(term)
+      (a) => a.Account.Name.toLowerCase().includes(term) || a.Account.DisplayID.toLowerCase().includes(term)
     );
   };
 
-  const totalIncome = incomeAccounts.reduce((sum, a) => sum + a.AccountTotal, 0);
-  const totalCos = cosAccounts.reduce((sum, a) => sum + a.AccountTotal, 0);
-  const grossProfit = totalIncome - Math.abs(totalCos);
-  const totalExpenses = expenseAccounts.reduce((sum, a) => sum + Math.abs(a.AccountTotal), 0);
-  const netProfit = grossProfit - totalExpenses;
+  const COLORS = [
+    "hsl(210, 70%, 50%)", "hsl(160, 60%, 45%)", "hsl(30, 80%, 55%)", "hsl(340, 65%, 50%)",
+    "hsl(270, 55%, 55%)", "hsl(190, 65%, 45%)", "hsl(50, 75%, 50%)", "hsl(0, 65%, 50%)",
+    "hsl(120, 40%, 45%)", "hsl(240, 50%, 55%)",
+  ];
 
-  const handlePreset = (preset: string) => {
-    const dates = getPresetDates(preset);
-    setStartDate(dates.start);
-    setEndDate(dates.end);
-  };
-
-  const renderAccountSection = (title: string, sectionAccounts: PnlAccount[], total: number, icon: React.ReactNode, variant: "income" | "expense" | "neutral") => {
+  const renderAccountTable = (title: string, sectionAccounts: PnlAccount[], total: number, variant: "income" | "expense" | "neutral") => {
     const filtered = filterAccounts(sectionAccounts);
     if (sectionAccounts.length === 0 && !searchTerm) return null;
-
     return (
       <div className="space-y-2" data-testid={`section-${title.toLowerCase().replace(/\s+/g, "-")}`}>
         <div className="flex items-center justify-between gap-2 py-2 border-b flex-wrap">
-          <h3 className="font-semibold text-sm flex items-center gap-2">
-            {icon}
-            {title}
-          </h3>
+          <h3 className="font-semibold text-sm">{title}</h3>
           <span className={`font-mono font-semibold text-sm ${variant === "income" ? "text-green-600 dark:text-green-400" : variant === "expense" ? "text-red-600 dark:text-red-400" : ""}`}>
             {formatCurrency(total)}
           </span>
@@ -701,26 +794,37 @@ function ProfitAndLossTab() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <CardTitle className="text-base flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
-              Profit & Loss Report
+              Financial Dashboard
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search accounts..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 w-48"
-                  data-testid="input-search-pnl"
-                />
+              <div className="flex gap-1 border rounded-md p-0.5">
+                <Button
+                  variant={dashboardView === "dashboard" ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setDashboardView("dashboard")}
+                  data-testid="button-view-dashboard"
+                >
+                  Dashboard
+                </Button>
+                <Button
+                  variant={dashboardView === "detailed" ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setDashboardView("detailed")}
+                  data-testid="button-view-detailed"
+                >
+                  Detailed P&L
+                </Button>
               </div>
               <Button
                 variant="outline"
                 size="icon"
+                className="h-8 w-8"
                 onClick={() => refetch()}
                 disabled={isFetching}
                 data-testid="button-refresh-pnl"
@@ -730,55 +834,27 @@ function ProfitAndLossTab() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 pt-0">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Quick Period</Label>
-              <div className="flex gap-1 flex-wrap">
-                {[
-                  { label: "This Month", value: "this-month" },
-                  { label: "Last Month", value: "last-month" },
-                  { label: "This Quarter", value: "this-quarter" },
-                  { label: "This FY", value: "this-fy" },
-                  { label: "Last FY", value: "last-fy" },
-                ].map((p) => (
-                  <Button key={p.value} variant="outline" size="sm" onClick={() => handlePreset(p.value)} data-testid={`button-preset-${p.value}`}>
-                    {p.label}
-                  </Button>
-                ))}
-              </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Period</Label>
+              <Select value={monthCount} onValueChange={setMonthCount}>
+                <SelectTrigger className="w-36" data-testid="select-month-count">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="3">Last 3 months</SelectItem>
+                  <SelectItem value="6">Last 6 months</SelectItem>
+                  <SelectItem value="12">Last 12 months</SelectItem>
+                  <SelectItem value="18">Last 18 months</SelectItem>
+                  <SelectItem value="24">Last 24 months</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="pnl-start" className="text-xs text-muted-foreground">Start Date</Label>
-              <Input
-                id="pnl-start"
-                type="date"
-                {...dateInputProps}
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-40"
-                data-testid="input-pnl-start-date"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pnl-end" className="text-xs text-muted-foreground">End Date</Label>
-              <Input
-                id="pnl-end"
-                type="date"
-                {...dateInputProps}
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="w-40"
-                data-testid="input-pnl-end-date"
-              />
-            </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Basis</Label>
               <Select value={reportingBasis} onValueChange={setReportingBasis}>
-                <SelectTrigger className="w-32" data-testid="select-reporting-basis">
+                <SelectTrigger className="w-28" data-testid="select-reporting-basis">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -803,111 +879,390 @@ function ProfitAndLossTab() {
       </Card>
 
       {isLoading ? (
-        <Card>
-          <CardContent className="py-6 space-y-3">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-8 w-full" />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Card key={i}><CardContent className="pt-4 pb-3"><Skeleton className="h-16 w-full" /></CardContent></Card>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+          <Card><CardContent className="py-6"><Skeleton className="h-72 w-full" /></CardContent></Card>
+        </div>
       ) : isError ? (
         <Card>
           <CardContent className="py-8 text-center space-y-2">
             <XCircle className="h-8 w-8 mx-auto text-destructive" />
             <p className="text-sm text-muted-foreground">
-              {(error as Error)?.message || "Failed to load Profit & Loss from MYOB"}
+              {(error as Error)?.message || "Failed to load financial data from MYOB"}
             </p>
             <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-retry-pnl">
               Retry
             </Button>
           </CardContent>
         </Card>
-      ) : (
+      ) : dashboardView === "dashboard" ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <Card data-testid="card-total-income">
               <CardContent className="pt-4 pb-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <p className="text-xs text-muted-foreground font-medium">Total Income</p>
-                  <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-                </div>
-                <p className="text-xl font-bold font-mono mt-1 text-green-600 dark:text-green-400">{formatCurrency(totalIncome)}</p>
+                <p className="text-xs text-muted-foreground font-medium">Total Revenue</p>
+                <p className="text-lg font-bold font-mono mt-1 text-green-600 dark:text-green-400">{formatCurrency(totalsAgg.income)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Avg {formatCurrency(monthlyTotals.length > 0 ? totalsAgg.income / monthlyTotals.length : 0)}/mo
+                </p>
               </CardContent>
             </Card>
-            <Card data-testid="card-cost-of-sales">
+            <Card data-testid="card-total-expenses">
               <CardContent className="pt-4 pb-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <p className="text-xs text-muted-foreground font-medium">Cost of Sales</p>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="text-xl font-bold font-mono mt-1">{formatCurrency(Math.abs(totalCos))}</p>
+                <p className="text-xs text-muted-foreground font-medium">Total Costs & Expenses</p>
+                <p className="text-lg font-bold font-mono mt-1 text-red-600 dark:text-red-400">{formatCurrency(totalsAgg.cos + totalsAgg.expenses)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Avg {formatCurrency(monthlyTotals.length > 0 ? (totalsAgg.cos + totalsAgg.expenses) / monthlyTotals.length : 0)}/mo
+                </p>
               </CardContent>
             </Card>
             <Card data-testid="card-gross-profit">
               <CardContent className="pt-4 pb-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <p className="text-xs text-muted-foreground font-medium">Gross Profit</p>
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className={`text-xl font-bold font-mono mt-1 ${grossProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                  {formatCurrency(grossProfit)}
+                <p className="text-xs text-muted-foreground font-medium">Gross Profit</p>
+                <p className={`text-lg font-bold font-mono mt-1 ${totalsAgg.grossProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  {formatCurrency(totalsAgg.grossProfit)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Margin: {grossMarginPct.toFixed(1)}%
                 </p>
               </CardContent>
             </Card>
             <Card data-testid="card-net-profit">
               <CardContent className="pt-4 pb-3">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <p className="text-xs text-muted-foreground font-medium">Net Profit</p>
-                  {netProfit >= 0 ? (
-                    <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  ) : (
-                    <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
-                  )}
-                </div>
-                <p className={`text-xl font-bold font-mono mt-1 ${netProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                  {formatCurrency(netProfit)}
+                <p className="text-xs text-muted-foreground font-medium">Net Profit</p>
+                <p className={`text-lg font-bold font-mono mt-1 ${totalsAgg.netProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  {formatCurrency(totalsAgg.netProfit)}
                 </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Margin: {netMarginPct.toFixed(1)}%
+                </p>
+              </CardContent>
+            </Card>
+            <Card data-testid="card-mom-change">
+              <CardContent className="pt-4 pb-3">
+                <p className="text-xs text-muted-foreground font-medium">MoM Change</p>
+                {momChange !== null ? (
+                  <>
+                    <div className="flex items-center gap-1 mt-1">
+                      {momChange >= 0 ? (
+                        <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      ) : (
+                        <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      )}
+                      <p className={`text-lg font-bold font-mono ${momChange >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                        {momChange >= 0 ? "+" : ""}{momChange.toFixed(1)}%
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">Net profit vs prior month</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-1">Insufficient data</p>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          <Card>
-            <CardContent className="pt-4 space-y-6">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                <Calendar className="h-3.5 w-3.5" />
-                <span>
-                  {new Date(startDate).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
-                  {" - "}
-                  {new Date(endDate).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}
-                </span>
-                <Badge variant="secondary" className="text-xs">{reportingBasis}</Badge>
-                {yearEndAdjust && <Badge variant="secondary" className="text-xs">Incl. Year-End Adj.</Badge>}
-                <Badge variant="secondary" className="text-xs">{accounts.length} accounts</Badge>
-              </div>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <Card data-testid="chart-revenue-expenses">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Revenue vs Expenses</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                      <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                      <RechartsTooltip
+                        formatter={(value: number) => formatCurrency(value)}
+                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "6px", fontSize: "12px" }}
+                        labelStyle={{ fontWeight: 600 }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "12px" }} />
+                      <Bar dataKey="Income" fill="hsl(142, 60%, 45%)" radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="Expenses" fill="hsl(0, 65%, 50%)" radius={[2, 2, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
 
-              {renderAccountSection("Income", incomeAccounts, totalIncome, <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />, "income")}
+            <Card data-testid="chart-net-profit-trend">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Net Profit Trend</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                      <defs>
+                        <linearGradient id="gradProfit" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(210, 70%, 50%)" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="hsl(210, 70%, 50%)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                      <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                      <RechartsTooltip
+                        formatter={(value: number) => formatCurrency(value)}
+                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "6px", fontSize: "12px" }}
+                        labelStyle={{ fontWeight: 600 }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "12px" }} />
+                      <Area type="monotone" dataKey="Net Profit" stroke="hsl(210, 70%, 50%)" fill="url(#gradProfit)" strokeWidth={2} />
+                      <Area type="monotone" dataKey="Gross Profit" stroke="hsl(142, 60%, 45%)" fill="none" strokeWidth={2} strokeDasharray="5 5" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-              {renderAccountSection("Cost of Sales", cosAccounts, Math.abs(totalCos), <DollarSign className="h-4 w-4 text-muted-foreground" />, "neutral")}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <Card data-testid="chart-margin-analysis">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Margin Analysis (%)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={marginChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                      <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" tickFormatter={(v) => `${v}%`} />
+                      <RechartsTooltip
+                        formatter={(value: number) => `${value.toFixed(1)}%`}
+                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "6px", fontSize: "12px" }}
+                        labelStyle={{ fontWeight: 600 }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: "12px" }} />
+                      <Line type="monotone" dataKey="Gross Margin %" stroke="hsl(142, 60%, 45%)" strokeWidth={2} dot={{ r: 3 }} />
+                      <Line type="monotone" dataKey="Net Margin %" stroke="hsl(210, 70%, 50%)" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
 
-              <div className="flex items-center justify-between gap-2 py-2 border-y bg-muted/30 px-2 rounded-md flex-wrap">
-                <span className="font-semibold text-sm">Gross Profit</span>
-                <span className={`font-mono font-bold text-sm ${grossProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                  {formatCurrency(grossProfit)}
-                </span>
-              </div>
+            <Card data-testid="card-expense-breakdown">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Top Expense Categories</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={expenseBreakdownData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis type="number" tick={{ fontSize: 10 }} className="fill-muted-foreground" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} className="fill-muted-foreground" width={120} />
+                      <RechartsTooltip
+                        formatter={(value: number) => formatCurrency(value)}
+                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "6px", fontSize: "12px" }}
+                      />
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                        {expenseBreakdownData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-              {renderAccountSection("Operating Expenses", expenseAccounts, totalExpenses, <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />, "expense")}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <Card data-testid="card-income-breakdown">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Top Income Sources</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={incomeBreakdownData} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis type="number" tick={{ fontSize: 10 }} className="fill-muted-foreground" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} className="fill-muted-foreground" width={120} />
+                      <RechartsTooltip
+                        formatter={(value: number) => formatCurrency(value)}
+                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "6px", fontSize: "12px" }}
+                      />
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                        {incomeBreakdownData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
 
-              {otherAccounts.length > 0 && renderAccountSection("Other", otherAccounts, otherAccounts.reduce((s, a) => s + a.AccountTotal, 0), <FileText className="h-4 w-4 text-muted-foreground" />, "neutral")}
+            <Card data-testid="card-monthly-summary-table">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Monthly Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="max-h-64 overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs sticky top-0 bg-card">Month</TableHead>
+                        <TableHead className="text-xs text-right sticky top-0 bg-card">Revenue</TableHead>
+                        <TableHead className="text-xs text-right sticky top-0 bg-card">Expenses</TableHead>
+                        <TableHead className="text-xs text-right sticky top-0 bg-card">Net Profit</TableHead>
+                        <TableHead className="text-xs text-right sticky top-0 bg-card">Margin</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {monthlyTotals.map((m, idx) => (
+                        <TableRow
+                          key={idx}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => { setSelectedMonth(idx); setDashboardView("detailed"); }}
+                          data-testid={`row-month-${idx}`}
+                        >
+                          <TableCell className="text-xs font-medium">{m.label}</TableCell>
+                          <TableCell className="text-xs text-right font-mono text-green-600 dark:text-green-400">{formatCurrency(m.income)}</TableCell>
+                          <TableCell className="text-xs text-right font-mono text-red-600 dark:text-red-400">{formatCurrency(m.cos + m.expenses)}</TableCell>
+                          <TableCell className={`text-xs text-right font-mono ${m.netProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            {formatCurrency(m.netProfit)}
+                          </TableCell>
+                          <TableCell className="text-xs text-right font-mono">
+                            {m.income > 0 ? `${((m.netProfit / m.income) * 100).toFixed(1)}%` : "\u2014"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      <TableRow className="border-t-2 font-semibold bg-muted/30">
+                        <TableCell className="text-xs font-bold">Total</TableCell>
+                        <TableCell className="text-xs text-right font-mono font-bold text-green-600 dark:text-green-400">{formatCurrency(totalsAgg.income)}</TableCell>
+                        <TableCell className="text-xs text-right font-mono font-bold text-red-600 dark:text-red-400">{formatCurrency(totalsAgg.cos + totalsAgg.expenses)}</TableCell>
+                        <TableCell className={`text-xs text-right font-mono font-bold ${totalsAgg.netProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                          {formatCurrency(totalsAgg.netProfit)}
+                        </TableCell>
+                        <TableCell className="text-xs text-right font-mono font-bold">{netMarginPct.toFixed(1)}%</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Select Month</Label>
+              <Select
+                value={selectedMonth !== null ? String(selectedMonth) : ""}
+                onValueChange={(v) => setSelectedMonth(parseInt(v))}
+              >
+                <SelectTrigger className="w-48" data-testid="select-detail-month">
+                  <SelectValue placeholder="Choose a month..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map((m, idx) => (
+                    <SelectItem key={idx} value={String(idx)}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search accounts..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+                data-testid="input-search-pnl"
+              />
+            </div>
+          </div>
 
-              <div className="flex items-center justify-between gap-2 py-3 border-t-2 border-foreground/20 flex-wrap">
-                <span className="font-bold text-base">Net Profit / (Loss)</span>
-                <span className={`font-mono font-bold text-base ${netProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                  {formatCurrency(netProfit)}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
+          {selectedMonthData ? (
+            <>
+              {(() => {
+                const t = extractMonthlyTotals(months[selectedMonth!]);
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <Card>
+                      <CardContent className="pt-4 pb-3">
+                        <p className="text-xs text-muted-foreground">Income</p>
+                        <p className="text-lg font-bold font-mono text-green-600 dark:text-green-400">{formatCurrency(t.income)}</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4 pb-3">
+                        <p className="text-xs text-muted-foreground">Cost of Sales</p>
+                        <p className="text-lg font-bold font-mono">{formatCurrency(t.cos)}</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4 pb-3">
+                        <p className="text-xs text-muted-foreground">Gross Profit</p>
+                        <p className={`text-lg font-bold font-mono ${t.grossProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                          {formatCurrency(t.grossProfit)}
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="pt-4 pb-3">
+                        <p className="text-xs text-muted-foreground">Net Profit</p>
+                        <p className={`text-lg font-bold font-mono ${t.netProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                          {formatCurrency(t.netProfit)}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })()}
+
+              <Card>
+                <CardContent className="pt-4 space-y-6">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>{months[selectedMonth!].label}</span>
+                    <Badge variant="secondary" className="text-xs">{reportingBasis}</Badge>
+                    <Badge variant="secondary" className="text-xs">{detailAccounts.length} accounts</Badge>
+                  </div>
+
+                  {renderAccountTable("Income", detailIncome, detailIncome.reduce((s, a) => s + a.AccountTotal, 0), "income")}
+                  {renderAccountTable("Cost of Sales", detailCos, detailCos.reduce((s, a) => s + Math.abs(a.AccountTotal), 0), "neutral")}
+
+                  <div className="flex items-center justify-between gap-2 py-2 border-y bg-muted/30 px-2 rounded-md flex-wrap">
+                    <span className="font-semibold text-sm">Gross Profit</span>
+                    <span className={`font-mono font-bold text-sm ${extractMonthlyTotals(months[selectedMonth!]).grossProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                      {formatCurrency(extractMonthlyTotals(months[selectedMonth!]).grossProfit)}
+                    </span>
+                  </div>
+
+                  {renderAccountTable("Operating Expenses", detailExpenses, detailExpenses.reduce((s, a) => s + Math.abs(a.AccountTotal), 0), "expense")}
+
+                  <div className="flex items-center justify-between gap-2 py-3 border-t-2 border-foreground/20 flex-wrap">
+                    <span className="font-bold text-base">Net Profit / (Loss)</span>
+                    <span className={`font-mono font-bold text-base ${extractMonthlyTotals(months[selectedMonth!]).netProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                      {formatCurrency(extractMonthlyTotals(months[selectedMonth!]).netProfit)}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <Calendar className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">Select a month from the dropdown above to view its detailed P&L breakdown</p>
+                <p className="text-xs text-muted-foreground mt-1">Or click on a row in the Monthly Summary table from the Dashboard view</p>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>
