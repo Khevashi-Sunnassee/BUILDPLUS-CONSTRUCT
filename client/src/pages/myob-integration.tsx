@@ -1225,106 +1225,136 @@ function ProfitAndLossTab() {
           </div>
 
           {adjustmentsData && (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              <Card data-testid="card-unprocessed-invoices">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-amber-500" />
-                    Unprocessed AP Invoices
-                  </CardTitle>
-                  <CardDescription className="text-xs">Invoices not yet exported to MYOB for this period</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="text-center p-2 rounded-md bg-muted/50">
-                      <p className="text-xs text-muted-foreground">Count</p>
-                      <p className="text-lg font-bold font-mono" data-testid="text-unprocessed-count">{adjustmentsData.unprocessedInvoices.summary.count}</p>
-                    </div>
-                    <div className="text-center p-2 rounded-md bg-muted/50">
-                      <p className="text-xs text-muted-foreground">Ex-GST</p>
-                      <p className="text-lg font-bold font-mono text-amber-600 dark:text-amber-400" data-testid="text-unprocessed-ex">{formatCurrency(parseFloat(adjustmentsData.unprocessedInvoices.summary.totalEx))}</p>
-                    </div>
-                    <div className="text-center p-2 rounded-md bg-muted/50">
-                      <p className="text-xs text-muted-foreground">Inc-GST</p>
-                      <p className="text-lg font-bold font-mono text-amber-600 dark:text-amber-400" data-testid="text-unprocessed-inc">{formatCurrency(parseFloat(adjustmentsData.unprocessedInvoices.summary.totalInc))}</p>
-                    </div>
+            <div className="space-y-4">
+              <div className="relative pt-6">
+                <div className="absolute inset-x-0 top-0 border-t-2 border-dashed border-border" />
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center gap-2 bg-card px-3 py-1.5 rounded-md border shadow-sm">
+                    <Briefcase className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold">BuildPlus Data</span>
                   </div>
-                  {adjustmentsData.unprocessedInvoices.byStatus.length > 0 && (
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-medium text-muted-foreground">By Status</p>
-                      {adjustmentsData.unprocessedInvoices.byStatus.map((s) => (
-                        <div key={s.status} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-muted/30">
-                          <Badge variant={s.status === "APPROVED" ? "default" : "secondary"} className="text-xs">
-                            {s.status}
-                          </Badge>
-                          <div className="flex items-center gap-3">
-                            <span className="text-muted-foreground">{s.count} invoices</span>
-                            <span className="font-mono font-medium">{formatCurrency(parseFloat(s.totalEx))}</span>
+                  <span className="text-xs text-muted-foreground">Not included in MYOB figures above</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <Card className="border-amber-500/30 bg-amber-500/5" data-testid="card-kpi-unprocessed-count">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-xs text-muted-foreground font-medium">Unprocessed Invoices</p>
+                    <p className="text-lg font-bold font-mono mt-1" data-testid="text-unprocessed-count">{adjustmentsData.unprocessedInvoices.summary.count}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Not yet exported to MYOB</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-amber-500/30 bg-amber-500/5" data-testid="card-kpi-unprocessed-value">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-xs text-muted-foreground font-medium">Unprocessed Value (Ex-GST)</p>
+                    <p className="text-lg font-bold font-mono mt-1 text-amber-600 dark:text-amber-400" data-testid="text-unprocessed-ex">{formatCurrency(parseFloat(adjustmentsData.unprocessedInvoices.summary.totalEx))}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Inc-GST: {formatCurrency(parseFloat(adjustmentsData.unprocessedInvoices.summary.totalInc))}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card className="border-blue-500/30 bg-blue-500/5" data-testid="card-kpi-retention-amount">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-xs text-muted-foreground font-medium">Period Retention</p>
+                    <p className="text-lg font-bold font-mono mt-1 text-blue-600 dark:text-blue-400" data-testid="text-retention-amount">{formatCurrency(parseFloat(adjustmentsData.retention.summary.totalRetention))}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{adjustmentsData.retention.summary.claimCount} progress claims</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-blue-500/30 bg-blue-500/5" data-testid="card-kpi-retention-held">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-xs text-muted-foreground font-medium">Retention Held to Date</p>
+                    <p className="text-lg font-bold font-mono mt-1 text-blue-600 dark:text-blue-400" data-testid="text-retention-held">{formatCurrency(parseFloat(adjustmentsData.retention.summary.totalRetentionHeld))}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Cumulative across jobs</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <Card className="border-amber-500/20" data-testid="card-unprocessed-invoices">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-amber-500" />
+                      Unprocessed AP Invoices
+                    </CardTitle>
+                    <CardDescription className="text-xs">Breakdown of invoices not yet exported to MYOB</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {adjustmentsData.unprocessedInvoices.byStatus.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">By Status</p>
+                        {adjustmentsData.unprocessedInvoices.byStatus.map((s) => (
+                          <div key={s.status} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-muted/30">
+                            <Badge variant={s.status === "APPROVED" ? "default" : "secondary"} className="text-xs">
+                              {s.status}
+                            </Badge>
+                            <div className="flex items-center gap-4">
+                              <span className="text-muted-foreground">{s.count} invoices</span>
+                              <span className="font-mono font-medium w-24 text-right">{formatCurrency(parseFloat(s.totalEx))}</span>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded border-t font-semibold">
+                          <span>Total</span>
+                          <div className="flex items-center gap-4">
+                            <span className="text-muted-foreground">{adjustmentsData.unprocessedInvoices.summary.count} invoices</span>
+                            <span className="font-mono font-bold w-24 text-right text-amber-600 dark:text-amber-400">{formatCurrency(parseFloat(adjustmentsData.unprocessedInvoices.summary.totalEx))}</span>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  {adjustmentsData.unprocessedInvoices.byMonth.length > 0 && (
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-medium text-muted-foreground">By Month</p>
-                      <div className="max-h-32 overflow-auto space-y-1">
-                        {adjustmentsData.unprocessedInvoices.byMonth.map((m) => (
-                          <div key={m.month} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-muted/30">
-                            <span>{m.month}</span>
-                            <div className="flex items-center gap-3">
-                              <span className="text-muted-foreground">{m.count}</span>
-                              <span className="font-mono font-medium">{formatCurrency(parseFloat(m.totalEx))}</span>
-                            </div>
-                          </div>
-                        ))}
                       </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    )}
+                    {adjustmentsData.unprocessedInvoices.byMonth.length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">By Month</p>
+                        <div className="max-h-36 overflow-auto space-y-1">
+                          {adjustmentsData.unprocessedInvoices.byMonth.map((m) => (
+                            <div key={m.month} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-muted/30">
+                              <span>{m.month}</span>
+                              <div className="flex items-center gap-4">
+                                <span className="text-muted-foreground">{m.count} invoices</span>
+                                <span className="font-mono font-medium w-24 text-right">{formatCurrency(parseFloat(m.totalEx))}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-              <Card data-testid="card-retention-summary">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-blue-500" />
-                    Retention Held
-                  </CardTitle>
-                  <CardDescription className="text-xs">Retention amounts from progress claims in this period</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="text-center p-2 rounded-md bg-muted/50">
-                      <p className="text-xs text-muted-foreground">Claims</p>
-                      <p className="text-lg font-bold font-mono" data-testid="text-retention-claims">{adjustmentsData.retention.summary.claimCount}</p>
-                    </div>
-                    <div className="text-center p-2 rounded-md bg-muted/50">
-                      <p className="text-xs text-muted-foreground">Period Retention</p>
-                      <p className="text-lg font-bold font-mono text-blue-600 dark:text-blue-400" data-testid="text-retention-amount">{formatCurrency(parseFloat(adjustmentsData.retention.summary.totalRetention))}</p>
-                    </div>
-                    <div className="text-center p-2 rounded-md bg-muted/50">
-                      <p className="text-xs text-muted-foreground">Held to Date</p>
-                      <p className="text-lg font-bold font-mono text-blue-600 dark:text-blue-400" data-testid="text-retention-held">{formatCurrency(parseFloat(adjustmentsData.retention.summary.totalRetentionHeld))}</p>
-                    </div>
-                  </div>
-                  {adjustmentsData.retention.byJob.length > 0 && (
-                    <div className="space-y-1.5">
-                      <p className="text-xs font-medium text-muted-foreground">By Job</p>
-                      <div className="max-h-40 overflow-auto space-y-1">
-                        {adjustmentsData.retention.byJob.map((j) => (
-                          <div key={j.jobId} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-muted/30 gap-2">
-                            <span className="truncate flex-1" title={j.jobName || j.jobId}>{j.jobName || j.jobId}</span>
-                            <div className="flex items-center gap-3 shrink-0">
-                              <span className="text-muted-foreground">{j.claimCount} claims</span>
-                              <span className="font-mono font-medium">{formatCurrency(parseFloat(j.totalRetentionHeld))}</span>
+                <Card className="border-blue-500/20" data-testid="card-retention-summary">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-blue-500" />
+                      Retention by Job
+                    </CardTitle>
+                    <CardDescription className="text-xs">Retention amounts from progress claims in this period</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {adjustmentsData.retention.byJob.length > 0 ? (
+                      <div className="space-y-1.5">
+                        <div className="max-h-52 overflow-auto space-y-1">
+                          {adjustmentsData.retention.byJob.map((j) => (
+                            <div key={j.jobId} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-muted/30 gap-2">
+                              <span className="truncate flex-1" title={j.jobName || j.jobId}>{j.jobName || j.jobId}</span>
+                              <div className="flex items-center gap-4 shrink-0">
+                                <span className="text-muted-foreground">{j.claimCount} claims</span>
+                                <span className="font-mono font-medium w-24 text-right">{formatCurrency(parseFloat(j.totalRetentionHeld))}</span>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded border-t font-semibold">
+                          <span>Total Held</span>
+                          <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{formatCurrency(parseFloat(adjustmentsData.retention.summary.totalRetentionHeld))}</span>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    ) : (
+                      <p className="text-xs text-muted-foreground py-4 text-center">No retention data for this period</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           )}
         </>
