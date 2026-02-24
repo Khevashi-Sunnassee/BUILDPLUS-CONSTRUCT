@@ -1211,6 +1211,8 @@ export default function ApInvoiceDetailPage() {
     return current ? (current.approverName || current.approverEmail || "Unknown") : null;
   }, [approvalData]);
 
+  const invoiceTotal = useMemo(() => parseFloat(String(invoice?.totalInc || "0")), [invoice?.totalInc]);
+
   if (splitsData && !splitsInitialized) {
     setSplits(splitsData);
     setSplitsInitialized(true);
@@ -1459,8 +1461,6 @@ export default function ApInvoiceDetailPage() {
       </div>
     );
   }
-
-  const invoiceTotal = useMemo(() => parseFloat(String(invoice.totalInc || "0")), [invoice.totalInc]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-73px)]" data-testid="page-invoice-detail">
