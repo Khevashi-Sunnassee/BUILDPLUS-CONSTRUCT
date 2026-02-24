@@ -281,7 +281,7 @@ function SupplierSearchField({ invoice, onSupplierSelect, onFocus }: {
   return (
     <div
       ref={containerRef}
-      className="flex items-start gap-2 py-1.5 px-2 rounded-md hover-elevate cursor-pointer group relative"
+      className={`flex items-start gap-2 py-1.5 px-2 rounded-md cursor-pointer group relative ${editing ? '' : 'hover-elevate'}`}
       onClick={() => { onFocus(); if (!editing) { setEditing(true); setSearch(invoice.supplier?.name || ""); setShowDropdown(true); setTimeout(() => inputRef.current?.focus(), 0); } }}
       data-testid="field-supplierName"
     >
@@ -299,7 +299,7 @@ function SupplierSearchField({ invoice, onSupplierSelect, onFocus }: {
             data-testid="input-supplierName"
           />
           {showDropdown && (
-            <div className="absolute top-8 left-0 right-0 border border-border rounded-md shadow-lg max-h-48 overflow-y-auto bg-popover text-popover-foreground backdrop-blur-none" style={{ zIndex: 9999, backgroundColor: 'hsl(var(--popover))' }} data-testid="dropdown-supplier-results">
+            <div className="absolute top-full left-0 right-0 mt-1 border border-border rounded-md shadow-2xl max-h-48 overflow-y-auto bg-popover text-popover-foreground" style={{ zIndex: 9999 }} data-testid="dropdown-supplier-results">
               {filtered.map((s) => (
                 <button
                   type="button"
