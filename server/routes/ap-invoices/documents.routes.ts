@@ -8,6 +8,7 @@ import {
   apInvoiceSplits, apInvoiceActivity, apInvoiceComments,
   apInvoiceApprovals, apApprovalRules, users, suppliers,
   companies, jobs, myobExportLogs,
+  myobAccountMappings, myobTaxCodeMappings, myobSupplierMappings,
 } from "@shared/schema";
 import { assignApprovalPathToInvoice } from "../../lib/ap-approval-assign";
 import { requireUUID, safeJsonParse } from "../../lib/api-utils";
@@ -310,16 +311,33 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
 
       const myob = createMyobClient(companyId);
 
-      const billLines = splits.map((split) => ({
-        Description: split.description || invoice.description || "AP Invoice",
-        Total: parseFloat(split.amount),
-        Account: split.costCodeId ? { UID: split.costCodeId } : undefined,
-        Job: split.jobId ? { UID: split.jobId } : undefined,
-        TaxCode: split.taxCodeId ? { UID: split.taxCodeId } : undefined,
-      }));
+      const accountMaps = await db.select().from(myobAccountMappings)
+        .where(eq(myobAccountMappings.companyId, companyId)).limit(500);
+      const taxCodeMaps = await db.select().from(myobTaxCodeMappings)
+        .where(eq(myobTaxCodeMappings.companyId, companyId)).limit(200);
+      const supplierMaps = await db.select().from(myobSupplierMappings)
+        .where(eq(myobSupplierMappings.companyId, companyId)).limit(500);
+
+      const accountMapByCostCode = new Map(accountMaps.map((m) => [m.costCodeId, m]));
+      const taxMapByCode = new Map(taxCodeMaps.map((m) => [m.bpTaxCode, m]));
+      const supplierMapById = new Map(supplierMaps.map((m) => [m.supplierId, m]));
+
+      const billLines = splits.map((split) => {
+        const acctMap = split.costCodeId ? accountMapByCostCode.get(split.costCodeId) : null;
+        const taxMap = split.taxCodeId ? taxMapByCode.get(split.taxCodeId) : null;
+        return {
+          Type: "Transaction" as const,
+          Description: split.description || invoice.description || "AP Invoice",
+          Total: parseFloat(split.amount),
+          Account: acctMap ? { UID: acctMap.myobAccountUid } : undefined,
+          Job: split.jobId ? { UID: split.jobId } : undefined,
+          TaxCode: taxMap ? { UID: taxMap.myobTaxCodeUid } : undefined,
+        };
+      });
 
       if (billLines.length === 0) {
         billLines.push({
+          Type: "Transaction" as const,
           Description: invoice.description || "AP Invoice",
           Total: parseFloat(invoice.totalInc || "0"),
           Account: undefined,
@@ -328,10 +346,14 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         });
       }
 
+      const supplierMap = invoice.supplierId ? supplierMapById.get(invoice.supplierId) : null;
+      const supplierUid = supplierMap?.myobSupplierUid;
+
       const bill = {
         Date: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString() : new Date().toISOString(),
-        Supplier: supplierInfo ? { UID: supplierInfo.myobUid || supplierInfo.id, DisplayID: supplierInfo.name } : undefined,
+        Supplier: supplierUid ? { UID: supplierUid } : (supplierInfo ? { DisplayID: supplierInfo.name } : undefined),
         SupplierInvoiceNumber: invoice.invoiceNumber,
+        IsTaxInclusive: true,
         Comment: invoice.description || "",
         Lines: billLines,
       };

@@ -5752,6 +5752,65 @@ export const insertMyobExportLogSchema = createInsertSchema(myobExportLogs).omit
 export type InsertMyobExportLog = z.infer<typeof insertMyobExportLogSchema>;
 export type MyobExportLog = typeof myobExportLogs.$inferSelect;
 
+export const myobAccountMappings = pgTable("myob_account_mappings", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
+  costCodeId: varchar("cost_code_id", { length: 36 }).notNull().references(() => costCodes.id, { onDelete: "cascade" }),
+  myobAccountUid: text("myob_account_uid").notNull(),
+  myobAccountName: text("myob_account_name"),
+  myobAccountDisplayId: text("myob_account_display_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("myob_account_mappings_company_idx").on(table.companyId),
+  costCodeIdx: index("myob_account_mappings_cost_code_idx").on(table.costCodeId),
+  companyCostCodeIdx: uniqueIndex("myob_account_mappings_company_cost_code_idx").on(table.companyId, table.costCodeId),
+}));
+
+export const insertMyobAccountMappingSchema = createInsertSchema(myobAccountMappings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMyobAccountMapping = z.infer<typeof insertMyobAccountMappingSchema>;
+export type MyobAccountMapping = typeof myobAccountMappings.$inferSelect;
+
+export const myobTaxCodeMappings = pgTable("myob_tax_code_mappings", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
+  bpTaxCode: text("bp_tax_code").notNull(),
+  myobTaxCodeUid: text("myob_tax_code_uid").notNull(),
+  myobTaxCodeName: text("myob_tax_code_name"),
+  myobTaxCodeCode: text("myob_tax_code_code"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("myob_tax_code_mappings_company_idx").on(table.companyId),
+  companyBpTaxIdx: uniqueIndex("myob_tax_code_mappings_company_bp_tax_idx").on(table.companyId, table.bpTaxCode),
+}));
+
+export const insertMyobTaxCodeMappingSchema = createInsertSchema(myobTaxCodeMappings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMyobTaxCodeMapping = z.infer<typeof insertMyobTaxCodeMappingSchema>;
+export type MyobTaxCodeMapping = typeof myobTaxCodeMappings.$inferSelect;
+
+export const myobSupplierMappings = pgTable("myob_supplier_mappings", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
+  supplierId: varchar("supplier_id", { length: 36 }).notNull().references(() => suppliers.id, { onDelete: "cascade" }),
+  myobSupplierUid: text("myob_supplier_uid").notNull(),
+  myobSupplierName: text("myob_supplier_name"),
+  myobSupplierDisplayId: text("myob_supplier_display_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("myob_supplier_mappings_company_idx").on(table.companyId),
+  supplierIdx: index("myob_supplier_mappings_supplier_idx").on(table.supplierId),
+  companySupplierIdx: uniqueIndex("myob_supplier_mappings_company_supplier_idx").on(table.companyId, table.supplierId),
+}));
+
+export const insertMyobSupplierMappingSchema = createInsertSchema(myobSupplierMappings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMyobSupplierMapping = z.infer<typeof insertMyobSupplierMappingSchema>;
+export type MyobSupplierMapping = typeof myobSupplierMappings.$inferSelect;
+
 // ============================================================================
 // EMAIL TEMPLATES
 // ============================================================================

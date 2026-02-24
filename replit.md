@@ -66,7 +66,7 @@ The system employs a client-server architecture. The frontend is a React applica
 - **Vitest**: Testing framework.
 - **ExcelJS**: Excel file generation library.
 - **Resend**: Email service for outbound and inbound email processing.
-- **MYOB Business API**: Accounting software integration.
+- **MYOB Business API**: Accounting software integration with OAuth authentication, Financial Dashboard (monthly P&L trends, KPI cards, charts), AP invoice export to MYOB Purchase Bills, and code mapping system (cost codes → MYOB accounts, suppliers → MYOB suppliers, tax codes → MYOB tax codes) with auto-map by name and manual mapping UI.
 - **Twilio**: SMS and voice communication services.
 - **Mailgun**: Email automation service.
 - **TipTap**: Rich text editor framework.

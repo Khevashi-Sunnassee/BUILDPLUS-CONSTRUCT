@@ -979,6 +979,11 @@ export const MYOB_ROUTES = {
   EXPORT_LOGS: '/api/myob/export-logs',
   PROFIT_AND_LOSS: '/api/myob/profit-and-loss',
   MONTHLY_PNL: '/api/myob/monthly-pnl',
+  TAX_CODES: '/api/myob/tax-codes',
+  ACCOUNT_MAPPINGS: '/api/myob/account-mappings',
+  TAX_CODE_MAPPINGS: '/api/myob/tax-code-mappings',
+  SUPPLIER_MAPPINGS: '/api/myob/supplier-mappings',
+  AUTO_MAP: '/api/myob/auto-map',
 } as const;
 export type MyobRoutes = typeof MYOB_ROUTES;
 
