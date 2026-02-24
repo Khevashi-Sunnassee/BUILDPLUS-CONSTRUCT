@@ -322,6 +322,16 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       const taxMapByCode = new Map(taxCodeMaps.map((m) => [m.bpTaxCode, m]));
       const supplierMapById = new Map(supplierMaps.map((m) => [m.supplierId, m]));
 
+      let defaultTaxCodeUid: string | null = null;
+      try {
+        const myobTaxCodesResp: any = await myob.getTaxCodes();
+        const taxItems: any[] = myobTaxCodesResp?.Items || [];
+        const gstCode = taxItems.find((t: any) => t.Code === "GST") || taxItems.find((t: any) => t.Code?.includes("GST")) || taxItems[0];
+        if (gstCode?.UID) defaultTaxCodeUid = gstCode.UID;
+      } catch (e) {
+        logger.warn({ err: e }, "Failed to fetch MYOB tax codes for export default");
+      }
+
       const splitJobIds = [...new Set(splits.map((s) => s.jobId).filter(Boolean))] as string[];
       const jobMyobMap = new Map<string, string>();
       if (splitJobIds.length > 0) {
@@ -339,13 +349,14 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         const taxMap = split.taxCodeId ? taxMapByCode.get(split.taxCodeId) : null;
         const myobJobUid = split.jobId ? jobMyobMap.get(split.jobId) : undefined;
         const lineTotal = parseFloat(split.amount) + parseFloat(split.gstAmount || "0");
+        const lineTaxCodeUid = taxMap?.myobTaxCodeUid || defaultTaxCodeUid;
         return {
           Type: "Transaction" as const,
           Description: split.description || invoice.description || "AP Invoice",
           Total: lineTotal,
           Account: acctMap ? { UID: acctMap.myobAccountUid } : undefined,
           Job: myobJobUid ? { UID: myobJobUid } : undefined,
-          TaxCode: taxMap ? { UID: taxMap.myobTaxCodeUid } : undefined,
+          TaxCode: lineTaxCodeUid ? { UID: lineTaxCodeUid } : undefined,
         };
       });
 
@@ -356,7 +367,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
           Total: parseFloat(invoice.totalInc || "0"),
           Account: undefined,
           Job: undefined,
-          TaxCode: undefined,
+          TaxCode: defaultTaxCodeUid ? { UID: defaultTaxCodeUid } : undefined,
         });
       }
 
@@ -367,7 +378,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         return sendBadRequest(res, `Supplier "${supplierInfo?.name || 'unknown'}" is not mapped to a MYOB supplier. Please add the mapping in MYOB Integration → Code Mapping → Suppliers before exporting.`);
       }
 
-      const bill = {
+      const bill: any = {
         Date: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString() : new Date().toISOString(),
         Supplier: { UID: supplierUid },
         SupplierInvoiceNumber: invoice.invoiceNumber,
@@ -375,6 +386,9 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         Comment: invoice.description || "",
         Lines: billLines,
       };
+      if (defaultTaxCodeUid) {
+        bill.FreightTaxCode = { UID: defaultTaxCodeUid };
+      }
 
       try {
         const result = await myob.createPurchaseBill(bill);
