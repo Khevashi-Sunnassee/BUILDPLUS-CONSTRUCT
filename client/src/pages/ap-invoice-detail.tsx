@@ -521,7 +521,7 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplier
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">None</SelectItem>
-                          {(jobs || []).map(j => (
+                          {(jobs || []).slice().sort((a, b) => a.name.localeCompare(b.name)).map(j => (
                             <SelectItem key={j.id} value={j.id}>{j.jobNumber} - {j.name}</SelectItem>
                           ))}
                         </SelectContent>
