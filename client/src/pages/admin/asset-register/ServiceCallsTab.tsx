@@ -1,4 +1,4 @@
-import { Pencil, Wrench } from "lucide-react";
+import { Pencil, Wrench, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,21 @@ import {
 import type { ServiceCallsTabProps } from "./types";
 import { formatCurrency } from "./types";
 
+const STATUS_LABELS: Record<string, string> = {
+  open: "Open",
+  in_progress: "In Progress",
+  resolved: "Resolved",
+  closed: "Closed",
+  cancelled: "Cancelled",
+};
+
+const PRIORITY_LABELS: Record<string, string> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  critical: "Critical",
+};
+
 export function ServiceCallsTab({
   serviceStatusFilter,
   setServiceStatusFilter,
@@ -39,18 +54,27 @@ export function ServiceCallsTab({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All ({repairStatusCounts.all || 0})</SelectItem>
-            <SelectItem value="DRAFT">Draft ({repairStatusCounts.DRAFT || 0})</SelectItem>
-            <SelectItem value="SUBMITTED">Submitted ({repairStatusCounts.SUBMITTED || 0})</SelectItem>
-            <SelectItem value="IN_PROGRESS">In Progress ({repairStatusCounts.IN_PROGRESS || 0})</SelectItem>
-            <SelectItem value="COMPLETED">Completed ({repairStatusCounts.COMPLETED || 0})</SelectItem>
-            <SelectItem value="CANCELLED">Cancelled ({repairStatusCounts.CANCELLED || 0})</SelectItem>
+            <SelectItem value="open">Open ({repairStatusCounts.open || 0})</SelectItem>
+            <SelectItem value="in_progress">In Progress ({repairStatusCounts.in_progress || 0})</SelectItem>
+            <SelectItem value="resolved">Resolved ({repairStatusCounts.resolved || 0})</SelectItem>
+            <SelectItem value="closed">Closed ({repairStatusCounts.closed || 0})</SelectItem>
+            <SelectItem value="cancelled">Cancelled ({repairStatusCounts.cancelled || 0})</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <CardTitle>Service / Repair Requests</CardTitle>
+          <CardTitle>Work Orders / Service Requests</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/work-orders")}
+            data-testid="button-view-all-work-orders"
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            View All Work Orders
+          </Button>
         </CardHeader>
         <CardContent>
           {repairsLoading ? (
@@ -62,15 +86,16 @@ export function ServiceCallsTab({
           ) : filteredRepairRequests.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Wrench className="h-12 w-12 mb-2" />
-              <p>No service calls found.</p>
+              <p>No service requests found.</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Repair #</TableHead>
+                  <TableHead>WO #</TableHead>
                   <TableHead>Asset</TableHead>
                   <TableHead>Title</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Requested By</TableHead>
@@ -84,52 +109,57 @@ export function ServiceCallsTab({
                 {filteredRepairRequests.map((r: any) => (
                   <TableRow key={r.id} data-testid={`row-service-${r.id}`}>
                     <TableCell className="font-mono text-sm" data-testid={`text-service-number-${r.id}`}>
-                      {r.repairNumber}
+                      {r.workOrderNumber || r.repairNumber || "-"}
                     </TableCell>
                     <TableCell data-testid={`text-service-asset-${r.id}`}>
                       <div>
-                        <span className="font-medium">{r.asset?.name || "-"}</span>
-                        {r.asset?.assetTag && (
-                          <span className="text-xs text-muted-foreground ml-1">({r.asset.assetTag})</span>
+                        <span className="font-medium">{r.asset?.name || r.assetName || "-"}</span>
+                        {(r.asset?.assetTag || r.assetTag) && (
+                          <span className="text-xs text-muted-foreground ml-1">({r.asset?.assetTag || r.assetTag})</span>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell data-testid={`text-service-title-${r.id}`}>{r.title}</TableCell>
+                    <TableCell data-testid={`text-service-title-${r.id}`}>{r.title || r.fieldName || "-"}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {(r.workOrderType || "general").replace(/_/g, " ")}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <Badge
                         variant="outline"
                         className={
-                          r.priority === "URGENT" ? "border-red-500 text-red-700 dark:text-red-400" :
-                          r.priority === "HIGH" ? "border-orange-500 text-orange-700 dark:text-orange-400" :
-                          r.priority === "MEDIUM" ? "border-yellow-500 text-yellow-700 dark:text-yellow-400" :
+                          r.priority === "critical" ? "border-red-500 text-red-700 dark:text-red-400" :
+                          r.priority === "high" ? "border-orange-500 text-orange-700 dark:text-orange-400" :
+                          r.priority === "medium" ? "border-yellow-500 text-yellow-700 dark:text-yellow-400" :
                           "border-muted-foreground"
                         }
                         data-testid={`badge-service-priority-${r.id}`}
                       >
-                        {r.priority}
+                        {PRIORITY_LABELS[r.priority] || r.priority}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge
-                        variant={r.status === "COMPLETED" ? "default" : r.status === "CANCELLED" ? "secondary" : "outline"}
+                        variant={r.status === "resolved" || r.status === "closed" ? "default" : r.status === "cancelled" ? "secondary" : "outline"}
                         className={
-                          r.status === "IN_PROGRESS" ? "border-blue-500 text-blue-700 dark:text-blue-400" :
-                          r.status === "SUBMITTED" ? "border-orange-500 text-orange-700 dark:text-orange-400" :
+                          r.status === "in_progress" ? "border-blue-500 text-blue-700 dark:text-blue-400" :
+                          r.status === "open" ? "border-orange-500 text-orange-700 dark:text-orange-400" :
                           ""
                         }
                         data-testid={`badge-service-status-${r.id}`}
                       >
-                        {r.status === "IN_PROGRESS" ? "In Progress" : r.status}
+                        {STATUS_LABELS[r.status] || r.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">
-                      {r.requestedBy?.name || "-"}
+                      {r.requestedBy?.name || r.requestedByName || "-"}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {r.requestedDate ? new Date(r.requestedDate).toLocaleDateString() : "-"}
+                      {r.requestedDate ? new Date(r.requestedDate).toLocaleDateString() : r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "-"}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {r.vendor?.name || "-"}
+                      {r.vendor?.name || r.supplierName || "-"}
                     </TableCell>
                     <TableCell className="text-sm">
                       {r.estimatedCost
@@ -138,44 +168,33 @@ export function ServiceCallsTab({
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        {r.status === "DRAFT" && (
+                        {r.status === "open" && (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => serviceStatusMutation.mutate({ id: r.id, status: "SUBMITTED" })}
-                            disabled={serviceStatusMutation.isPending}
-                            data-testid={`button-submit-service-${r.id}`}
-                          >
-                            Submit
-                          </Button>
-                        )}
-                        {r.status === "SUBMITTED" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => serviceStatusMutation.mutate({ id: r.id, status: "IN_PROGRESS" })}
+                            onClick={() => serviceStatusMutation.mutate({ id: r.id, status: "in_progress" })}
                             disabled={serviceStatusMutation.isPending}
                             data-testid={`button-start-service-${r.id}`}
                           >
                             Start
                           </Button>
                         )}
-                        {(r.status === "SUBMITTED" || r.status === "IN_PROGRESS") && (
+                        {(r.status === "open" || r.status === "in_progress") && (
                           <Button
                             variant="default"
                             size="sm"
-                            onClick={() => serviceStatusMutation.mutate({ id: r.id, status: "COMPLETED" })}
+                            onClick={() => serviceStatusMutation.mutate({ id: r.id, status: "resolved" })}
                             disabled={serviceStatusMutation.isPending}
                             data-testid={`button-complete-service-${r.id}`}
                           >
-                            Close
+                            Resolve
                           </Button>
                         )}
-                        {r.status !== "COMPLETED" && r.status !== "CANCELLED" && (
+                        {r.status !== "resolved" && r.status !== "closed" && r.status !== "cancelled" && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => serviceStatusMutation.mutate({ id: r.id, status: "CANCELLED" })}
+                            onClick={() => serviceStatusMutation.mutate({ id: r.id, status: "cancelled" })}
                             disabled={serviceStatusMutation.isPending}
                             data-testid={`button-cancel-service-${r.id}`}
                           >
@@ -185,8 +204,8 @@ export function ServiceCallsTab({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => navigate(`/admin/asset-repair/new?assetId=${r.assetId}&editId=${r.id}`)}
-                          data-testid={`button-edit-service-${r.id}`}
+                          onClick={() => navigate(`/work-orders?selected=${r.id}`)}
+                          data-testid={`button-view-wo-${r.id}`}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>

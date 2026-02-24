@@ -2775,17 +2775,20 @@ export type ChecklistInstance = typeof checklistInstances.$inferSelect;
 // ==================== CHECKLIST WORK ORDERS ====================
 export const workOrderStatusEnum = pgEnum("work_order_status", ["open", "in_progress", "resolved", "closed", "cancelled"]);
 export const workOrderPriorityEnum = pgEnum("work_order_priority", ["low", "medium", "high", "critical"]);
-export const workOrderTypeEnum = pgEnum("work_order_type", ["defect", "maintenance", "safety", "corrective_action", "inspection", "warranty", "general"]);
+export const workOrderTypeEnum = pgEnum("work_order_type", ["defect", "maintenance", "safety", "corrective_action", "inspection", "warranty", "general", "service_request"]);
 
 export const checklistWorkOrders = pgTable("checklist_work_orders", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).references(() => companies.id, { onDelete: "cascade" }).notNull(),
-  checklistInstanceId: varchar("checklist_instance_id", { length: 36 }).references(() => checklistInstances.id, { onDelete: "restrict" }).notNull(),
-  fieldId: varchar("field_id", { length: 100 }).notNull(),
-  fieldName: varchar("field_name", { length: 255 }).notNull(),
-  sectionName: varchar("section_name", { length: 255 }).notNull(),
+  workOrderNumber: varchar("work_order_number", { length: 50 }),
+  checklistInstanceId: varchar("checklist_instance_id", { length: 36 }).references(() => checklistInstances.id, { onDelete: "restrict" }),
+  fieldId: varchar("field_id", { length: 100 }),
+  fieldName: varchar("field_name", { length: 255 }),
+  sectionName: varchar("section_name", { length: 255 }),
   triggerValue: varchar("trigger_value", { length: 255 }),
   result: varchar("result", { length: 255 }),
+  title: varchar("title", { length: 500 }),
+  issueDescription: text("issue_description"),
   details: text("details"),
   photos: jsonb("photos").default([]),
   status: workOrderStatusEnum("status").default("open").notNull(),
@@ -2794,6 +2797,18 @@ export const checklistWorkOrders = pgTable("checklist_work_orders", {
   assignedTo: varchar("assigned_to", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
   supplierId: varchar("supplier_id", { length: 36 }),
   supplierName: varchar("supplier_name", { length: 255 }),
+  vendorNotes: text("vendor_notes"),
+  assetId: varchar("asset_id", { length: 36 }).references(() => assets.id, { onDelete: "set null" }),
+  assetLocation: varchar("asset_location", { length: 500 }),
+  assetConditionBefore: text("asset_condition_before"),
+  assetConditionAfter: text("asset_condition_after"),
+  estimatedCost: decimal("estimated_cost", { precision: 14, scale: 2 }),
+  actualCost: decimal("actual_cost", { precision: 14, scale: 2 }),
+  requestedById: varchar("requested_by_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+  requestedDate: timestamp("requested_date"),
+  desiredServiceDate: text("desired_service_date"),
+  completedAt: timestamp("completed_at"),
+  completedById: varchar("completed_by_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
   resolvedBy: varchar("resolved_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
   resolvedAt: timestamp("resolved_at"),
   resolutionNotes: text("resolution_notes"),
@@ -2806,6 +2821,8 @@ export const checklistWorkOrders = pgTable("checklist_work_orders", {
   fieldIdx: index("checklist_wo_field_idx").on(table.checklistInstanceId, table.fieldId),
   statusIdx: index("checklist_wo_status_idx").on(table.status),
   typeIdx: index("checklist_wo_type_idx").on(table.workOrderType),
+  assetIdx: index("checklist_wo_asset_idx").on(table.assetId),
+  numberIdx: uniqueIndex("checklist_wo_number_company_idx").on(table.workOrderNumber, table.companyId),
 }));
 
 export const insertChecklistWorkOrderSchema = createInsertSchema(checklistWorkOrders).omit({ id: true, createdAt: true, updatedAt: true });

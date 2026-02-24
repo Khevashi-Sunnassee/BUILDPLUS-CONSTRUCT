@@ -25,10 +25,10 @@ import type { EntitySidebarRoutes } from "@/lib/sidebar-utils";
 interface WorkOrder {
   id: string;
   companyId: string;
-  checklistInstanceId: string;
-  fieldId: string;
-  fieldName: string;
-  sectionName: string;
+  checklistInstanceId: string | null;
+  fieldId: string | null;
+  fieldName: string | null;
+  sectionName: string | null;
   triggerValue: string | null;
   result: string | null;
   details: string | null;
@@ -50,6 +50,21 @@ interface WorkOrder {
   instanceStatus: string | null;
   assignedUserName: string | null;
   assignedUserEmail: string | null;
+  workOrderNumber: string | null;
+  title: string | null;
+  issueDescription: string | null;
+  assetId: string | null;
+  assetName: string | null;
+  assetTag: string | null;
+  assetLocation: string | null;
+  assetConditionBefore: string | null;
+  assetConditionAfter: string | null;
+  estimatedCost: string | null;
+  actualCost: string | null;
+  vendorNotes: string | null;
+  requestedById: string | null;
+  requestedDate: string | null;
+  desiredServiceDate: string | null;
 }
 
 interface WorkOrderStats {
@@ -113,6 +128,7 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; icon: typeof W
   inspection: { label: "Inspection", color: "text-teal-600 bg-teal-50 border-teal-200 dark:text-teal-400 dark:bg-teal-950 dark:border-teal-800", icon: ClipboardList },
   warranty: { label: "Warranty", color: "text-indigo-600 bg-indigo-50 border-indigo-200 dark:text-indigo-400 dark:bg-indigo-950 dark:border-indigo-800", icon: FileText },
   general: { label: "General", color: "text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-950 dark:border-gray-800", icon: Tag },
+  service_request: { label: "Service Request", color: "text-cyan-600 bg-cyan-50 border-cyan-200 dark:text-cyan-400 dark:bg-cyan-950 dark:border-cyan-800", icon: Wrench },
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -265,23 +281,72 @@ function DetailTabContent({
         </Button>
       </div>
 
+      {order.workOrderNumber && (
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Work Order #</label>
+          <p className="text-sm font-mono font-medium" data-testid="text-detail-wo-number">{order.workOrderNumber}</p>
+        </div>
+      )}
+
+      {order.assetId && (
+        <div className="rounded-md border p-2 bg-muted/30 space-y-1 mb-2">
+          <label className="text-xs font-medium text-muted-foreground">Asset</label>
+          <p className="text-sm font-medium" data-testid="text-detail-asset">{order.assetName || "—"}{order.assetTag ? ` (${order.assetTag})` : ""}</p>
+          {order.assetLocation && <p className="text-xs text-muted-foreground">Location: {order.assetLocation}</p>}
+          {order.assetConditionBefore && <p className="text-xs text-muted-foreground">Condition (before): {order.assetConditionBefore}</p>}
+          {order.assetConditionAfter && <p className="text-xs text-muted-foreground">Condition (after): {order.assetConditionAfter}</p>}
+        </div>
+      )}
+
+      {order.title && (
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Title</label>
+          <p className="text-sm font-medium" data-testid="text-detail-title">{order.title}</p>
+        </div>
+      )}
+
+      {order.issueDescription && (
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Issue Description</label>
+          <p className="text-sm" data-testid="text-detail-issue">{order.issueDescription}</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Field</label>
-          <p className="text-sm font-medium" data-testid="text-detail-field">{order.fieldName}</p>
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Section</label>
-          <p className="text-sm" data-testid="text-detail-section">{order.sectionName}</p>
-        </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Result</label>
-          <p className="text-sm font-medium text-red-600 dark:text-red-400" data-testid="text-detail-result">{order.result || "\u2014"}</p>
-        </div>
+        {order.fieldName && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Field</label>
+            <p className="text-sm font-medium" data-testid="text-detail-field">{order.fieldName}</p>
+          </div>
+        )}
+        {order.sectionName && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Section</label>
+            <p className="text-sm" data-testid="text-detail-section">{order.sectionName}</p>
+          </div>
+        )}
+        {order.result && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Result</label>
+            <p className="text-sm font-medium text-red-600 dark:text-red-400" data-testid="text-detail-result">{order.result}</p>
+          </div>
+        )}
         <div className="space-y-1">
           <label className="text-xs font-medium text-muted-foreground">Created</label>
           <p className="text-sm" data-testid="text-detail-created">{formatDateTime(order.createdAt)}</p>
         </div>
+        {order.estimatedCost && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Estimated Cost</label>
+            <p className="text-sm font-medium" data-testid="text-detail-est-cost">${parseFloat(order.estimatedCost).toLocaleString()}</p>
+          </div>
+        )}
+        {order.actualCost && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Actual Cost</label>
+            <p className="text-sm font-medium" data-testid="text-detail-act-cost">${parseFloat(order.actualCost).toLocaleString()}</p>
+          </div>
+        )}
       </div>
 
       <Separator />
@@ -419,12 +484,14 @@ export default function ChecklistWorkOrdersPage() {
   useDocumentTitle("Work Orders Hub");
 
   const { toast } = useToast();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialSelectedId = urlParams.get("selected");
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [assignmentTab, setAssignmentTab] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(!!initialSelectedId);
 
   const { data: stats, isLoading: statsLoading } = useQuery<WorkOrderStats>({
     queryKey: ["/api/checklist/work-orders/stats"],
@@ -471,12 +538,16 @@ export default function ChecklistWorkOrdersPage() {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(o =>
-        o.fieldName.toLowerCase().includes(q) ||
-        o.sectionName.toLowerCase().includes(q) ||
+        (o.fieldName || "").toLowerCase().includes(q) ||
+        (o.sectionName || "").toLowerCase().includes(q) ||
         (o.templateName || "").toLowerCase().includes(q) ||
         (o.instanceNumber || "").toLowerCase().includes(q) ||
         (o.assignedUserName || "").toLowerCase().includes(q) ||
-        (o.supplierName || "").toLowerCase().includes(q)
+        (o.supplierName || "").toLowerCase().includes(q) ||
+        (o.title || "").toLowerCase().includes(q) ||
+        (o.workOrderNumber || "").toLowerCase().includes(q) ||
+        (o.assetName || "").toLowerCase().includes(q) ||
+        (o.assetTag || "").toLowerCase().includes(q)
       );
     }
     return filtered;
@@ -516,7 +587,7 @@ export default function ChecklistWorkOrdersPage() {
             <Wrench className="h-6 w-6 text-primary" />
             <div>
               <h1 className="text-xl font-semibold" data-testid="text-page-title">Work Orders Hub</h1>
-              <p className="text-sm text-muted-foreground">Manage checklist-triggered work orders across all jobs</p>
+              <p className="text-sm text-muted-foreground">Manage work orders, service requests, and checklist-triggered items</p>
             </div>
           </div>
         </div>
@@ -589,7 +660,10 @@ export default function ChecklistWorkOrdersPage() {
             ) : (
               filteredOrders.map((order) => {
                 const isSelected = order.id === selectedId;
-                const typeConfig = TYPE_CONFIG[order.workOrderType || "general"] || TYPE_CONFIG.general;
+                const displayName = order.title || order.fieldName || "Work Order";
+                const subtitle = order.assetId
+                  ? `${order.assetName || "Asset"}${order.assetTag ? ` (${order.assetTag})` : ""}`
+                  : `${order.sectionName || ""}${order.templateName ? ` · ${order.templateName}` : ""}`;
                 return (
                   <div
                     key={order.id}
@@ -600,18 +674,26 @@ export default function ChecklistWorkOrdersPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          {order.workOrderNumber && (
+                            <span className="text-xs font-mono text-muted-foreground">{order.workOrderNumber}</span>
+                          )}
                           <p className="text-sm font-medium truncate" data-testid={`text-field-name-${order.id}`}>
-                            {order.fieldName}
+                            {displayName}
                           </p>
                           <StatusBadge status={order.status} />
                           <PriorityBadge priority={order.priority} />
                           <TypeBadge type={order.workOrderType || "general"} />
                         </div>
                         <p className="text-xs text-muted-foreground truncate">
-                          {order.sectionName} {order.templateName ? `\u00B7 ${order.templateName}` : ""}
+                          {subtitle}
                         </p>
                         <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
-                          <span>Result: <span className="font-medium text-foreground">{order.result || "\u2014"}</span></span>
+                          {order.result && (
+                            <span>Result: <span className="font-medium text-foreground">{order.result}</span></span>
+                          )}
+                          {order.issueDescription && !order.result && (
+                            <span className="truncate max-w-[200px]">{order.issueDescription}</span>
+                          )}
                           {order.assignedUserName && (
                             <span className="flex items-center gap-1">
                               <User className="h-3 w-3" />
@@ -630,6 +712,9 @@ export default function ChecklistWorkOrdersPage() {
                               Due: {formatDate(order.dueDate)}
                             </span>
                           )}
+                          {order.estimatedCost && (
+                            <span>Est: ${parseFloat(order.estimatedCost).toLocaleString()}</span>
+                          )}
                           <span>{formatDate(order.createdAt)}</span>
                         </div>
                       </div>
@@ -645,7 +730,7 @@ export default function ChecklistWorkOrdersPage() {
       {selectedOrder && sidebarOpen && (
         <EntitySidebar
           entityId={selectedId}
-          entityName={`WO: ${selectedOrder.fieldName}`}
+          entityName={`WO: ${selectedOrder.workOrderNumber || selectedOrder.title || selectedOrder.fieldName || "Work Order"}`}
           routes={WORK_ORDER_ROUTES}
           invalidationKeys={[["/api/checklist/work-orders"], ["/api/checklist/work-orders/stats"]]}
           onClose={handleCloseSidebar}

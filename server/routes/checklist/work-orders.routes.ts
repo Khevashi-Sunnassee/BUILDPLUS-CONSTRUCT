@@ -7,12 +7,19 @@ import {
   logger,
 } from "./shared";
 import { sql as dsql, isNull, isNotNull, or } from "drizzle-orm";
-import { workOrderUpdates, workOrderFiles } from "@shared/schema";
+import { workOrderUpdates, workOrderFiles, assets, suppliers } from "@shared/schema";
 import multer from "multer";
 import { parseEmailFile, summarizeEmailBody } from "../../utils/email-parser";
 import { validateUploads } from "../../middleware/file-validation";
+import { z } from "zod";
 
 const router = Router();
+
+async function getNextWorkOrderNumber(companyId: string): Promise<string> {
+  const { getNextSequenceNumber } = await import("../../lib/sequence-generator");
+  const year = new Date().getFullYear();
+  return getNextSequenceNumber("work_order", `${companyId}_${year}`, `WO-${year}-`, 4);
+}
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const emailUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
@@ -144,12 +151,15 @@ router.get("/api/checklist/work-orders", requireAuth, async (req: Request, res: 
     const orders = await db.select({
       id: checklistWorkOrders.id,
       companyId: checklistWorkOrders.companyId,
+      workOrderNumber: checklistWorkOrders.workOrderNumber,
       checklistInstanceId: checklistWorkOrders.checklistInstanceId,
       fieldId: checklistWorkOrders.fieldId,
       fieldName: checklistWorkOrders.fieldName,
       sectionName: checklistWorkOrders.sectionName,
       triggerValue: checklistWorkOrders.triggerValue,
       result: checklistWorkOrders.result,
+      title: checklistWorkOrders.title,
+      issueDescription: checklistWorkOrders.issueDescription,
       details: checklistWorkOrders.details,
       photos: checklistWorkOrders.photos,
       status: checklistWorkOrders.status,
@@ -158,10 +168,17 @@ router.get("/api/checklist/work-orders", requireAuth, async (req: Request, res: 
       assignedTo: checklistWorkOrders.assignedTo,
       supplierId: checklistWorkOrders.supplierId,
       supplierName: checklistWorkOrders.supplierName,
+      vendorNotes: checklistWorkOrders.vendorNotes,
+      assetId: checklistWorkOrders.assetId,
+      estimatedCost: checklistWorkOrders.estimatedCost,
+      actualCost: checklistWorkOrders.actualCost,
+      requestedById: checklistWorkOrders.requestedById,
+      requestedDate: checklistWorkOrders.requestedDate,
       dueDate: checklistWorkOrders.dueDate,
       resolvedBy: checklistWorkOrders.resolvedBy,
       resolvedAt: checklistWorkOrders.resolvedAt,
       resolutionNotes: checklistWorkOrders.resolutionNotes,
+      completedAt: checklistWorkOrders.completedAt,
       createdAt: checklistWorkOrders.createdAt,
       updatedAt: checklistWorkOrders.updatedAt,
       templateName: checklistTemplates.name,
@@ -169,11 +186,14 @@ router.get("/api/checklist/work-orders", requireAuth, async (req: Request, res: 
       instanceStatus: checklistInstances.status,
       assignedUserName: users.name,
       assignedUserEmail: users.email,
+      assetName: assets.name,
+      assetTag: assets.assetTag,
     })
       .from(checklistWorkOrders)
       .leftJoin(checklistInstances, eq(checklistWorkOrders.checklistInstanceId, checklistInstances.id))
       .leftJoin(checklistTemplates, eq(checklistInstances.templateId, checklistTemplates.id))
       .leftJoin(users, eq(checklistWorkOrders.assignedTo, users.id))
+      .leftJoin(assets, eq(checklistWorkOrders.assetId, assets.id))
       .where(and(...conditions))
       .orderBy(desc(checklistWorkOrders.createdAt))
       .limit(safeLimit);
@@ -181,6 +201,135 @@ router.get("/api/checklist/work-orders", requireAuth, async (req: Request, res: 
     res.json(orders);
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch all work orders");
+    res.status(500).json({ error: "Failed to fetch work orders" });
+  }
+});
+
+const createWorkOrderSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  issueDescription: z.string().optional().nullable(),
+  details: z.string().optional().nullable(),
+  priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
+  workOrderType: z.enum(["defect", "maintenance", "safety", "corrective_action", "inspection", "warranty", "general", "service_request"]).default("service_request"),
+  assetId: z.string().optional().nullable(),
+  assetLocation: z.string().optional().nullable(),
+  assetConditionBefore: z.string().optional().nullable(),
+  estimatedCost: z.any().optional().nullable(),
+  desiredServiceDate: z.string().optional().nullable(),
+  assignedTo: z.string().optional().nullable(),
+  supplierId: z.string().optional().nullable(),
+  supplierName: z.string().optional().nullable(),
+  vendorNotes: z.string().optional().nullable(),
+  dueDate: z.string().optional().nullable(),
+});
+
+router.post("/api/checklist/work-orders", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    const userId = req.session.userId;
+    if (!companyId || !userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const parsed = createWorkOrderSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+
+    const data = parsed.data;
+    const workOrderNumber = await getNextWorkOrderNumber(companyId);
+
+    const [created] = await db.insert(checklistWorkOrders).values({
+      companyId,
+      workOrderNumber,
+      title: data.title,
+      issueDescription: data.issueDescription || null,
+      details: data.details || null,
+      priority: data.priority,
+      workOrderType: data.workOrderType,
+      assetId: data.assetId || null,
+      assetLocation: data.assetLocation || null,
+      assetConditionBefore: data.assetConditionBefore || null,
+      estimatedCost: data.estimatedCost ? String(data.estimatedCost) : null,
+      desiredServiceDate: data.desiredServiceDate || null,
+      assignedTo: data.assignedTo || null,
+      supplierId: data.supplierId || null,
+      supplierName: data.supplierName || null,
+      vendorNotes: data.vendorNotes || null,
+      dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      requestedById: userId,
+      requestedDate: new Date(),
+      status: "open",
+    }).returning();
+
+    res.status(201).json(created);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Failed to create work order");
+    res.status(500).json({ error: "Failed to create work order" });
+  }
+});
+
+router.get("/api/checklist/work-orders/next-number", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const workOrderNumber = await getNextWorkOrderNumber(companyId);
+    res.json({ workOrderNumber });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error getting next work order number");
+    res.status(500).json({ error: "Failed to get next work order number" });
+  }
+});
+
+router.get("/api/checklist/work-orders/by-asset/:assetId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    const assetId = String(req.params.assetId);
+    if (!companyId) return res.status(400).json({ error: "Company ID required" });
+
+    const orders = await db.select({
+      id: checklistWorkOrders.id,
+      companyId: checklistWorkOrders.companyId,
+      workOrderNumber: checklistWorkOrders.workOrderNumber,
+      checklistInstanceId: checklistWorkOrders.checklistInstanceId,
+      title: checklistWorkOrders.title,
+      issueDescription: checklistWorkOrders.issueDescription,
+      fieldName: checklistWorkOrders.fieldName,
+      sectionName: checklistWorkOrders.sectionName,
+      details: checklistWorkOrders.details,
+      status: checklistWorkOrders.status,
+      priority: checklistWorkOrders.priority,
+      workOrderType: checklistWorkOrders.workOrderType,
+      assignedTo: checklistWorkOrders.assignedTo,
+      supplierId: checklistWorkOrders.supplierId,
+      supplierName: checklistWorkOrders.supplierName,
+      vendorNotes: checklistWorkOrders.vendorNotes,
+      assetId: checklistWorkOrders.assetId,
+      assetLocation: checklistWorkOrders.assetLocation,
+      estimatedCost: checklistWorkOrders.estimatedCost,
+      actualCost: checklistWorkOrders.actualCost,
+      requestedById: checklistWorkOrders.requestedById,
+      requestedDate: checklistWorkOrders.requestedDate,
+      desiredServiceDate: checklistWorkOrders.desiredServiceDate,
+      completedAt: checklistWorkOrders.completedAt,
+      completedById: checklistWorkOrders.completedById,
+      resolvedBy: checklistWorkOrders.resolvedBy,
+      resolvedAt: checklistWorkOrders.resolvedAt,
+      resolutionNotes: checklistWorkOrders.resolutionNotes,
+      dueDate: checklistWorkOrders.dueDate,
+      createdAt: checklistWorkOrders.createdAt,
+      updatedAt: checklistWorkOrders.updatedAt,
+      assignedUserName: users.name,
+      assignedUserEmail: users.email,
+      assetName: assets.name,
+      assetTag: assets.assetTag,
+    })
+      .from(checklistWorkOrders)
+      .leftJoin(users, eq(checklistWorkOrders.assignedTo, users.id))
+      .leftJoin(assets, eq(checklistWorkOrders.assetId, assets.id))
+      .where(and(eq(checklistWorkOrders.companyId, companyId!), eq(checklistWorkOrders.assetId, assetId)))
+      .orderBy(desc(checklistWorkOrders.createdAt))
+      .limit(500);
+
+    res.json(orders);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Failed to fetch work orders by asset");
     res.status(500).json({ error: "Failed to fetch work orders" });
   }
 });
@@ -197,6 +346,10 @@ router.get("/api/checklist/work-orders/:id/checklist-detail", requireAuth, async
       .limit(1);
 
     if (!workOrder) return res.status(404).json({ error: "Work order not found" });
+
+    if (!workOrder.checklistInstanceId) {
+      return res.json({ workOrder, instance: null, template: null });
+    }
 
     const [instance] = await db.select()
       .from(checklistInstances)
@@ -224,22 +377,36 @@ router.patch("/api/checklist/work-orders/:id", requireAuth, async (req: Request,
     const userId = req.session.userId;
     if (!companyId) return res.status(400).json({ error: "Company ID required" });
 
-    const { status, resolutionNotes, priority, details, assignedTo, workOrderType, supplierId, supplierName, dueDate } = req.body;
+    const { status, resolutionNotes, priority, details, assignedTo, workOrderType, 
+      supplierId, supplierName, dueDate, title, issueDescription, vendorNotes,
+      assetLocation, assetConditionBefore, assetConditionAfter,
+      estimatedCost, actualCost, desiredServiceDate } = req.body;
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (status) updateData.status = status;
     if (resolutionNotes !== undefined) updateData.resolutionNotes = resolutionNotes;
     if (priority) updateData.priority = priority;
     if (details !== undefined) updateData.details = details;
+    if (title !== undefined) updateData.title = title;
+    if (issueDescription !== undefined) updateData.issueDescription = issueDescription;
     if (assignedTo !== undefined) updateData.assignedTo = assignedTo || null;
     if (workOrderType !== undefined) updateData.workOrderType = workOrderType;
     if (supplierId !== undefined) updateData.supplierId = supplierId || null;
     if (supplierName !== undefined) updateData.supplierName = supplierName || null;
+    if (vendorNotes !== undefined) updateData.vendorNotes = vendorNotes || null;
     if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
+    if (assetLocation !== undefined) updateData.assetLocation = assetLocation || null;
+    if (assetConditionBefore !== undefined) updateData.assetConditionBefore = assetConditionBefore || null;
+    if (assetConditionAfter !== undefined) updateData.assetConditionAfter = assetConditionAfter || null;
+    if (estimatedCost !== undefined) updateData.estimatedCost = estimatedCost ? String(estimatedCost) : null;
+    if (actualCost !== undefined) updateData.actualCost = actualCost ? String(actualCost) : null;
+    if (desiredServiceDate !== undefined) updateData.desiredServiceDate = desiredServiceDate || null;
 
     if (status === "resolved" || status === "closed") {
       updateData.resolvedBy = userId;
       updateData.resolvedAt = new Date();
+      updateData.completedAt = new Date();
+      updateData.completedById = userId;
     }
 
     const [updated] = await db.update(checklistWorkOrders)
