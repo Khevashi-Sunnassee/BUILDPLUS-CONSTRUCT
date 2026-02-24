@@ -46,4 +46,9 @@ integrations = ["javascript_openai_ai_integrations:2.0.0", "javascript_object_st
 
 [userenv.shared]
 SUPER_ADMIN_EMAILS = "admin@buildplusai.com"
+
+[userenv.development]
+MYOB_REDIRECT_URI = "https://237451d2-dfc9-4fcc-9ecc-a157561ba7f8-00-3jxjv4yzkjlvk.worf.replit.dev/api/myob/callback"
+
+[userenv.production]
 MYOB_REDIRECT_URI = "https://buildplusai.com/api/myob/callback"
