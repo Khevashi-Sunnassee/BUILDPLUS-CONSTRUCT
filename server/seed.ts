@@ -682,8 +682,7 @@ export async function ensureSystemChecklistModules() {
         const existing = await db.select().from(entityTypes)
           .where(and(
             eq(entityTypes.companyId, company.id),
-            eq(entityTypes.code, mod.code),
-            eq(entityTypes.isSystemDefault, true)
+            eq(entityTypes.code, mod.code)
           ));
 
         let entityTypeId: string;
@@ -704,6 +703,9 @@ export async function ensureSystemChecklistModules() {
           logger.info(`Created system module: ${mod.name} for company ${company.id}`);
         } else {
           entityTypeId = existing[0].id;
+          if (!existing[0].isSystemDefault) {
+            await db.update(entityTypes).set({ isSystemDefault: true }).where(eq(entityTypes.id, entityTypeId));
+          }
         }
 
         if (mod.code === "EQUIPMENT") {
