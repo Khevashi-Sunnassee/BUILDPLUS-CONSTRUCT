@@ -12,6 +12,9 @@ import multer from "multer";
 import { parseEmailFile, summarizeEmailBody } from "../../utils/email-parser";
 import { validateUploads } from "../../middleware/file-validation";
 import { z } from "zod";
+import { emailDispatchService } from "../../services/email-dispatch.service";
+import { twilioService } from "../../services/twilio.service";
+import { buildBrandedEmail } from "../../lib/email-template";
 
 const router = Router();
 
@@ -380,7 +383,7 @@ router.patch("/api/checklist/work-orders/:id", requireAuth, async (req: Request,
     const { status, resolutionNotes, priority, details, assignedTo, workOrderType, 
       supplierId, supplierName, dueDate, title, issueDescription, vendorNotes,
       assetLocation, assetConditionBefore, assetConditionAfter,
-      estimatedCost, actualCost, desiredServiceDate } = req.body;
+      estimatedCost, actualCost, desiredServiceDate, notifications } = req.body;
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (status) updateData.status = status;
@@ -415,6 +418,62 @@ router.patch("/api/checklist/work-orders/:id", requireAuth, async (req: Request,
       .returning();
 
     if (!updated) return res.status(404).json({ error: "Work order not found" });
+
+    const shouldNotify = notifications && typeof notifications === "object"
+      && updated.assignedTo && (notifications.email || notifications.sms);
+
+    if (shouldNotify) {
+      try {
+        const [assignedUser] = await db.select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          phone: users.phone,
+        }).from(users).where(and(eq(users.id, updated.assignedTo!), eq(users.companyId, companyId!))).limit(1);
+
+        const [updatingUser] = await db.select({ name: users.name }).from(users).where(and(eq(users.id, userId!), eq(users.companyId, companyId!))).limit(1);
+        const updaterName = updatingUser?.name || "Someone";
+        const woNumber = updated.workOrderNumber || updated.id;
+        const woTitle = updated.title || updated.fieldName || `Work Order ${woNumber}`;
+
+        if (assignedUser) {
+          if (notifications.email && assignedUser.email) {
+            const htmlContent = await buildBrandedEmail({
+              title: `Work Order Assigned: ${woTitle}`,
+              body: `
+                <p>Hi ${assignedUser.name || "there"},</p>
+                <p><strong>${updaterName}</strong> has updated work order <strong>${woNumber}</strong> and assigned it to you.</p>
+                <table style="width:100%; border-collapse:collapse; margin:16px 0;">
+                  <tr><td style="padding:6px 12px; border:1px solid #ddd; font-weight:600;">Work Order</td><td style="padding:6px 12px; border:1px solid #ddd;">${woNumber}</td></tr>
+                  <tr><td style="padding:6px 12px; border:1px solid #ddd; font-weight:600;">Title</td><td style="padding:6px 12px; border:1px solid #ddd;">${woTitle}</td></tr>
+                  <tr><td style="padding:6px 12px; border:1px solid #ddd; font-weight:600;">Status</td><td style="padding:6px 12px; border:1px solid #ddd;">${updated.status}</td></tr>
+                  <tr><td style="padding:6px 12px; border:1px solid #ddd; font-weight:600;">Priority</td><td style="padding:6px 12px; border:1px solid #ddd;">${updated.priority}</td></tr>
+                </table>
+                <p>Please review and take any necessary action.</p>
+              `,
+              companyId: companyId!,
+            });
+
+            emailDispatchService.enqueueDirectEmail({
+              companyId: companyId!,
+              to: assignedUser.email,
+              subject: `Work Order Assigned: ${woNumber} - ${woTitle}`,
+              htmlBody: htmlContent,
+              userId: userId!,
+            }).catch(err => logger.error({ err }, "Failed to queue work order assignment email"));
+          }
+
+          if (notifications.sms && assignedUser.phone) {
+            const smsBody = `BuildPlus: Work order ${woNumber} "${woTitle}" has been assigned to you by ${updaterName}. Status: ${updated.status}, Priority: ${updated.priority}.`;
+            twilioService.sendSMS(assignedUser.phone, smsBody)
+              .catch(err => logger.error({ err }, "Failed to send work order assignment SMS"));
+          }
+        }
+      } catch (notifError: unknown) {
+        logger.error({ err: notifError }, "Failed to send work order notifications (non-blocking)");
+      }
+    }
+
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to update work order");

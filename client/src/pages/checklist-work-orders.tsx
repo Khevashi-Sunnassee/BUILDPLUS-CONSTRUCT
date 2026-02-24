@@ -17,8 +17,11 @@ import {
   AlertTriangle, CheckCircle2, Clock, ClipboardList,
   Loader2, Search, User, XCircle, AlertCircle, Wrench,
   Save, Calendar, Building2, Tag, FileText, MessageSquare,
-  Paperclip, Info, UserCheck, UserX,
+  Paperclip, Info, UserCheck, UserX, Bell, Mail, Smartphone,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { PROCUREMENT_ROUTES } from "@shared/api-routes";
 import { EntitySidebar } from "@/components/EntitySidebar";
 import type { EntitySidebarRoutes } from "@/lib/sidebar-utils";
 
@@ -85,6 +88,12 @@ interface CompanyUser {
   id: string;
   name: string | null;
   email: string;
+  phone?: string | null;
+}
+
+interface Supplier {
+  id: string;
+  name: string;
 }
 
 const WORK_ORDER_ROUTES: EntitySidebarRoutes = {
@@ -214,12 +223,14 @@ function DashboardTiles({ stats, isLoading, activeFilter, onFilterClick }: {
 function DetailTabContent({
   order,
   companyUsers,
+  suppliers,
   onSave,
   isPending,
 }: {
   order: WorkOrder;
   companyUsers: CompanyUser[];
-  onSave: (updates: Record<string, unknown>) => void;
+  suppliers: Supplier[];
+  onSave: (updates: Record<string, unknown>, notifications?: { email: boolean; sms: boolean }) => void;
   isPending: boolean;
 }) {
   const [editDetails, setEditDetails] = useState(order.details || "");
@@ -228,9 +239,11 @@ function DetailTabContent({
   const [editPriority, setEditPriority] = useState(order.priority);
   const [editResolutionNotes, setEditResolutionNotes] = useState(order.resolutionNotes || "");
   const [editType, setEditType] = useState(order.workOrderType || "general");
-  const [editSupplierName, setEditSupplierName] = useState(order.supplierName || "");
+  const [editSupplierId, setEditSupplierId] = useState(order.supplierId || "");
   const [editDueDate, setEditDueDate] = useState(order.dueDate ? new Date(order.dueDate).toISOString().slice(0, 10) : "");
   const [isDirty, setIsDirty] = useState(false);
+  const [notifyEmail, setNotifyEmail] = useState(false);
+  const [notifySms, setNotifySms] = useState(false);
 
   useEffect(() => {
     setEditDetails(order.details || "");
@@ -239,9 +252,11 @@ function DetailTabContent({
     setEditPriority(order.priority);
     setEditResolutionNotes(order.resolutionNotes || "");
     setEditType(order.workOrderType || "general");
-    setEditSupplierName(order.supplierName || "");
+    setEditSupplierId(order.supplierId || "");
     setEditDueDate(order.dueDate ? new Date(order.dueDate).toISOString().slice(0, 10) : "");
     setIsDirty(false);
+    setNotifyEmail(false);
+    setNotifySms(false);
   }, [order.id]);
 
   const handleFieldChange = useCallback((setter: (v: string) => void) => {
@@ -251,6 +266,8 @@ function DetailTabContent({
     };
   }, []);
 
+  const selectedSupplier = suppliers.find(s => s.id === editSupplierId);
+
   const handleSave = useCallback(() => {
     onSave({
       details: editDetails,
@@ -259,11 +276,14 @@ function DetailTabContent({
       priority: editPriority,
       resolutionNotes: editResolutionNotes || null,
       workOrderType: editType,
-      supplierName: editSupplierName || null,
+      supplierId: editSupplierId || null,
+      supplierName: selectedSupplier?.name || null,
       dueDate: editDueDate || null,
-    });
+    }, { email: notifyEmail, sms: notifySms });
     setIsDirty(false);
-  }, [editDetails, editAssignedTo, editStatus, editPriority, editResolutionNotes, editType, editSupplierName, editDueDate, onSave]);
+    setNotifyEmail(false);
+    setNotifySms(false);
+  }, [editDetails, editAssignedTo, editStatus, editPriority, editResolutionNotes, editType, editSupplierId, selectedSupplier, editDueDate, notifyEmail, notifySms, onSave]);
 
   return (
     <div className="p-4 space-y-4 overflow-y-auto" data-testid="tab-details">
@@ -420,13 +440,17 @@ function DetailTabContent({
         <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
           <Building2 className="h-3 w-3" /> Supplier
         </label>
-        <Input
-          value={editSupplierName}
-          onChange={(e) => handleFieldChange(setEditSupplierName)(e.target.value)}
-          placeholder="Enter supplier name"
-          className="h-8 text-xs"
-          data-testid="input-supplier"
-        />
+        <Select value={editSupplierId || "none"} onValueChange={(v) => handleFieldChange(setEditSupplierId)(v === "none" ? "" : v)}>
+          <SelectTrigger className="h-8 text-xs" data-testid="select-supplier">
+            <SelectValue placeholder="Select supplier" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No Supplier</SelectItem>
+            {suppliers.map((s) => (
+              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-1">
@@ -451,6 +475,42 @@ function DetailTabContent({
           className="min-h-[60px] text-xs"
           data-testid="textarea-details"
         />
+      </div>
+
+      <Separator />
+
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          <Bell className="h-3 w-3" /> Notify Assigned Person on Save
+        </label>
+        {editAssignedTo ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="notify-email"
+                checked={notifyEmail}
+                onCheckedChange={(checked) => { setNotifyEmail(!!checked); setIsDirty(true); }}
+                data-testid="checkbox-notify-email"
+              />
+              <Label htmlFor="notify-email" className="text-xs flex items-center gap-1.5 cursor-pointer">
+                <Mail className="h-3 w-3" /> Send Email Notification
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="notify-sms"
+                checked={notifySms}
+                onCheckedChange={(checked) => { setNotifySms(!!checked); setIsDirty(true); }}
+                data-testid="checkbox-notify-sms"
+              />
+              <Label htmlFor="notify-sms" className="text-xs flex items-center gap-1.5 cursor-pointer">
+                <Smartphone className="h-3 w-3" /> Send SMS/Text Notification
+              </Label>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Assign a person above to enable notifications</p>
+        )}
       </div>
 
       {(editStatus === "resolved" || editStatus === "closed") && (
@@ -512,14 +572,27 @@ export default function ChecklistWorkOrdersPage() {
     queryKey: ["/api/users"],
   });
 
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_ACTIVE],
+  });
+
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: string; updates: Record<string, unknown> }) => {
-      return apiRequest("PATCH", `/api/checklist/work-orders/${data.id}`, data.updates);
+    mutationFn: async (data: { id: string; updates: Record<string, unknown>; notifications?: { email: boolean; sms: boolean } }) => {
+      const res = await apiRequest("PATCH", `/api/checklist/work-orders/${data.id}`, {
+        ...data.updates,
+        notifications: data.notifications,
+      });
+      return { response: res, notifications: data.notifications };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/checklist/work-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/checklist/work-orders/stats"] });
-      toast({ title: "Work order updated" });
+      const notifs = result?.notifications;
+      const parts: string[] = [];
+      if (notifs?.email) parts.push("email");
+      if (notifs?.sms) parts.push("SMS");
+      const notifMsg = parts.length > 0 ? `. ${parts.join(" & ")} notification sent.` : "";
+      toast({ title: `Work order updated${notifMsg}` });
     },
     onError: () => {
       toast({ title: "Failed to update work order", variant: "destructive" });
@@ -746,9 +819,10 @@ export default function ChecklistWorkOrdersPage() {
                   key={selectedOrder.id}
                   order={selectedOrder}
                   companyUsers={companyUsers}
-                  onSave={(updates) => {
+                  suppliers={suppliers}
+                  onSave={(updates, notifications) => {
                     if (selectedId) {
-                      updateMutation.mutate({ id: selectedId, updates });
+                      updateMutation.mutate({ id: selectedId, updates, notifications });
                     }
                   }}
                   isPending={updateMutation.isPending}
