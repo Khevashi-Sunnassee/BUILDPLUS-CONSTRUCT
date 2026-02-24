@@ -2757,7 +2757,7 @@ function JobMappingTable({ bpJobs, myobJobs, isLoading, searchFilter, onLink, on
   });
 
   const linkedJobs = filtered.filter((j) => j.myobJobUid);
-  const unlinkedJobs = filtered.filter((j) => !j.myobJobUid);
+  const unlinkedJobs = filtered.filter((j) => !j.myobJobUid).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   const usedMyobUids = new Set(bpJobs.filter((j) => j.myobJobUid).map((j) => j.myobJobUid));
   const availableMyobJobs = myobJobs.filter((mj: any) => !usedMyobUids.has(mj.UID));
@@ -2980,7 +2980,11 @@ function ImportFromMyobDialog({
   const [importResult, setImportResult] = useState<{ created: number; linked: number; skipped: number } | null>(null);
   const [actions, setActions] = useState<Record<string, { action: string; existingBpId?: string }>>({});
 
-  const unlinkedItems = myobItems.filter((item) => !alreadyMappedMyobUids.has(item.UID));
+  const unlinkedItems = myobItems.filter((item) => !alreadyMappedMyobUids.has(item.UID)).sort((a, b) => {
+    const nameA = (type === "suppliers" || type === "customers") ? (a.CompanyName || a.Name || `${a.FirstName || ""} ${a.LastName || ""}`.trim()) : (a.Name || "");
+    const nameB = (type === "suppliers" || type === "customers") ? (b.CompanyName || b.Name || `${b.FirstName || ""} ${b.LastName || ""}`.trim()) : (b.Name || "");
+    return nameA.localeCompare(nameB);
+  });
 
   const getMyobName = (item: any): string => {
     if (type === "suppliers" || type === "customers") return item.CompanyName || item.Name || `${item.FirstName || ""} ${item.LastName || ""}`.trim();
