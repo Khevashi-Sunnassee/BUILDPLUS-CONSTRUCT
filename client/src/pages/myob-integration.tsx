@@ -801,14 +801,14 @@ export function ProfitAndLossTab() {
       Unprocessed: Math.round(adj.unprocessedEx),
       Retention: Math.round(adj.retentionHeld),
       "Asset Purchases": Math.round(adj.assetPurchases),
-      "Adjusted Net": Math.round(t.netProfit + adj.retentionHeld - adj.unprocessedEx - adj.assetPurchases),
+      "Adjusted Net": Math.round(t.netProfit + adj.retentionHeld - adj.unprocessedEx + adj.assetPurchases),
     };
   });
 
   const totalUnprocessedEx = adjustmentsData ? parseFloat(adjustmentsData.unprocessedInvoices.summary.totalEx) : 0;
   const totalRetentionHeld = adjustmentsData ? parseFloat(adjustmentsData.retention.summary.totalRetentionHeld) : 0;
   const totalAssetPurchases = adjustmentsData ? parseFloat(adjustmentsData.assetPurchases.summary.totalPurchasePrice) : 0;
-  const adjustedNetProfit = totalsAgg.netProfit + totalRetentionHeld - totalUnprocessedEx - totalAssetPurchases;
+  const adjustedNetProfit = totalsAgg.netProfit + totalRetentionHeld - totalUnprocessedEx + totalAssetPurchases;
 
   const marginChartData = monthlyTotals.map((m) => ({
     name: m.label,
@@ -1126,7 +1126,7 @@ export function ProfitAndLossTab() {
                   {formatCurrency(adjustedNetProfit)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  + Ret. {formatCurrency(totalRetentionHeld)} &minus; Unproc. {formatCurrency(totalUnprocessedEx)} &minus; Assets {formatCurrency(totalAssetPurchases)}
+                  + Ret. {formatCurrency(totalRetentionHeld)} &minus; Unproc. {formatCurrency(totalUnprocessedEx)} + Assets {formatCurrency(totalAssetPurchases)}
                 </p>
               </CardContent>
             </Card>
@@ -1538,7 +1538,7 @@ export function ProfitAndLossTab() {
                       { label: "MYOB Net Profit", value: totalsAgg.netProfit, color: totalsAgg.netProfit >= 0 ? "bg-green-500" : "bg-red-500", textColor: totalsAgg.netProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400" },
                       { label: "+ Retention Held", value: totalRetentionHeld, color: "bg-blue-500", textColor: "text-blue-600 dark:text-blue-400", isAdd: true },
                       { label: "− Unprocessed Invoices", value: totalUnprocessedEx, color: "bg-amber-500", textColor: "text-amber-600 dark:text-amber-400", isSubtract: true },
-                      { label: "− Asset Purchases", value: totalAssetPurchases, color: "bg-teal-500", textColor: "text-teal-600 dark:text-teal-400", isSubtract: true },
+                      { label: "+ Asset Purchases", value: totalAssetPurchases, color: "bg-teal-500", textColor: "text-teal-600 dark:text-teal-400", isAdd: true },
                     ].map((item, idx) => {
                       const maxVal = Math.max(Math.abs(totalsAgg.netProfit), totalRetentionHeld, totalUnprocessedEx, totalAssetPurchases, Math.abs(adjustedNetProfit), 1);
                       const barWidth = Math.min(Math.abs(item.value) / maxVal * 100, 100);
