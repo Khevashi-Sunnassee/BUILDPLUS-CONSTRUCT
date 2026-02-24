@@ -121,6 +121,7 @@ const JobBoqPage = lazyWithRetry(() => import("@/pages/job-boq"));
 const WorkflowBuilderPage = lazyWithRetry(() => import("@/pages/admin/workflow-builder"));
 const JobActivitiesPage = lazyWithRetry(() => import("@/pages/job-activities"));
 const MyobIntegrationPage = lazyWithRetry(() => import("@/pages/myob-integration"));
+const FinancialAnalysisPage = lazyWithRetry(() => import("@/pages/financial-analysis"));
 const TenderEmailsPage = lazyWithRetry(() => import("@/pages/tender-emails"));
 const TenderEmailDetailPage = lazyWithRetry(() => import("@/pages/tender-email-detail"));
 const DraftingEmailsPage = lazyWithRetry(() => import("@/pages/drafting-emails"));
@@ -595,6 +596,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <MyobIntegrationPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/financial-analysis">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <FinancialAnalysisPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

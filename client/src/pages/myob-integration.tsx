@@ -179,7 +179,6 @@ export default function MyobIntegrationPage() {
               <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
               <TabsTrigger value="items" data-testid="tab-items">Items</TabsTrigger>
               <TabsTrigger value="code-mapping" data-testid="tab-code-mapping">Code Mapping</TabsTrigger>
-              <TabsTrigger value="profit-loss" data-testid="tab-profit-loss">Profit & Loss</TabsTrigger>
               <TabsTrigger value="export-log" data-testid="tab-export-log">Export Log</TabsTrigger>
             </TabsList>
 
@@ -307,10 +306,6 @@ export default function MyobIntegrationPage() {
 
             <TabsContent value="code-mapping">
               <CodeMappingTab />
-            </TabsContent>
-
-            <TabsContent value="profit-loss">
-              <ProfitAndLossTab />
             </TabsContent>
 
             <TabsContent value="export-log">
@@ -550,7 +545,7 @@ function MyobDataTable({
 }
 
 
-interface PnlAccount {
+export interface PnlAccount {
   AccountTotal: number;
   Account: {
     UID: string;
@@ -560,7 +555,7 @@ interface PnlAccount {
   };
 }
 
-interface PnlData {
+export interface PnlData {
   StartDate: string;
   EndDate: string;
   ReportingBasis: string;
@@ -568,7 +563,7 @@ interface PnlData {
   AccountsBreakdown: PnlAccount[];
 }
 
-interface MonthlyPnlEntry {
+export interface MonthlyPnlEntry {
   start: string;
   end: string;
   label: string;
@@ -576,13 +571,13 @@ interface MonthlyPnlEntry {
   error: string | null;
 }
 
-interface MonthlyPnlResponse {
+export interface MonthlyPnlResponse {
   months: MonthlyPnlEntry[];
   reportingBasis: string;
   yearEndAdjust: boolean;
 }
 
-function extractMonthlyTotals(entry: MonthlyPnlEntry) {
+export function extractMonthlyTotals(entry: MonthlyPnlEntry) {
   if (!entry.data) return { income: 0, cos: 0, grossProfit: 0, expenses: 0, netProfit: 0 };
   const accounts = entry.data.AccountsBreakdown || [];
   const income = accounts.filter((a) => a.Account.DisplayID.startsWith("4-")).reduce((s, a) => s + a.AccountTotal, 0);
@@ -596,7 +591,7 @@ function extractMonthlyTotals(entry: MonthlyPnlEntry) {
   return { income, cos, grossProfit, expenses, netProfit };
 }
 
-function getFinancialYearDates() {
+export function getFinancialYearDates() {
   const now = new Date();
   const year = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
   return {
@@ -605,7 +600,7 @@ function getFinancialYearDates() {
   };
 }
 
-function getPresetDates(preset: string) {
+export function getPresetDates(preset: string) {
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth();
@@ -638,7 +633,7 @@ function getPresetDates(preset: string) {
   }
 }
 
-function getFinancialYears() {
+export function getFinancialYears() {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth();
@@ -665,7 +660,7 @@ function getFinancialYears() {
   return years;
 }
 
-function ProfitAndLossTab() {
+export function ProfitAndLossTab() {
   const [reportingBasis, setReportingBasis] = useState("Accrual");
   const [yearEndAdjust, setYearEndAdjust] = useState(false);
   const [monthCount, setMonthCount] = useState("12");

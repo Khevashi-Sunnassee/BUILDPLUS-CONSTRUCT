@@ -72,6 +72,7 @@ import {
   Brain,
   Mail,
   Plug,
+  TrendingUp,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -143,6 +144,7 @@ const adminFinanceNavItems = [
 
 const managerNavItems = [
   { title: "KPI Dashboard", url: "/kpi-dashboard", icon: BarChart3 },
+  { title: "Financial Analysis", url: "/financial-analysis", icon: TrendingUp },
   { title: "Manager Review", url: "/manager/review", icon: CheckSquare },
   { title: "Checklist Reports", url: "/checklist-reports", icon: BarChart3 },
   { title: "Reports", url: "/reports", icon: Clock },
@@ -202,6 +204,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/weekly-wages": "weekly_wages",
   "/admin/asset-register": "admin_assets",
   "/kpi-dashboard": "kpi_dashboard",
+  "/financial-analysis": "financial_analysis",
   "/manager/review": "manager_review",
   "/checklist-reports": "checklist_reports",
   "/reports": "daily_reports",

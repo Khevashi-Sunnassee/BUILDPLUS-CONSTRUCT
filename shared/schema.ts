@@ -232,6 +232,7 @@ export const FUNCTION_KEYS = [
   "ap_invoices",
   "myob_integration",
   "kpi_dashboard",
+  "financial_analysis",
   "manager_review",
   "checklist_reports",
   "reports",
