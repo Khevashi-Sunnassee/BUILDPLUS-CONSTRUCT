@@ -1,14 +1,40 @@
+import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Edit2, Briefcase, User } from "lucide-react";
+import { ArrowLeft, Edit2, Briefcase, User, Receipt, Link2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
 import type { Customer, Job } from "@shared/schema";
-import { PROCUREMENT_ROUTES } from "@shared/api-routes";
+import { PROCUREMENT_ROUTES, MYOB_ROUTES } from "@shared/api-routes";
+import { apiRequest } from "@/lib/queryClient";
+
+interface MyobInvoice {
+  uid: string;
+  number: string;
+  date: string;
+  customerPO: string;
+  status: string;
+  subtotal: number;
+  totalTax: number;
+  totalAmount: number;
+  amountPaid: number;
+  balanceDue: number;
+  comment: string;
+  journalMemo: string;
+}
+
+interface CustomerInvoicesResponse {
+  linked: boolean;
+  myobCustomer: { uid: string; name: string; displayId: string } | null;
+  invoices: MyobInvoice[];
+  totalCount: number;
+}
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -19,11 +45,11 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
   );
 }
 
-function formatCurrency(val: string | null | undefined) {
-  if (!val) return "-";
-  const num = parseFloat(val);
-  if (isNaN(num)) return "-";
-  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(num);
+function formatCurrency(val: string | number | null | undefined) {
+  if (val === null || val === undefined) return "-";
+  const num = typeof val === "string" ? parseFloat(val) : val;
+  if (isNaN(num) || num === 0) return "-";
+  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(num);
 }
 
 function getJobStatusBadge(status: string) {
@@ -54,6 +80,276 @@ function getJobStatusBadge(status: string) {
     default:
       return <Badge variant="outline" className="text-xs">{status}</Badge>;
   }
+}
+
+function getMyobStatusBadge(status: string) {
+  switch (status) {
+    case "Open":
+      return <Badge className="bg-blue-600 text-xs">Open</Badge>;
+    case "Closed":
+      return <Badge className="bg-green-600 text-xs">Closed</Badge>;
+    case "Credit":
+      return <Badge className="bg-amber-500 text-xs">Credit</Badge>;
+    default:
+      return <Badge variant="outline" className="text-xs">{status}</Badge>;
+  }
+}
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return "-";
+  try {
+    return new Date(dateStr).toLocaleDateString("en-AU", { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return dateStr;
+  }
+}
+
+function formatMonthLabel(dateStr: string) {
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("en-AU", { year: "2-digit", month: "short" });
+  } catch {
+    return dateStr;
+  }
+}
+
+function CustomerMyobInvoicesTab({ customerId }: { customerId: string }) {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const { data, isLoading, isError } = useQuery<CustomerInvoicesResponse>({
+    queryKey: [MYOB_ROUTES.CUSTOMER_INVOICES(customerId)],
+    queryFn: async () => {
+      const res = await apiRequest("GET", MYOB_ROUTES.CUSTOMER_INVOICES(customerId));
+      return res.json();
+    },
+    enabled: !!customerId,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-full" />
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-48 w-full" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-destructive">
+          Failed to load MYOB invoice data. Please check MYOB connection.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data?.linked) {
+    return (
+      <Card className="border-amber-500/30">
+        <CardContent className="py-12 text-center space-y-3">
+          <Link2 className="h-12 w-12 mx-auto text-amber-500" />
+          <p className="font-medium" data-testid="text-customer-not-linked">Customer not linked to MYOB</p>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            This customer needs to be linked to a MYOB customer record first. Go to MYOB Integration &gt; Code Mapping &gt; Customers to link them.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const invoices = data.invoices || [];
+  const filteredInvoices = invoices.filter((inv) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      (inv.number || "").toLowerCase().includes(term) ||
+      (inv.customerPO || "").toLowerCase().includes(term) ||
+      (inv.comment || "").toLowerCase().includes(term) ||
+      (inv.journalMemo || "").toLowerCase().includes(term)
+    );
+  });
+
+  const totalValue = invoices.reduce((s, inv) => s + (inv.totalAmount || 0), 0);
+  const totalOutstanding = invoices.reduce((s, inv) => s + (inv.balanceDue || 0), 0);
+  const openCount = invoices.filter((inv) => inv.status === "Open").length;
+  const closedCount = invoices.filter((inv) => inv.status === "Closed").length;
+
+  const monthlyMap = new Map<string, { month: string; total: number; count: number }>();
+  invoices.forEach((inv) => {
+    if (!inv.date) return;
+    const key = inv.date.slice(0, 7);
+    const existing = monthlyMap.get(key) || { month: key, total: 0, count: 0 };
+    existing.total += inv.totalAmount || 0;
+    existing.count += 1;
+    monthlyMap.set(key, existing);
+  });
+  const monthlyData = Array.from(monthlyMap.values())
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map((m) => ({
+      name: formatMonthLabel(m.month + "-01"),
+      Amount: Math.round(m.total),
+      Invoices: m.count,
+    }));
+
+  const cumulativeData = monthlyData.reduce<{ name: string; Cumulative: number; Monthly: number }[]>((acc, m) => {
+    const prev = acc.length > 0 ? acc[acc.length - 1].Cumulative : 0;
+    acc.push({ name: m.name, Monthly: m.Amount, Cumulative: prev + m.Amount });
+    return acc;
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Badge variant="outline" className="gap-1.5 text-xs" data-testid="badge-myob-linked">
+          <Link2 className="h-3 w-3" />
+          Linked: {data.myobCustomer?.name} ({data.myobCustomer?.displayId})
+        </Badge>
+        <Badge variant="secondary" className="text-xs">{data.totalCount} invoices in MYOB</Badge>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card data-testid="card-kpi-total-revenue">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Total Invoiced</p>
+            <p className="text-lg font-bold font-mono mt-1" data-testid="text-total-invoiced">{formatCurrency(totalValue)}</p>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-kpi-outstanding">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Outstanding</p>
+            <p className="text-lg font-bold font-mono mt-1 text-amber-600 dark:text-amber-400" data-testid="text-outstanding">{formatCurrency(totalOutstanding)}</p>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-kpi-open">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Open Invoices</p>
+            <p className="text-lg font-bold font-mono mt-1 text-blue-600 dark:text-blue-400" data-testid="text-open-count">{openCount}</p>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-kpi-closed">
+          <CardContent className="pt-4 pb-3">
+            <p className="text-xs text-muted-foreground">Closed Invoices</p>
+            <p className="text-lg font-bold font-mono mt-1 text-green-600 dark:text-green-400" data-testid="text-closed-count">{closedCount}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {monthlyData.length > 1 && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <Card data-testid="chart-monthly-revenue">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Monthly Sales History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                    <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                    <RechartsTooltip
+                      formatter={(value: number, name: string) => name === "Amount" ? formatCurrency(value) : value}
+                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "6px", fontSize: "12px" }}
+                    />
+                    <Bar dataKey="Amount" fill="hsl(142, 60%, 45%)" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="chart-cumulative-revenue">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Cumulative Revenue</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={cumulativeData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="gradCumulativeRev" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(210, 70%, 50%)" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(210, 70%, 50%)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} className="fill-muted-foreground" />
+                    <YAxis tick={{ fontSize: 10 }} className="fill-muted-foreground" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                    <RechartsTooltip
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "6px", fontSize: "12px" }}
+                    />
+                    <Legend wrapperStyle={{ fontSize: "12px" }} />
+                    <Area type="monotone" dataKey="Cumulative" stroke="hsl(210, 70%, 50%)" fill="url(#gradCumulativeRev)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="Monthly" stroke="hsl(142, 60%, 45%)" fill="none" strokeWidth={2} strokeDasharray="5 5" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <Card data-testid="card-invoices-table">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between gap-4">
+            <CardTitle className="text-sm font-medium">All Sales Invoices</CardTitle>
+            <Input
+              placeholder="Search invoices..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-xs h-8 text-sm"
+              data-testid="input-search-invoices"
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {filteredInvoices.length > 0 ? (
+            <div className="max-h-[500px] overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-xs">Invoice #</TableHead>
+                    <TableHead className="text-xs">Customer PO</TableHead>
+                    <TableHead className="text-xs">Date</TableHead>
+                    <TableHead className="text-xs">Status</TableHead>
+                    <TableHead className="text-xs text-right">Subtotal</TableHead>
+                    <TableHead className="text-xs text-right">Tax</TableHead>
+                    <TableHead className="text-xs text-right">Total</TableHead>
+                    <TableHead className="text-xs text-right">Balance Due</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredInvoices.map((inv) => (
+                    <TableRow key={inv.uid} data-testid={`row-invoice-${inv.uid}`}>
+                      <TableCell className="font-mono text-xs" data-testid={`text-invoice-number-${inv.uid}`}>{inv.number}</TableCell>
+                      <TableCell className="text-xs">{inv.customerPO || "-"}</TableCell>
+                      <TableCell className="text-xs">{formatDate(inv.date)}</TableCell>
+                      <TableCell>{getMyobStatusBadge(inv.status)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{formatCurrency(inv.subtotal)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{formatCurrency(inv.totalTax)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-medium">{formatCurrency(inv.totalAmount)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">
+                        <span className={inv.balanceDue > 0 ? "text-amber-600 dark:text-amber-400 font-medium" : ""}>
+                          {formatCurrency(inv.balanceDue)}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-muted-foreground text-sm">
+              {searchTerm ? "No invoices matching search" : "No sales invoices found in MYOB"}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 export default function CustomerDetailPage() {
@@ -135,6 +431,10 @@ export default function CustomerDetailPage() {
             <Badge variant={jobCount > 0 ? "default" : "secondary"} className="ml-1.5 h-5 min-w-[20px] px-1.5 text-xs" data-testid="badge-job-count">
               {jobCount}
             </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="myob-invoices" data-testid="tab-myob-invoices">
+            <Receipt className="h-4 w-4 mr-2" />
+            MYOB Invoices
           </TabsTrigger>
         </TabsList>
 
@@ -237,6 +537,10 @@ export default function CustomerDetailPage() {
               <p className="text-sm" data-testid="text-no-jobs">No jobs linked to this customer</p>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="myob-invoices" className="space-y-4">
+          <CustomerMyobInvoicesTab customerId={id} />
         </TabsContent>
       </Tabs>
     </div>

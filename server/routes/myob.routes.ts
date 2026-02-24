@@ -692,6 +692,104 @@ router.get("/api/myob/tax-codes", requireAuth, async (req: Request, res: Respons
   }
 });
 
+router.get("/api/myob/supplier-bills/:supplierId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const { supplierId } = req.params;
+
+    const [mapping] = await db.select()
+      .from(myobSupplierMappings)
+      .where(and(eq(myobSupplierMappings.companyId, companyId), eq(myobSupplierMappings.supplierId, supplierId)))
+      .limit(1);
+
+    if (!mapping) {
+      return res.json({ linked: false, bills: [], myobSupplier: null });
+    }
+
+    const client = createMyobClient(companyId);
+    const myobUid = mapping.myobSupplierUid;
+    const query = `$filter=Supplier/UID eq guid'${myobUid}'&$orderby=Date desc&$top=1000`;
+    const result = await client.getPurchaseBills(query);
+    const bills = result?.Items || [];
+
+    res.json({
+      linked: true,
+      myobSupplier: {
+        uid: mapping.myobSupplierUid,
+        name: mapping.myobSupplierName,
+        displayId: mapping.myobSupplierDisplayId,
+      },
+      bills: bills.map((b: any) => ({
+        uid: b.UID,
+        number: b.Number,
+        date: b.Date,
+        supplierInvoiceNumber: b.SupplierInvoiceNumber,
+        status: b.Status,
+        subtotal: b.Subtotal,
+        totalTax: b.TotalTax,
+        totalAmount: b.TotalAmount,
+        amountPaid: b.AmountPaid,
+        balanceDue: b.BalanceDueAmount,
+        comment: b.Comment,
+        journalMemo: b.JournalMemo,
+      })),
+      totalCount: bills.length,
+    });
+  } catch (err) {
+    handleMyobError(err, res, "supplier-bills");
+  }
+});
+
+router.get("/api/myob/customer-invoices/:customerId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const { customerId } = req.params;
+
+    const [mapping] = await db.select()
+      .from(myobCustomerMappings)
+      .where(and(eq(myobCustomerMappings.companyId, companyId), eq(myobCustomerMappings.customerId, customerId)))
+      .limit(1);
+
+    if (!mapping) {
+      return res.json({ linked: false, invoices: [], myobCustomer: null });
+    }
+
+    const client = createMyobClient(companyId);
+    const myobUid = mapping.myobCustomerUid;
+    const query = `$filter=Customer/UID eq guid'${myobUid}'&$orderby=Date desc&$top=1000`;
+    const result = await client.getInvoices(query);
+    const invoices = result?.Items || [];
+
+    res.json({
+      linked: true,
+      myobCustomer: {
+        uid: mapping.myobCustomerUid,
+        name: mapping.myobCustomerName,
+        displayId: mapping.myobCustomerDisplayId,
+      },
+      invoices: invoices.map((inv: any) => ({
+        uid: inv.UID,
+        number: inv.Number,
+        date: inv.Date,
+        customerPO: inv.CustomerPurchaseOrderNumber,
+        status: inv.Status,
+        subtotal: inv.Subtotal,
+        totalTax: inv.TotalTax,
+        totalAmount: inv.TotalAmount,
+        amountPaid: inv.AmountPaid,
+        balanceDue: inv.BalanceDueAmount,
+        comment: inv.Comment,
+        journalMemo: inv.JournalMemo,
+      })),
+      totalCount: invoices.length,
+    });
+  } catch (err) {
+    handleMyobError(err, res, "customer-invoices");
+  }
+});
+
 router.get("/api/myob/account-mappings", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;

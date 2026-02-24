@@ -992,6 +992,8 @@ export const MYOB_ROUTES = {
   CUSTOMER_MAPPINGS: '/api/myob/customer-mappings',
   IMPORT_CUSTOMERS: '/api/myob/import-customers',
   BUILDPLUS_ADJUSTMENTS: '/api/myob/buildplus-adjustments',
+  SUPPLIER_BILLS: (supplierId: string) => `/api/myob/supplier-bills/${supplierId}` as const,
+  CUSTOMER_INVOICES: (customerId: string) => `/api/myob/customer-invoices/${customerId}` as const,
 } as const;
 export type MyobRoutes = typeof MYOB_ROUTES;
 
