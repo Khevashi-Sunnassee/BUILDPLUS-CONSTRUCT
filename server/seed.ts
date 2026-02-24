@@ -4,6 +4,7 @@ import { eq, and, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import logger from "./lib/logger";
 import { SAFETY_TEMPLATE_DEFINITIONS } from "./safety-checklist-templates";
+import { DOCUMENT_TEMPLATE_DEFINITIONS } from "./document-checklist-templates";
 
 export async function ensureSuperAdmins() {
   const envEmails = process.env.SUPER_ADMIN_EMAILS;
@@ -706,6 +707,15 @@ export async function ensureSystemChecklistModules() {
           if (!existing[0].isSystemDefault) {
             await db.update(entityTypes).set({ isSystemDefault: true }).where(eq(entityTypes.id, entityTypeId));
           }
+          if (existing.length > 1) {
+            for (let i = 1; i < existing.length; i++) {
+              const dupId = existing[i].id;
+              await db.update(entitySubtypes).set({ entityTypeId }).where(eq(entitySubtypes.entityTypeId, dupId));
+              await db.update(checklistTemplates).set({ entityTypeId }).where(eq(checklistTemplates.entityTypeId, dupId));
+              await db.delete(entityTypes).where(eq(entityTypes.id, dupId));
+              logger.info(`Merged duplicate entity type ${dupId} into ${entityTypeId} for ${mod.code} company ${company.id}`);
+            }
+          }
         }
 
         if (mod.code === "EQUIPMENT") {
@@ -757,6 +767,72 @@ export async function ensureSystemChecklistModules() {
               isActive: true,
             });
             logger.info(`Created Equipment Maintenance Log template for company ${company.id}`);
+          }
+        }
+
+        if (mod.code === "DOCUMENTS") {
+          const existingSubtypes = await db.select().from(entitySubtypes)
+            .where(and(
+              eq(entitySubtypes.entityTypeId, entityTypeId),
+              eq(entitySubtypes.companyId, company.id!)
+            ));
+
+          const subtypeMap: Record<string, string> = {};
+          for (const st of existingSubtypes) {
+            subtypeMap[st.code] = st.id;
+          }
+
+          const docSubtypes = [
+            { code: "SHOP_DRAWING", name: "Shop Drawing Review", description: "Shop drawing IFC review checklists", sortOrder: 0 },
+            { code: "IFC_REVIEW", name: "IFC Quality Assurance", description: "Issued for Construction QA review checklists", sortOrder: 1 },
+          ];
+
+          for (const sub of docSubtypes) {
+            if (!subtypeMap[sub.code]) {
+              const [created] = await db.insert(entitySubtypes).values({
+                companyId: company.id,
+                entityTypeId,
+                name: sub.name,
+                code: sub.code,
+                description: sub.description,
+                sortOrder: sub.sortOrder,
+                isActive: true,
+              }).returning();
+              subtypeMap[sub.code] = created.id;
+            }
+          }
+
+          const templateSubtypeMapping: Record<string, string> = {
+            SD_IFC_PRECAST: "SHOP_DRAWING",
+            SD_IFC_JOINERY: "SHOP_DRAWING",
+            SD_IFC_STAIRS: "SHOP_DRAWING",
+            IFC_ARCHITECTURAL: "IFC_REVIEW",
+          };
+
+          const existingTemplates = await db.select().from(checklistTemplates)
+            .where(and(
+              eq(checklistTemplates.companyId, company.id),
+              eq(checklistTemplates.entityTypeId, entityTypeId),
+              eq(checklistTemplates.isSystemDefault, true)
+            ));
+
+          const existingNames = existingTemplates.map(t => t.name);
+
+          for (const tmplDef of DOCUMENT_TEMPLATE_DEFINITIONS) {
+            if (!existingNames.includes(tmplDef.name)) {
+              const subtypeCode = templateSubtypeMapping[tmplDef.code];
+              await db.insert(checklistTemplates).values({
+                companyId: company.id,
+                name: tmplDef.name,
+                description: tmplDef.description,
+                entityTypeId,
+                entitySubtypeId: subtypeCode && subtypeMap[subtypeCode] ? subtypeMap[subtypeCode] : undefined,
+                sections: tmplDef.sections as any,
+                isSystemDefault: true,
+                isActive: true,
+              });
+              logger.info(`Created document template: ${tmplDef.name} for company ${company.id}`);
+            }
           }
         }
 
