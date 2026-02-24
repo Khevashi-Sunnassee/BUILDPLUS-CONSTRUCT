@@ -688,6 +688,29 @@ function ProfitAndLossTab() {
     },
   });
 
+  const adjustmentsUrl = selectedFY
+    ? `${MYOB_ROUTES.BUILDPLUS_ADJUSTMENTS}?months=12&startDate=${selectedFY.startDate}&endDate=${selectedFY.endDate}`
+    : `${MYOB_ROUTES.BUILDPLUS_ADJUSTMENTS}?months=${monthCount}`;
+
+  const { data: adjustmentsData } = useQuery<{
+    period: { start: string; end: string };
+    unprocessedInvoices: {
+      summary: { count: number; totalEx: string; totalInc: string };
+      byStatus: { status: string; count: number; totalEx: string; totalInc: string }[];
+      byMonth: { month: string; count: number; totalEx: string; totalInc: string }[];
+    };
+    retention: {
+      summary: { totalRetention: string; totalRetentionHeld: string; claimCount: number };
+      byJob: { jobId: string; jobName: string | null; totalRetention: string; totalRetentionHeld: string; claimCount: number }[];
+    };
+  }>({
+    queryKey: [MYOB_ROUTES.BUILDPLUS_ADJUSTMENTS, monthCount],
+    queryFn: async () => {
+      const res = await apiRequest("GET", adjustmentsUrl);
+      return res.json();
+    },
+  });
+
   const months = monthlyData?.months || [];
   const monthlyTotals = months.map((m) => ({ ...extractMonthlyTotals(m), label: m.label }));
 
@@ -1200,6 +1223,110 @@ function ProfitAndLossTab() {
               </CardContent>
             </Card>
           </div>
+
+          {adjustmentsData && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <Card data-testid="card-unprocessed-invoices">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-amber-500" />
+                    Unprocessed AP Invoices
+                  </CardTitle>
+                  <CardDescription className="text-xs">Invoices not yet exported to MYOB for this period</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="text-center p-2 rounded-md bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Count</p>
+                      <p className="text-lg font-bold font-mono" data-testid="text-unprocessed-count">{adjustmentsData.unprocessedInvoices.summary.count}</p>
+                    </div>
+                    <div className="text-center p-2 rounded-md bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Ex-GST</p>
+                      <p className="text-lg font-bold font-mono text-amber-600 dark:text-amber-400" data-testid="text-unprocessed-ex">{formatCurrency(parseFloat(adjustmentsData.unprocessedInvoices.summary.totalEx))}</p>
+                    </div>
+                    <div className="text-center p-2 rounded-md bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Inc-GST</p>
+                      <p className="text-lg font-bold font-mono text-amber-600 dark:text-amber-400" data-testid="text-unprocessed-inc">{formatCurrency(parseFloat(adjustmentsData.unprocessedInvoices.summary.totalInc))}</p>
+                    </div>
+                  </div>
+                  {adjustmentsData.unprocessedInvoices.byStatus.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">By Status</p>
+                      {adjustmentsData.unprocessedInvoices.byStatus.map((s) => (
+                        <div key={s.status} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-muted/30">
+                          <Badge variant={s.status === "APPROVED" ? "default" : "secondary"} className="text-xs">
+                            {s.status}
+                          </Badge>
+                          <div className="flex items-center gap-3">
+                            <span className="text-muted-foreground">{s.count} invoices</span>
+                            <span className="font-mono font-medium">{formatCurrency(parseFloat(s.totalEx))}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {adjustmentsData.unprocessedInvoices.byMonth.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">By Month</p>
+                      <div className="max-h-32 overflow-auto space-y-1">
+                        {adjustmentsData.unprocessedInvoices.byMonth.map((m) => (
+                          <div key={m.month} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-muted/30">
+                            <span>{m.month}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-muted-foreground">{m.count}</span>
+                              <span className="font-mono font-medium">{formatCurrency(parseFloat(m.totalEx))}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-retention-summary">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-blue-500" />
+                    Retention Held
+                  </CardTitle>
+                  <CardDescription className="text-xs">Retention amounts from progress claims in this period</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="text-center p-2 rounded-md bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Claims</p>
+                      <p className="text-lg font-bold font-mono" data-testid="text-retention-claims">{adjustmentsData.retention.summary.claimCount}</p>
+                    </div>
+                    <div className="text-center p-2 rounded-md bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Period Retention</p>
+                      <p className="text-lg font-bold font-mono text-blue-600 dark:text-blue-400" data-testid="text-retention-amount">{formatCurrency(parseFloat(adjustmentsData.retention.summary.totalRetention))}</p>
+                    </div>
+                    <div className="text-center p-2 rounded-md bg-muted/50">
+                      <p className="text-xs text-muted-foreground">Held to Date</p>
+                      <p className="text-lg font-bold font-mono text-blue-600 dark:text-blue-400" data-testid="text-retention-held">{formatCurrency(parseFloat(adjustmentsData.retention.summary.totalRetentionHeld))}</p>
+                    </div>
+                  </div>
+                  {adjustmentsData.retention.byJob.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">By Job</p>
+                      <div className="max-h-40 overflow-auto space-y-1">
+                        {adjustmentsData.retention.byJob.map((j) => (
+                          <div key={j.jobId} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-muted/30 gap-2">
+                            <span className="truncate flex-1" title={j.jobName || j.jobId}>{j.jobName || j.jobId}</span>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <span className="text-muted-foreground">{j.claimCount} claims</span>
+                              <span className="font-mono font-medium">{formatCurrency(parseFloat(j.totalRetentionHeld))}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </>
       ) : (
         <>

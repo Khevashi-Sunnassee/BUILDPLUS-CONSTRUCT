@@ -11,8 +11,8 @@ import {
 } from "../myob";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { myobTokens, myobExportLogs, users, myobAccountMappings, myobTaxCodeMappings, myobSupplierMappings, myobCustomerMappings, costCodes, suppliers, jobs, customers } from "@shared/schema";
-import { eq, desc, and, asc, sql, ilike } from "drizzle-orm";
+import { myobTokens, myobExportLogs, users, myobAccountMappings, myobTaxCodeMappings, myobSupplierMappings, myobCustomerMappings, costCodes, suppliers, jobs, customers, progressClaims } from "@shared/schema";
+import { eq, desc, and, asc, sql, ilike, gte, lte, not, inArray } from "drizzle-orm";
 import { apInvoices } from "@shared/schema";
 
 const router = Router();
@@ -480,6 +480,146 @@ router.get("/api/myob/monthly-pnl", requireAuth, async (req: Request, res: Respo
     });
   } catch (err) {
     handleMyobError(err, res, "monthly-pnl");
+  }
+});
+
+router.get("/api/myob/buildplus-adjustments", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+    const months = parseInt(req.query.months as string) || 12;
+
+    const endDt = endDate ? new Date(endDate) : new Date();
+    const monthRanges: { start: string; end: string; label: string }[] = [];
+
+    if (startDate) {
+      const startDt = new Date(startDate);
+      const rangeStart = new Date(startDt.getFullYear(), startDt.getMonth(), 1);
+      const rangeEnd = new Date(endDt.getFullYear(), endDt.getMonth(), 1);
+      let cursor = new Date(rangeStart);
+      while (cursor <= rangeEnd) {
+        const s = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-01`;
+        const lastDay = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+        const e = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        const label = cursor.toLocaleDateString("en-AU", { month: "short", year: "numeric" });
+        monthRanges.push({ start: s, end: e, label });
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+      }
+    } else {
+      for (let i = months - 1; i >= 0; i--) {
+        const d = new Date(endDt.getFullYear(), endDt.getMonth() - i, 1);
+        const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+        const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        const e = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        const label = d.toLocaleDateString("en-AU", { month: "short", year: "numeric" });
+        monthRanges.push({ start: s, end: e, label });
+      }
+    }
+
+    const periodStart = monthRanges[0]?.start;
+    const periodEnd = monthRanges[monthRanges.length - 1]?.end;
+
+    const unprocessedInvoices = await db.select({
+      count: sql<number>`count(*)::int`,
+      totalEx: sql<string>`COALESCE(sum(${apInvoices.totalEx}), 0)`,
+      totalInc: sql<string>`COALESCE(sum(${apInvoices.totalInc}), 0)`,
+    })
+    .from(apInvoices)
+    .where(
+      and(
+        eq(apInvoices.companyId, companyId),
+        not(eq(apInvoices.status, "EXPORTED")),
+        ...(periodStart ? [gte(apInvoices.invoiceDate, new Date(periodStart))] : []),
+        ...(periodEnd ? [lte(apInvoices.invoiceDate, new Date(periodEnd + "T23:59:59"))] : [])
+      )
+    );
+
+    const unprocessedByStatus = await db.select({
+      status: apInvoices.status,
+      count: sql<number>`count(*)::int`,
+      totalEx: sql<string>`COALESCE(sum(${apInvoices.totalEx}), 0)`,
+      totalInc: sql<string>`COALESCE(sum(${apInvoices.totalInc}), 0)`,
+    })
+    .from(apInvoices)
+    .where(
+      and(
+        eq(apInvoices.companyId, companyId),
+        not(eq(apInvoices.status, "EXPORTED")),
+        ...(periodStart ? [gte(apInvoices.invoiceDate, new Date(periodStart))] : []),
+        ...(periodEnd ? [lte(apInvoices.invoiceDate, new Date(periodEnd + "T23:59:59"))] : [])
+      )
+    )
+    .groupBy(apInvoices.status);
+
+    const unprocessedByMonth = await db.select({
+      month: sql<string>`to_char(${apInvoices.invoiceDate}, 'YYYY-MM')`,
+      count: sql<number>`count(*)::int`,
+      totalEx: sql<string>`COALESCE(sum(${apInvoices.totalEx}), 0)`,
+      totalInc: sql<string>`COALESCE(sum(${apInvoices.totalInc}), 0)`,
+    })
+    .from(apInvoices)
+    .where(
+      and(
+        eq(apInvoices.companyId, companyId),
+        not(eq(apInvoices.status, "EXPORTED")),
+        ...(periodStart ? [gte(apInvoices.invoiceDate, new Date(periodStart))] : []),
+        ...(periodEnd ? [lte(apInvoices.invoiceDate, new Date(periodEnd + "T23:59:59"))] : [])
+      )
+    )
+    .groupBy(sql`to_char(${apInvoices.invoiceDate}, 'YYYY-MM')`)
+    .orderBy(sql`to_char(${apInvoices.invoiceDate}, 'YYYY-MM')`);
+
+    const retentionData = await db.select({
+      totalRetention: sql<string>`COALESCE(sum(${progressClaims.retentionAmount}), 0)`,
+      totalRetentionHeld: sql<string>`COALESCE(sum(${progressClaims.retentionHeldToDate}), 0)`,
+      claimCount: sql<number>`count(*)::int`,
+    })
+    .from(progressClaims)
+    .where(
+      and(
+        eq(progressClaims.companyId, companyId),
+        ...(periodStart ? [gte(progressClaims.claimDate, new Date(periodStart))] : []),
+        ...(periodEnd ? [lte(progressClaims.claimDate, new Date(periodEnd + "T23:59:59"))] : [])
+      )
+    );
+
+    const retentionByJob = await db.select({
+      jobId: progressClaims.jobId,
+      jobName: jobs.name,
+      totalRetention: sql<string>`COALESCE(sum(${progressClaims.retentionAmount}), 0)`,
+      totalRetentionHeld: sql<string>`COALESCE(sum(${progressClaims.retentionHeldToDate}), 0)`,
+      claimCount: sql<number>`count(*)::int`,
+    })
+    .from(progressClaims)
+    .leftJoin(jobs, eq(progressClaims.jobId, jobs.id))
+    .where(
+      and(
+        eq(progressClaims.companyId, companyId),
+        ...(periodStart ? [gte(progressClaims.claimDate, new Date(periodStart))] : []),
+        ...(periodEnd ? [lte(progressClaims.claimDate, new Date(periodEnd + "T23:59:59"))] : [])
+      )
+    )
+    .groupBy(progressClaims.jobId, jobs.name)
+    .orderBy(sql`sum(${progressClaims.retentionHeldToDate}) DESC`);
+
+    res.json({
+      period: { start: periodStart, end: periodEnd },
+      unprocessedInvoices: {
+        summary: unprocessedInvoices[0] || { count: 0, totalEx: "0", totalInc: "0" },
+        byStatus: unprocessedByStatus,
+        byMonth: unprocessedByMonth,
+      },
+      retention: {
+        summary: retentionData[0] || { totalRetention: "0", totalRetentionHeld: "0", claimCount: 0 },
+        byJob: retentionByJob,
+      },
+    });
+  } catch (err) {
+    logger.error({ err }, "[MYOB] BuildPlus adjustments endpoint error");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to fetch BuildPlus adjustment data" });
   }
 });
 
