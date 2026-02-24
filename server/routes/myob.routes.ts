@@ -245,6 +245,20 @@ router.get("/api/myob/items", requireAuth, async (req: Request, res: Response) =
   }
 });
 
+router.get("/api/myob/jobs", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const query = req.query.$filter ? `$filter=${req.query.$filter}` : undefined;
+    const myob = createMyobClient(companyId);
+    const data = await myob.getJobs(query);
+    res.json(data);
+  } catch (err) {
+    handleMyobError(err, res, "jobs");
+  }
+});
+
 router.get("/api/myob/export-logs", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;

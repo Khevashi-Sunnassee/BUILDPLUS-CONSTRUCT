@@ -297,6 +297,7 @@ export default function AdminJobsPage() {
       productionSlotColor: null,
       jobTypeId: null,
       defectLiabilityEndDate: null,
+      myobJobUid: null,
     },
   });
 
@@ -738,6 +739,7 @@ export default function AdminJobsPage() {
       productionSlotColor: job.productionSlotColor || getNextAvailableColor(),
       jobTypeId: job.jobTypeId || null,
       defectLiabilityEndDate: job.defectLiabilityEndDate ? new Date(job.defectLiabilityEndDate).toISOString().split('T')[0] : null,
+      myobJobUid: job.myobJobUid || null,
     });
     setJobDialogOpen(true);
     

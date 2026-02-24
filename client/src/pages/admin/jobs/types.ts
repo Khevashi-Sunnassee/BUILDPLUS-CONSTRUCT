@@ -50,6 +50,7 @@ export const jobSchema = z.object({
   productionSlotColor: z.string().optional().nullable(),
   jobTypeId: z.string().optional().nullable(),
   defectLiabilityEndDate: z.string().optional().nullable(),
+  myobJobUid: z.string().optional().nullable(),
 });
 
 export type JobFormData = z.infer<typeof jobSchema>;

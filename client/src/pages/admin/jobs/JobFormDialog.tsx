@@ -586,6 +586,27 @@ export function JobFormDialog({
                 </div>
                 <FormField
                   control={jobForm.control}
+                  name="myobJobUid"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>MYOB Job UID</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Paste MYOB Job UID here"
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(e.target.value || null)}
+                          data-testid="input-myob-job-uid"
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Links this job to a MYOB job for invoice exports. Get the UID from MYOB job list.
+                      </p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={jobForm.control}
                   name="description"
                   render={({ field }) => (
                     <FormItem>

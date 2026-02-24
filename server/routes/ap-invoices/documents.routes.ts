@@ -322,15 +322,28 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       const taxMapByCode = new Map(taxCodeMaps.map((m) => [m.bpTaxCode, m]));
       const supplierMapById = new Map(supplierMaps.map((m) => [m.supplierId, m]));
 
+      const splitJobIds = [...new Set(splits.map((s) => s.jobId).filter(Boolean))] as string[];
+      const jobMyobMap = new Map<string, string>();
+      if (splitJobIds.length > 0) {
+        const jobRows = await db.select({ id: jobs.id, myobJobUid: jobs.myobJobUid })
+          .from(jobs)
+          .where(and(inArray(jobs.id, splitJobIds), eq(jobs.companyId, companyId)))
+          .limit(200);
+        for (const j of jobRows) {
+          if (j.myobJobUid) jobMyobMap.set(j.id, j.myobJobUid);
+        }
+      }
+
       const billLines = splits.map((split) => {
         const acctMap = split.costCodeId ? accountMapByCostCode.get(split.costCodeId) : null;
         const taxMap = split.taxCodeId ? taxMapByCode.get(split.taxCodeId) : null;
+        const myobJobUid = split.jobId ? jobMyobMap.get(split.jobId) : undefined;
         return {
           Type: "Transaction" as const,
           Description: split.description || invoice.description || "AP Invoice",
           Total: parseFloat(split.amount),
           Account: acctMap ? { UID: acctMap.myobAccountUid } : undefined,
-          Job: split.jobId ? { UID: split.jobId } : undefined,
+          Job: myobJobUid ? { UID: myobJobUid } : undefined,
           TaxCode: taxMap ? { UID: taxMap.myobTaxCodeUid } : undefined,
         };
       });
@@ -349,9 +362,13 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       const supplierMap = invoice.supplierId ? supplierMapById.get(invoice.supplierId) : null;
       const supplierUid = supplierMap?.myobSupplierUid;
 
+      if (!supplierUid) {
+        return sendBadRequest(res, `Supplier "${supplierInfo?.name || 'unknown'}" is not mapped to a MYOB supplier. Please add the mapping in MYOB Integration → Code Mapping → Suppliers before exporting.`);
+      }
+
       const bill = {
         Date: invoice.invoiceDate ? new Date(invoice.invoiceDate).toISOString() : new Date().toISOString(),
-        Supplier: supplierUid ? { UID: supplierUid } : (supplierInfo ? { DisplayID: supplierInfo.name } : undefined),
+        Supplier: { UID: supplierUid },
         SupplierInvoiceNumber: invoice.invoiceNumber,
         IsTaxInclusive: true,
         Comment: invoice.description || "",
