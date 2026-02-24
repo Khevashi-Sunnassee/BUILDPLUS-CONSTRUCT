@@ -704,6 +704,11 @@ function ProfitAndLossTab() {
       byJob: { jobId: string; jobName: string | null; totalRetention: string; totalRetentionHeld: string; claimCount: number }[];
       byMonth: { month: string; totalRetention: string; totalRetentionHeld: string; claimCount: number }[];
     };
+    assetPurchases: {
+      summary: { count: number; totalPurchasePrice: string };
+      byMonth: { month: string; count: number; totalPurchasePrice: string }[];
+      byCategory: { category: string; count: number; totalPurchasePrice: string }[];
+    };
   }>({
     queryKey: [MYOB_ROUTES.BUILDPLUS_ADJUSTMENTS, monthCount],
     queryFn: async () => {
@@ -735,18 +740,25 @@ function ProfitAndLossTab() {
   const grossMarginPct = totalsAgg.income > 0 ? (totalsAgg.grossProfit / totalsAgg.income) * 100 : 0;
   const netMarginPct = totalsAgg.income > 0 ? (totalsAgg.netProfit / totalsAgg.income) * 100 : 0;
 
-  const adjByMonth = new Map<string, { unprocessedEx: number; retentionHeld: number }>();
+  const adjByMonth = new Map<string, { unprocessedEx: number; retentionHeld: number; assetPurchases: number }>();
   if (adjustmentsData?.unprocessedInvoices?.byMonth) {
     adjustmentsData.unprocessedInvoices.byMonth.forEach((m) => {
-      const existing = adjByMonth.get(m.month) || { unprocessedEx: 0, retentionHeld: 0 };
+      const existing = adjByMonth.get(m.month) || { unprocessedEx: 0, retentionHeld: 0, assetPurchases: 0 };
       existing.unprocessedEx = parseFloat(m.totalEx);
       adjByMonth.set(m.month, existing);
     });
   }
   if (adjustmentsData?.retention?.byMonth) {
     adjustmentsData.retention.byMonth.forEach((m) => {
-      const existing = adjByMonth.get(m.month) || { unprocessedEx: 0, retentionHeld: 0 };
+      const existing = adjByMonth.get(m.month) || { unprocessedEx: 0, retentionHeld: 0, assetPurchases: 0 };
       existing.retentionHeld = parseFloat(m.totalRetentionHeld);
+      adjByMonth.set(m.month, existing);
+    });
+  }
+  if (adjustmentsData?.assetPurchases?.byMonth) {
+    adjustmentsData.assetPurchases.byMonth.forEach((m) => {
+      const existing = adjByMonth.get(m.month) || { unprocessedEx: 0, retentionHeld: 0, assetPurchases: 0 };
+      existing.assetPurchases = parseFloat(m.totalPurchasePrice);
       adjByMonth.set(m.month, existing);
     });
   }
@@ -754,7 +766,7 @@ function ProfitAndLossTab() {
   const chartData = months.map((m, idx) => {
     const t = monthlyTotals[idx];
     const key = m.start.slice(0, 7);
-    const adj = adjByMonth.get(key) || { unprocessedEx: 0, retentionHeld: 0 };
+    const adj = adjByMonth.get(key) || { unprocessedEx: 0, retentionHeld: 0, assetPurchases: 0 };
     return {
       name: t.label,
       Income: Math.round(t.income),
@@ -763,13 +775,15 @@ function ProfitAndLossTab() {
       "Gross Profit": Math.round(t.grossProfit),
       Unprocessed: Math.round(adj.unprocessedEx),
       Retention: Math.round(adj.retentionHeld),
-      "Adjusted Net": Math.round(t.netProfit + adj.retentionHeld - adj.unprocessedEx),
+      "Asset Purchases": Math.round(adj.assetPurchases),
+      "Adjusted Net": Math.round(t.netProfit + adj.retentionHeld - adj.unprocessedEx - adj.assetPurchases),
     };
   });
 
   const totalUnprocessedEx = adjustmentsData ? parseFloat(adjustmentsData.unprocessedInvoices.summary.totalEx) : 0;
   const totalRetentionHeld = adjustmentsData ? parseFloat(adjustmentsData.retention.summary.totalRetentionHeld) : 0;
-  const adjustedNetProfit = totalsAgg.netProfit + totalRetentionHeld - totalUnprocessedEx;
+  const totalAssetPurchases = adjustmentsData ? parseFloat(adjustmentsData.assetPurchases.summary.totalPurchasePrice) : 0;
+  const adjustedNetProfit = totalsAgg.netProfit + totalRetentionHeld - totalUnprocessedEx - totalAssetPurchases;
 
   const marginChartData = monthlyTotals.map((m) => ({
     name: m.label,
@@ -1047,7 +1061,7 @@ function ProfitAndLossTab() {
                   {formatCurrency(adjustedNetProfit)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  + Retention {formatCurrency(totalRetentionHeld)} &minus; Unprocessed {formatCurrency(totalUnprocessedEx)}
+                  + Ret. {formatCurrency(totalRetentionHeld)} &minus; Unproc. {formatCurrency(totalUnprocessedEx)} &minus; Assets {formatCurrency(totalAssetPurchases)}
                 </p>
               </CardContent>
             </Card>
@@ -1097,6 +1111,7 @@ function ProfitAndLossTab() {
                       <Bar dataKey="Expenses" fill="hsl(0, 65%, 50%)" radius={[2, 2, 0, 0]} />
                       <Bar dataKey="Unprocessed" fill="hsl(45, 90%, 50%)" radius={[2, 2, 0, 0]} />
                       <Bar dataKey="Retention" fill="hsl(210, 70%, 50%)" radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="Asset Purchases" fill="hsl(180, 60%, 45%)" radius={[2, 2, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1284,7 +1299,7 @@ function ProfitAndLossTab() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
                 <Card className="border-amber-500/30 bg-amber-500/5" data-testid="card-kpi-unprocessed-count">
                   <CardContent className="pt-4 pb-3">
                     <p className="text-xs text-muted-foreground font-medium">Unprocessed Invoices</p>
@@ -1315,9 +1330,16 @@ function ProfitAndLossTab() {
                     <p className="text-xs text-muted-foreground mt-0.5">Cumulative across jobs</p>
                   </CardContent>
                 </Card>
+                <Card className="border-teal-500/30 bg-teal-500/5" data-testid="card-kpi-asset-purchases">
+                  <CardContent className="pt-4 pb-3">
+                    <p className="text-xs text-muted-foreground font-medium">Asset Purchases</p>
+                    <p className="text-lg font-bold font-mono mt-1 text-teal-600 dark:text-teal-400" data-testid="text-asset-purchases">{formatCurrency(parseFloat(adjustmentsData.assetPurchases.summary.totalPurchasePrice))}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{adjustmentsData.assetPurchases.summary.count} items purchased</p>
+                  </CardContent>
+                </Card>
               </div>
 
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
                 <Card className="border-amber-500/20" data-testid="card-unprocessed-invoices">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -1401,7 +1423,90 @@ function ProfitAndLossTab() {
                     )}
                   </CardContent>
                 </Card>
+
+                <Card className="border-teal-500/20" data-testid="card-asset-purchases">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Package className="h-4 w-4 text-teal-500" />
+                      Asset Purchases
+                    </CardTitle>
+                    <CardDescription className="text-xs">Capital expenditure from Asset Register in this period</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {adjustmentsData.assetPurchases.byCategory.length > 0 ? (
+                      <div className="space-y-1.5">
+                        <div className="max-h-52 overflow-auto space-y-1">
+                          {adjustmentsData.assetPurchases.byCategory.map((c) => (
+                            <div key={c.category} className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-muted/30 gap-2">
+                              <span className="truncate flex-1">{c.category}</span>
+                              <div className="flex items-center gap-4 shrink-0">
+                                <span className="text-muted-foreground">{c.count} items</span>
+                                <span className="font-mono font-medium w-24 text-right">{formatCurrency(parseFloat(c.totalPurchasePrice))}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between text-xs py-1.5 px-2 rounded border-t font-semibold">
+                          <span>Total Purchases ({adjustmentsData.assetPurchases.summary.count} items)</span>
+                          <span className="font-mono font-bold text-teal-600 dark:text-teal-400">{formatCurrency(parseFloat(adjustmentsData.assetPurchases.summary.totalPurchasePrice))}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground py-4 text-center">No asset purchases for this period</p>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
+
+              {/* Profit Build-Up Waterfall */}
+              <Card className="border-purple-500/20" data-testid="card-profit-waterfall">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-purple-500" />
+                    Adjusted Profit Build-Up
+                  </CardTitle>
+                  <CardDescription className="text-xs">Waterfall from MYOB Net Profit to Adjusted Net Profit</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {[
+                      { label: "MYOB Net Profit", value: totalsAgg.netProfit, color: totalsAgg.netProfit >= 0 ? "bg-green-500" : "bg-red-500", textColor: totalsAgg.netProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400" },
+                      { label: "+ Retention Held", value: totalRetentionHeld, color: "bg-blue-500", textColor: "text-blue-600 dark:text-blue-400", isAdd: true },
+                      { label: "− Unprocessed Invoices", value: totalUnprocessedEx, color: "bg-amber-500", textColor: "text-amber-600 dark:text-amber-400", isSubtract: true },
+                      { label: "− Asset Purchases", value: totalAssetPurchases, color: "bg-teal-500", textColor: "text-teal-600 dark:text-teal-400", isSubtract: true },
+                    ].map((item, idx) => {
+                      const maxVal = Math.max(Math.abs(totalsAgg.netProfit), totalRetentionHeld, totalUnprocessedEx, totalAssetPurchases, Math.abs(adjustedNetProfit), 1);
+                      const barWidth = Math.min(Math.abs(item.value) / maxVal * 100, 100);
+                      return (
+                        <div key={idx} className="flex items-center gap-3">
+                          <span className="text-xs w-44 shrink-0">{item.label}</span>
+                          <div className="flex-1 h-5 bg-muted/30 rounded-sm overflow-hidden relative">
+                            <div className={`h-full ${item.color} rounded-sm transition-all`} style={{ width: `${barWidth}%` }} />
+                          </div>
+                          <span className={`text-xs font-mono font-semibold w-28 text-right shrink-0 ${item.textColor}`}>
+                            {item.isSubtract ? "−" : item.isAdd ? "+" : ""}{formatCurrency(Math.abs(item.value))}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    <div className="border-t pt-2 mt-1">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold w-44 shrink-0">= Adjusted Net Profit</span>
+                        <div className="flex-1 h-6 bg-muted/30 rounded-sm overflow-hidden relative">
+                          {(() => {
+                            const maxVal = Math.max(Math.abs(totalsAgg.netProfit), totalRetentionHeld, totalUnprocessedEx, totalAssetPurchases, Math.abs(adjustedNetProfit), 1);
+                            const barWidth = Math.min(Math.abs(adjustedNetProfit) / maxVal * 100, 100);
+                            return <div className={`h-full ${adjustedNetProfit >= 0 ? "bg-purple-500" : "bg-red-500"} rounded-sm transition-all`} style={{ width: `${barWidth}%` }} />;
+                          })()}
+                        </div>
+                        <span className={`text-xs font-mono font-bold w-28 text-right shrink-0 ${adjustedNetProfit >= 0 ? "text-purple-600 dark:text-purple-400" : "text-red-600 dark:text-red-400"}`}>
+                          {formatCurrency(adjustedNetProfit)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </>

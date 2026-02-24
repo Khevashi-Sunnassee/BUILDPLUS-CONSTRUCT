@@ -11,7 +11,7 @@ import {
 } from "../myob";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { myobTokens, myobExportLogs, users, myobAccountMappings, myobTaxCodeMappings, myobSupplierMappings, myobCustomerMappings, costCodes, suppliers, jobs, customers, progressClaims } from "@shared/schema";
+import { myobTokens, myobExportLogs, users, myobAccountMappings, myobTaxCodeMappings, myobSupplierMappings, myobCustomerMappings, costCodes, suppliers, jobs, customers, progressClaims, assets } from "@shared/schema";
 import { eq, desc, and, asc, sql, ilike, gte, lte, not, inArray } from "drizzle-orm";
 import { apInvoices } from "@shared/schema";
 
@@ -605,6 +605,40 @@ router.get("/api/myob/buildplus-adjustments", requireAuth, async (req: Request, 
     .groupBy(progressClaims.jobId, jobs.name)
     .orderBy(sql`sum(${progressClaims.retentionHeldToDate}) DESC`);
 
+    const assetDateFilter = and(
+      eq(assets.companyId, companyId),
+      sql`${assets.purchaseDate} IS NOT NULL AND ${assets.purchaseDate} <> '' AND ${assets.purchaseDate} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'`,
+      ...(periodStart ? [sql`${assets.purchaseDate} >= ${periodStart}`] : []),
+      ...(periodEnd ? [sql`${assets.purchaseDate} <= ${periodEnd}`] : [])
+    );
+
+    const assetPurchases = await db.select({
+      count: sql<number>`count(*)::int`,
+      totalPurchasePrice: sql<string>`COALESCE(sum(${assets.purchasePrice}), 0)`,
+    })
+    .from(assets)
+    .where(assetDateFilter);
+
+    const assetPurchasesByMonth = await db.select({
+      month: sql<string>`substring(${assets.purchaseDate} from 1 for 7)`,
+      count: sql<number>`count(*)::int`,
+      totalPurchasePrice: sql<string>`COALESCE(sum(${assets.purchasePrice}), 0)`,
+    })
+    .from(assets)
+    .where(assetDateFilter)
+    .groupBy(sql`substring(${assets.purchaseDate} from 1 for 7)`)
+    .orderBy(sql`substring(${assets.purchaseDate} from 1 for 7)`);
+
+    const assetPurchasesByCategory = await db.select({
+      category: assets.category,
+      count: sql<number>`count(*)::int`,
+      totalPurchasePrice: sql<string>`COALESCE(sum(${assets.purchasePrice}), 0)`,
+    })
+    .from(assets)
+    .where(assetDateFilter)
+    .groupBy(assets.category)
+    .orderBy(sql`sum(${assets.purchasePrice}) DESC`);
+
     const retentionByMonth = await db.select({
       month: sql<string>`to_char(${progressClaims.claimDate}, 'YYYY-MM')`,
       totalRetention: sql<string>`COALESCE(sum(${progressClaims.retentionAmount}), 0)`,
@@ -633,6 +667,11 @@ router.get("/api/myob/buildplus-adjustments", requireAuth, async (req: Request, 
         summary: retentionData[0] || { totalRetention: "0", totalRetentionHeld: "0", claimCount: 0 },
         byJob: retentionByJob,
         byMonth: retentionByMonth,
+      },
+      assetPurchases: {
+        summary: assetPurchases[0] || { count: 0, totalPurchasePrice: "0" },
+        byMonth: assetPurchasesByMonth,
+        byCategory: assetPurchasesByCategory,
       },
     });
   } catch (err) {
