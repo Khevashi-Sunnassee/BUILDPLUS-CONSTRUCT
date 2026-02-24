@@ -790,6 +790,88 @@ router.get("/api/myob/customer-invoices/:customerId", requireAuth, async (req: R
   }
 });
 
+router.get("/api/myob/job-invoices/:jobId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const { jobId } = req.params;
+
+    const [job] = await db.select()
+      .from(jobs)
+      .where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId)))
+      .limit(1);
+
+    if (!job) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    if (!job.myobJobUid) {
+      return res.json({ linked: false, bills: [], invoices: [], job: { id: job.id, name: job.projectName, jobNumber: job.jobNumber } });
+    }
+
+    const client = createMyobClient(companyId);
+    const myobJobUid = job.myobJobUid;
+
+    const billQuery = `$filter=Lines/any(L: L/Job/UID eq guid'${myobJobUid}')&$orderby=Date desc&$top=1000`;
+    const invoiceQuery = `$filter=Lines/any(L: L/Job/UID eq guid'${myobJobUid}')&$orderby=Date desc&$top=1000`;
+
+    const [billResult, invoiceResult] = await Promise.all([
+      client.getPurchaseBills(billQuery).catch((e: any) => {
+        logger.warn("Failed to fetch job purchase bills", { jobId, error: e.message });
+        return { Items: [] };
+      }),
+      client.getInvoices(invoiceQuery).catch((e: any) => {
+        logger.warn("Failed to fetch job sale invoices", { jobId, error: e.message });
+        return { Items: [] };
+      }),
+    ]);
+
+    const bills = (billResult?.Items || []).map((b: any) => ({
+      uid: b.UID,
+      number: b.Number,
+      date: b.Date,
+      supplierInvoiceNumber: b.SupplierInvoiceNumber,
+      supplierName: b.Supplier?.Name || "",
+      status: b.Status,
+      subtotal: b.Subtotal,
+      totalTax: b.TotalTax,
+      totalAmount: b.TotalAmount,
+      amountPaid: b.AmountPaid,
+      balanceDue: b.BalanceDueAmount,
+      comment: b.Comment,
+      journalMemo: b.JournalMemo,
+    }));
+
+    const invoices = (invoiceResult?.Items || []).map((inv: any) => ({
+      uid: inv.UID,
+      number: inv.Number,
+      date: inv.Date,
+      customerPO: inv.CustomerPurchaseOrderNumber,
+      customerName: inv.Customer?.Name || "",
+      status: inv.Status,
+      subtotal: inv.Subtotal,
+      totalTax: inv.TotalTax,
+      totalAmount: inv.TotalAmount,
+      amountPaid: inv.AmountPaid,
+      balanceDue: inv.BalanceDueAmount,
+      comment: inv.Comment,
+      journalMemo: inv.JournalMemo,
+    }));
+
+    res.json({
+      linked: true,
+      myobJobUid,
+      job: { id: job.id, name: job.projectName, jobNumber: job.jobNumber },
+      bills,
+      invoices,
+      billCount: bills.length,
+      invoiceCount: invoices.length,
+    });
+  } catch (err) {
+    handleMyobError(err, res, "job-invoices");
+  }
+});
+
 router.get("/api/myob/account-mappings", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;

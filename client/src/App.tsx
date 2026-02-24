@@ -54,6 +54,7 @@ const AdminSettingsPage = lazyWithRetry(() => import("@/pages/admin/settings"));
 const AdminUsersPage = lazyWithRetry(() => import("@/pages/admin/users"));
 const UserDetailPage = lazyWithRetry(() => import("@/pages/admin/user-detail"));
 const AdminJobsPage = lazyWithRetry(() => import("@/pages/admin/jobs"));
+const JobMyobInvoicesPage = lazyWithRetry(() => import("@/pages/admin/jobs/job-myob-invoices"));
 const AdminPanelsPage = lazyWithRetry(() => import("@/pages/admin/panels"));
 const AdminPanelTypesPage = lazyWithRetry(() => import("@/pages/admin/panel-types"));
 const AdminZonesPage = lazyWithRetry(() => import("@/pages/admin/zones"));
@@ -420,6 +421,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <ProductionSlotsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/jobs/:id/myob-invoices">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <JobMyobInvoicesPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

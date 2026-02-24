@@ -30,6 +30,7 @@ import {
   CalendarRange,
   Wallet,
   ListChecks,
+  Receipt,
 } from "lucide-react";
 import { QueryErrorState } from "@/components/query-error-state";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -1229,6 +1230,17 @@ export default function AdminJobsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {job.myobJobUid && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => navigate(`/admin/jobs/${job.id}/myob-invoices`)}
+                              title="MYOB Invoices"
+                              data-testid={`button-myob-invoices-${job.id}`}
+                            >
+                              <Receipt className="h-4 w-4 text-orange-600" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
