@@ -82,8 +82,8 @@ export default function ChecklistFillPage() {
       setHasChanges(false);
       toast({ title: "Saved", description: "Your progress has been saved" });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to save progress", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to save progress", variant: "destructive" });
     },
   });
 

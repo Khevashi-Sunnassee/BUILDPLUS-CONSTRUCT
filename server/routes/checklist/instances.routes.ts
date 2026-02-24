@@ -280,18 +280,24 @@ router.put("/api/checklist/instances/:id", requireAuth, async (req: Request, res
       return res.status(400).json({ error: "Company ID required" });
     }
 
-    const parsed = insertChecklistInstanceSchema.partial().safeParse(req.body);
-    if (!parsed.success) {
-      logger.warn({ details: parsed.error.flatten(), body: req.body }, "Checklist instance update validation failed");
-      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
-    }
-
+    const body = req.body;
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
-    for (const [key, value] of Object.entries(parsed.data)) {
-      if (value !== undefined) {
-        updateData[key] = value;
-      }
-    }
+
+    if (body.responses !== undefined) updateData.responses = body.responses;
+    if (body.completionRate !== undefined) updateData.completionRate = String(body.completionRate);
+    if (body.status !== undefined) updateData.status = body.status;
+    if (body.score !== undefined) updateData.score = String(body.score);
+    if (body.maxPossibleScore !== undefined) updateData.maxPossibleScore = body.maxPossibleScore;
+    if (body.assignedTo !== undefined) updateData.assignedTo = body.assignedTo;
+    if (body.location !== undefined) updateData.location = body.location;
+    if (body.jobId !== undefined) updateData.jobId = body.jobId;
+    if (body.panelId !== undefined) updateData.panelId = body.panelId;
+    if (body.customerId !== undefined) updateData.customerId = body.customerId;
+    if (body.supplierId !== undefined) updateData.supplierId = body.supplierId;
+    if (body.staffId !== undefined) updateData.staffId = body.staffId;
+    if (body.entityTypeId !== undefined) updateData.entityTypeId = body.entityTypeId;
+    if (body.entitySubtypeId !== undefined) updateData.entitySubtypeId = body.entitySubtypeId;
+    if (body.generatedWorkOrders !== undefined) updateData.generatedWorkOrders = body.generatedWorkOrders;
 
     const [updated] = await db.update(checklistInstances)
       .set(updateData)
@@ -302,11 +308,11 @@ router.put("/api/checklist/instances/:id", requireAuth, async (req: Request, res
       return res.status(404).json({ error: "Instance not found" });
     }
 
-    if (parsed.data.responses && updated.templateId) {
+    if (body.responses && updated.templateId) {
       processWorkOrderTriggers(
         companyId!,
         instanceId,
-        parsed.data.responses as Record<string, unknown>,
+        body.responses as Record<string, unknown>,
         updated.templateId
       ).catch(err => logger.error({ err }, "Work order trigger processing failed"));
     }
