@@ -793,8 +793,8 @@ export default function AdminChecklistTemplatesPage() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              {template.isSystem && (
-                <Badge variant="outline" className="text-xs">System</Badge>
+              {template.isSystemDefault && (
+                <Badge variant="outline" className="text-xs">Default</Badge>
               )}
               <Badge variant={template.isActive ? "default" : "secondary"}>
                 {template.isActive ? "Active" : "Inactive"}

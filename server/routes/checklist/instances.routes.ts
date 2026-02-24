@@ -194,7 +194,7 @@ router.post("/api/checklist/instances/from-asset", requireAuth, async (req: Requ
       .where(and(
         eq(checklistTemplates.companyId, companyId!),
         eq(checklistTemplates.name, "Equipment Maintenance Log"),
-        eq(checklistTemplates.isSystem, true),
+        eq(checklistTemplates.isSystemDefault, true),
         eq(checklistTemplates.isActive, true)
       ));
 

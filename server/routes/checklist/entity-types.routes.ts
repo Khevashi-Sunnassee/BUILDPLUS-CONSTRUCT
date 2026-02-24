@@ -103,12 +103,8 @@ router.delete("/api/checklist/entity-types/:id", requireAuth, requireRole("ADMIN
       return res.status(404).json({ error: "Entity type not found" });
     }
 
-    if (existing.isSystem) {
-      return res.status(403).json({ error: "System modules cannot be deleted" });
-    }
-
     const [deleted] = await db.update(entityTypes)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ isActive: false, isSystemDefault: false, updatedAt: new Date() })
       .where(and(eq(entityTypes.id, typeId), eq(entityTypes.companyId, companyId!)))
       .returning();
 

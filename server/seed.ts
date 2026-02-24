@@ -681,7 +681,7 @@ export async function ensureSystemChecklistModules() {
           .where(and(
             eq(entityTypes.companyId, company.id),
             eq(entityTypes.code, mod.code),
-            eq(entityTypes.isSystem, true)
+            eq(entityTypes.isSystemDefault, true)
           ));
 
         let entityTypeId: string;
@@ -694,7 +694,7 @@ export async function ensureSystemChecklistModules() {
             description: mod.description,
             icon: mod.icon,
             color: mod.color,
-            isSystem: true,
+            isSystemDefault: true,
             isActive: true,
             sortOrder: mod.code === "PANELS" ? 0 : 1,
           }).returning();
@@ -714,7 +714,7 @@ export async function ensureSystemChecklistModules() {
           if (allExistingMaintenanceTemplates.length > 0) {
             for (const tmpl of allExistingMaintenanceTemplates) {
               const updates: Record<string, any> = {
-                isSystem: true,
+                isSystemDefault: true,
                 sections: EQUIPMENT_MAINTENANCE_SECTIONS as any,
                 description: "Standard service and repair checklist for equipment maintenance. Used for logging service requests, inspections, parts tracking, and sign-off from the Asset Register.",
               };
@@ -724,7 +724,7 @@ export async function ensureSystemChecklistModules() {
               await db.update(checklistTemplates)
                 .set(updates)
                 .where(eq(checklistTemplates.id, tmpl.id));
-              if (!tmpl.isSystem || tmpl.entityTypeId !== entityTypeId) {
+              if (!tmpl.isSystemDefault || tmpl.entityTypeId !== entityTypeId) {
                 logger.info(`Upgraded Equipment Maintenance Log template ${tmpl.id} for company ${company.id}`);
               }
             }
@@ -749,7 +749,7 @@ export async function ensureSystemChecklistModules() {
               description: "Standard service and repair checklist for equipment maintenance. Used for logging service requests, inspections, parts tracking, and sign-off from the Asset Register.",
               entityTypeId,
               sections: EQUIPMENT_MAINTENANCE_SECTIONS as any,
-              isSystem: true,
+              isSystemDefault: true,
               isActive: true,
             });
             logger.info(`Created Equipment Maintenance Log template for company ${company.id}`);
@@ -798,7 +798,7 @@ export async function ensureSystemChecklistModules() {
             .where(and(
               eq(checklistTemplates.companyId, company.id),
               eq(checklistTemplates.entityTypeId, entityTypeId),
-              eq(checklistTemplates.isSystem, true)
+              eq(checklistTemplates.isSystemDefault, true)
             ));
 
           const templateCodes = existingTemplates.map(t => t.name);
@@ -811,7 +811,7 @@ export async function ensureSystemChecklistModules() {
               entityTypeId,
               entitySubtypeId: subtypeMap["PRE_POUR"],
               sections: PRE_POUR_SECTIONS as any,
-              isSystem: true,
+              isSystemDefault: true,
               isActive: true,
             });
             logger.info(`Created Pre-Pour template for company ${company.id}`);
@@ -825,7 +825,7 @@ export async function ensureSystemChecklistModules() {
               entityTypeId,
               entitySubtypeId: subtypeMap["POST_POUR"],
               sections: POST_POUR_SECTIONS as any,
-              isSystem: true,
+              isSystemDefault: true,
               isActive: true,
             });
             logger.info(`Created Post-Pour template for company ${company.id}`);

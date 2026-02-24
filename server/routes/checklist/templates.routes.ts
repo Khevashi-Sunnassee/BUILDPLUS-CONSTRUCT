@@ -363,7 +363,7 @@ router.delete("/api/checklist/templates/:id", requireAuth, requireRole("ADMIN"),
     }
 
     const [deleted] = await db.update(checklistTemplates)
-      .set({ isActive: false, isSystem: false, updatedAt: new Date() })
+      .set({ isActive: false, isSystemDefault: false, updatedAt: new Date() })
       .where(and(eq(checklistTemplates.id, templateId), eq(checklistTemplates.companyId, companyId!)))
       .returning();
 

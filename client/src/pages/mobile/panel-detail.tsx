@@ -88,7 +88,7 @@ interface ChecklistTemplate {
   description: string | null;
   entityTypeId: string | null;
   entitySubtypeId: string | null;
-  isSystem: boolean;
+  isSystemDefault: boolean;
   sections: any[];
 }
 
@@ -96,7 +96,7 @@ interface EntityType {
   id: string;
   name: string;
   code: string;
-  isSystem: boolean;
+  isSystemDefault: boolean;
   icon: string | null;
   color: string | null;
 }
@@ -238,8 +238,8 @@ export default function MobilePanelDetailPage() {
     queryKey: [CHECKLIST_ROUTES.TEMPLATES],
   });
 
-  const panelsModule = entityTypes.find(et => et.code === "PANELS" && et.isSystem);
-  const panelTemplates = allTemplates.filter(t => t.entityTypeId === panelsModule?.id && t.isSystem);
+  const panelsModule = entityTypes.find(et => et.code === "PANELS" && et.isSystemDefault);
+  const panelTemplates = allTemplates.filter(t => t.entityTypeId === panelsModule?.id && t.isSystemDefault);
 
   const createInstanceMutation = useMutation({
     mutationFn: async (templateId: string) => {
