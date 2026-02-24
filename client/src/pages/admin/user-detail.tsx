@@ -1,14 +1,84 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft, Edit2, User, Shield, KeyRound } from "lucide-react";
+import { ArrowLeft, Edit2, User, Shield, KeyRound, CheckCircle2, EyeOff, Eye, Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { User as UserType } from "@shared/schema";
 import { ADMIN_ROUTES } from "@shared/api-routes";
+
+const FUNCTION_LABELS: Record<string, string> = {
+  tasks: "Tasks",
+  chat: "Chat",
+  jobs: "Jobs",
+  panel_register: "Panel Register",
+  document_register: "Document Register",
+  photo_gallery: "Photo Gallery",
+  checklists: "Checklists",
+  weekly_job_logs: "Weekly Job Logs",
+  broadcast: "Broadcast",
+  production_slots: "Production Slots",
+  production_report: "Production Schedule",
+  drafting_program: "Drafting Program",
+  daily_reports: "Drafting Register",
+  reo_scheduling: "Reo Scheduling",
+  pm_call_logs: "PM Call Logs",
+  logistics: "Logistics",
+  sales_pipeline: "Sales Pipeline",
+  contract_hub: "Contract Hub",
+  progress_claims: "Progress Claims",
+  purchase_orders: "Purchase Orders",
+  hire_bookings: "Hire Bookings",
+  weekly_wages: "Weekly Wages",
+  admin_assets: "Asset Register",
+  kpi_dashboard: "KPI Dashboard",
+  manager_review: "Manager Review",
+  checklist_reports: "Checklist Reports",
+  admin_settings: "Settings",
+  admin_companies: "Companies",
+  admin_factories: "Factories",
+  admin_panel_types: "Panel Types",
+  admin_document_config: "Document Config",
+  admin_checklist_templates: "Checklist Templates",
+  admin_item_catalog: "Items & Categories",
+  admin_devices: "Devices",
+  admin_users: "Users",
+  admin_user_permissions: "User Permissions",
+  admin_job_types: "Job Types & Workflows",
+  admin_jobs: "Jobs Management",
+  admin_customers: "Customers",
+  admin_suppliers: "Suppliers",
+  admin_employees: "Employees",
+  admin_zones: "Zones",
+  admin_work_types: "Work Types",
+  admin_trailer_types: "Trailer Types",
+  admin_data_management: "Data Management",
+  admin_cost_codes: "Cost Codes",
+  tenders: "Tenders",
+  budgets: "Budgets",
+  scopes: "Scopes",
+};
+
+function getPermissionBadge(level: string) {
+  switch (level) {
+    case "HIDDEN":
+      return <Badge variant="secondary" className="gap-1"><EyeOff className="h-3 w-3" />Hidden</Badge>;
+    case "VIEW":
+      return <Badge variant="outline" className="gap-1 border-blue-500/30 text-blue-500"><Eye className="h-3 w-3" />View</Badge>;
+    case "VIEW_AND_UPDATE":
+      return <Badge className="gap-1 bg-green-500/10 text-green-500 border-green-500/30"><Pencil className="h-3 w-3" />View & Edit</Badge>;
+    case "VIEW_OWN":
+      return <Badge variant="outline" className="gap-1 border-amber-500/30 text-amber-500"><Eye className="h-3 w-3" />View Own</Badge>;
+    case "VIEW_AND_UPDATE_OWN":
+      return <Badge className="gap-1 bg-amber-500/10 text-amber-500 border-amber-500/30"><Pencil className="h-3 w-3" />View & Edit Own</Badge>;
+    default:
+      return <Badge variant="secondary">{level}</Badge>;
+  }
+}
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -30,6 +100,13 @@ function getRoleBadge(role: string) {
   }
 }
 
+interface UserPermission {
+  id: string;
+  userId: string;
+  functionKey: string;
+  permissionLevel: string;
+}
+
 export default function UserDetailPage() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/admin/users/:id");
@@ -37,6 +114,11 @@ export default function UserDetailPage() {
 
   const { data: user, isLoading } = useQuery<UserType>({
     queryKey: [ADMIN_ROUTES.USER_BY_ID(id)],
+    enabled: !!id,
+  });
+
+  const { data: permissions = [], isLoading: permLoading } = useQuery<UserPermission[]>({
+    queryKey: [`/api/admin/user-permissions/${id}`],
     enabled: !!id,
   });
 
@@ -64,6 +146,9 @@ export default function UserDetailPage() {
       </div>
     );
   }
+
+  const corePermissions = permissions.filter(p => !p.functionKey.startsWith("admin_"));
+  const adminPermissions = permissions.filter(p => p.functionKey.startsWith("admin_"));
 
   return (
     <div className="space-y-6" role="main" aria-label="User Detail" data-testid="user-detail-page">
@@ -96,6 +181,10 @@ export default function UserDetailPage() {
             <User className="h-4 w-4 mr-2" />
             Overview
           </TabsTrigger>
+          <TabsTrigger value="permissions" data-testid="tab-permissions">
+            <KeyRound className="h-4 w-4 mr-2" />
+            Permissions
+          </TabsTrigger>
           <TabsTrigger value="security" data-testid="tab-security">
             <Shield className="h-4 w-4 mr-2" />
             Security
@@ -112,6 +201,7 @@ export default function UserDetailPage() {
                 <InfoRow label="Name" value={user.name} />
                 <InfoRow label="Email" value={user.email} />
                 <InfoRow label="Phone" value={user.phone} />
+                <InfoRow label="Address" value={(user as any).address} />
                 <InfoRow label="Position" value={(user as any).position} />
               </CardContent>
             </Card>
@@ -164,6 +254,93 @@ export default function UserDetailPage() {
           </div>
         </TabsContent>
 
+        <TabsContent value="permissions" className="space-y-4">
+          {permLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-[200px]" />
+              <Skeleton className="h-[200px]" />
+            </div>
+          ) : permissions.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground" data-testid="text-no-permissions">
+                <KeyRound className="h-8 w-8 mx-auto mb-3 opacity-50" />
+                <p>No permissions configured for this user.</p>
+                <p className="text-xs mt-1">Permissions can be initialized from the Users list page.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <Card data-testid="card-core-permissions">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-primary" />
+                    Core Permissions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Function</TableHead>
+                          <TableHead className="text-right">Access Level</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {corePermissions.map((p) => (
+                          <TableRow key={p.functionKey} data-testid={`row-perm-${p.functionKey}`}>
+                            <TableCell className="font-medium">{FUNCTION_LABELS[p.functionKey] || p.functionKey}</TableCell>
+                            <TableCell className="text-right">{getPermissionBadge(p.permissionLevel)}</TableCell>
+                          </TableRow>
+                        ))}
+                        {corePermissions.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={2} className="text-center text-muted-foreground py-4">No core permissions</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-admin-permissions">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-amber-500" />
+                    Admin Permissions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Function</TableHead>
+                          <TableHead className="text-right">Access Level</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {adminPermissions.map((p) => (
+                          <TableRow key={p.functionKey} data-testid={`row-perm-${p.functionKey}`}>
+                            <TableCell className="font-medium">{FUNCTION_LABELS[p.functionKey] || p.functionKey}</TableCell>
+                            <TableCell className="text-right">{getPermissionBadge(p.permissionLevel)}</TableCell>
+                          </TableRow>
+                        ))}
+                        {adminPermissions.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={2} className="text-center text-muted-foreground py-4">No admin permissions</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+
         <TabsContent value="security" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card data-testid="card-authentication">
@@ -190,25 +367,6 @@ export default function UserDetailPage() {
                 <p className="text-sm text-muted-foreground" data-testid="text-password-info">
                   Password can be changed via the Edit User dialog on the Users list page.
                 </p>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-permissions">
-              <CardHeader>
-                <CardTitle className="text-lg">Permissions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground" data-testid="text-permissions-info">
-                  User permissions can be managed from the Users list page using the Permissions button.
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={() => setLocation("/admin/users")}
-                  data-testid="button-go-to-permissions"
-                >
-                  <KeyRound className="h-4 w-4 mr-2" />
-                  Go to Users
-                </Button>
               </CardContent>
             </Card>
           </div>

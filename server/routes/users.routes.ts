@@ -117,6 +117,20 @@ router.get("/api/admin/users", requireRoleOrSuperAdmin("ADMIN"), async (req, res
   res.json(users.map(u => ({ ...u, passwordHash: undefined })));
 });
 
+// Admin: Get single user by ID
+router.get("/api/admin/users/:id", requireRoleOrSuperAdmin("ADMIN"), async (req, res) => {
+  try {
+    const userId = req.params.id as string;
+    const user = await storage.getUser(userId);
+    if (!user || user.companyId !== req.companyId) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    res.json({ ...user, passwordHash: undefined });
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
 const createUserSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email address"),
   name: z.string().optional(),
