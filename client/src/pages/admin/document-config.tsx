@@ -15,6 +15,9 @@ import {
   Tag,
   Palette,
   X,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,6 +99,65 @@ type TypeFormData = z.infer<typeof typeSchema>;
 type DisciplineFormData = z.infer<typeof disciplineSchema>;
 type CategoryFormData = z.infer<typeof categorySchema>;
 
+type SortDir = "asc" | "desc" | null;
+interface SortState { column: string; direction: SortDir }
+
+function SortableHead({ column, label, sort, onSort, className }: {
+  column: string;
+  label: string;
+  sort: SortState;
+  onSort: (column: string) => void;
+  className?: string;
+}) {
+  const isActive = sort.column === column;
+  return (
+    <TableHead className={className}>
+      <button
+        className="flex items-center gap-1 hover:text-foreground transition-colors -ml-1 px-1 py-0.5 rounded"
+        onClick={() => onSort(column)}
+        data-testid={`sort-${column}`}
+      >
+        {label}
+        {isActive && sort.direction === "asc" ? (
+          <ArrowUp className="h-3.5 w-3.5 text-primary" />
+        ) : isActive && sort.direction === "desc" ? (
+          <ArrowDown className="h-3.5 w-3.5 text-primary" />
+        ) : (
+          <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+        )}
+      </button>
+    </TableHead>
+  );
+}
+
+function useSortState() {
+  const [sort, setSort] = useState<SortState>({ column: "", direction: null });
+  const toggle = (column: string) => {
+    setSort(prev => {
+      if (prev.column !== column) return { column, direction: "asc" as SortDir };
+      if (prev.direction === "asc") return { column, direction: "desc" as SortDir };
+      return { column: "", direction: null };
+    });
+  };
+  return { sort, toggle };
+}
+
+function sortRows<T extends Record<string, any>>(rows: T[], sort: SortState): T[] {
+  if (!sort.column || !sort.direction) return rows;
+  return [...rows].sort((a, b) => {
+    let va = a[sort.column];
+    let vb = b[sort.column];
+    if (typeof va === "boolean") { va = va ? 1 : 0; vb = vb ? 1 : 0; }
+    if (typeof va === "number" && typeof vb === "number") {
+      return sort.direction === "asc" ? va - vb : vb - va;
+    }
+    const sa = String(va ?? "").toLowerCase();
+    const sb = String(vb ?? "").toLowerCase();
+    const cmp = sa.localeCompare(sb);
+    return sort.direction === "asc" ? cmp : -cmp;
+  });
+}
+
 export default function AdminDocumentConfigPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("disciplines");
@@ -124,6 +186,10 @@ export default function AdminDocumentConfigPage() {
   const [editStatusName, setEditStatusName] = useState("");
   const [editStatusColor, setEditStatusColor] = useState("#6b7280");
 
+  const typeSort = useSortState();
+  const disciplineSort = useSortState();
+  const categorySort = useSortState();
+
   const { data: types = [], isLoading: typesLoading } = useQuery<DocumentTypeConfig[]>({
     queryKey: [DOCUMENT_ROUTES.TYPES],
   });
@@ -135,6 +201,10 @@ export default function AdminDocumentConfigPage() {
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<DocumentCategory[]>({
     queryKey: [DOCUMENT_ROUTES.CATEGORIES],
   });
+
+  const sortedTypes = useMemo(() => sortRows(types, typeSort.sort), [types, typeSort.sort]);
+  const sortedDisciplines = useMemo(() => sortRows(disciplines, disciplineSort.sort), [disciplines, disciplineSort.sort]);
+  const sortedCategories = useMemo(() => sortRows(categories, categorySort.sort), [categories, categorySort.sort]);
 
   const typeForm = useForm<TypeFormData>({
     resolver: zodResolver(typeSchema),
@@ -515,16 +585,16 @@ export default function AdminDocumentConfigPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Prefix</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Short Form</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Status</TableHead>
+                      <SortableHead column="prefix" label="Prefix" sort={typeSort.sort} onSort={typeSort.toggle} />
+                      <SortableHead column="typeName" label="Name" sort={typeSort.sort} onSort={typeSort.toggle} />
+                      <SortableHead column="shortForm" label="Short Form" sort={typeSort.sort} onSort={typeSort.toggle} />
+                      <SortableHead column="description" label="Description" sort={typeSort.sort} onSort={typeSort.toggle} />
+                      <SortableHead column="isActive" label="Status" sort={typeSort.sort} onSort={typeSort.toggle} />
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {types.map((type) => (
+                    {sortedTypes.map((type) => (
                       <TableRow key={type.id} data-testid={`row-type-${type.id}`}>
                         <TableCell className="font-mono font-medium">{type.prefix}</TableCell>
                         <TableCell>{type.typeName}</TableCell>
@@ -603,15 +673,15 @@ export default function AdminDocumentConfigPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Short Form</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Color</TableHead>
-                      <TableHead>Status</TableHead>
+                      <SortableHead column="shortForm" label="Short Form" sort={disciplineSort.sort} onSort={disciplineSort.toggle} />
+                      <SortableHead column="disciplineName" label="Name" sort={disciplineSort.sort} onSort={disciplineSort.toggle} />
+                      <SortableHead column="color" label="Color" sort={disciplineSort.sort} onSort={disciplineSort.toggle} />
+                      <SortableHead column="isActive" label="Status" sort={disciplineSort.sort} onSort={disciplineSort.toggle} />
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {disciplines.map((discipline) => (
+                    {sortedDisciplines.map((discipline) => (
                       <TableRow key={discipline.id} data-testid={`row-discipline-${discipline.id}`}>
                         <TableCell className="font-mono font-medium">{discipline.shortForm || "-"}</TableCell>
                         <TableCell>{discipline.disciplineName}</TableCell>
@@ -692,16 +762,16 @@ export default function AdminDocumentConfigPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Short Form</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Sort Order</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Status</TableHead>
+                      <SortableHead column="shortForm" label="Short Form" sort={categorySort.sort} onSort={categorySort.toggle} />
+                      <SortableHead column="categoryName" label="Name" sort={categorySort.sort} onSort={categorySort.toggle} />
+                      <SortableHead column="sortOrder" label="Sort Order" sort={categorySort.sort} onSort={categorySort.toggle} />
+                      <SortableHead column="description" label="Description" sort={categorySort.sort} onSort={categorySort.toggle} />
+                      <SortableHead column="isActive" label="Status" sort={categorySort.sort} onSort={categorySort.toggle} />
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {categories.map((category) => (
+                    {sortedCategories.map((category) => (
                       <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
                         <TableCell className="font-mono font-medium">{category.shortForm || "-"}</TableCell>
                         <TableCell>{category.categoryName}</TableCell>
