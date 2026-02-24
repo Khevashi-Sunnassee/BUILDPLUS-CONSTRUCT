@@ -25,7 +25,7 @@ The system employs a client-server architecture. The frontend is a React applica
 - **Scheduling:** Drafting and procurement scheduling linked to production slots for multi-factory operations; enhanced job program scheduling with pour labels and drag-and-drop functionality.
 - **Communication:** Teams-style chat supporting DMs, groups, channels, @mentions, notifications, and file attachments.
 - **Sales & Document Management:** Mobile-first pre-sales opportunity management; document management with version control, bundles, entity linking, bulk upload, and AI metadata extraction.
-- **Mobile Functionality:** QR scanner, mobile panel checklists with conditional fields, and mobile PM Call Logs.
+- **Mobile Functionality:** QR scanner, mobile panel checklists with conditional fields, mobile PM Call Logs, and mobile Work Orders with pull-to-refresh, error recovery with retry, client-side pagination, quick status actions (Start Work / Mark Resolved), and full asset/cost/description detail views.
 - **Advanced Features:** Panel consolidation, contract retention tracking, visual document comparison, Asset Register, Employee Licences & Tickets management, Hire Booking Engine, Capital Expenditure (CAPEX) module, AI-powered Scope of Works Builder, and a four-phase Budget System with Bill of Quantities (BOQ).
 - **Project Activities / Workflow System:** Template-driven activity workflow system with nested tasks, statuses, comments, and MS Project-style dependencies.
 - **External API Integration:** REST API with two-layer authentication (API key + JWT user tokens) for external app connectivity. API key provides company-level access; user tokens enforce per-user job membership filtering matching BuildPlus web app access rules. Supports bidirectional data sharing including jobs, documents, cost codes, markups, and estimates. Includes file download (`GET /api/v1/external/documents/:id/download`) and markup version upload (`POST /api/v1/external/documents/:id/markup-version`) endpoints.
@@ -66,7 +66,7 @@ The system employs a client-server architecture. The frontend is a React applica
 - **Vitest**: Testing framework.
 - **ExcelJS**: Excel file generation library.
 - **Resend**: Email service for outbound and inbound email processing.
-- **MYOB Business API**: Accounting software integration with OAuth authentication, Financial Dashboard (monthly P&L trends, KPI cards, charts), AP invoice export to MYOB Purchase Bills, and code mapping system (cost codes → MYOB accounts, suppliers → MYOB suppliers, tax codes → MYOB tax codes) with auto-map by name and manual mapping UI.
+- **MYOB Business API**: Accounting software integration with OAuth authentication (database-persisted state for restart resilience), Financial Dashboard (monthly P&L trends, KPI cards, charts), AP invoice export to MYOB Purchase Bills, code mapping system (cost codes → MYOB accounts, suppliers → MYOB suppliers, tax codes → MYOB tax codes) with auto-map by name and manual mapping UI, and bulk supplier import with atomic transaction-wrapped re-linking. Routes organized into sub-modules under `server/routes/myob/` (auth, data, mappings, financial, import, bulk-import).
 - **Twilio**: SMS and voice communication services.
 - **Mailgun**: Email automation service.
 - **TipTap**: Rich text editor framework.
