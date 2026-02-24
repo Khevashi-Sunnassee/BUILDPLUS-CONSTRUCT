@@ -11,7 +11,7 @@ import {
 } from "../myob";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { myobTokens, myobExportLogs, users, myobAccountMappings, myobTaxCodeMappings, myobSupplierMappings, costCodes, suppliers, jobs } from "@shared/schema";
+import { myobTokens, myobExportLogs, users, myobAccountMappings, myobTaxCodeMappings, myobSupplierMappings, myobCustomerMappings, costCodes, suppliers, jobs, customers } from "@shared/schema";
 import { eq, desc, and, asc } from "drizzle-orm";
 
 const router = Router();
@@ -664,6 +664,128 @@ router.delete("/api/myob/supplier-mappings/:id", requireAuth, async (req: Reques
     res.json({ success: true });
   } catch (err) {
     handleMyobError(err, res, "supplier-mappings-delete");
+  }
+});
+
+router.get("/api/myob/customers", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const myob = createMyobClient(companyId);
+    const data = await myob.getCustomers();
+    res.json(data);
+  } catch (err) {
+    handleMyobError(err, res, "customers");
+  }
+});
+
+router.get("/api/myob/customer-mappings", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const mappings = await db.select({
+      mapping: myobCustomerMappings,
+      customer: { name: customers.name },
+    })
+    .from(myobCustomerMappings)
+    .leftJoin(customers, eq(myobCustomerMappings.customerId, customers.id))
+    .where(eq(myobCustomerMappings.companyId, companyId))
+    .orderBy(asc(customers.name))
+    .limit(500);
+    res.json(mappings);
+  } catch (err) {
+    handleMyobError(err, res, "customer-mappings-list");
+  }
+});
+
+router.post("/api/myob/customer-mappings", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const { customerId, myobCustomerUid, myobCustomerName, myobCustomerDisplayId, notes } = req.body;
+    if (!customerId || !myobCustomerUid) return res.status(400).json({ error: "customerId and myobCustomerUid are required" });
+
+    const existing = await db.select().from(myobCustomerMappings)
+      .where(and(eq(myobCustomerMappings.companyId, companyId), eq(myobCustomerMappings.customerId, customerId)))
+      .limit(1);
+
+    if (existing.length > 0) {
+      const [updated] = await db.update(myobCustomerMappings)
+        .set({ myobCustomerUid, myobCustomerName, myobCustomerDisplayId, notes, updatedAt: new Date() })
+        .where(eq(myobCustomerMappings.id, existing[0].id))
+        .returning();
+      return res.json(updated);
+    }
+
+    const [created] = await db.insert(myobCustomerMappings).values({
+      companyId, customerId, myobCustomerUid, myobCustomerName, myobCustomerDisplayId, notes,
+    }).returning();
+    res.status(201).json(created);
+  } catch (err) {
+    handleMyobError(err, res, "customer-mappings-create");
+  }
+});
+
+router.delete("/api/myob/customer-mappings/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    await db.delete(myobCustomerMappings)
+      .where(and(eq(myobCustomerMappings.id, req.params.id), eq(myobCustomerMappings.companyId, companyId)));
+    res.json({ success: true });
+  } catch (err) {
+    handleMyobError(err, res, "customer-mappings-delete");
+  }
+});
+
+router.post("/api/myob/import-customers", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: "items array required" });
+
+    let created = 0, linked = 0, skipped = 0;
+
+    for (const item of items) {
+      const { myobUid, myobName, myobDisplayId, action, existingBpId } = item;
+      if (!myobUid || !myobName) { skipped++; continue; }
+
+      if (action === "skip") { skipped++; continue; }
+
+      if (action === "link" && existingBpId) {
+        const bpCustomer = await db.select().from(customers)
+          .where(and(eq(customers.id, existingBpId), eq(customers.companyId, companyId)))
+          .limit(1);
+        if (bpCustomer.length === 0) { skipped++; continue; }
+        const existing = await db.select().from(myobCustomerMappings)
+          .where(and(eq(myobCustomerMappings.companyId, companyId), eq(myobCustomerMappings.customerId, existingBpId)))
+          .limit(1);
+        if (existing.length > 0) {
+          await db.update(myobCustomerMappings)
+            .set({ myobCustomerUid: myobUid, myobCustomerName: myobName, myobCustomerDisplayId: myobDisplayId || null, updatedAt: new Date() })
+            .where(eq(myobCustomerMappings.id, existing[0].id));
+        } else {
+          await db.insert(myobCustomerMappings).values({
+            companyId, customerId: existingBpId, myobCustomerUid: myobUid, myobCustomerName: myobName, myobCustomerDisplayId: myobDisplayId || null,
+          });
+        }
+        linked++;
+      } else if (action === "create") {
+        const [newCustomer] = await db.insert(customers).values({ companyId, name: myobName }).returning();
+        await db.insert(myobCustomerMappings).values({
+          companyId, customerId: newCustomer.id, myobCustomerUid: myobUid, myobCustomerName: myobName, myobCustomerDisplayId: myobDisplayId || null,
+        });
+        created++;
+      } else {
+        skipped++;
+      }
+    }
+
+    res.json({ created, linked, skipped });
+  } catch (err) {
+    handleMyobError(err, res, "import-customers");
   }
 });
 

@@ -989,6 +989,8 @@ export const MYOB_ROUTES = {
   IMPORT_SUPPLIERS: '/api/myob/import-suppliers',
   IMPORT_JOBS: '/api/myob/import-jobs',
   IMPORT_ACCOUNTS: '/api/myob/import-accounts',
+  CUSTOMER_MAPPINGS: '/api/myob/customer-mappings',
+  IMPORT_CUSTOMERS: '/api/myob/import-customers',
 } as const;
 export type MyobRoutes = typeof MYOB_ROUTES;
 

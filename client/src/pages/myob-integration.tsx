@@ -1329,9 +1329,10 @@ interface ExportLogEntry {
 
 function CodeMappingTab() {
   const { toast } = useToast();
-  const [mappingSubTab, setMappingSubTab] = useState<"accounts" | "suppliers" | "tax" | "jobs">("accounts");
+  const [mappingSubTab, setMappingSubTab] = useState<"accounts" | "suppliers" | "customers" | "tax" | "jobs">("accounts");
   const [searchFilter, setSearchFilter] = useState("");
   const [importSupplierOpen, setImportSupplierOpen] = useState(false);
+  const [importCustomerOpen, setImportCustomerOpen] = useState(false);
   const [importJobOpen, setImportJobOpen] = useState(false);
   const [importAccountOpen, setImportAccountOpen] = useState(false);
 
@@ -1347,12 +1348,20 @@ function CodeMappingTab() {
     queryKey: [MYOB_ROUTES.SUPPLIERS],
   });
 
+  const { data: myobCustomers } = useQuery<any>({
+    queryKey: [MYOB_ROUTES.CUSTOMERS],
+  });
+
   const { data: accountMappings, isLoading: acctLoading } = useQuery<any[]>({
     queryKey: [MYOB_ROUTES.ACCOUNT_MAPPINGS],
   });
 
   const { data: supplierMappings, isLoading: supLoading } = useQuery<any[]>({
     queryKey: [MYOB_ROUTES.SUPPLIER_MAPPINGS],
+  });
+
+  const { data: customerMappings, isLoading: custLoading } = useQuery<any[]>({
+    queryKey: [MYOB_ROUTES.CUSTOMER_MAPPINGS],
   });
 
   const { data: taxCodeMappings, isLoading: taxLoading } = useQuery<any[]>({
@@ -1365,6 +1374,10 @@ function CodeMappingTab() {
 
   const { data: bpSuppliers } = useQuery<any[]>({
     queryKey: ["/api/suppliers"],
+  });
+
+  const { data: bpCustomers } = useQuery<any[]>({
+    queryKey: ["/api/customers"],
   });
 
   const { data: myobJobs } = useQuery<any>({
@@ -1430,6 +1443,26 @@ function CodeMappingTab() {
     },
   });
 
+  const saveCustomerMappingMutation = useMutation({
+    mutationFn: (data: { customerId: string; myobCustomerUid: string; myobCustomerName: string; myobCustomerDisplayId: string }) =>
+      apiRequest("POST", MYOB_ROUTES.CUSTOMER_MAPPINGS, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [MYOB_ROUTES.CUSTOMER_MAPPINGS] });
+      toast({ title: "Customer mapping saved" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to save mapping", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteCustomerMappingMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `${MYOB_ROUTES.CUSTOMER_MAPPINGS}/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [MYOB_ROUTES.CUSTOMER_MAPPINGS] });
+      toast({ title: "Customer mapping removed" });
+    },
+  });
+
   const saveTaxMappingMutation = useMutation({
     mutationFn: (data: { bpTaxCode: string; myobTaxCodeUid: string; myobTaxCodeName: string; myobTaxCodeCode: string }) =>
       apiRequest("POST", MYOB_ROUTES.TAX_CODE_MAPPINGS, data),
@@ -1472,16 +1505,19 @@ function CodeMappingTab() {
 
   const myobAccountItems: any[] = myobAccounts?.Items || [];
   const myobSupplierItems: any[] = myobSuppliers?.Items || [];
+  const myobCustomerItems: any[] = myobCustomers?.Items || [];
   const myobTaxCodeItems: any[] = myobTaxCodes?.Items || [];
   const myobJobItems: any[] = myobJobs?.Items || [];
 
   const acctMappingList: any[] = accountMappings || [];
   const supMappingList: any[] = supplierMappings || [];
+  const custMappingList: any[] = customerMappings || [];
   const taxMappingList: any[] = taxCodeMappings || [];
   const jobMappingList: any[] = bpJobMappings || [];
 
   const mappedAccountCount = acctMappingList.length;
   const mappedSupplierCount = supMappingList.length;
+  const mappedCustomerCount = custMappingList.length;
   const mappedTaxCount = taxMappingList.length;
   const mappedJobCount = jobMappingList.filter((j: any) => j.myobJobUid).length;
 
@@ -1517,6 +1553,9 @@ function CodeMappingTab() {
             <Truck className="h-3 w-3" /> Suppliers: {mappedSupplierCount} mapped
           </Badge>
           <Badge variant="outline" className="gap-1">
+            <Users className="h-3 w-3" /> Customers: {mappedCustomerCount} mapped
+          </Badge>
+          <Badge variant="outline" className="gap-1">
             <DollarSign className="h-3 w-3" /> Tax Codes: {mappedTaxCount} mapped
           </Badge>
           <Badge variant="outline" className="gap-1">
@@ -1541,6 +1580,14 @@ function CodeMappingTab() {
             data-testid="button-mapping-suppliers"
           >
             Supplier Mapping ({mappedSupplierCount})
+          </Button>
+          <Button
+            variant={mappingSubTab === "customers" ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setMappingSubTab("customers"); setSearchFilter(""); }}
+            data-testid="button-mapping-customers"
+          >
+            Customer Mapping ({mappedCustomerCount})
           </Button>
           <Button
             variant={mappingSubTab === "tax" ? "default" : "outline"}
@@ -1623,6 +1670,32 @@ function CodeMappingTab() {
           </>
         )}
 
+        {mappingSubTab === "customers" && (
+          <>
+            <div className="flex justify-end mb-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setImportCustomerOpen(true)}
+                data-testid="button-import-customers"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Import from MYOB
+              </Button>
+            </div>
+            <CustomerMappingTable
+              mappings={custMappingList}
+              myobCustomers={myobCustomerItems}
+              bpCustomers={bpCustomers || []}
+              isLoading={custLoading}
+              searchFilter={searchFilter}
+              onSave={(data) => saveCustomerMappingMutation.mutate(data)}
+              onDelete={(id) => deleteCustomerMappingMutation.mutate(id)}
+              isSaving={saveCustomerMappingMutation.isPending}
+            />
+          </>
+        )}
+
         {mappingSubTab === "tax" && (
           <TaxCodeMappingTable
             mappings={taxMappingList}
@@ -1671,6 +1744,19 @@ function CodeMappingTab() {
         onImportComplete={() => {
           queryClient.invalidateQueries({ queryKey: [MYOB_ROUTES.SUPPLIER_MAPPINGS] });
           queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+        }}
+      />
+
+      <ImportFromMyobDialog
+        open={importCustomerOpen}
+        onOpenChange={setImportCustomerOpen}
+        type="customers"
+        myobItems={myobCustomerItems}
+        bpItems={(bpCustomers || []).map((c: any) => ({ id: c.id, name: c.name }))}
+        alreadyMappedMyobUids={new Set(custMappingList.map((m: any) => m.mapping?.myobCustomerUid || m.myobCustomerUid).filter(Boolean))}
+        onImportComplete={() => {
+          queryClient.invalidateQueries({ queryKey: [MYOB_ROUTES.CUSTOMER_MAPPINGS] });
+          queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
         }}
       />
 
@@ -2092,6 +2178,204 @@ function SupplierMappingTable({ mappings, myobSuppliers, bpSuppliers, isLoading,
                             className="text-destructive"
                             onClick={() => onDelete(m.mapping.id)}
                             data-testid={`button-delete-sup-${m.mapping.id}`}
+                          >
+                            <XCircle className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+function CustomerMappingTable({ mappings, myobCustomers, bpCustomers, isLoading, searchFilter, onSave, onDelete, isSaving }: {
+  mappings: any[];
+  myobCustomers: any[];
+  bpCustomers: any[];
+  isLoading: boolean;
+  searchFilter: string;
+  onSave: (data: any) => void;
+  onDelete: (id: string) => void;
+  isSaving: boolean;
+}) {
+  const [editingRow, setEditingRow] = useState<string | null>(null);
+  const [selectedMyobCustomer, setSelectedMyobCustomer] = useState<string>("");
+  const [newCustomerId, setNewCustomerId] = useState("");
+  const [newMyobCustomerUid, setNewMyobCustomerUid] = useState("");
+
+  const mappedCustomerIds = new Set(mappings.map((m) => m.mapping?.customerId));
+  const unmappedCustomers = bpCustomers.filter((c: any) => c.isActive !== false && !mappedCustomerIds.has(c.id));
+
+  const filtered = mappings.filter((m) => {
+    if (!searchFilter) return true;
+    const term = searchFilter.toLowerCase();
+    const name = m.customer?.name?.toLowerCase() || "";
+    const myobName = m.mapping?.myobCustomerName?.toLowerCase() || "";
+    return name.includes(term) || myobName.includes(term);
+  });
+
+  if (isLoading) return <div className="flex items-center gap-2 p-4"><Loader2 className="h-4 w-4 animate-spin" /> Loading mappings...</div>;
+
+  return (
+    <div className="space-y-4">
+      {unmappedCustomers.length > 0 && myobCustomers.length > 0 && (
+        <div className="p-3 bg-muted/50 rounded-lg border">
+          <p className="text-sm font-medium mb-2">Add Customer Mapping</p>
+          <div className="flex gap-2 items-end flex-wrap">
+            <div>
+              <Label className="text-xs">BuildPlus Customer</Label>
+              <Select value={newCustomerId} onValueChange={setNewCustomerId}>
+                <SelectTrigger className="w-[250px]" data-testid="select-new-bp-customer">
+                  <SelectValue placeholder="Select customer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {unmappedCustomers.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">MYOB Customer</Label>
+              <Select value={newMyobCustomerUid} onValueChange={setNewMyobCustomerUid}>
+                <SelectTrigger className="w-[250px]" data-testid="select-new-myob-customer">
+                  <SelectValue placeholder="Select MYOB customer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {myobCustomers.filter((c: any) => c.IsActive !== false).map((c: any) => (
+                    <SelectItem key={c.UID} value={c.UID}>
+                      {c.CompanyName || c.Name || `${c.FirstName || ""} ${c.LastName || ""}`.trim()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              size="sm"
+              disabled={!newCustomerId || !newMyobCustomerUid || isSaving}
+              onClick={() => {
+                const cust = myobCustomers.find((c: any) => c.UID === newMyobCustomerUid);
+                if (cust) {
+                  onSave({
+                    customerId: newCustomerId,
+                    myobCustomerUid: cust.UID,
+                    myobCustomerName: cust.CompanyName || cust.Name || "",
+                    myobCustomerDisplayId: cust.DisplayID || "",
+                  });
+                  setNewCustomerId("");
+                  setNewMyobCustomerUid("");
+                }
+              }}
+              data-testid="button-add-cust-mapping"
+            >
+              {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Add"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">{unmappedCustomers.length} unmapped customers remaining</p>
+        </div>
+      )}
+
+      <div className="rounded-md border overflow-auto max-h-[500px]">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>BuildPlus Customer</TableHead>
+              <TableHead>MYOB Customer</TableHead>
+              <TableHead>MYOB Display ID</TableHead>
+              <TableHead>Notes</TableHead>
+              <TableHead className="w-[100px]">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  {mappings.length === 0
+                    ? "No customer mappings yet. Click 'Auto-Map by Name' to get started."
+                    : "No mappings match your search."}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((m) => (
+                <TableRow key={m.mapping.id} data-testid={`row-cust-mapping-${m.mapping.id}`}>
+                  <TableCell>{m.customer?.name || "-"}</TableCell>
+                  <TableCell>
+                    {editingRow === m.mapping.id ? (
+                      <Select
+                        value={selectedMyobCustomer}
+                        onValueChange={setSelectedMyobCustomer}
+                      >
+                        <SelectTrigger className="w-[250px]" data-testid={`select-myob-customer-${m.mapping.id}`}>
+                          <SelectValue placeholder="Select MYOB customer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {myobCustomers.filter((c: any) => c.IsActive !== false).map((c: any) => (
+                            <SelectItem key={c.UID} value={c.UID}>
+                              {c.CompanyName || c.Name || `${c.FirstName || ""} ${c.LastName || ""}`.trim()}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      m.mapping.myobCustomerName || "-"
+                    )}
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">{editingRow === m.mapping.id ? "" : (m.mapping.myobCustomerDisplayId || "-")}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{m.mapping.notes || "-"}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {editingRow === m.mapping.id ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            disabled={!selectedMyobCustomer || isSaving}
+                            onClick={() => {
+                              const cust = myobCustomers.find((c: any) => c.UID === selectedMyobCustomer);
+                              if (cust) {
+                                onSave({
+                                  customerId: m.mapping.customerId,
+                                  myobCustomerUid: cust.UID,
+                                  myobCustomerName: cust.CompanyName || cust.Name || "",
+                                  myobCustomerDisplayId: cust.DisplayID || "",
+                                });
+                                setEditingRow(null);
+                              }
+                            }}
+                            data-testid={`button-save-cust-${m.mapping.id}`}
+                          >
+                            {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingRow(null)}>
+                            <XCircle className="h-3 w-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingRow(m.mapping.id);
+                              setSelectedMyobCustomer(m.mapping.myobCustomerUid || "");
+                            }}
+                            data-testid={`button-edit-cust-${m.mapping.id}`}
+                          >
+                            <ClipboardList className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive"
+                            onClick={() => onDelete(m.mapping.id)}
+                            data-testid={`button-delete-cust-${m.mapping.id}`}
                           >
                             <XCircle className="h-3 w-3" />
                           </Button>
@@ -2685,7 +2969,7 @@ function ImportFromMyobDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  type: "suppliers" | "jobs" | "accounts";
+  type: "suppliers" | "customers" | "jobs" | "accounts";
   myobItems: any[];
   bpItems: any[];
   alreadyMappedMyobUids: Set<string>;
@@ -2699,12 +2983,13 @@ function ImportFromMyobDialog({
   const unlinkedItems = myobItems.filter((item) => !alreadyMappedMyobUids.has(item.UID));
 
   const getMyobName = (item: any): string => {
-    if (type === "suppliers") return item.CompanyName || item.Name || `${item.FirstName || ""} ${item.LastName || ""}`.trim();
+    if (type === "suppliers" || type === "customers") return item.CompanyName || item.Name || `${item.FirstName || ""} ${item.LastName || ""}`.trim();
     return item.Name || "";
   };
 
   const getMyobId = (item: any): string => {
     if (type === "jobs") return item.Number || "";
+    if (type === "customers") return item.DisplayID || "";
     return item.DisplayID || "";
   };
 
@@ -2750,6 +3035,7 @@ function ImportFromMyobDialog({
   };
 
   const importUrl = type === "suppliers" ? MYOB_ROUTES.IMPORT_SUPPLIERS
+    : type === "customers" ? MYOB_ROUTES.IMPORT_CUSTOMERS
     : type === "jobs" ? MYOB_ROUTES.IMPORT_JOBS
     : MYOB_ROUTES.IMPORT_ACCOUNTS;
 
@@ -2797,7 +3083,7 @@ function ImportFromMyobDialog({
     onOpenChange(false);
   };
 
-  const typeLabel = type === "suppliers" ? "Suppliers" : type === "jobs" ? "Jobs" : "Accounts";
+  const typeLabel = type === "suppliers" ? "Suppliers" : type === "customers" ? "Customers" : type === "jobs" ? "Jobs" : "Accounts";
   const idLabel = type === "jobs" ? "Number" : "Display ID";
 
   return (

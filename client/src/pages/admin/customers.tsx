@@ -647,6 +647,7 @@ export default function AdminCustomersPage() {
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")} data-testid="sort-customer-status">
                     <span className="flex items-center">Status<SortIcon column="status" sortColumn={sortColumn} sortDirection={sortDirection} /></span>
                   </TableHead>
+                  <TableHead data-testid="header-customer-myob">MYOB</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -672,6 +673,13 @@ export default function AdminCustomersPage() {
                       <Badge variant={customer.isActive ? "default" : "secondary"} data-testid={`badge-customer-status-${customer.id}`}>
                         {customer.isActive ? "Active" : "Inactive"}
                       </Badge>
+                    </TableCell>
+                    <TableCell data-testid={`text-customer-myob-${customer.id}`}>
+                      {(customer as any).myobUid ? (
+                        <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/30">Linked</Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">

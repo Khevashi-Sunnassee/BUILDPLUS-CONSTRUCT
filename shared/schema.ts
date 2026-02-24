@@ -5812,6 +5812,25 @@ export const insertMyobSupplierMappingSchema = createInsertSchema(myobSupplierMa
 export type InsertMyobSupplierMapping = z.infer<typeof insertMyobSupplierMappingSchema>;
 export type MyobSupplierMapping = typeof myobSupplierMappings.$inferSelect;
 
+export const myobCustomerMappings = pgTable("myob_customer_mappings", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id, { onDelete: "cascade" }),
+  customerId: varchar("customer_id", { length: 36 }).notNull().references(() => customers.id, { onDelete: "cascade" }),
+  myobCustomerUid: text("myob_customer_uid").notNull(),
+  myobCustomerName: text("myob_customer_name"),
+  myobCustomerDisplayId: text("myob_customer_display_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("myob_customer_mappings_company_idx").on(table.companyId),
+  customerIdx: index("myob_customer_mappings_customer_idx").on(table.customerId),
+}));
+
+export const insertMyobCustomerMappingSchema = createInsertSchema(myobCustomerMappings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMyobCustomerMapping = z.infer<typeof insertMyobCustomerMappingSchema>;
+export type MyobCustomerMapping = typeof myobCustomerMappings.$inferSelect;
+
 // ============================================================================
 // EMAIL TEMPLATES
 // ============================================================================

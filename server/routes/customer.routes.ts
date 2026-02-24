@@ -6,8 +6,8 @@ import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { jobs } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { jobs, customers, myobCustomerMappings } from "@shared/schema";
+import { eq, and, asc, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -106,7 +106,19 @@ router.get("/api/customers", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const customersData = await storage.getAllCustomers(companyId);
+    const rows = await db.select({
+      customer: customers,
+      myobUid: myobCustomerMappings.myobCustomerUid,
+    })
+    .from(customers)
+    .leftJoin(myobCustomerMappings, and(
+      eq(myobCustomerMappings.customerId, customers.id),
+      eq(myobCustomerMappings.companyId, customers.companyId),
+    ))
+    .where(eq(customers.companyId, companyId))
+    .orderBy(asc(customers.name))
+    .limit(1000);
+    const customersData = rows.map(r => ({ ...r.customer, myobUid: r.myobUid || null }));
     res.json(customersData);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching customers");
