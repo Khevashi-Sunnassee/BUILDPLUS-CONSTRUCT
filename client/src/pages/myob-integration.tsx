@@ -2416,9 +2416,11 @@ function JobMappingTable({ bpJobs, myobJobs, isLoading, searchFilter, onLink, on
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Job Number</TableHead>
-                  <TableHead>Job Name</TableHead>
-                  <TableHead>MYOB Job</TableHead>
+                  <TableHead>BP Job Number</TableHead>
+                  <TableHead>BP Job Name</TableHead>
+                  <TableHead>MYOB Job No.</TableHead>
+                  <TableHead>MYOB Job Name</TableHead>
+                  <TableHead className="text-xs text-muted-foreground">MYOB UID</TableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -2429,9 +2431,9 @@ function JobMappingTable({ bpJobs, myobJobs, isLoading, searchFilter, onLink, on
                     <TableRow key={j.id} data-testid={`row-job-linked-${j.id}`}>
                       <TableCell className="font-mono text-sm">{j.jobNumber}</TableCell>
                       <TableCell>{j.name}</TableCell>
-                      <TableCell className="text-sm">
-                        {myobJob ? `${myobJob.Number || ""} - ${myobJob.Name || ""}` : j.myobJobUid}
-                      </TableCell>
+                      <TableCell className="font-mono text-sm font-medium">{myobJob?.Number || "-"}</TableCell>
+                      <TableCell className="text-sm">{myobJob?.Name || "-"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground font-mono max-w-[120px] truncate" title={j.myobJobUid}>{j.myobJobUid?.slice(0, 8)}...</TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"
@@ -2531,11 +2533,62 @@ function JobMappingTable({ bpJobs, myobJobs, isLoading, searchFilter, onLink, on
         )}
       </div>
 
-      {myobJobs.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-4">
-          No MYOB jobs found. Make sure your MYOB connection is active and you have jobs in MYOB.
-        </p>
-      )}
+      <div>
+        <p className="text-sm font-medium mb-2">MYOB Jobs ({myobJobs.length})</p>
+        {myobJobs.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">
+            No MYOB jobs found. Make sure your MYOB connection is active and you have jobs configured in MYOB.
+          </p>
+        ) : (
+          <div className="rounded-md border overflow-auto max-h-[300px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>MYOB Job No.</TableHead>
+                  <TableHead>MYOB Job Name</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Header</TableHead>
+                  <TableHead>Parent Job</TableHead>
+                  <TableHead className="text-xs text-muted-foreground">UID</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {myobJobs
+                  .filter((mj: any) => {
+                    if (!searchFilter) return true;
+                    const term = searchFilter.toLowerCase();
+                    return (
+                      (mj.Number || "").toLowerCase().includes(term) ||
+                      (mj.Name || "").toLowerCase().includes(term) ||
+                      (mj.Description || "").toLowerCase().includes(term)
+                    );
+                  })
+                  .map((mj: any) => {
+                    const isLinked = usedMyobUids.has(mj.UID);
+                    return (
+                      <TableRow key={mj.UID} data-testid={`row-myob-job-${mj.UID}`}>
+                        <TableCell className="font-mono text-sm font-medium">{mj.Number || "-"}</TableCell>
+                        <TableCell>{mj.Name || "-"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate" title={mj.Description || ""}>{mj.Description || "-"}</TableCell>
+                        <TableCell className="text-sm">{mj.IsHeader ? "Yes" : "No"}</TableCell>
+                        <TableCell className="text-sm">{mj.ParentJob ? `${mj.ParentJob.Number || ""} - ${mj.ParentJob.Name || ""}` : "-"}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground font-mono max-w-[120px] truncate" title={mj.UID}>{mj.UID?.slice(0, 8)}...</TableCell>
+                        <TableCell>
+                          {isLinked ? (
+                            <Badge variant="default" className="text-xs">Linked</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">Available</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
