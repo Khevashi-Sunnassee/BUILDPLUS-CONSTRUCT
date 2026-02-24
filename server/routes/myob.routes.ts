@@ -26,6 +26,9 @@ setInterval(() => {
 }, 60000);
 
 function buildRedirectUri(req: Request): string {
+  if (process.env.MYOB_REDIRECT_URI) {
+    return process.env.MYOB_REDIRECT_URI;
+  }
   const protocol = req.headers["x-forwarded-proto"] || req.protocol;
   const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:5000";
   return `${protocol}://${host}/api/myob/callback`;
