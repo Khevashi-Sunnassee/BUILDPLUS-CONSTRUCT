@@ -423,16 +423,32 @@ router.get("/api/myob/monthly-pnl", requireAuth, async (req: Request, res: Respo
       return res.status(400).json({ error: "months must be between 1 and 24" });
     }
 
+    const startDateParam = req.query.startDate as string | undefined;
     const endDate = endDateParam ? new Date(endDateParam) : new Date();
     const monthRanges: { start: string; end: string; label: string }[] = [];
 
-    for (let i = months - 1; i >= 0; i--) {
-      const d = new Date(endDate.getFullYear(), endDate.getMonth() - i, 1);
-      const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-      const end = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-      const label = d.toLocaleDateString("en-AU", { month: "short", year: "numeric" });
-      monthRanges.push({ start, end, label });
+    if (startDateParam) {
+      const startDate = new Date(startDateParam);
+      const rangeStart = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+      const rangeEnd = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+      let cursor = new Date(rangeStart);
+      while (cursor <= rangeEnd) {
+        const start = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-01`;
+        const lastDay = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+        const end = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        const label = cursor.toLocaleDateString("en-AU", { month: "short", year: "numeric" });
+        monthRanges.push({ start, end, label });
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+      }
+    } else {
+      for (let i = months - 1; i >= 0; i--) {
+        const d = new Date(endDate.getFullYear(), endDate.getMonth() - i, 1);
+        const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+        const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        const end = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+        const label = d.toLocaleDateString("en-AU", { month: "short", year: "numeric" });
+        monthRanges.push({ start, end, label });
+      }
     }
 
     const myob = createMyobClient(companyId);

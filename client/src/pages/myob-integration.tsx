@@ -637,6 +637,33 @@ function getPresetDates(preset: string) {
   }
 }
 
+function getFinancialYears() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentFYStart = currentMonth >= 6 ? currentYear : currentYear - 1;
+  const years: { value: string; label: string; startDate: string; endDate: string }[] = [];
+  for (let i = 0; i < 5; i++) {
+    const fyStart = currentFYStart - i;
+    const fyEnd = fyStart + 1;
+    const startDate = `${fyStart}-07-01`;
+    let endDate: string;
+    if (i === 0) {
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    } else {
+      endDate = `${fyEnd}-06-30`;
+    }
+    years.push({
+      value: `fy-${fyStart}`,
+      label: `FY ${fyStart}/${String(fyEnd).slice(-2)}`,
+      startDate,
+      endDate,
+    });
+  }
+  return years;
+}
+
 function ProfitAndLossTab() {
   const [reportingBasis, setReportingBasis] = useState("Accrual");
   const [yearEndAdjust, setYearEndAdjust] = useState(false);
@@ -645,7 +672,12 @@ function ProfitAndLossTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
-  const monthlyUrl = `${MYOB_ROUTES.MONTHLY_PNL}?months=${monthCount}&reportingBasis=${reportingBasis}&yearEndAdjust=${yearEndAdjust}`;
+  const financialYears = getFinancialYears();
+  const selectedFY = financialYears.find((fy) => fy.value === monthCount);
+
+  const monthlyUrl = selectedFY
+    ? `${MYOB_ROUTES.MONTHLY_PNL}?months=12&startDate=${selectedFY.startDate}&endDate=${selectedFY.endDate}&reportingBasis=${reportingBasis}&yearEndAdjust=${yearEndAdjust}`
+    : `${MYOB_ROUTES.MONTHLY_PNL}?months=${monthCount}&reportingBasis=${reportingBasis}&yearEndAdjust=${yearEndAdjust}`;
 
   const { data: monthlyData, isLoading, isError, error, refetch, isFetching } = useQuery<MonthlyPnlResponse>({
     queryKey: [MYOB_ROUTES.MONTHLY_PNL, monthCount, reportingBasis, yearEndAdjust],
@@ -844,7 +876,7 @@ function ProfitAndLossTab() {
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Period</Label>
               <Select value={monthCount} onValueChange={setMonthCount}>
-                <SelectTrigger className="w-36" data-testid="select-month-count">
+                <SelectTrigger className="w-44" data-testid="select-month-count">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -853,6 +885,14 @@ function ProfitAndLossTab() {
                   <SelectItem value="12">Last 12 months</SelectItem>
                   <SelectItem value="18">Last 18 months</SelectItem>
                   <SelectItem value="24">Last 24 months</SelectItem>
+                  {financialYears.length > 0 && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-2">Financial Years</div>
+                      {financialYears.map((fy) => (
+                        <SelectItem key={fy.value} value={fy.value}>{fy.label}</SelectItem>
+                      ))}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
