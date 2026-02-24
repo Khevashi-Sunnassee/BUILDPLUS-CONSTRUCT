@@ -92,6 +92,7 @@ export default function ChecklistFillPage() {
       await apiRequest("PUT", CHECKLIST_ROUTES.INSTANCE_BY_ID(id!), {
         responses,
         completionRate: "100",
+        status: "in_progress",
       });
       return apiRequest("PATCH", CHECKLIST_ROUTES.INSTANCE_COMPLETE(id!));
     },
@@ -102,8 +103,8 @@ export default function ChecklistFillPage() {
       setCompleteDialogOpen(false);
       toast({ title: "Completed", description: "Checklist has been marked as complete" });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to complete checklist", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to complete checklist", variant: "destructive" });
     },
   });
 
@@ -182,42 +183,15 @@ export default function ChecklistFillPage() {
             <p className="text-muted-foreground">{template.description || "No description"}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {hasChanges && (
-            <Badge variant="outline" className="mr-2">
-              Unsaved Changes
-            </Badge>
-          )}
-          {!isCompleted && (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => saveInstanceMutation.mutate()}
-                disabled={!hasChanges || saveInstanceMutation.isPending}
-                data-testid="button-save-checklist"
-              >
-                {saveInstanceMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4 mr-2" />
-                )}
-                Save Progress
-              </Button>
-              <Button
-                onClick={handleComplete}
-                disabled={completeInstanceMutation.isPending}
-                data-testid="button-complete-checklist"
-              >
-                {completeInstanceMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4 mr-2" />
-                )}
-                Complete
-              </Button>
-            </>
-          )}
-        </div>
+        {statusConfig && (
+          <div className="flex items-center gap-2">
+            {hasChanges && (
+              <Badge variant="outline" className="mr-2">
+                Unsaved Changes
+              </Badge>
+            )}
+          </div>
+        )}
       </div>
 
       {isCompleted && (
@@ -241,6 +215,41 @@ export default function ChecklistFillPage() {
         disabled={isCompleted}
         showProgress={!isCompleted}
       />
+
+      {!isCompleted && (
+        <div className="flex items-center justify-end gap-3 pt-4 pb-6 border-t">
+          {hasChanges && (
+            <Badge variant="outline" className="mr-auto">
+              Unsaved Changes
+            </Badge>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => saveInstanceMutation.mutate()}
+            disabled={!hasChanges || saveInstanceMutation.isPending}
+            data-testid="button-save-checklist"
+          >
+            {saveInstanceMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Save Progress
+          </Button>
+          <Button
+            onClick={handleComplete}
+            disabled={completeInstanceMutation.isPending}
+            data-testid="button-complete-checklist"
+          >
+            {completeInstanceMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            Complete
+          </Button>
+        </div>
+      )}
 
       <AlertDialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
         <AlertDialogContent>

@@ -282,11 +282,19 @@ router.put("/api/checklist/instances/:id", requireAuth, async (req: Request, res
 
     const parsed = insertChecklistInstanceSchema.partial().safeParse(req.body);
     if (!parsed.success) {
+      logger.warn({ details: parsed.error.flatten(), body: req.body }, "Checklist instance update validation failed");
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
 
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    for (const [key, value] of Object.entries(parsed.data)) {
+      if (value !== undefined) {
+        updateData[key] = value;
+      }
+    }
+
     const [updated] = await db.update(checklistInstances)
-      .set({ ...parsed.data, updatedAt: new Date() })
+      .set(updateData)
       .where(and(eq(checklistInstances.id, instanceId), eq(checklistInstances.companyId, companyId!)))
       .returning();
 
@@ -320,11 +328,29 @@ router.patch("/api/checklist/instances/:id/complete", requireAuth, async (req: R
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    if (!userId) {
+      return res.status(400).json({ error: "User ID required" });
+    }
+
+    const existing = await db.select()
+      .from(checklistInstances)
+      .where(and(eq(checklistInstances.id, instanceId), eq(checklistInstances.companyId, companyId!)))
+      .limit(1);
+
+    if (!existing.length) {
+      return res.status(404).json({ error: "Instance not found" });
+    }
+
+    if (existing[0].status === "completed" || existing[0].status === "signed_off") {
+      return res.status(400).json({ error: "Checklist is already completed" });
+    }
+
     const [updated] = await db.update(checklistInstances)
       .set({
         status: "completed",
         completedAt: new Date(),
         completedBy: userId,
+        completionRate: "100",
         updatedAt: new Date(),
       })
       .where(and(eq(checklistInstances.id, instanceId), eq(checklistInstances.companyId, companyId!)))
@@ -336,7 +362,7 @@ router.patch("/api/checklist/instances/:id/complete", requireAuth, async (req: R
 
     res.json(updated);
   } catch (error: unknown) {
-    logger.error({ err: error }, "Failed to complete instance");
+    logger.error({ err: error, instanceId: req.params.id }, "Failed to complete instance");
     res.status(500).json({ error: "Failed to complete instance" });
   }
 });
