@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -10,7 +11,8 @@ router.get("/api/reports", requireAuth, async (req, res) => {
     const reports = await storage.getReports(period, req.companyId);
     res.json(reports);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to load reports" });
+    logger.error({ err: error }, "Error fetching reports");
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

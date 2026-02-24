@@ -16,7 +16,7 @@ router.get("/api/task-notifications", requireAuth, async (req, res) => {
     sendSuccess(res, notifications);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task notifications");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch task notifications");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -27,7 +27,7 @@ router.get("/api/task-notifications/unread-count", requireAuth, async (req, res)
     sendSuccess(res, { count });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching unread task notification count");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch count");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -45,7 +45,7 @@ router.post("/api/task-notifications/:id/read", requireAuth, async (req, res) =>
     sendSuccess(res, { success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error marking notification read");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to mark notification read");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -56,7 +56,7 @@ router.post("/api/task-notifications/read-all", requireAuth, async (req, res) =>
     sendSuccess(res, { success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error marking all notifications read");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to mark notifications read");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -105,7 +105,7 @@ router.post("/api/tasks/send-email", requireAuth, async (req, res) => {
     sendSuccess(res, { success: true, messageId: result.messageId });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error sending tasks email");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to send email");
+    sendServerError(res, "An internal error occurred");
   }
 });
 

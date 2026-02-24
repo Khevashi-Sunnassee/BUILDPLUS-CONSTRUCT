@@ -39,8 +39,7 @@ router.get("/api/myob/export-logs", requireAuth, async (req: Request, res: Respo
     res.json(logs);
   } catch (err) {
     logger.error({ err }, "Error fetching MYOB export logs");
-    const message = err instanceof Error ? err.message : "Unknown error";
-    res.status(500).json({ error: "Failed to fetch export logs", details: message });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -362,7 +361,7 @@ router.get("/api/myob/buildplus-adjustments", requireAuth, async (req: Request, 
     });
   } catch (err) {
     logger.error({ err }, "[MYOB] BuildPlus adjustments endpoint error");
-    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to fetch BuildPlus adjustment data" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

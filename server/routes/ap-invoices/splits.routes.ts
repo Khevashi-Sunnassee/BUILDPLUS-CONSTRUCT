@@ -97,7 +97,7 @@ export function registerSplitsRoutes(router: Router, deps: SharedDeps): void {
       res.json(splits);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP invoice splits");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch splits" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -175,7 +175,7 @@ export function registerSplitsRoutes(router: Router, deps: SharedDeps): void {
       res.json(splits);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error updating AP invoice splits");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update splits" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -203,7 +203,7 @@ export function registerSplitsRoutes(router: Router, deps: SharedDeps): void {
       res.json(fields);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching extracted fields");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch extracted fields" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -262,7 +262,7 @@ export function registerSplitsRoutes(router: Router, deps: SharedDeps): void {
       res.json({ success: true });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error mapping AP invoice field");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to map field" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 }

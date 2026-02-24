@@ -68,7 +68,7 @@ router.get("/api/tender-inbox/settings", requireAuth, async (req: Request, res: 
     sendSuccess(res, { ...settings, inboundEmailAddress: centralEmail || settings.inboundEmailAddress });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender inbox settings");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch tender inbox settings");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -102,7 +102,7 @@ router.put("/api/tender-inbox/settings", requireAuth, async (req: Request, res: 
     sendSuccess(res, settings);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating tender inbox settings");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to update tender inbox settings");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -176,7 +176,7 @@ router.get("/api/tender-inbox/emails", requireAuth, async (req: Request, res: Re
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender inbound emails");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch tender inbound emails");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -215,7 +215,7 @@ router.get("/api/tender-inbox/counts", requireAuth, async (req: Request, res: Re
     sendSuccess(res, counts);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender inbox counts");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch counts");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -264,7 +264,7 @@ router.get("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, res
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender email detail");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch tender email");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -328,7 +328,7 @@ router.post("/api/tender-inbox/upload", requireAuth, upload.array("files", 20), 
     sendSuccess(res, createdEmails.length === 1 ? createdEmails[0] : { emails: createdEmails, count: createdEmails.length });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading tender email document");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to upload document");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -389,7 +389,7 @@ router.get("/api/tender-inbox/emails/:id/extracted-fields", requireAuth, async (
     sendSuccess(res, fields);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender email extracted fields");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch extracted fields");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -446,7 +446,7 @@ router.post("/api/tender-inbox/emails/:id/extract", requireAuth, async (req: Req
     sendSuccess(res, updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error triggering tender email extraction");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to trigger extraction");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -538,7 +538,7 @@ router.post("/api/tender-inbox/emails/:id/match", requireAuth, async (req: Reque
     sendSuccess(res, updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error matching tender email");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to match tender email");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -597,7 +597,7 @@ router.patch("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, r
     sendSuccess(res, updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating tender email");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to update tender email");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -629,7 +629,7 @@ router.delete("/api/tender-inbox/emails/:id", requireAuth, async (req: Request, 
     sendSuccess(res, { success: true, deletedId: id });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting tender email");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to delete tender email");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -652,7 +652,7 @@ router.get("/api/tender-inbox/emails/:id/activity", requireAuth, async (req: Req
     sendSuccess(res, activity);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching tender email activity");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch activity");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -757,7 +757,7 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
     }
   } catch (error: unknown) {
     logger.error({ err: error }, "Error generating tender email page thumbnails");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to generate thumbnails");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -789,7 +789,7 @@ router.post("/api/tender-inbox/check-emails", requireAuth, async (req: Request, 
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "[Tender Inbox] Error triggering email check");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to check emails");
+    sendServerError(res, "An internal error occurred");
   }
 });
 

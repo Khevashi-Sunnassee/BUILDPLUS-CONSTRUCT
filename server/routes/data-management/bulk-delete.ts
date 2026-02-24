@@ -379,7 +379,7 @@ router.delete("/api/admin/data-management/:entityType/bulk-delete", requireRoleO
       protectedReason,
     });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to perform bulk delete" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

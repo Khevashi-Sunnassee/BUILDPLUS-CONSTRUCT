@@ -122,7 +122,7 @@ router.post("/api/admin/assets", requireRole("ADMIN"), async (req: Request, res:
     res.status(201).json(created);
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to create asset");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create asset" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -159,7 +159,7 @@ router.patch("/api/admin/assets/:id", requireRole("ADMIN"), async (req: Request,
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to update asset");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update asset" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

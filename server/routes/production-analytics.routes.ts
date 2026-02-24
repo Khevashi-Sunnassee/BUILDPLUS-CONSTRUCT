@@ -96,7 +96,7 @@ router.get("/api/reports/production-daily", requireAuth, async (req, res) => {
     period: { startDate, endDate },
   });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate production report" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -256,7 +256,7 @@ router.get("/api/reports/production-with-costs", requireAuth, async (req, res) =
     period: { startDate, endDate },
   });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate production cost report" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

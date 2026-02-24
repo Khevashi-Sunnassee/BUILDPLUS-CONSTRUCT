@@ -438,7 +438,7 @@ CRITICAL RULES:
   } catch (error: unknown) {
     logger.error({ err: error }, "Error analyzing drawing package");
     try {
-      res.write(`data: ${JSON.stringify({ type: "error", error: error instanceof Error ? error.message : "Failed to analyze drawing package" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: "error", error: "An internal error occurred" })}\n\n`);
       res.end();
     } catch {}
   }
@@ -637,7 +637,7 @@ print(json.dumps(extracted))
   } catch (error: unknown) {
     logger.error({ err: error }, "Error registering drawing package");
     try {
-      res.write(`data: ${JSON.stringify({ type: "error", error: error instanceof Error ? error.message : "Failed to register drawing package" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: "error", error: "An internal error occurred" })}\n\n`);
       res.end();
     } catch {}
   }

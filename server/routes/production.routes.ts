@@ -235,7 +235,7 @@ router.post("/api/production-days", requireAuth, async (req: Request, res: Respo
     
     res.json(day);
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create production day" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 

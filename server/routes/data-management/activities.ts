@@ -35,7 +35,7 @@ router.get("/api/admin/data-management/activity-templates", requireRoleOrSuperAd
       .limit(1000);
     res.json(result);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity templates" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -52,7 +52,7 @@ router.delete("/api/admin/data-management/activity-templates/:id", requireRoleOr
     await db.delete(activityTemplates).where(and(eq(activityTemplates.id, id), eq(activityTemplates.companyId, companyId)));
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete activity template" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -84,7 +84,7 @@ router.get("/api/admin/data-management/job-activities", requireRoleOrSuperAdmin(
       .limit(1000);
     res.json(result);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch job activities" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -104,7 +104,7 @@ router.delete("/api/admin/data-management/job-activities/:id", requireRoleOrSupe
     await db.delete(jobActivities).where(and(eq(jobActivities.id, id), eq(jobActivities.companyId, companyId)));
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete job activity" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -126,7 +126,7 @@ router.get("/api/admin/data-management/activity-stages", requireRoleOrSuperAdmin
       .limit(1000);
     res.json(result);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity stages" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -152,7 +152,7 @@ router.delete("/api/admin/data-management/activity-stages/:id", requireRoleOrSup
     await db.delete(activityStages).where(and(eq(activityStages.id, id), eq(activityStages.companyId, companyId)));
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete activity stage" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -173,7 +173,7 @@ router.get("/api/admin/data-management/activity-consultants", requireRoleOrSuper
       .limit(1000);
     res.json(result);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity consultants" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -194,7 +194,7 @@ router.delete("/api/admin/data-management/activity-consultants/:id", requireRole
     await db.delete(activityConsultants).where(and(eq(activityConsultants.id, id), eq(activityConsultants.companyId, companyId)));
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete activity consultant" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

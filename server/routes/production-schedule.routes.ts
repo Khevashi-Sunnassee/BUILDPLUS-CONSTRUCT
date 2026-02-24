@@ -80,7 +80,7 @@ router.get("/api/production-schedule/stats", requireAuth, requirePermission("pro
     res.json(stats);
   } catch (error: unknown) {
     logger.error(`Error fetching production schedule stats: ${error instanceof Error ? error.message : String(error)}`);
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch stats" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -191,7 +191,7 @@ router.get("/api/production-schedule/ready-panels", requireAuth, requirePermissi
     res.json(readyPanels);
   } catch (error: unknown) {
     logger.error(`Error fetching ready panels: ${error instanceof Error ? error.message : String(error)}`);
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch ready panels" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -271,7 +271,7 @@ router.get("/api/production-schedule/days", requireAuth, requirePermission("prod
     res.json(days);
   } catch (error: unknown) {
     logger.error(`Error fetching production days: ${error instanceof Error ? error.message : String(error)}`);
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch production days" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -349,7 +349,7 @@ router.post("/api/production-schedule/add-panels", requireAuth, requirePermissio
     });
   } catch (error: unknown) {
     logger.error(`Error adding panels to production: ${error instanceof Error ? error.message : String(error)}`);
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to add panels" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

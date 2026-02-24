@@ -190,7 +190,7 @@ router.post("/api/documents/bulk-upload", requireAuth, bulkUpload.array("files",
     res.json({ uploaded, errors, total: files.length });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error in bulk document upload");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to process bulk upload" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

@@ -218,7 +218,7 @@ router.get("/api/employees", requireAuth, async (req, res) => {
     const employeesList = await storage.getAllEmployees(companyId);
     res.json(employeesList);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch employees";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error fetching employees");
     res.status(500).json({ error: msg });
   }
@@ -231,7 +231,7 @@ router.get("/api/employees/active", requireAuth, async (req, res) => {
     const employeesList = await storage.getActiveEmployees(companyId);
     res.json(employeesList);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch employees";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error fetching active employees");
     res.status(500).json({ error: msg });
   }
@@ -466,7 +466,7 @@ router.post("/api/employees/import", requireRole("ADMIN", "MANAGER"), upload.sin
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error importing employees");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import employees" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -481,7 +481,7 @@ router.get("/api/employees/licences/all", requireAuth, async (req, res) => {
       .limit(500);
     res.json(allLicences);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch all licences";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error fetching all company licences");
     res.status(500).json({ error: msg });
   }
@@ -494,7 +494,7 @@ router.get("/api/employees/:id", requireAuth, async (req, res) => {
     if (!employee || employee.companyId !== companyId) return res.status(404).json({ error: "Employee not found" });
     res.json(employee);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch employee";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error fetching employee");
     res.status(500).json({ error: msg });
   }
@@ -511,7 +511,7 @@ router.post("/api/employees", requireRole("ADMIN", "MANAGER"), async (req, res) 
     const employee = await storage.createEmployee({ ...parsed.data, companyId });
     res.json(employee);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to create employee";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error creating employee");
     res.status(500).json({ error: msg });
   }
@@ -529,7 +529,7 @@ router.patch("/api/employees/:id", requireRole("ADMIN", "MANAGER"), async (req, 
     const employee = await storage.updateEmployee(String(req.params.id), parsed.data);
     res.json(employee);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to update employee";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error updating employee");
     res.status(500).json({ error: msg });
   }
@@ -543,7 +543,7 @@ router.delete("/api/employees/:id", requireRole("ADMIN"), async (req, res) => {
     await storage.deleteEmployee(String(req.params.id));
     res.json({ success: true });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to delete employee";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error deleting employee");
     res.status(500).json({ error: msg });
   }
@@ -559,7 +559,7 @@ router.get("/api/employees/:employeeId/employments", requireAuth, async (req, re
     const employments = await storage.getEmployeeEmployments(String(req.params.employeeId));
     res.json(employments);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch employments";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error fetching employments");
     res.status(500).json({ error: msg });
   }
@@ -592,7 +592,7 @@ router.post("/api/employees/:employeeId/employments", requireRole("ADMIN", "MANA
     const employment = await storage.createEmployeeEmployment(createData as any);
     res.json(employment);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to create employment";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error creating employment");
     res.status(500).json({ error: msg });
   }
@@ -633,7 +633,7 @@ router.patch("/api/employees/:employeeId/employments/:id", requireRole("ADMIN", 
     const employment = await storage.updateEmployeeEmployment(String(req.params.id), updateData as any);
     res.json(employment);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to update employment";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error updating employment");
     res.status(500).json({ error: msg });
   }
@@ -649,7 +649,7 @@ router.delete("/api/employees/:employeeId/employments/:id", requireRole("ADMIN")
     await storage.deleteEmployeeEmployment(String(req.params.id));
     res.json({ success: true });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to delete employment";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error deleting employment");
     res.status(500).json({ error: msg });
   }
@@ -665,7 +665,7 @@ router.get("/api/employees/:employeeId/documents", requireAuth, async (req, res)
     const docs = await storage.getEmployeeDocuments(String(req.params.employeeId));
     res.json(docs);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch documents";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error fetching employee documents");
     res.status(500).json({ error: msg });
   }
@@ -684,7 +684,7 @@ router.post("/api/employees/:employeeId/documents", requireRole("ADMIN", "MANAGE
     const doc = await storage.createEmployeeDocument(parsed.data);
     res.json(doc);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to create document";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error creating employee document");
     res.status(500).json({ error: msg });
   }
@@ -704,7 +704,7 @@ router.patch("/api/employees/:employeeId/documents/:id", requireRole("ADMIN", "M
     const doc = await storage.updateEmployeeDocument(String(req.params.id), parsed.data);
     res.json(doc);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to update document";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error updating employee document");
     res.status(500).json({ error: msg });
   }
@@ -720,7 +720,7 @@ router.delete("/api/employees/:employeeId/documents/:id", requireRole("ADMIN"), 
     await storage.deleteEmployeeDocument(String(req.params.id));
     res.json({ success: true });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to delete document";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error deleting employee document");
     res.status(500).json({ error: msg });
   }
@@ -736,7 +736,7 @@ router.get("/api/employees/:employeeId/licences", requireAuth, async (req, res) 
     const licences = await storage.getEmployeeLicences(String(req.params.employeeId));
     res.json(licences);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch licences";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error fetching employee licences");
     res.status(500).json({ error: msg });
   }
@@ -755,7 +755,7 @@ router.post("/api/employees/:employeeId/licences", requireRole("ADMIN", "MANAGER
     const licence = await storage.createEmployeeLicence(parsed.data);
     res.json(licence);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to create licence";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error creating employee licence");
     res.status(500).json({ error: msg });
   }
@@ -775,7 +775,7 @@ router.patch("/api/employees/:employeeId/licences/:id", requireRole("ADMIN", "MA
     const licence = await storage.updateEmployeeLicence(String(req.params.id), parsed.data);
     res.json(licence);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to update licence";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error updating employee licence");
     res.status(500).json({ error: msg });
   }
@@ -791,7 +791,7 @@ router.delete("/api/employees/:employeeId/licences/:id", requireRole("ADMIN"), a
     await storage.deleteEmployeeLicence(String(req.params.id));
     res.json({ success: true });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to delete licence";
+    const msg = "An internal error occurred";
     logger.error({ err: error }, "Error deleting employee licence");
     res.status(500).json({ error: msg });
   }

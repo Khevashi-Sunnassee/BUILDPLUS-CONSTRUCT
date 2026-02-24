@@ -328,7 +328,7 @@ router.post("/api/cost-codes/import", requireAuth, requirePermission("admin_cost
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error importing cost codes");
-    res.status(500).json({ message: error instanceof Error ? error.message : "Failed to import cost codes" });
+    res.status(500).json({ message: "An internal error occurred" });
   }
 });
 

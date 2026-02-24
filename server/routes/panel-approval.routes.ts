@@ -103,7 +103,7 @@ router.post("/api/panels/admin/:id/upload-pdf", requireRole("ADMIN", "MANAGER"),
     logger.error({ err: error }, "PDF upload error");
     res.status(500).json({
       error: "Failed to upload PDF",
-      details: error instanceof Error ? error.message : String(error),
+      details: "An internal error occurred",
     });
   }
 });
@@ -138,7 +138,7 @@ router.get("/api/panels/admin/:id/download-pdf", requireRole("ADMIN", "MANAGER")
     logger.error({ err: error }, "PDF download error");
     res.status(500).json({
       error: "Failed to download PDF",
-      details: error instanceof Error ? error.message : String(error),
+      details: "An internal error occurred",
     });
   }
 });
@@ -226,7 +226,7 @@ Return ONLY valid JSON, no explanation text.`
     logger.error({ err: error }, "PDF analysis error");
     res.status(500).json({ 
       error: "Failed to analyze PDF", 
-      details: error instanceof Error ? error.message : String(error) 
+      details: "An internal error occurred" 
     });
   }
 });
@@ -296,7 +296,7 @@ router.post("/api/panels/admin/:id/approve-production", requireRole("ADMIN", "MA
     res.json({ success: true, panel: updated });
   } catch (error: unknown) {
     logger.error({ err: error }, "Approval error");
-    res.status(500).json({ error: "Failed to approve panel", details: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "Failed to approve panel", details: "An internal error occurred" });
   }
 });
 
@@ -323,7 +323,7 @@ router.post("/api/panels/admin/:id/revoke-production", requireRole("ADMIN", "MAN
     res.json({ success: true, panel: updated });
   } catch (error: unknown) {
     logger.error({ err: error }, "Revoke error");
-    res.status(500).json({ error: "Failed to revoke approval", details: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "Failed to revoke approval", details: "An internal error occurred" });
   }
 });
 

@@ -68,7 +68,7 @@ router.get("/api/purchase-orders", requireAuth, requirePermission("purchase_orde
     res.json(orders.slice(0, safeLimit));
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching purchase orders");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch purchase orders" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -80,7 +80,7 @@ router.get("/api/purchase-orders/my", requireAuth, async (req, res) => {
     res.json(orders);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching my purchase orders");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch purchase orders" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -93,7 +93,7 @@ router.get("/api/purchase-orders/by-capex/:capexId", requireAuth, requirePermiss
     res.json(capexOrders);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching purchase orders by CAPEX");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch purchase orders" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -105,7 +105,7 @@ router.get("/api/purchase-orders/next-number", requireAuth, async (req, res) => 
     res.json({ poNumber });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error getting next PO number");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get next PO number" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -121,7 +121,7 @@ router.get("/api/purchase-orders/:id", requireAuth, requirePermission("purchase_
     res.json(order);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching purchase order");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch purchase order" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -168,7 +168,7 @@ router.post("/api/purchase-orders", requireAuth, async (req, res) => {
     res.json(order);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating purchase order");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create purchase order" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -203,7 +203,7 @@ router.patch("/api/purchase-orders/:id", requireAuth, requirePermission("purchas
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating purchase order");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update purchase order" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -226,7 +226,7 @@ router.post("/api/purchase-orders/:id/submit", requireAuth, async (req, res) => 
     res.json(submitted);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error submitting purchase order");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to submit purchase order" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -286,7 +286,7 @@ router.post("/api/purchase-orders/:id/approve", requireAuth, async (req, res) =>
     res.json(approved);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error approving purchase order");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to approve purchase order" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -321,7 +321,7 @@ router.post("/api/purchase-orders/:id/reject", requireAuth, async (req, res) => 
     res.json(rejected);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error rejecting purchase order");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to reject purchase order" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -389,7 +389,7 @@ router.post("/api/purchase-orders/:id/receive", requireAuth, async (req, res) =>
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error receiving purchase order items");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to receive items" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -418,7 +418,7 @@ router.delete("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting purchase order");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete purchase order" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -428,7 +428,7 @@ router.get("/api/purchase-orders/:id/attachments", requireAuth, async (req, res)
     res.json(attachments);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching PO attachments");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch attachments" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -473,7 +473,7 @@ router.post("/api/purchase-orders/:id/attachments", requireAuth, upload.array("f
     res.status(201).json(attachments);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading PO attachments");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload attachments" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -492,7 +492,7 @@ router.get("/api/po-attachments/:id/download", requireAuth, async (req, res) => 
     fs.createReadStream(attachment.filePath).pipe(res);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error downloading attachment");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to download attachment" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -521,7 +521,7 @@ router.delete("/api/po-attachments/:id", requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting attachment");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete attachment" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

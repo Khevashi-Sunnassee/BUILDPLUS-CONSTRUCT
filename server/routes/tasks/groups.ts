@@ -21,7 +21,7 @@ router.get("/api/task-groups", requireAuth, requirePermission("tasks"), async (r
     sendSuccess(res, groups);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task groups");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch task groups");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -37,7 +37,7 @@ router.get("/api/task-groups/:id", requireAuth, requirePermission("tasks"), asyn
     sendSuccess(res, group);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task group");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch task group");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -63,7 +63,7 @@ router.post("/api/task-groups", requireAuth, requirePermission("tasks", "VIEW_AN
     sendCreated(res, group);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating task group");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to create task group");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -100,7 +100,7 @@ router.patch("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VI
     sendSuccess(res, group);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating task group");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to update task group");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -113,7 +113,7 @@ router.delete("/api/task-groups/:id", requireAuth, requirePermission("tasks", "V
     sendSuccess(res, { success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting task group");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to delete task group");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -126,7 +126,7 @@ router.get("/api/task-groups/:id/members", requireAuth, requirePermission("tasks
     sendSuccess(res, members);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task group members");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch task group members");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -143,7 +143,7 @@ router.put("/api/task-groups/:id/members", requireAuth, requirePermission("tasks
     sendSuccess(res, members);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error setting task group members");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to set task group members");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -165,7 +165,7 @@ router.post("/api/task-groups/reorder", requireAuth, requirePermission("tasks", 
     sendSuccess(res, { success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error reordering task groups");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to reorder task groups");
+    sendServerError(res, "An internal error occurred");
   }
 });
 

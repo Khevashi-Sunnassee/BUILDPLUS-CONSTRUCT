@@ -253,7 +253,7 @@ router.post("/api/documents/zip-upload/extract", requireAuth, zipUpload.single("
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error extracting ZIP file");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to extract ZIP file" });
+    res.status(500).json({ error: "An internal error occurred" });
   } finally {
     closeZip(zipHandle);
     cleanupTempFile(tempPath);
@@ -464,7 +464,7 @@ router.post("/api/documents/zip-upload/register", requireAuth, zipUpload.single(
     res.json({ uploaded, errors, total: fileMetadata.length });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error in ZIP bulk register");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to process ZIP upload" });
+    res.status(500).json({ error: "An internal error occurred" });
   } finally {
     closeZip(scanZip);
     closeZip(registerZip);

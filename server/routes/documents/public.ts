@@ -44,7 +44,7 @@ router.get("/api/public/documents/:token/download", async (req: Request, res: Re
       return res.status(404).json({ error: "File not found in storage" });
     }
     logger.error({ err: error }, "Error downloading public document via token");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to download document" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -91,7 +91,7 @@ router.get("/api/public/documents/bulk/:token/download", async (req: Request, re
   } catch (error: unknown) {
     logger.error({ err: error }, "Error processing bulk document download");
     if (!res.headersSent) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to download documents" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   }
 });
@@ -160,7 +160,7 @@ router.get("/api/public/bundles/:qrCodeId", async (req, res) => {
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching public bundle");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch bundle" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -206,7 +206,7 @@ router.get("/api/public/bundles/:qrCodeId/documents/:documentId/view", async (re
       return res.status(404).json({ error: "File not found in storage" });
     }
     logger.error({ err: error }, "Error viewing public bundle document");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to view document" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -252,7 +252,7 @@ router.get("/api/public/bundles/:qrCodeId/documents/:documentId/download", async
       return res.status(404).json({ error: "File not found in storage" });
     }
     logger.error({ err: error }, "Error downloading public bundle document");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to download document" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

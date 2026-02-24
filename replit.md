@@ -40,8 +40,9 @@ The system employs a client-server architecture. The frontend is a React applica
 - **Data Integrity:** Enforced through CHECK constraints, unique constraints, foreign keys, and performance indexes; list endpoints use `.limit()` safeguards.
 - **Testing:** Comprehensive five-tier testing system including Frontend Component Tests, Backend API Tests, API Smoke Tests, CRUD Flow E2E Tests, and Load Testing.
 - **Background Processes:** Interval-based scheduler and an in-memory priority job queue with concurrency control.
-- **Email Dispatch:** Enterprise async queue-based email dispatch with token bucket rate limiting, per-company daily quotas, exponential backoff retry.
-- **Circuit Breakers:** Implemented for external services.
+- **Email Dispatch:** Enterprise async queue-based email dispatch with token bucket rate limiting, per-company UTC-based daily quotas, cache pruning, exponential backoff retry.
+- **Error Handling:** Async route wrapper utility (`server/lib/async-handler.ts`); all 500 responses return sanitized generic messages; global error handler with production error sanitization.
+- **Circuit Breakers:** Implemented for external services (OpenAI embeddings, KB chat, Twilio, Mailgun, Resend).
 - **Caching:** LRU cache with TTL.
 - **Rate Limiting:** Applied to API, Auth, Upload endpoints, and email dispatch.
 - **Monitoring:** Metrics collection, event loop lag measurement, request timing, and error monitoring.

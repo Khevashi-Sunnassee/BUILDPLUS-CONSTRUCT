@@ -27,7 +27,7 @@ router.get("/api/tasks/:id/updates", requireAuth, requirePermission("tasks"), as
     sendSuccess(res, updates);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task updates");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch task updates");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -78,7 +78,7 @@ router.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "V
     sendCreated(res, update);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating task update");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to create task update");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -139,7 +139,7 @@ router.post("/api/tasks/:id/email-drop", requireAuth, requirePermission("tasks",
     sendCreated(res, update);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error processing email drop");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to process email");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -158,7 +158,7 @@ router.delete("/api/task-updates/:id", requireAuth, requirePermission("tasks", "
     sendSuccess(res, { success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting task update");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to delete task update");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -179,7 +179,7 @@ router.get("/api/tasks/:id/files", requireAuth, requirePermission("tasks"), asyn
     sendSuccess(res, files);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task files");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch task files");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -225,7 +225,7 @@ router.post("/api/tasks/:id/files", requireAuth, requirePermission("tasks", "VIE
     sendCreated(res, taskFile);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading task file");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to upload task file");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -244,7 +244,7 @@ router.delete("/api/task-files/:id", requireAuth, requirePermission("tasks", "VI
     sendSuccess(res, { success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting task file");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to delete task file");
+    sendServerError(res, "An internal error occurred");
   }
 });
 

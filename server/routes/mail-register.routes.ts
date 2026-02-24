@@ -311,7 +311,7 @@ mailRegisterRouter.post("/api/mail-register", requireAuth, async (req, res) => {
     res.json({ success: true, mailNumber, entry, queued: true });
   } catch (error) {
     logger.error({ err: error }, "Error creating mail register entry");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create mail register entry" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

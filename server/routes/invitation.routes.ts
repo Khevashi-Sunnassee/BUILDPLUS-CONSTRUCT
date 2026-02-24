@@ -131,7 +131,7 @@ router.post("/api/admin/invitations", requireRole("ADMIN"), async (req, res) => 
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating invitation");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create invitation" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -276,7 +276,7 @@ router.post("/api/invitations/:token/register", async (req, res) => {
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error processing registration");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create account" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

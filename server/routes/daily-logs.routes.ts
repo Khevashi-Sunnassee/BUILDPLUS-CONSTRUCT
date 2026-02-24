@@ -216,7 +216,7 @@ router.post("/api/daily-logs", requireAuth, requirePermission("daily_reports", "
     res.status(201).json(newLog);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating daily log");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create daily log" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -430,7 +430,7 @@ router.delete("/api/log-rows/:id", requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting log row");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete log row" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -458,7 +458,7 @@ router.delete("/api/daily-logs/:id", requireAuth, requirePermission("daily_repor
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting daily log");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete daily log" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

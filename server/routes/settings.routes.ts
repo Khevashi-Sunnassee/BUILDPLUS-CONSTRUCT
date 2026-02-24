@@ -59,7 +59,7 @@ router.get("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
   }
   res.json(settings);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to load settings" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -88,7 +88,7 @@ router.put("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
     const settings = await storage.updateGlobalSettings(body, companyId);
     res.json(settings);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update settings" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -106,7 +106,7 @@ router.post("/api/admin/settings/logo", requireRole("ADMIN"), async (req, res) =
     const settings = await storage.updateGlobalSettings({ logoBase64: logoBase64 || null }, companyId);
     res.json({ success: true, logoBase64: settings.logoBase64 });
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to upload logo" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -121,7 +121,7 @@ router.post("/api/admin/settings/company-name", requireRole("ADMIN"), async (req
     const settings = await storage.updateGlobalSettings({ companyName }, companyId);
     res.json({ success: true, companyName: settings.companyName });
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to save company name" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -190,7 +190,7 @@ router.get("/api/settings/logo", async (req, res) => {
       companyName: settings?.companyName || "BuildPlus Ai"
     });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to load logo" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -203,7 +203,7 @@ router.get("/api/settings/po-terms", requireAuth, async (req, res) => {
       includePOTerms: settings?.includePOTerms || false,
     });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to load PO terms" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -219,7 +219,7 @@ router.put("/api/settings/po-terms", requireRole("ADMIN"), async (req, res) => {
     const settings = await storage.updateGlobalSettings({ poTermsHtml: cleanHtml }, companyId);
     res.json({ success: true, poTermsHtml: settings.poTermsHtml });
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to save PO terms" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -232,7 +232,7 @@ router.get("/api/settings/email-template", requireRole("ADMIN"), async (req, res
       defaultTemplate: getDefaultTemplate(),
     });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to load email template" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -252,7 +252,7 @@ router.put("/api/settings/email-template", requireRole("ADMIN"), async (req, res
     clearBrandingCache(companyId);
     res.json({ success: true, emailTemplateHtml: (settings as any).emailTemplateHtml });
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to save email template" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -267,7 +267,7 @@ router.get("/api/admin/settings/next-job-number", requireRole("ADMIN"), async (r
     const nextJobNumber = `${prefix}${paddedNum}`;
     res.json({ nextJobNumber, prefix, minDigits, nextSequence: nextSeq });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get next job number" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -286,7 +286,7 @@ router.post("/api/settings/email-template/preview", requireRole("ADMIN"), async 
     });
     res.json({ html: preview });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate preview" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

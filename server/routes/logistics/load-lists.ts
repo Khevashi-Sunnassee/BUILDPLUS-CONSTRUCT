@@ -118,7 +118,7 @@ router.get("/api/load-lists", requireAuth, requirePermission("logistics"), async
 
     sendPaginated(res, enriched, { page, limit: queryLimit, total });
   } catch (error: unknown) {
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch load lists");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -180,7 +180,7 @@ router.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW
     }
     sendSuccess(res, loadList);
   } catch (error: unknown) {
-    sendBadRequest(res, error instanceof Error ? error.message : "Failed to create load list");
+    sendBadRequest(res, "An internal error occurred");
   }
 });
 

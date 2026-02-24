@@ -17,7 +17,7 @@ router.get("/api/procurement/item-categories", requireAuth, async (req, res) => 
     res.json(categories);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching item categories");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch categories" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -29,7 +29,7 @@ router.get("/api/procurement/item-categories/active", requireAuth, async (req, r
     res.json(categories);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active item categories");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch categories" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -41,7 +41,7 @@ router.get("/api/procurement/item-categories/:id", requireAuth, async (req, res)
     res.json(category);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching category");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch category" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -57,7 +57,7 @@ router.post("/api/procurement/item-categories", requireRole("ADMIN", "MANAGER"),
     res.json(category);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating category");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create category" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -74,7 +74,7 @@ router.patch("/api/procurement/item-categories/:id", requireRole("ADMIN", "MANAG
     res.json(category);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating category");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update category" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -87,7 +87,7 @@ router.delete("/api/procurement/item-categories/:id", requireRole("ADMIN"), asyn
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting category");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete category" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -110,7 +110,7 @@ router.get("/api/procurement/items", requireAuth, async (req, res) => {
     res.json(itemsData.slice(0, safeLimit));
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching items");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch items" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -122,7 +122,7 @@ router.get("/api/procurement/items/active", requireAuth, async (req, res) => {
     res.json(itemsData);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active items");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch items" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -208,7 +208,7 @@ router.get("/api/procurement/items/:id", requireAuth, async (req, res) => {
     res.json(item);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching item");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch item" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -224,7 +224,7 @@ router.post("/api/procurement/items", requireRole("ADMIN", "MANAGER"), async (re
     res.json(item);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating item");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create item" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -242,7 +242,7 @@ router.patch("/api/procurement/items/:id", requireRole("ADMIN", "MANAGER"), asyn
     res.json(item);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating item");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update item" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -255,7 +255,7 @@ router.delete("/api/procurement/items/:id", requireRole("ADMIN"), async (req, re
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting item");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete item" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -401,7 +401,7 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error importing items");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import items" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

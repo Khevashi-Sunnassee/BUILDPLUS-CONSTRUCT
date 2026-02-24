@@ -38,7 +38,7 @@ router.get("/api/job-activities/:activityId/tasks", requireAuth, requirePermissi
     res.json(activityTasks);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching activity tasks");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity tasks" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -169,7 +169,7 @@ router.post("/api/job-activities/:activityId/tasks", requireAuth, requirePermiss
     res.status(201).json(taskWithDetails || task);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating activity task");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create activity task" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -212,7 +212,7 @@ router.post("/api/job-activities/:activityId/tasks/reorder", requireAuth, requir
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error reordering activity tasks");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to reorder activity tasks" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

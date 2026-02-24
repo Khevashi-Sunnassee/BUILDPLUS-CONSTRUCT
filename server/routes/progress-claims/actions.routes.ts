@@ -34,7 +34,7 @@ router.post("/api/progress-claims/:id/submit", requireAuth, async (req: Request,
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error submitting progress claim");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -85,7 +85,7 @@ router.post("/api/progress-claims/:id/approve", requireAuth, async (req: Request
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error approving progress claim");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -114,7 +114,7 @@ router.post("/api/progress-claims/:id/reject", requireAuth, async (req: Request,
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error rejecting progress claim");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

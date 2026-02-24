@@ -48,7 +48,7 @@ router.post("/api/documents/visual-diff", requireAuth, async (req: Request, res:
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Visual diff endpoint error");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate visual diff" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -289,7 +289,7 @@ Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
     res.json({ results });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error extracting metadata from files");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to extract metadata" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

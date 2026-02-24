@@ -70,7 +70,7 @@ router.get("/api/capex-requests", requireAuth, requirePermission("capex_requests
     res.json(requests);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching CAPEX requests");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch CAPEX requests" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -181,7 +181,7 @@ router.post("/api/capex-requests", requireAuth, requirePermission("capex_request
     res.json(detailed);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating CAPEX request");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create CAPEX request" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -214,7 +214,7 @@ router.put("/api/capex-requests/:id", requireAuth, requirePermission("capex_requ
     res.json(detailed);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating CAPEX request");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update CAPEX request" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -348,7 +348,7 @@ router.post("/api/capex-requests/:id/approve", requireAuth, async (req, res) => 
     res.json(detailed);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error approving CAPEX request");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to approve CAPEX request" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

@@ -929,7 +929,7 @@ router.get("/api/super-admin/review-mode/queue", requireSuperAdmin, async (_req:
       },
     });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Unknown error";
+    const msg = "An internal error occurred";
     logger.error({ error: msg }, "Failed to fetch review queue");
     res.status(500).json({ error: "Failed to fetch review queue" });
   }

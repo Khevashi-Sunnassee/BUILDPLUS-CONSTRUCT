@@ -4,7 +4,7 @@ import { JOBS_ROUTES } from "@shared/api-routes";
 import { getPhaseLabel, getStatusLabel } from "@shared/job-phases";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Briefcase, MapPin, User, ChevronRight } from "lucide-react";
+import { AlertTriangle, Briefcase, MapPin, User, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
@@ -45,7 +45,7 @@ const statusColors: Record<string, string> = {
 export default function MobileJobsPage() {
   const [, setLocation] = useLocation();
 
-  const { data: jobs = [], isLoading } = useQuery<Job[]>({
+  const { data: jobs = [], isLoading, isError, refetch } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
   });
 
@@ -64,7 +64,19 @@ export default function MobileJobsPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4">
-        {isLoading ? (
+        {isError ? (
+          <div className="text-center py-12" data-testid="error-state">
+            <AlertTriangle className="h-12 w-12 mx-auto text-red-400 mb-3" />
+            <p className="text-white/60 mb-4">Something went wrong</p>
+            <button
+              onClick={() => refetch()}
+              className="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-medium active:scale-[0.97]"
+              data-testid="button-retry"
+            >
+              Tap to Retry
+            </button>
+          </div>
+        ) : isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-20 rounded-2xl bg-white/10" />

@@ -62,7 +62,7 @@ router.get("/api/admin/companies", requireSuperAdmin, async (req, res) => {
     const allCompanies = await storage.getAllCompanies();
     res.json(allCompanies);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch companies" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -75,7 +75,7 @@ router.get("/api/admin/companies/:id", requireSuperAdmin, async (req: Request, r
     }
     res.json(company);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch company" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -111,7 +111,7 @@ router.post("/api/admin/companies", requireSuperAdmin, async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", issues: error.issues });
     }
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create company" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -136,7 +136,7 @@ router.put("/api/admin/companies/:id", requireSuperAdmin, async (req: Request, r
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", issues: error.issues });
     }
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update company" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -153,7 +153,7 @@ router.delete("/api/admin/companies/:id", requireSuperAdmin, async (req: Request
     await storage.deleteCompany(companyId);
     res.json({ ok: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete company" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -170,7 +170,7 @@ router.get("/api/settings/inbox-emails", requireAuth, async (req: Request, res: 
     }
     res.json(company);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch inbox emails" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -208,7 +208,7 @@ router.put("/api/settings/inbox-emails", requireRole("ADMIN"), async (req: Reque
       draftingInboxEmail: updated.draftingInboxEmail,
     });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update inbox emails" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

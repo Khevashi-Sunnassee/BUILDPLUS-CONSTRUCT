@@ -109,7 +109,7 @@ router.get("/api/progress-claims/retention-report", requireAuth, async (req: Req
     res.json(Object.values(jobGroups));
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching retention report");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -227,7 +227,7 @@ router.get("/api/progress-claims/job/:jobId/claimable-panels", requireAuth, asyn
     res.json(panelsWithRevenue);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching claimable panels");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -286,7 +286,7 @@ router.get("/api/progress-claims/job/:jobId/summary", requireAuth, async (req: R
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching job claim summary");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -354,7 +354,7 @@ router.get("/api/progress-claims/job/:jobId/retention-summary", requireAuth, asy
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching retention summary");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

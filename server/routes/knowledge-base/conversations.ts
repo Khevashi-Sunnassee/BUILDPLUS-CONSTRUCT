@@ -194,14 +194,17 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
       return res.status(429).json({ error: `Daily AI request limit reached (${MAX_DAILY_REQUESTS}). Try again tomorrow.` });
     }
 
-    await db.execute(sql`
-      INSERT INTO ai_usage_tracking (id, company_id, user_id, usage_date, request_count, total_tokens, last_request_at)
-      VALUES (gen_random_uuid(), ${companyId}, ${userId}, ${today}, 1, 0, NOW())
-      ON CONFLICT (user_id, usage_date)
-      DO UPDATE SET request_count = ai_usage_tracking.request_count + 1, last_request_at = NOW()
-    `).catch(err => {
-      logger.warn({ err }, "[KB] Failed to update AI usage tracking");
-    });
+    try {
+      await db.execute(sql`
+        INSERT INTO ai_usage_tracking (id, company_id, user_id, usage_date, request_count, total_tokens, last_request_at)
+        VALUES (gen_random_uuid(), ${companyId}, ${userId}, ${today}, 1, 0, NOW())
+        ON CONFLICT (user_id, usage_date)
+        DO UPDATE SET request_count = ai_usage_tracking.request_count + 1, last_request_at = NOW()
+      `);
+    } catch (quotaErr) {
+      logger.error({ err: quotaErr }, "[KB] Failed to update AI usage tracking — blocking request");
+      return res.status(500).json({ error: "Unable to verify usage quota. Please try again." });
+    }
 
     await db.insert(kbMessages).values({
       companyId: String(companyId),
@@ -306,10 +309,18 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
       res.end();
     } catch (streamError: any) {
       logger.error({ err: streamError }, "[KB] Streaming error");
+      const isRateLimit = streamError?.status === 429 || streamError?.message?.includes("rate limit");
+      const isAuthError = streamError?.status === 401 || streamError?.status === 403;
+      let userMessage = "AI service temporarily unavailable. Please try again.";
+      if (isRateLimit) {
+        userMessage = "AI service is currently busy. Please wait a moment and try again.";
+      } else if (isAuthError) {
+        userMessage = "AI service configuration error. Please contact your administrator.";
+      }
       if (!res.headersSent) {
-        res.status(500).json({ error: "AI service unavailable" });
+        res.status(isRateLimit ? 429 : 500).json({ error: userMessage });
       } else {
-        res.write(`data: ${JSON.stringify({ error: "AI service temporarily unavailable. Please try again." })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: userMessage })}\n\n`);
         res.end();
       }
     }

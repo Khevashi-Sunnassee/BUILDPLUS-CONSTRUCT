@@ -45,7 +45,7 @@ router.get("/api/drafting-inbox/emails/:id", requireAuth, async (req: Request, r
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting email detail");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch drafting email" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -66,7 +66,7 @@ router.get("/api/drafting-inbox/emails/:id/extracted-fields", requireAuth, async
     res.json(fields);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting email extracted fields");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch extracted fields" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -165,7 +165,7 @@ router.patch("/api/drafting-inbox/emails/:id", requireAuth, async (req: Request,
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating drafting email");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update drafting email" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -193,7 +193,7 @@ router.delete("/api/drafting-inbox/emails/:id", requireAuth, async (req: Request
     res.json({ success: true, deletedId: id });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting drafting email");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete drafting email" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -216,7 +216,7 @@ router.get("/api/drafting-inbox/emails/:id/activity", requireAuth, async (req: R
     res.json(activity);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting email activity");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -241,7 +241,7 @@ router.get("/api/drafting-inbox/emails/:id/body", requireAuth, async (req: Reque
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting email body");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch email body" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -346,7 +346,7 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
     }
   } catch (error: unknown) {
     logger.error({ err: error }, "Error generating drafting email page thumbnails");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate thumbnails" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

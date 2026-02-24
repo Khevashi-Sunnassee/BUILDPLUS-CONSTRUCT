@@ -37,7 +37,7 @@ router.get("/api/drafting-inbox/settings", requireAuth, async (req: Request, res
     res.json({ ...settings, inboundEmailAddress: centralEmail || settings.inboundEmailAddress });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting inbox settings");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch drafting inbox settings" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -71,7 +71,7 @@ router.put("/api/drafting-inbox/settings", requireAuth, async (req: Request, res
     res.json(settings);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating drafting inbox settings");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update drafting inbox settings" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -135,7 +135,7 @@ router.post("/api/drafting-inbox/upload", requireAuth, upload.array("files", 20)
     res.json(createdEmails.length === 1 ? createdEmails[0] : { emails: createdEmails, count: createdEmails.length });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading drafting email document");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload document" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -164,7 +164,7 @@ router.get("/api/drafting-inbox/emails/:id/tasks", requireAuth, async (req: Requ
     res.json(linkedTasks);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting email tasks");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch tasks" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -277,7 +277,7 @@ router.post("/api/drafting-inbox/emails/:id/tasks", requireAuth, async (req: Req
     res.status(201).json(taskWithDetails || task);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating drafting email task");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create task" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

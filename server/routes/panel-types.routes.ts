@@ -40,7 +40,7 @@ router.get("/api/panel-types/admin", requireRole("ADMIN"), async (req: Request, 
     const types = await storage.getAllPanelTypes(req.companyId);
     res.json(types);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch panel types" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -60,7 +60,7 @@ router.get("/api/panel-types/admin/cost-summaries", requireRole("ADMIN"), async 
     
     res.json(summaries);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch cost summaries" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -71,7 +71,7 @@ router.get("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Reque
     if (req.companyId && type.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
     res.json(type);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch panel type" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -83,7 +83,7 @@ router.post("/api/panel-types/admin", requireRole("ADMIN"), async (req: Request,
     const type = await storage.createPanelType(result.data);
     res.json(type);
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create panel type" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -98,7 +98,7 @@ router.put("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Reque
     if (!type) return res.status(404).json({ error: "Panel type not found" });
     res.json(type);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update panel type" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -110,7 +110,7 @@ router.delete("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Re
     await storage.deletePanelType(req.params.id as string);
     res.json({ ok: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete panel type" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -122,7 +122,7 @@ router.get("/api/panel-types/:id/cost-components", requireAuth, async (req: Requ
     const components = await storage.getCostComponentsByPanelType(req.params.id as string);
     res.json(components);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch cost components" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -148,7 +148,7 @@ router.put("/api/panel-types/:id/cost-components", requireRole("ADMIN"), async (
     );
     res.json(inserted);
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update cost components" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -157,7 +157,7 @@ router.get("/api/panel-types", requireAuth, async (req: Request, res: Response) 
     const types = await storage.getAllPanelTypes(req.companyId);
     res.json(types.filter(t => t.isActive));
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch panel types" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

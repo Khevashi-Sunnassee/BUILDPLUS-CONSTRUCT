@@ -171,7 +171,7 @@ export async function batchProcessWithSSE<T, R>(
       sendEvent({
         type: "progress",
         index,
-        error: error instanceof Error ? error.message : "Processing failed",
+        error: "An internal error occurred",
       });
     }
   }

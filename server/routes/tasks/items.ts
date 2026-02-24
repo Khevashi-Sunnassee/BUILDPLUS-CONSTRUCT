@@ -24,7 +24,7 @@ router.get("/api/tasks/:id", requireAuth, requirePermission("tasks"), async (req
     sendSuccess(res, task);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch task");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -76,7 +76,7 @@ router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDA
     sendCreated(res, taskWithDetails || task);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating task");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to create task");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -111,7 +111,7 @@ router.patch("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND
     sendSuccess(res, task);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating task");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to update task");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -132,7 +132,7 @@ router.delete("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AN
     sendSuccess(res, { success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting task");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to delete task");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -151,7 +151,7 @@ router.post("/api/tasks/reorder", requireAuth, requirePermission("tasks", "VIEW_
     sendSuccess(res, { success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error reordering tasks");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to reorder tasks");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -179,7 +179,7 @@ router.post("/api/tasks/:id/move", requireAuth, requirePermission("tasks", "VIEW
     sendSuccess(res, task);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error moving task");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to move task");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -200,7 +200,7 @@ router.get("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks"), 
     sendSuccess(res, assignees);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task assignees");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch task assignees");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -225,7 +225,7 @@ router.put("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks", "
     sendSuccess(res, assignees);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error setting task assignees");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to set task assignees");
+    sendServerError(res, "An internal error occurred");
   }
 });
 

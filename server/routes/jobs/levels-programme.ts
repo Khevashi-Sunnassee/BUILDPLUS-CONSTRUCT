@@ -69,7 +69,7 @@ router.get("/api/admin/jobs/:id/generate-levels", requireRole("ADMIN"), async (r
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error generating levels from settings");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate levels" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -126,7 +126,7 @@ router.get("/api/admin/jobs/:id/build-levels", requireRole("ADMIN"), async (req:
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error building levels from panels");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to build levels from panels" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -139,7 +139,7 @@ router.get("/api/admin/jobs/:id/level-cycle-times", requireRole("ADMIN"), async 
     const cycleTimes = await storage.getJobLevelCycleTimes(req.params.id as string);
     res.json(cycleTimes);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get level cycle times" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -168,7 +168,7 @@ router.post("/api/admin/jobs/:id/level-cycle-times", requireRole("ADMIN"), async
     await storage.saveJobLevelCycleTimes(req.params.id as string, parseResult.data.cycleTimes);
     res.json({ ok: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to save level cycle times" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -182,7 +182,7 @@ router.get("/api/admin/jobs/:id/programme", requireAuth, async (req: Request, re
     res.json(programme);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error getting job programme");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get job programme" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -267,7 +267,7 @@ router.patch("/api/admin/jobs/:id/programme/:entryId", requireRole("ADMIN", "MAN
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating programme entry");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update programme entry" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -315,7 +315,7 @@ router.post("/api/admin/jobs/:id/programme", requireRole("ADMIN", "MANAGER"), as
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error saving job programme");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to save job programme" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -336,7 +336,7 @@ router.post("/api/admin/jobs/:id/programme/split", requireRole("ADMIN", "MANAGER
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error splitting programme entry");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to split level" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -357,7 +357,7 @@ router.post("/api/admin/jobs/:id/programme/reorder", requireRole("ADMIN", "MANAG
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error reordering programme");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to reorder programme" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -479,7 +479,7 @@ router.post("/api/admin/jobs/:id/programme/recalculate", requireRole("ADMIN", "M
     res.json(result.sort((a, b) => a.sequenceOrder - b.sequenceOrder));
   } catch (error: unknown) {
     logger.error({ err: error }, "Error recalculating programme dates");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to recalculate dates" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -499,7 +499,7 @@ router.delete("/api/admin/jobs/:id/programme/:entryId", requireRole("ADMIN", "MA
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting programme entry");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete programme entry" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

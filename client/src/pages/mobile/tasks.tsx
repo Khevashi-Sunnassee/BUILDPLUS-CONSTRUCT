@@ -146,7 +146,7 @@ export default function MobileTasksPage() {
   const [activityHideDone, setActivityHideDone] = useState(true);
   const [activitySearchQuery, setActivitySearchQuery] = useState("");
 
-  const { data: groups = [], isLoading } = useQuery<TaskGroup[]>({
+  const { data: groups = [], isLoading, isError, refetch } = useQuery<TaskGroup[]>({
     queryKey: [TASKS_ROUTES.GROUPS],
   });
 
@@ -473,6 +473,8 @@ export default function MobileTasksPage() {
           <TasksListView
             groups={groups}
             isLoading={isLoading}
+            isError={isError}
+            refetch={refetch}
             collapsedGroups={collapsedGroups}
             toggleGroup={toggleGroup}
             hideDone={hideDone}
@@ -674,6 +676,8 @@ export default function MobileTasksPage() {
 function TasksListView({
   groups,
   isLoading,
+  isError,
+  refetch,
   collapsedGroups,
   toggleGroup,
   hideDone,
@@ -689,6 +693,8 @@ function TasksListView({
 }: {
   groups: TaskGroup[];
   isLoading: boolean;
+  isError: boolean;
+  refetch: () => void;
   collapsedGroups: Set<string>;
   toggleGroup: (id: string) => void;
   hideDone: boolean;
@@ -739,6 +745,22 @@ function TasksListView({
     if (!name) return "?";
     return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
   };
+
+  if (isError) {
+    return (
+      <div className="text-center py-12" data-testid="error-state">
+        <AlertCircle className="h-12 w-12 mx-auto text-red-400 mb-3" />
+        <p className="text-white/60 mb-4">Something went wrong</p>
+        <button
+          onClick={() => refetch()}
+          className="px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-medium active:scale-[0.97]"
+          data-testid="button-retry"
+        >
+          Tap to Retry
+        </button>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

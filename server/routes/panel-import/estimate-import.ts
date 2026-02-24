@@ -398,7 +398,7 @@ router.post("/api/jobs/:jobId/import-estimate",
       });
     } catch (error: unknown) {
       logger.error({ err: error }, "Estimate import error");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import estimate" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   }
 );

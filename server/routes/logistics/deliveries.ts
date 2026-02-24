@@ -55,7 +55,7 @@ router.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
     }
     sendSuccess(res, record);
   } catch (error: unknown) {
-    sendBadRequest(res, error instanceof Error ? error.message : "Failed to create delivery record");
+    sendBadRequest(res, "An internal error occurred");
   }
 });
 
@@ -91,7 +91,7 @@ router.get("/api/load-lists/:id/return", requireAuth, async (req, res) => {
     const loadReturn = await storage.getLoadReturn(req.params.id as string);
     sendSuccess(res, loadReturn || null);
   } catch (error: unknown) {
-    sendServerError(res, error instanceof Error ? error.message : "Failed to get load return");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -139,7 +139,7 @@ router.post("/api/load-lists/:id/return", requireAuth, async (req, res) => {
 
     sendSuccess(res, loadReturn);
   } catch (error: unknown) {
-    sendBadRequest(res, error instanceof Error ? error.message : "Failed to create load return");
+    sendBadRequest(res, "An internal error occurred");
   }
 });
 
@@ -163,7 +163,7 @@ router.post("/api/test-gmail", requireAuth, async (req, res) => {
     );
     sendSuccess(res, result);
   } catch (error: unknown) {
-    sendServerError(res, error instanceof Error ? error.message : String(error));
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -585,7 +585,7 @@ router.post("/api/test-all-emails", requireAuth, async (req, res) => {
       results,
     });
   } catch (error: unknown) {
-    sendServerError(res, error instanceof Error ? error.message : String(error));
+    sendServerError(res, "An internal error occurred");
   }
 });
 

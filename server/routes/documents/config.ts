@@ -22,7 +22,7 @@ router.get("/api/document-types", requireAuth, async (req, res) => {
     res.json(types);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document types");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document types" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -32,7 +32,7 @@ router.get("/api/document-types/active", requireAuth, async (req, res) => {
     res.json(types);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active document types");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document types" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -43,7 +43,7 @@ router.get("/api/document-types/:id", requireAuth, async (req, res) => {
     res.json(type);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document type");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document type" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -78,7 +78,7 @@ router.post("/api/document-types", requireRole("ADMIN"), async (req, res) => {
     res.json(type);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating document type");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create document type" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -93,7 +93,7 @@ router.patch("/api/document-types/:id", requireRole("ADMIN"), async (req, res) =
     res.json(type);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document type");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document type" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -112,7 +112,7 @@ router.delete("/api/document-types/:id", requireRole("ADMIN"), async (req, res) 
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document type");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete document type" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -124,7 +124,7 @@ router.get("/api/document-types/:typeId/statuses", requireAuth, async (req, res)
     res.json(statuses);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document type statuses");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch statuses" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -144,7 +144,7 @@ router.post("/api/document-types/:typeId/statuses", requireRole("ADMIN"), async 
     res.json(status);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating document type status");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create status" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -159,7 +159,7 @@ router.patch("/api/document-types/:typeId/statuses/:statusId", requireRole("ADMI
     res.json(status);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document type status");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update status" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -169,7 +169,7 @@ router.delete("/api/document-types/:typeId/statuses/:statusId", requireRole("ADM
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document type status");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete status" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -181,7 +181,7 @@ router.get("/api/document-disciplines", requireAuth, async (req, res) => {
     res.json(disciplines);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document disciplines");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document disciplines" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -191,7 +191,7 @@ router.get("/api/document-disciplines/active", requireAuth, async (req, res) => 
     res.json(disciplines);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active document disciplines");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document disciplines" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -202,7 +202,7 @@ router.get("/api/document-disciplines/:id", requireAuth, async (req, res) => {
     res.json(discipline);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document discipline");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document discipline" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -217,7 +217,7 @@ router.post("/api/document-disciplines", requireRole("ADMIN"), async (req, res) 
     res.json(discipline);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating document discipline");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create document discipline" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -232,7 +232,7 @@ router.patch("/api/document-disciplines/:id", requireRole("ADMIN"), async (req, 
     res.json(discipline);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document discipline");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document discipline" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -251,7 +251,7 @@ router.delete("/api/document-disciplines/:id", requireRole("ADMIN"), async (req,
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document discipline");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete document discipline" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -263,7 +263,7 @@ router.get("/api/document-categories", requireAuth, async (req, res) => {
     res.json(categories);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document categories");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document categories" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -273,7 +273,7 @@ router.get("/api/document-categories/active", requireAuth, async (req, res) => {
     res.json(categories);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active document categories");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document categories" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -284,7 +284,7 @@ router.get("/api/document-categories/:id", requireAuth, async (req, res) => {
     res.json(category);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document category");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document category" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -299,7 +299,7 @@ router.post("/api/document-categories", requireRole("ADMIN"), async (req, res) =
     res.json(category);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating document category");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create document category" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -314,7 +314,7 @@ router.patch("/api/document-categories/:id", requireRole("ADMIN"), async (req, r
     res.json(category);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document category");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document category" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -333,7 +333,7 @@ router.delete("/api/document-categories/:id", requireRole("ADMIN"), async (req, 
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document category");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete document category" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

@@ -33,7 +33,7 @@ export function registerSettingsRoutes(router: Router) {
       res.json({ ...settings, inboundEmailAddress: centralEmail || settings.inboundEmailAddress });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching inbox settings");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch inbox settings" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -69,7 +69,7 @@ export function registerSettingsRoutes(router: Router) {
       res.json(settings);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error updating inbox settings");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update inbox settings" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 }

@@ -115,7 +115,7 @@ router.get("/api/hire-bookings", requireAuth, async (req: Request, res: Response
     res.json(results);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching hire bookings");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch hire bookings" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -127,7 +127,7 @@ router.get("/api/hire-bookings/next-number", requireAuth, async (req: Request, r
     res.json({ bookingNumber });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error getting next hire booking number");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get next booking number" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -184,7 +184,7 @@ router.get("/api/hire-bookings/:id", requireAuth, async (req: Request, res: Resp
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching hire booking");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch hire booking" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -269,7 +269,7 @@ router.post("/api/hire-bookings", requireAuth, async (req: Request, res: Respons
     res.status(201).json(booking);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating hire booking");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create hire booking" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -363,7 +363,7 @@ router.patch("/api/hire-bookings/:id", requireAuth, async (req: Request, res: Re
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating hire booking");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update hire booking" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -424,7 +424,7 @@ async function transitionStatus(
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, `Error transitioning hire booking to ${targetStatus}`);
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update status" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 }
 
@@ -458,7 +458,7 @@ router.post("/api/hire-bookings/:id/reject", requireAuth, requireRole("ADMIN", "
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to reject hire booking" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -491,7 +491,7 @@ router.post("/api/hire-bookings/:id/return", requireAuth, async (req: Request, r
     if (parsed.data.returnNotes) extraUpdates.notes = parsed.data.returnNotes;
     await transitionStatus(req, res, "RETURNED", extraUpdates);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to return hire booking" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -510,7 +510,7 @@ router.post("/api/hire-bookings/:id/cancel", requireAuth, async (req: Request, r
       notes: parsed.data.reason || parsed.data.comments || undefined,
     });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to cancel hire booking" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -541,7 +541,7 @@ router.delete("/api/hire-bookings/:id", requireAuth, requireRole("ADMIN"), async
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting hire booking");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete hire booking" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -709,7 +709,7 @@ router.post("/api/hire-bookings/:id/send-email", requireAuth, async (req: Reques
     res.json({ success: true, messageId: emailResult.messageId });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error sending hire booking email");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to send email" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

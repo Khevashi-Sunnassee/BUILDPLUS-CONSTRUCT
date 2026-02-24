@@ -17,7 +17,7 @@ router.get("/api/broadcast-templates", requireAuth, async (req, res) => {
     const templates = await storage.getBroadcastTemplates(companyId);
     res.json(templates);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -28,7 +28,7 @@ router.get("/api/broadcast-templates/:id", requireAuth, async (req, res) => {
     if (!template) return res.status(404).json({ error: "Template not found" });
     res.json(template);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -78,7 +78,7 @@ router.delete("/api/broadcast-templates/:id", requireAuth, async (req, res) => {
     await storage.deleteBroadcastTemplate(id);
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -89,7 +89,7 @@ router.get("/api/broadcasts", requireAuth, async (req, res) => {
     const messages = await storage.getBroadcastMessages(companyId);
     res.json(messages);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -98,7 +98,7 @@ router.get("/api/broadcasts/channels-status", requireAuth, async (_req, res) => 
     const status = broadcastService.getChannelStatus();
     res.json(status);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -109,7 +109,7 @@ router.get("/api/broadcasts/:id", requireAuth, async (req, res) => {
     if (!message) return res.status(404).json({ error: "Broadcast not found" });
     res.json(message);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -119,7 +119,7 @@ router.get("/api/broadcasts/:id/deliveries", requireAuth, async (req, res) => {
     const deliveries = await storage.getBroadcastDeliveries(id);
     res.json(deliveries);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -134,7 +134,7 @@ router.post("/api/broadcasts/deliveries/:deliveryId/resend", requireAuth, async 
     }
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -229,7 +229,7 @@ router.get("/api/broadcasts/recipients", requireAuth, async (req, res) => {
     });
   } catch (error: unknown) {
     logger.error({ error }, "Failed to fetch broadcast recipients");
-    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

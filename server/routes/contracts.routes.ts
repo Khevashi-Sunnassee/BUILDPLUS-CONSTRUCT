@@ -98,7 +98,7 @@ router.get("/api/contracts/hub", requireAuth, async (req: Request, res: Response
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching contract hub");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch contract hub" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -120,7 +120,7 @@ router.get("/api/contracts/job/:jobId", requireAuth, async (req: Request, res: R
     res.json(contract);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching contract by job");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch contract" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -142,7 +142,7 @@ router.get("/api/contracts/:id", requireAuth, async (req: Request, res: Response
     res.json(contract);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching contract");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch contract" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -171,7 +171,7 @@ router.post("/api/contracts", requireAuth, async (req: Request, res: Response) =
     res.status(201).json(contract);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating contract");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create contract" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -228,7 +228,7 @@ router.patch("/api/contracts/:id", requireAuth, async (req: Request, res: Respon
       return res.status(409).json({ error: error.message });
     }
     logger.error({ err: error }, "Error updating contract");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update contract" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -471,7 +471,7 @@ RULES:
     });
   } catch (error: unknown) {
     logger.error({ err: error, stack: error instanceof Error ? error.stack : undefined }, "Error analyzing contract with AI");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to analyze contract" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

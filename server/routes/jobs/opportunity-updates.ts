@@ -23,7 +23,7 @@ router.get("/api/opportunities/:id/updates", requireAuth, async (req: Request, r
     res.json(updates);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching opportunity updates");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch opportunity updates" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -50,7 +50,7 @@ router.post("/api/opportunities/:id/updates", requireAuth, async (req: Request, 
     res.status(201).json(update);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating opportunity update");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create opportunity update" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -83,7 +83,7 @@ router.post("/api/opportunities/:id/email-drop", requireAuth, oppEmailUpload.sin
     res.status(201).json(update);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error processing opportunity email drop");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to process email" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -99,7 +99,7 @@ router.delete("/api/opportunity-updates/:id", requireAuth, async (req: Request, 
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting opportunity update");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete opportunity update" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -114,7 +114,7 @@ router.get("/api/opportunities/:id/files", requireAuth, async (req: Request, res
     res.json(files);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching opportunity files");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch opportunity files" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -145,7 +145,7 @@ router.post("/api/opportunities/:id/files", requireAuth, oppUpload.single("file"
     res.status(201).json(oppFile);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading opportunity file");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload opportunity file" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -161,7 +161,7 @@ router.delete("/api/opportunity-files/:id", requireAuth, async (req: Request, re
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting opportunity file");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete opportunity file" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

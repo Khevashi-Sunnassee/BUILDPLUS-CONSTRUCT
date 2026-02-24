@@ -122,7 +122,7 @@ router.get("/api/customers", requireAuth, async (req, res) => {
     res.json(customersData);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching customers");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch customers" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -134,7 +134,7 @@ router.get("/api/customers/active", requireAuth, async (req, res) => {
     res.json(customersData);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active customers");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch customers" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -149,7 +149,7 @@ router.get("/api/customers/with-jobs", requireAuth, async (req, res) => {
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching customers with jobs");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch customers with jobs" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -360,7 +360,7 @@ router.post("/api/customers/import", requireRole("ADMIN", "MANAGER"), upload.sin
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error importing customers");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import customers" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -372,7 +372,7 @@ router.get("/api/customers/:id", requireAuth, async (req, res) => {
     res.json(customer);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching customer");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch customer" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -388,7 +388,7 @@ router.post("/api/customers", requireRole("ADMIN"), async (req, res) => {
     res.json(customer);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating customer");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create customer" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -405,7 +405,7 @@ router.patch("/api/customers/:id", requireRole("ADMIN"), async (req, res) => {
     res.json(customer);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating customer");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update customer" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -419,7 +419,7 @@ router.delete("/api/customers/:id", requireRole("ADMIN"), async (req, res) => {
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting customer");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete customer" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

@@ -32,7 +32,7 @@ router.get("/api/onboarding/instruments", requireAuth, async (req, res) => {
       .limit(1000);
     res.json(results);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch instruments";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -47,7 +47,7 @@ router.post("/api/onboarding/instruments", requireAuth, requireRole("ADMIN", "MA
     const [created] = await db.insert(industrialInstruments).values(parsed.data).returning();
     res.status(201).json(created);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to create instrument";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -75,7 +75,7 @@ router.patch("/api/onboarding/instruments/:id", requireAuth, requireRole("ADMIN"
       .returning();
     res.json(updated);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to update instrument";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -98,7 +98,7 @@ router.delete("/api/onboarding/instruments/:id", requireAuth, requireRole("ADMIN
       .returning();
     res.json(updated);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to delete instrument";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -127,7 +127,7 @@ router.get("/api/onboarding/templates", requireAuth, async (req, res) => {
     );
     res.json(templatesWithCounts);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch templates";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -158,7 +158,7 @@ router.post("/api/onboarding/templates", requireAuth, requireRole("ADMIN", "MANA
     }
     res.status(201).json({ ...created, tasks: createdTasks });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to create template";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -182,7 +182,7 @@ router.get("/api/onboarding/templates/:id", requireAuth, async (req, res) => {
       .limit(1000);
     res.json({ ...template, tasks });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch template";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -210,7 +210,7 @@ router.patch("/api/onboarding/templates/:id", requireAuth, requireRole("ADMIN", 
       .returning();
     res.json(updated);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to update template";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -229,7 +229,7 @@ router.delete("/api/onboarding/templates/:id", requireAuth, requireRole("ADMIN",
     await db.delete(onboardingTemplates).where(and(eq(onboardingTemplates.id, id), eq(onboardingTemplates.companyId, companyId)));
     res.json({ success: true });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to delete template";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -255,7 +255,7 @@ router.get("/api/onboarding/templates/:templateId/tasks", requireAuth, async (re
       .limit(1000);
     res.json(tasks);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch template tasks";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -278,7 +278,7 @@ router.post("/api/onboarding/templates/:templateId/tasks", requireAuth, requireR
     const [created] = await db.insert(onboardingTemplateTasks).values(parsed.data).returning();
     res.status(201).json(created);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to create template task";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -314,7 +314,7 @@ router.patch("/api/onboarding/templates/:templateId/tasks/:taskId", requireAuth,
       .returning();
     res.json(updated);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to update template task";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -341,7 +341,7 @@ router.delete("/api/onboarding/templates/:templateId/tasks/:taskId", requireAuth
     await db.delete(onboardingTemplateTasks).where(and(eq(onboardingTemplateTasks.id, taskId), eq(onboardingTemplateTasks.templateId, templateId)));
     res.json({ success: true });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to delete template task";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -360,7 +360,7 @@ router.get("/api/employees/:employeeId/onboardings", requireAuth, async (req, re
       .limit(1000);
     res.json(results);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch onboardings";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -436,7 +436,7 @@ router.post("/api/employees/:employeeId/onboardings", requireAuth, requireRole("
 
     res.status(201).json({ ...created, tasks: createdTasks });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to create onboarding";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -467,7 +467,7 @@ router.get("/api/employees/:employeeId/onboardings/:id", requireAuth, async (req
       .limit(1000);
     res.json({ ...onboarding, tasks });
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch onboarding";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -508,7 +508,7 @@ router.patch("/api/employees/:employeeId/onboardings/:id", requireAuth, requireR
       .returning();
     res.json(updated);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to update onboarding";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });
@@ -585,7 +585,7 @@ router.patch("/api/employees/:employeeId/onboardings/:onboardingId/tasks/:taskId
 
     res.json(updated);
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Failed to update onboarding task";
+    const msg = "An internal error occurred";
     res.status(500).json({ error: msg });
   }
 });

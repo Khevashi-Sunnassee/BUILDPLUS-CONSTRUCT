@@ -37,7 +37,7 @@ router.get("/api/admin/jobs/:id/production-slot-status", requireRole("ADMIN"), a
       nonStartedCount: nonStartedSlots.length,
     });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get production slot status" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

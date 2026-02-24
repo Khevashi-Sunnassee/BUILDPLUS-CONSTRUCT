@@ -158,7 +158,7 @@ router.put("/api/panels/:id/document-status", requireAuth, async (req: Request, 
     
     res.json(updatedPanel);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document status" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -283,7 +283,7 @@ router.post("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res:
     if (error instanceof Error && error.message?.includes("duplicate")) {
       return res.status(400).json({ error: "Panel with this mark already exists for this job" });
     }
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create panel" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -372,7 +372,7 @@ router.post("/api/panels/admin/:id/validate", requireRole("ADMIN", "MANAGER"), a
     logPanelChange(updatedPanel!.id, "Panel validated", req.session.userId);
     res.json(updatedPanel);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to validate panel" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -404,7 +404,7 @@ router.delete("/api/panels/admin/by-source/:source", requireRole("ADMIN"), async
     const deletedCount = await storage.deletePanelsBySource(source);
     res.json({ deleted: deletedCount });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete panels" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -498,7 +498,7 @@ router.post("/api/panels/consolidation-check", requireAuth, requireRole("ADMIN",
     res.json(results);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error checking panel consolidation records");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to check panel records" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -640,7 +640,7 @@ router.post("/api/panels/consolidate", requireAuth, requireRole("ADMIN", "MANAGE
     res.json({ panel: updatedPanel, consumedPanelIds });
   } catch (error: unknown) {
     logger.error({ err: error }, "Panel consolidation error");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to consolidate panels" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

@@ -250,7 +250,7 @@ router.post("/api/panels/admin/import", requireRole("ADMIN"), async (req: Reques
     }
     res.json(result);
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Import failed" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 

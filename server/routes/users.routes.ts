@@ -194,7 +194,7 @@ router.post("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create user" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -239,7 +239,7 @@ router.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update user" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -517,7 +517,7 @@ router.get("/api/departments", requireAuth, async (req, res) => {
     const departments = await storage.getDepartmentsByCompany(req.companyId!);
     res.json(departments);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch departments" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -526,7 +526,7 @@ router.get("/api/admin/departments", requireRole("ADMIN"), async (req, res) => {
     const departments = await storage.getDepartmentsByCompany(req.companyId!);
     res.json(departments);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch departments" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -546,7 +546,7 @@ router.post("/api/admin/departments", requireRole("ADMIN"), async (req, res) => 
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create department" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -568,7 +568,7 @@ router.put("/api/admin/departments/:id", requireRole("ADMIN"), async (req, res) 
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update department" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -582,7 +582,7 @@ router.delete("/api/admin/departments/:id", requireRole("ADMIN"), async (req, re
     await storage.deleteDepartment(id);
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to delete department" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 

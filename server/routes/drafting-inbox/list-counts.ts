@@ -93,7 +93,7 @@ router.get("/api/drafting-inbox/emails", requireAuth, async (req: Request, res: 
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting inbound emails");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch drafting inbound emails" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -135,7 +135,7 @@ router.get("/api/drafting-inbox/counts", requireAuth, async (req: Request, res: 
     res.json(counts);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting inbox counts");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch counts" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -191,7 +191,7 @@ router.get("/api/drafting-inbox/trends", requireAuth, async (req: Request, res: 
     res.json({ trends, days });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting inbox trends");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch trends" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

@@ -36,7 +36,7 @@ router.get("/api/procurement/suppliers", requireAuth, async (req, res) => {
     res.json(suppliersData);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching suppliers");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -48,7 +48,7 @@ router.get("/api/procurement/suppliers/active", requireAuth, async (req, res) =>
     res.json(suppliersData);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active suppliers");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -60,7 +60,7 @@ router.get("/api/procurement/suppliers/equipment-hire", requireAuth, async (req,
     res.json(suppliersData);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching equipment hire suppliers");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -75,7 +75,7 @@ router.get("/api/procurement/suppliers/with-purchase-orders", requireAuth, async
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching suppliers with purchase orders");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers with purchase orders" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -286,7 +286,7 @@ router.post("/api/procurement/suppliers/import", requireRole("ADMIN", "MANAGER")
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error importing suppliers");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import suppliers" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -298,7 +298,7 @@ router.get("/api/procurement/suppliers/:id", requireAuth, async (req, res) => {
     res.json(supplier);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching supplier");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch supplier" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -314,7 +314,7 @@ router.post("/api/procurement/suppliers", requireRole("ADMIN", "MANAGER"), async
     res.json(supplier);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating supplier");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create supplier" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -331,7 +331,7 @@ router.patch("/api/procurement/suppliers/:id", requireRole("ADMIN", "MANAGER"), 
     res.json(supplier);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating supplier");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update supplier" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -367,7 +367,7 @@ router.delete("/api/procurement/suppliers/:id", requireRole("ADMIN"), async (req
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting supplier");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete supplier" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

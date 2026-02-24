@@ -148,7 +148,7 @@ router.get("/api/progress-claims", requireAuth, async (req: Request, res: Respon
     res.json(enrichedClaims);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching progress claims");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch progress claims" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -163,7 +163,7 @@ router.get("/api/progress-claims/next-number", requireAuth, async (req: Request,
     res.json({ claimNumber: `PC-${String(nextNum).padStart(4, "0")}` });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error getting next claim number");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -210,7 +210,7 @@ router.get("/api/progress-claims/:id", requireAuth, async (req: Request, res: Re
     res.json(claim);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching progress claim");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -245,7 +245,7 @@ router.get("/api/progress-claims/:id/items", requireAuth, async (req: Request, r
     res.json(items);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching claim items");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -342,7 +342,7 @@ router.post("/api/progress-claims", requireAuth, async (req: Request, res: Respo
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating progress claim");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create progress claim" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -447,10 +447,10 @@ router.patch("/api/progress-claims/:id", requireAuth, async (req: Request, res: 
     res.json(updated);
   } catch (error: unknown) {
     if ((error as { statusCode?: number }).statusCode === 409) {
-      return res.status(409).json({ error: error instanceof Error ? error.message : "Internal server error" });
+      return res.status(409).json({ error: "An internal error occurred" });
     }
     logger.error({ err: error }, "Error updating progress claim");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -477,7 +477,7 @@ router.delete("/api/progress-claims/:id", requireAuth, async (req: Request, res:
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting progress claim");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

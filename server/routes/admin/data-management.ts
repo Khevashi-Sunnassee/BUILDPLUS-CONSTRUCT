@@ -137,7 +137,7 @@ router.get("/api/admin/data-deletion/counts", requireRole("ADMIN"), async (req, 
     sendSuccess(res, counts);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching data counts");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch data counts");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -434,7 +434,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error validating deletion");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to validate deletion");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -817,7 +817,7 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error performing deletion");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to delete data");
+    sendServerError(res, "An internal error occurred");
   }
 });
 

@@ -27,7 +27,7 @@ router.get("/api/drafting-program", requireAuth, requirePermission("production_r
     res.json(programs);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting program");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch drafting program" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -66,7 +66,7 @@ router.get("/api/drafting-program/my-allocated", requireAuth, requirePermission(
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching my allocated panels");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch allocated panels" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -80,7 +80,7 @@ router.get("/api/drafting-program/:id", requireAuth, requirePermission("producti
     res.json(program);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting program entry");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch drafting program entry" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -90,7 +90,7 @@ router.post("/api/drafting-program/generate", requireAuth, requirePermission("pr
     res.json({ success: true, ...result });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error generating drafting program");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate drafting program" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -116,7 +116,7 @@ router.post("/api/drafting-program/:id/assign", requireAuth, requirePermission("
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error assigning drafting resource");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to assign drafting resource" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -149,7 +149,7 @@ router.patch("/api/drafting-program/:id", requireAuth, requirePermission("produc
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating drafting program");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update drafting program" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -164,7 +164,7 @@ router.delete("/api/drafting-program/:id", requireAuth, requirePermission("produ
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting drafting program entry");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete drafting program entry" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -181,7 +181,7 @@ router.delete("/api/drafting-program/job/:jobId", requireAuth, requirePermission
     res.json({ success: true, deleted });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting drafting program entries for job");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete drafting program entries" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

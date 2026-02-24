@@ -34,7 +34,7 @@ router.get("/api/document-bundles", requireAuth, async (req, res) => {
     res.json(bundles);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document bundles");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document bundles" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -45,7 +45,7 @@ router.get("/api/document-bundles/:id", requireAuth, async (req, res) => {
     res.json(bundle);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document bundle");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document bundle" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -56,7 +56,7 @@ router.get("/api/document-bundles/qr/:qrCodeId", requireAuth, async (req, res) =
     res.json(bundle);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document bundle by QR");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document bundle" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -131,7 +131,7 @@ router.post("/api/document-bundles", requireAuth, async (req, res) => {
     res.json(fullBundle);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating document bundle");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create document bundle" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -149,7 +149,7 @@ router.patch("/api/document-bundles/:id", requireAuth, async (req, res) => {
     res.json(bundle);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document bundle");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document bundle" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -164,7 +164,7 @@ router.post("/api/document-bundles/:id/documents", requireAuth, async (req, res)
     res.json(items);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error adding documents to bundle");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to add documents to bundle" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -174,7 +174,7 @@ router.delete("/api/document-bundles/:bundleId/documents/:documentId", requireAu
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error removing document from bundle");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to remove document from bundle" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -188,7 +188,7 @@ router.delete("/api/document-bundles/:id", requireRole("ADMIN", "MANAGER"), asyn
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document bundle");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete document bundle" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -254,7 +254,7 @@ router.post("/api/document-bundles/:bundleId/items/:itemId/request-latest", requ
     res.json({ success: true, bundle: updatedBundle });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating bundle item to latest version");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update bundle item" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -323,7 +323,7 @@ router.get("/api/document-bundles/:id/access-logs", requireRole("ADMIN", "MANAGE
     res.json(logs);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching bundle access logs");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch access logs" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

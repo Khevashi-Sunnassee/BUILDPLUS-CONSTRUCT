@@ -29,7 +29,7 @@ router.post("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
     const zone = await storage.createZone(req.body);
     sendSuccess(res, zone);
   } catch (error: unknown) {
-    sendBadRequest(res, error instanceof Error ? error.message : "Failed to create zone");
+    sendBadRequest(res, "An internal error occurred");
   }
 });
 

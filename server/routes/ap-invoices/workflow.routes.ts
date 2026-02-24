@@ -105,7 +105,7 @@ export function registerWorkflowRoutes(router: Router, deps: SharedDeps): void {
       res.json(updated);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error confirming AP invoice");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to confirm invoice" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -156,7 +156,7 @@ export function registerWorkflowRoutes(router: Router, deps: SharedDeps): void {
       res.json(updated);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error submitting AP invoice");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to submit invoice" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -189,7 +189,7 @@ export function registerWorkflowRoutes(router: Router, deps: SharedDeps): void {
       res.json(updated);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error assigning AP invoice");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to assign invoice" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -278,7 +278,7 @@ export function registerWorkflowRoutes(router: Router, deps: SharedDeps): void {
       res.json(updated);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error approving AP invoice");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to approve invoice" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -330,7 +330,7 @@ export function registerWorkflowRoutes(router: Router, deps: SharedDeps): void {
       res.json(updated);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error rejecting AP invoice");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to reject invoice" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -373,7 +373,7 @@ export function registerWorkflowRoutes(router: Router, deps: SharedDeps): void {
       res.json(updated);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error toggling AP invoice on-hold");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to toggle on-hold" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -405,7 +405,7 @@ export function registerWorkflowRoutes(router: Router, deps: SharedDeps): void {
       res.json(updated);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error toggling AP invoice urgent");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to toggle urgent" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -499,7 +499,7 @@ export function registerWorkflowRoutes(router: Router, deps: SharedDeps): void {
       res.json({ approved, errors });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error bulk approving AP invoices");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to bulk approve" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -525,7 +525,7 @@ export function registerWorkflowRoutes(router: Router, deps: SharedDeps): void {
       res.json({ success: true });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error deleting AP invoice");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete invoice" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 }

@@ -25,9 +25,31 @@ interface EmailJobPayload {
 }
 
 const companyDailyCountCache = new Map<string, { count: number; resetAt: number }>();
+const MAX_CACHE_SIZE = 100;
 
 const DAILY_QUOTA_PER_COMPANY = 5000;
 const HOURLY_BURST_LIMIT = 500;
+
+function pruneCompanyCache(): void {
+  if (companyDailyCountCache.size <= MAX_CACHE_SIZE) return;
+  const now = Date.now();
+  for (const [key, val] of companyDailyCountCache) {
+    if (val.resetAt <= now) companyDailyCountCache.delete(key);
+  }
+  if (companyDailyCountCache.size > MAX_CACHE_SIZE) {
+    const entries = [...companyDailyCountCache.entries()];
+    entries.sort((a, b) => a[1].resetAt - b[1].resetAt);
+    const toRemove = entries.slice(0, entries.length - MAX_CACHE_SIZE);
+    for (const [key] of toRemove) companyDailyCountCache.delete(key);
+  }
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of companyDailyCountCache) {
+    if (val.resetAt <= now) companyDailyCountCache.delete(key);
+  }
+}, 10 * 60 * 1000);
 
 class EmailDispatchService {
   private initialized = false;
@@ -346,8 +368,8 @@ class EmailDispatchService {
       return { allowed: cached.count < DAILY_QUOTA_PER_COMPANY, count: cached.count };
     }
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const todayUTC = new Date().toISOString().slice(0, 10);
+    const todayStartUTC = new Date(todayUTC + "T00:00:00.000Z");
 
     const [result] = await db
       .select({ count: sql<number>`count(*)::int` })
@@ -355,17 +377,18 @@ class EmailDispatchService {
       .where(
         and(
           eq(mailRegister.companyId, companyId),
-          sql`${mailRegister.sentAt} >= ${todayStart}`,
+          sql`${mailRegister.sentAt} >= ${todayStartUTC}`,
           inArray(mailRegister.status, ["SENT", "QUEUED", "DELIVERED"])
         )
       )
       .limit(1);
 
     const count = result?.count || 0;
-    const nextMidnight = new Date(todayStart);
-    nextMidnight.setDate(nextMidnight.getDate() + 1);
+    const nextMidnightUTC = new Date(todayUTC + "T00:00:00.000Z");
+    nextMidnightUTC.setUTCDate(nextMidnightUTC.getUTCDate() + 1);
 
-    companyDailyCountCache.set(companyId, { count, resetAt: nextMidnight.getTime() });
+    companyDailyCountCache.set(companyId, { count, resetAt: nextMidnightUTC.getTime() });
+    pruneCompanyCache();
 
     return { allowed: count < DAILY_QUOTA_PER_COMPANY, count };
   }

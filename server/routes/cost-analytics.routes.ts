@@ -125,7 +125,7 @@ router.get("/api/reports/cost-analysis", requireAuth, async (req, res) => {
     entryCount: filteredEntries.length,
   });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate cost analysis" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -275,7 +275,7 @@ router.get("/api/reports/cost-analysis-daily", requireAuth, async (req, res) => 
     selectedComponent: componentFilter || null,
   });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate daily cost analysis" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -475,7 +475,7 @@ router.get("/api/reports/labour-cost-analysis", requireAuth, async (req, res) =>
     hasWeeklyWageData: weeklyWages.length > 0,
   });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate labour cost analysis" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

@@ -202,7 +202,7 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
     res.json(serializeJobPhase(job));
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating opportunity");
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create opportunity" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -292,7 +292,7 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
     res.json(serializeJobPhase(updated!));
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating opportunity");
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update opportunity" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -335,7 +335,7 @@ router.post("/api/customers/quick", requireAuth, async (req: Request, res: Respo
     res.json(customer);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating quick customer");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create customer" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

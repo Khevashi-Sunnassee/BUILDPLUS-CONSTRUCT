@@ -162,7 +162,7 @@ router.get("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
     res.json(allFactories);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching factories");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch factories" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -174,7 +174,7 @@ router.get("/api/factories", requireAuth, async (req, res) => {
     res.json(activeFactories);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching factories");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch factories" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -190,7 +190,7 @@ router.get("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) =>
     res.json({ ...factory[0], beds });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching factory");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch factory" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -210,7 +210,7 @@ router.post("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
     res.json(created);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating factory");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create factory" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -240,7 +240,7 @@ router.patch("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) 
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating factory");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update factory" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -254,7 +254,7 @@ router.delete("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res)
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting factory");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete factory" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -267,7 +267,7 @@ router.get("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (
     res.json(beds);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching production beds");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch production beds" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -281,7 +281,7 @@ router.post("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async 
     res.json(created);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating production bed");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create production bed" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -304,7 +304,7 @@ router.patch("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN")
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating production bed");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update production bed" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -322,7 +322,7 @@ router.delete("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN"
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting production bed");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete production bed" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -354,7 +354,7 @@ router.get("/api/cfmeu-holidays", requireAuth, async (req, res) => {
     res.json(holidays);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching CFMEU holidays");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch holidays" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -377,7 +377,7 @@ router.get("/api/admin/cfmeu-calendars", requireRole("ADMIN"), async (req, res) 
     res.json({ holidays, summary });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching CFMEU calendars");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch calendars" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -413,7 +413,7 @@ router.post("/api/admin/cfmeu-calendars/sync", requireRole("ADMIN"), async (req,
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error syncing CFMEU calendar");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to sync calendar" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -448,7 +448,7 @@ router.post("/api/admin/cfmeu-calendars/sync-all", requireRole("ADMIN"), async (
     res.json({ success: true, results });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error syncing all CFMEU calendars");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to sync calendars" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -464,7 +464,7 @@ router.delete("/api/admin/cfmeu-calendars/:calendarType", requireRole("ADMIN"), 
     res.json({ success: true, deleted: result.rowCount || 0 });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting CFMEU calendar");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete calendar" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

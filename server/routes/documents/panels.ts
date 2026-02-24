@@ -41,7 +41,7 @@ router.get("/api/panels/:panelId/documents", requireAuth, async (req, res) => {
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching panel documents");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch panel documents" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -184,7 +184,7 @@ router.post("/api/panels/:panelId/documents/upload", requireAuth, upload.single(
     res.json(document);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading panel document");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload panel document" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -242,7 +242,7 @@ router.patch("/api/panels/:panelId/documents/:documentId/status", requireAuth, a
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating panel document status");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update status" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

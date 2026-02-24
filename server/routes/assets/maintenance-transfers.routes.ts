@@ -43,7 +43,7 @@ router.post("/api/admin/assets/:id/maintenance", requireRole("ADMIN"), async (re
     }).returning();
     res.status(201).json(record);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create maintenance record" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -104,7 +104,7 @@ router.post("/api/admin/assets/:id/transfers", requireRole("ADMIN"), async (req:
 
     res.status(201).json(record);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create transfer record" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

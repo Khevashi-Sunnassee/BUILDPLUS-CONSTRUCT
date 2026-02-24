@@ -335,7 +335,7 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to import assets");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import assets" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

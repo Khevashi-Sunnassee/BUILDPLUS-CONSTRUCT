@@ -84,7 +84,7 @@ router.get("/api/documents", requireAuth, async (req, res) => {
     sendSuccess(res, result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching documents");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch documents");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -98,7 +98,7 @@ router.get("/api/documents/next-number", requireAuth, async (req, res) => {
     sendSuccess(res, { documentNumber: nextNumber });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error getting next document number");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to get next document number");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -112,7 +112,7 @@ router.get("/api/documents/:id", requireAuth, async (req, res) => {
     sendSuccess(res, document);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch document");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -127,7 +127,7 @@ router.get("/api/documents/:id/versions", requireAuth, async (req, res) => {
     sendSuccess(res, versions);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document versions");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to fetch document versions");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -185,7 +185,7 @@ router.post("/api/documents/check-duplicates", requireAuth, async (req: Request,
     sendSuccess(res, { duplicates });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error checking document duplicates");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to check duplicates");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -318,7 +318,7 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
     sendSuccess(res, document);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading document");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to upload document");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -406,7 +406,7 @@ router.post("/api/documents/:id/new-version", requireAuth, upload.single("file")
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating new document version");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to create new version");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -427,7 +427,7 @@ router.get("/api/documents/:id/view", requireAuth, async (req: Request, res: Res
       return sendNotFound(res, "File not found in storage");
     }
     logger.error({ err: error }, "Error viewing document");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to view document");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -504,7 +504,7 @@ router.get("/api/documents/:id/thumbnail", requireAuth, async (req: Request, res
     }
     logger.error({ err: error }, "Error generating thumbnail");
     if (!res.headersSent) {
-      sendServerError(res, error instanceof Error ? error.message : "Failed to generate thumbnail");
+      sendServerError(res, "An internal error occurred");
     }
   }
 });
@@ -534,7 +534,7 @@ router.get("/api/documents/:id/download", requireAuth, async (req: Request, res:
       return sendNotFound(res, "File not found in storage");
     }
     logger.error({ err: error }, "Error downloading document");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to download document");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -549,7 +549,7 @@ router.patch("/api/documents/:id", requireAuth, async (req, res) => {
     sendSuccess(res, document);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to update document");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -568,7 +568,7 @@ router.patch("/api/documents/:id/status", requireRole("ADMIN", "MANAGER"), async
     sendSuccess(res, document);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document status");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to update document status");
+    sendServerError(res, "An internal error occurred");
   }
 });
 
@@ -724,7 +724,7 @@ router.delete("/api/documents/:id", requireRole("ADMIN", "MANAGER"), async (req,
     sendSuccess(res, { success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document");
-    sendServerError(res, error instanceof Error ? error.message : "Failed to delete document");
+    sendServerError(res, "An internal error occurred");
   }
 });
 

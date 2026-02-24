@@ -151,7 +151,7 @@ export function registerCoreRoutes(router: Router, deps: SharedDeps): void {
       });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP invoices");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch AP invoices" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -209,7 +209,7 @@ export function registerCoreRoutes(router: Router, deps: SharedDeps): void {
       res.json(counts);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP invoice counts");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch counts" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -254,7 +254,7 @@ export function registerCoreRoutes(router: Router, deps: SharedDeps): void {
       res.json(invoiceRows);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching my AP approvals");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch approvals" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -386,7 +386,7 @@ export function registerCoreRoutes(router: Router, deps: SharedDeps): void {
       });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP invoice detail");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch invoice" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -441,7 +441,7 @@ export function registerCoreRoutes(router: Router, deps: SharedDeps): void {
       res.json(createdInvoices.length === 1 ? createdInvoices[0] : { invoices: createdInvoices, count: createdInvoices.length });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error uploading AP invoice");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload invoice" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -542,7 +542,7 @@ export function registerCoreRoutes(router: Router, deps: SharedDeps): void {
       res.json(updated);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error updating AP invoice");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update invoice" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 }

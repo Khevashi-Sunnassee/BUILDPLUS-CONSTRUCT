@@ -40,7 +40,7 @@ export function registerEmailsRoutes(router: Router) {
       res.json(counts);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP inbox counts");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch counts" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -61,7 +61,7 @@ export function registerEmailsRoutes(router: Router) {
       res.json(emails);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching inbound emails");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch inbound emails" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -88,7 +88,7 @@ export function registerEmailsRoutes(router: Router) {
       res.json({ triggered, message: triggered ? "Email check started in background. New invoices will appear shortly." : "Could not start email check" });
     } catch (error: unknown) {
       logger.error({ err: error }, "[AP Inbox] Error triggering email check");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to check emails" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 

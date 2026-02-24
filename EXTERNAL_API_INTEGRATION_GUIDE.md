@@ -431,7 +431,7 @@ async function apiCall(endpoint) {
 ## 8. Rate Limits
 
 API requests are rate-limited. If you receive a `429` response, back off and retry
-after a short delay. Recommended: max 60 requests per minute.
+after a short delay. Current limit: 300 requests per minute per session.
 
 ---
 

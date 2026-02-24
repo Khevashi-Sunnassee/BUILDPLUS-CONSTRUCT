@@ -76,7 +76,7 @@ router.get("/api/jobs/:jobId", requireAuth, async (req: Request, res: Response) 
     }
     res.json(serializeJobPhase(job));
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get job" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -140,7 +140,7 @@ router.get("/api/jobs/:jobId/totals", requireAuth, async (req: Request, res: Res
       panelCount: panels.length,
     });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get job totals" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -162,7 +162,7 @@ router.put("/api/jobs/:jobId/panel-rates/:panelTypeId", requireRole("ADMIN"), as
     const rate = await storage.upsertJobPanelRate(req.params.jobId as string, req.params.panelTypeId as string, req.body);
     res.json(rate);
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update job rate" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -242,7 +242,7 @@ router.get("/api/admin/jobs/next-number", requireAuth, async (req: Request, res:
     const nextJobNumber = prefix ? `${prefix}${paddedNum}` : "";
     res.json({ nextJobNumber, prefix, minDigits, nextSequence: nextSeq, hasAutoNumbering: !!prefix });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get next job number" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -391,7 +391,7 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
 
     res.json(serializeJobPhase(job));
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create job" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 
@@ -530,7 +530,7 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
 
     res.json(serializeJobPhase(job));
   } catch (error: unknown) {
-    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update job" });
+    res.status(400).json({ error: "An internal error occurred" });
   }
 });
 

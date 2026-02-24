@@ -70,7 +70,7 @@ router.post("/api/drafting-inbox/emails/:id/extract", requireAuth, async (req: R
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error triggering drafting email extraction");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to trigger extraction" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -112,7 +112,7 @@ router.post("/api/drafting-inbox/emails/:id/match", requireAuth, async (req: Req
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error matching drafting email");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to match drafting email" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -144,7 +144,7 @@ router.post("/api/drafting-inbox/check-emails", requireAuth, async (req: Request
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "[Drafting Inbox] Error triggering email check");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to check emails" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

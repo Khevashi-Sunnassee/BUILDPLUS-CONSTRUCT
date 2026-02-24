@@ -35,7 +35,7 @@ router.get("/api/admin/data-management/deliveries", requireRoleOrSuperAdmin("ADM
 
     res.json(allDeliveries);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch deliveries" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -67,7 +67,7 @@ router.delete("/api/admin/data-management/deliveries/:id", requireRoleOrSuperAdm
     await db.delete(deliveryRecords).where(eq(deliveryRecords.id, id));
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete delivery record" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -94,7 +94,7 @@ router.get("/api/admin/data-management/load-lists", requireRoleOrSuperAdmin("ADM
       .limit(1000);
     res.json(result);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch load lists" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -129,7 +129,7 @@ router.delete("/api/admin/data-management/load-lists/:id", requireRoleOrSuperAdm
     await db.delete(loadLists).where(eq(loadLists.id, id));
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete load list" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -153,7 +153,7 @@ router.get("/api/admin/data-management/suppliers", requireRoleOrSuperAdmin("ADMI
       .limit(1000);
     res.json(result);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -204,7 +204,7 @@ router.delete("/api/admin/data-management/suppliers/:id", requireRoleOrSuperAdmi
     await db.delete(suppliers).where(and(eq(suppliers.id, id), eq(suppliers.companyId, companyId)));
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete supplier" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -228,7 +228,7 @@ router.get("/api/admin/data-management/customers", requireRoleOrSuperAdmin("ADMI
       .limit(1000);
     res.json(result);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch customers" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -249,7 +249,7 @@ router.delete("/api/admin/data-management/customers/:id", requireRoleOrSuperAdmi
     await db.delete(customers).where(and(eq(customers.id, id), eq(customers.companyId, companyId)));
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete customer" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -275,7 +275,7 @@ router.get("/api/admin/data-management/employees", requireRoleOrSuperAdmin("ADMI
       .limit(1000);
     res.json(result);
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch employees" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -301,7 +301,7 @@ router.delete("/api/admin/data-management/employees/:id", requireRoleOrSuperAdmi
     await db.delete(employees).where(and(eq(employees.id, id), eq(employees.companyId, companyId)));
     res.json({ success: true });
   } catch (error: unknown) {
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete employee" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

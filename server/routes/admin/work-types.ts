@@ -31,7 +31,7 @@ router.post("/api/admin/work-types", requireRole("ADMIN"), async (req, res) => {
     const workType = await storage.createWorkType(parsed.data);
     sendSuccess(res, workType);
   } catch (error: unknown) {
-    sendBadRequest(res, error instanceof Error ? error.message : "Failed to create work type");
+    sendBadRequest(res, "An internal error occurred");
   }
 });
 
@@ -53,7 +53,7 @@ router.put("/api/admin/work-types/:id", requireRole("ADMIN"), async (req, res) =
     }
     sendSuccess(res, workType);
   } catch (error: unknown) {
-    sendBadRequest(res, error instanceof Error ? error.message : "Failed to update work type");
+    sendBadRequest(res, "An internal error occurred");
   }
 });
 

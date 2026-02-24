@@ -37,7 +37,7 @@ export function registerApprovalRulesRoutes(router: Router, deps: SharedDeps): v
       res.json(rules);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP approval rules");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch approval rules" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -73,7 +73,7 @@ export function registerApprovalRulesRoutes(router: Router, deps: SharedDeps): v
       res.json(rule);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error creating AP approval rule");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create approval rule" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -120,7 +120,7 @@ export function registerApprovalRulesRoutes(router: Router, deps: SharedDeps): v
       res.json(updated);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error updating AP approval rule");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update approval rule" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 
@@ -148,7 +148,7 @@ export function registerApprovalRulesRoutes(router: Router, deps: SharedDeps): v
       res.json({ success: true });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error deleting AP approval rule");
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete approval rule" });
+      res.status(500).json({ error: "An internal error occurred" });
     }
   });
 }

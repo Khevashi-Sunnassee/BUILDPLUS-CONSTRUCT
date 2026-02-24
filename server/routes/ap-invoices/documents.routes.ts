@@ -50,7 +50,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP invoice document");
-      sendServerError(res, error instanceof Error ? error.message : "Failed to fetch document");
+      sendServerError(res, "An internal error occurred");
     }
   });
 
@@ -88,7 +88,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       sendSuccess(res, comments);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP invoice comments");
-      sendServerError(res, error instanceof Error ? error.message : "Failed to fetch comments");
+      sendServerError(res, "An internal error occurred");
     }
   });
 
@@ -124,7 +124,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       sendSuccess(res, comment);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error adding AP invoice comment");
-      sendServerError(res, error instanceof Error ? error.message : "Failed to add comment");
+      sendServerError(res, "An internal error occurred");
     }
   });
 
@@ -164,7 +164,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       sendSuccess(res, activity);
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP invoice activity");
-      sendServerError(res, error instanceof Error ? error.message : "Failed to fetch activity");
+      sendServerError(res, "An internal error occurred");
     }
   });
 
@@ -274,7 +274,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       sendSuccess(res, { steps, totalSteps, completedSteps, currentStepIndex });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error fetching AP invoice approval path");
-      sendServerError(res, error instanceof Error ? error.message : "Failed to fetch approval path");
+      sendServerError(res, "An internal error occurred");
     }
   });
 
@@ -467,7 +467,7 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       }
     } catch (error: unknown) {
       logger.error({ err: error }, "Error exporting AP invoice to MYOB");
-      sendServerError(res, error instanceof Error ? error.message : "Failed to export to MYOB");
+      sendServerError(res, "An internal error occurred");
     }
   });
 
@@ -614,7 +614,7 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
       }
     } catch (error: unknown) {
       logger.error({ err: error }, "Error generating page thumbnails");
-      sendServerError(res, error instanceof Error ? error.message : "Failed to generate thumbnails");
+      sendServerError(res, "An internal error occurred");
     }
   });
 
@@ -778,7 +778,7 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
       });
     } catch (error: unknown) {
       logger.error({ err: error }, "Error extracting AP invoice fields");
-      sendServerError(res, error instanceof Error ? error.message : "Extraction failed");
+      sendServerError(res, "An internal error occurred");
     }
   });
 }

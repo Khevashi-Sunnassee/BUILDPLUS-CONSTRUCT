@@ -52,7 +52,12 @@ export function clearErrorLog() {
   }
 }
 
+let globalTrackingInitialized = false;
+
 export function initGlobalErrorTracking() {
+  if (globalTrackingInitialized) return;
+  globalTrackingInitialized = true;
+
   window.addEventListener("error", (event) => {
     trackError(
       event.error || event.message || "Unknown error",

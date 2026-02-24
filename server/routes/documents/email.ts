@@ -353,7 +353,7 @@ print(json.dumps({"pages": page_count}))
     }
   } catch (error: unknown) {
     logger.error({ err: error }, "Error sending documents email");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to send email" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

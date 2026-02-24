@@ -28,7 +28,7 @@ router.get("/purchase-orders/:id/pdf", requireAuth, async (req, res) => {
     res.send(pdfBuffer);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error generating PO PDF");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate PDF" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -102,7 +102,7 @@ router.post("/purchase-orders/:id/send-with-pdf", requireAuth, async (req, res) 
     }
   } catch (error: unknown) {
     logger.error({ err: error }, "Error sending PO email with PDF");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to send email" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 
@@ -176,7 +176,7 @@ router.post("/api/purchase-orders/:id/send-email", requireAuth, async (req, res)
     }
   } catch (error: unknown) {
     logger.error({ err: error }, "Error sending PO email");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to send email" });
+    res.status(500).json({ error: "An internal error occurred" });
   }
 });
 

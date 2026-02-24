@@ -179,8 +179,8 @@ export function registerWebhookRoutes(router: Router) {
 
       res.status(200).json({ status: "accepted", inboundId: inboundRecord.id });
     } catch (error: unknown) {
-      logger.error({ err: error }, "[AP Inbox] Error processing webhook");
-      res.status(200).json({ status: "error" });
+      logger.error({ err: error }, "[AP Inbox] Webhook processing error");
+      res.status(500).json({ status: "error", message: "Internal processing error" });
     }
   });
 }
