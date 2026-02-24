@@ -4,8 +4,8 @@ import { storage } from "../../storage";
 import { requireAuth, requireRole } from "../middleware/auth.middleware";
 import logger from "../../lib/logger";
 import { db } from "../../db";
-import { purchaseOrders } from "@shared/schema";
-import { eq, and, notInArray, sql } from "drizzle-orm";
+import { purchaseOrders, suppliers, myobSupplierMappings } from "@shared/schema";
+import { eq, and, notInArray, sql, asc } from "drizzle-orm";
 import {
   supplierSchema,
   SUPPLIER_TEMPLATE_COLUMNS,
@@ -20,8 +20,20 @@ router.get("/api/procurement/suppliers", requireAuth, async (req, res) => {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const safeLimit = Math.min(parseInt(req.query.limit as string) || 1000, 1000);
-    const suppliersData = await storage.getAllSuppliers(companyId);
-    res.json(suppliersData.slice(0, safeLimit));
+    const rows = await db.select({
+      supplier: suppliers,
+      myobUid: myobSupplierMappings.myobSupplierUid,
+    })
+    .from(suppliers)
+    .leftJoin(myobSupplierMappings, and(
+      eq(myobSupplierMappings.supplierId, suppliers.id),
+      eq(myobSupplierMappings.companyId, suppliers.companyId),
+    ))
+    .where(eq(suppliers.companyId, companyId))
+    .orderBy(asc(suppliers.name))
+    .limit(safeLimit);
+    const suppliersData = rows.map(r => ({ ...r.supplier, myobUid: r.myobUid || null }));
+    res.json(suppliersData);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching suppliers");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
