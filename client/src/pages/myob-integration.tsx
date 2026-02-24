@@ -660,32 +660,62 @@ export function getFinancialYears() {
   return years;
 }
 
+function computePeriodDates(periodValue: string): { startDate: string; endDate: string } {
+  const now = new Date();
+  const financialYears = getFinancialYears();
+  const fy = financialYears.find((f) => f.value === periodValue);
+  if (fy) return { startDate: fy.startDate, endDate: fy.endDate };
+
+  if (periodValue === "last-month") {
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastDay = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0).getDate();
+    return {
+      startDate: `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}-01`,
+      endDate: `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
+    };
+  }
+
+  const monthCount = parseInt(periodValue) || 12;
+  const endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, "0")}`;
+  const start = new Date(now.getFullYear(), now.getMonth() - monthCount + 1, 1);
+  const startDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-01`;
+  return { startDate, endDate };
+}
+
 export function ProfitAndLossTab() {
   const [reportingBasis, setReportingBasis] = useState("Accrual");
   const [yearEndAdjust, setYearEndAdjust] = useState(false);
-  const [monthCount, setMonthCount] = useState("12");
+  const [periodPreset, setPeriodPreset] = useState("12");
   const [dashboardView, setDashboardView] = useState<"dashboard" | "detailed">("dashboard");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
-  const financialYears = getFinancialYears();
-  const selectedFY = financialYears.find((fy) => fy.value === monthCount);
+  const initialDates = computePeriodDates("12");
+  const [startDate, setStartDate] = useState(initialDates.startDate);
+  const [endDate, setEndDate] = useState(initialDates.endDate);
 
-  const monthlyUrl = selectedFY
-    ? `${MYOB_ROUTES.MONTHLY_PNL}?months=12&startDate=${selectedFY.startDate}&endDate=${selectedFY.endDate}&reportingBasis=${reportingBasis}&yearEndAdjust=${yearEndAdjust}`
-    : `${MYOB_ROUTES.MONTHLY_PNL}?months=${monthCount}&reportingBasis=${reportingBasis}&yearEndAdjust=${yearEndAdjust}`;
+  const financialYears = getFinancialYears();
+
+  const handlePeriodChange = (value: string) => {
+    setPeriodPreset(value);
+    if (value !== "custom") {
+      const dates = computePeriodDates(value);
+      setStartDate(dates.startDate);
+      setEndDate(dates.endDate);
+    }
+  };
+
+  const monthlyUrl = `${MYOB_ROUTES.MONTHLY_PNL}?months=24&startDate=${startDate}&endDate=${endDate}&reportingBasis=${reportingBasis}&yearEndAdjust=${yearEndAdjust}`;
 
   const { data: monthlyData, isLoading, isError, error, refetch, isFetching } = useQuery<MonthlyPnlResponse>({
-    queryKey: [MYOB_ROUTES.MONTHLY_PNL, monthCount, reportingBasis, yearEndAdjust],
+    queryKey: [MYOB_ROUTES.MONTHLY_PNL, startDate, endDate, reportingBasis, yearEndAdjust],
     queryFn: async () => {
       const res = await apiRequest("GET", monthlyUrl);
       return res.json();
     },
   });
 
-  const adjustmentsUrl = selectedFY
-    ? `${MYOB_ROUTES.BUILDPLUS_ADJUSTMENTS}?months=12&startDate=${selectedFY.startDate}&endDate=${selectedFY.endDate}`
-    : `${MYOB_ROUTES.BUILDPLUS_ADJUSTMENTS}?months=${monthCount}`;
+  const adjustmentsUrl = `${MYOB_ROUTES.BUILDPLUS_ADJUSTMENTS}?months=24&startDate=${startDate}&endDate=${endDate}`;
 
   const { data: adjustmentsData } = useQuery<{
     period: { start: string; end: string };
@@ -705,7 +735,7 @@ export function ProfitAndLossTab() {
       byCategory: { category: string; count: number; totalPurchasePrice: string }[];
     };
   }>({
-    queryKey: [MYOB_ROUTES.BUILDPLUS_ADJUSTMENTS, monthCount],
+    queryKey: [MYOB_ROUTES.BUILDPLUS_ADJUSTMENTS, startDate, endDate],
     queryFn: async () => {
       const res = await apiRequest("GET", adjustmentsUrl);
       return res.json();
@@ -935,7 +965,7 @@ export function ProfitAndLossTab() {
         </CardHeader>
         <CardContent className="space-y-3 pt-0">
           <div className="print-filter-summary text-xs text-gray-600">
-            <span className="font-medium">Period:</span> {selectedFY ? selectedFY.label : `Last ${monthCount} months`}
+            <span className="font-medium">Period:</span> {startDate} to {endDate}
             {" · "}
             <span className="font-medium">Basis:</span> {reportingBasis}
             {yearEndAdjust ? " · Year-end adjustments included" : ""}
@@ -945,11 +975,15 @@ export function ProfitAndLossTab() {
           <div className="flex flex-wrap items-end gap-3 no-print">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Period</Label>
-              <Select value={monthCount} onValueChange={setMonthCount}>
-                <SelectTrigger className="w-44" data-testid="select-month-count">
+              <Select value={periodPreset} onValueChange={handlePeriodChange}>
+                <SelectTrigger className="w-44" data-testid="select-period-preset">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  {periodPreset === "custom" && (
+                    <SelectItem value="custom">Custom range</SelectItem>
+                  )}
+                  <SelectItem value="last-month">Last month</SelectItem>
                   <SelectItem value="3">Last 3 months</SelectItem>
                   <SelectItem value="6">Last 6 months</SelectItem>
                   <SelectItem value="12">Last 12 months</SelectItem>
@@ -965,6 +999,34 @@ export function ProfitAndLossTab() {
                   )}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Start Date</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setPeriodPreset("custom");
+                }}
+                className="w-40"
+                data-testid="input-start-date"
+                {...dateInputProps}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">End Date</Label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setPeriodPreset("custom");
+                }}
+                className="w-40"
+                data-testid="input-end-date"
+                {...dateInputProps}
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Basis</Label>
