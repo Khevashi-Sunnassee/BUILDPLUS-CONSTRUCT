@@ -3,6 +3,7 @@ import { users, jobs, dailyLogs, logRows, globalSettings, workTypes, trailerType
 import { eq, and, sql, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import logger from "./lib/logger";
+import { SAFETY_TEMPLATE_DEFINITIONS } from "./safety-checklist-templates";
 
 export async function ensureSuperAdmins() {
   const envEmails = process.env.SUPER_ADMIN_EMAILS;
@@ -669,6 +670,7 @@ export const SYSTEM_MODULES = [
   { code: "PANELS", name: "Panels", description: "Panel quality inspection module", icon: "Layers", color: "#3B82F6" },
   { code: "DOCUMENTS", name: "Documents", description: "Document management module", icon: "FileText", color: "#8B5CF6" },
   { code: "EQUIPMENT", name: "Equipment", description: "Equipment maintenance module", icon: "Wrench", color: "#F59E0B" },
+  { code: "SAFETY", name: "Safety", description: "Safety checklists and permits for high-rise construction", icon: "ShieldCheck", color: "#EF4444" },
 ] as const;
 
 export async function ensureSystemChecklistModules() {
@@ -829,6 +831,83 @@ export async function ensureSystemChecklistModules() {
               isActive: true,
             });
             logger.info(`Created Post-Pour template for company ${company.id}`);
+          }
+        }
+
+        if (mod.code === "SAFETY") {
+          const existingSubtypes = await db.select().from(entitySubtypes)
+            .where(and(
+              eq(entitySubtypes.entityTypeId, entityTypeId),
+              eq(entitySubtypes.companyId, company.id!)
+            ));
+
+          const subtypeMap: Record<string, string> = {};
+          for (const st of existingSubtypes) {
+            subtypeMap[st.code] = st.id;
+          }
+
+          const safetySubtypes = [
+            { code: "INDUCTION", name: "Site Induction", description: "Site-specific safety inductions", sortOrder: 0 },
+            { code: "INSPECTION", name: "Safety Inspection", description: "Safety walks and site inspections", sortOrder: 1 },
+            { code: "PERMIT", name: "Safety Permit", description: "Work permits (hot works, confined space, etc.)", sortOrder: 2 },
+            { code: "PLANT_CHECK", name: "Plant Pre-Start", description: "Plant and equipment pre-start checks", sortOrder: 3 },
+            { code: "CRANE_OPS", name: "Crane Operations", description: "Tower crane safety checklists", sortOrder: 4 },
+          ];
+
+          for (const sub of safetySubtypes) {
+            if (!subtypeMap[sub.code]) {
+              const [created] = await db.insert(entitySubtypes).values({
+                companyId: company.id,
+                entityTypeId,
+                name: sub.name,
+                code: sub.code,
+                description: sub.description,
+                sortOrder: sub.sortOrder,
+                isActive: true,
+              }).returning();
+              subtypeMap[sub.code] = created.id;
+            }
+          }
+
+          const templateSubtypeMapping: Record<string, string> = {
+            SITE_INDUCTION: "INDUCTION",
+            SAFETY_WALK: "INSPECTION",
+            DROP_ZONE: "INSPECTION",
+            CRANE_JUMP: "CRANE_OPS",
+            HOT_WORKS: "PERMIT",
+            WORKING_AT_HEIGHTS: "PERMIT",
+            CONFINED_SPACE: "PERMIT",
+            EXCAVATION: "INSPECTION",
+            SCAFFOLD: "INSPECTION",
+            PLANT_PRESTART: "PLANT_CHECK",
+            CONCRETE_POUR: "PERMIT",
+            TOOLBOX_TALK: "INSPECTION",
+          };
+
+          const existingTemplates = await db.select().from(checklistTemplates)
+            .where(and(
+              eq(checklistTemplates.companyId, company.id),
+              eq(checklistTemplates.entityTypeId, entityTypeId),
+              eq(checklistTemplates.isSystemDefault, true)
+            ));
+
+          const existingNames = existingTemplates.map(t => t.name);
+
+          for (const tmplDef of SAFETY_TEMPLATE_DEFINITIONS) {
+            if (!existingNames.includes(tmplDef.name)) {
+              const subtypeCode = templateSubtypeMapping[tmplDef.code];
+              await db.insert(checklistTemplates).values({
+                companyId: company.id,
+                name: tmplDef.name,
+                description: tmplDef.description,
+                entityTypeId,
+                entitySubtypeId: subtypeCode && subtypeMap[subtypeCode] ? subtypeMap[subtypeCode] : undefined,
+                sections: tmplDef.sections as any,
+                isSystemDefault: true,
+                isActive: true,
+              });
+              logger.info(`Created safety template: ${tmplDef.name} for company ${company.id}`);
+            }
           }
         }
       }
