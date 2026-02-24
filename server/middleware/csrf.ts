@@ -11,6 +11,7 @@ const EXEMPT_PATHS = new Set([
   "/auth/login",
   "/auth/register",
   "/auth/logout",
+  "/auth/reset-password",
   "/ap-inbox/webhook",
 ]);
 

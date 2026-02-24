@@ -6430,3 +6430,20 @@ export const emailDeadLetters = pgTable("email_dead_letters", {
 }));
 
 export type EmailDeadLetter = typeof emailDeadLetters.$inferSelect;
+
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+}, (table) => ({
+  tokenHashIdx: index("password_reset_token_hash_idx").on(table.tokenHash),
+  userIdx: index("password_reset_user_idx").on(table.userId),
+  expiresIdx: index("password_reset_expires_idx").on(table.expiresAt),
+}));
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;

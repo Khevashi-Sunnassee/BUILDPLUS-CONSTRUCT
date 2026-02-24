@@ -25,8 +25,9 @@ import {
   Search,
   KeyRound,
   Eye,
+  RotateCcw,
 } from "lucide-react";
-import { ADMIN_ROUTES, USER_ROUTES, INVITATION_ROUTES } from "@shared/api-routes";
+import { ADMIN_ROUTES, USER_ROUTES, INVITATION_ROUTES, AUTH_ROUTES } from "@shared/api-routes";
 import { Factory as FactoryIcon } from "lucide-react";
 import type { Factory } from "@shared/schema";
 import { QueryErrorState } from "@/components/query-error-state";
@@ -723,6 +724,18 @@ export default function AdminUsersPage() {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return apiRequest("POST", AUTH_ROUTES.ADMIN_RESET_PASSWORD, { userId });
+    },
+    onSuccess: () => {
+      toast({ title: "Password reset email sent", description: "The user will receive an email with a link to reset their password." });
+    },
+    onError: () => {
+      toast({ title: "Failed to send reset email", description: "Please try again.", variant: "destructive" });
+    },
+  });
+
   const deleteUserMutation = useMutation({
     mutationFn: async (id: string) => {
       return apiRequest("DELETE", ADMIN_ROUTES.USER_BY_ID(id), {});
@@ -1135,6 +1148,17 @@ export default function AdminUsersPage() {
                             data-testid={`button-permissions-${user.id}`}
                           >
                             <KeyRound className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Reset password"
+                            title="Send password reset email"
+                            onClick={() => resetPasswordMutation.mutate(user.id)}
+                            disabled={resetPasswordMutation.isPending}
+                            data-testid={`button-reset-password-${user.id}`}
+                          >
+                            <RotateCcw className="h-4 w-4 text-blue-600" />
                           </Button>
                           <Button
                             variant="ghost"

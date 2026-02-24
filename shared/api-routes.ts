@@ -23,6 +23,9 @@ export const AUTH_ROUTES = {
   ME: '/api/auth/me',
   CHANGE_PASSWORD: '/api/auth/change-password',
   SWITCH_COMPANY: '/api/auth/switch-company',
+  ADMIN_RESET_PASSWORD: '/api/auth/admin-reset-password',
+  VALIDATE_RESET_TOKEN: (token: string) => `/api/auth/reset-password/${token}/validate`,
+  RESET_PASSWORD: '/api/auth/reset-password',
 } as const;
 
 // ============================================================================

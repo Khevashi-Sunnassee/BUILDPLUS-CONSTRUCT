@@ -130,6 +130,7 @@ const DraftingEmailDetailPage = lazyWithRetry(() => import("@/pages/drafting-ema
 const ExternalApiPage = lazyWithRetry(() => import("@/pages/admin/external-api"));
 
 const RegisterPage = lazyWithRetry(() => import("@/pages/register"));
+const ResetPasswordPage = lazyWithRetry(() => import("@/pages/reset-password"));
 const MobileLoginPage = lazyWithRetry(() => import("@/pages/mobile/login"));
 const MobileDashboard = lazyWithRetry(() => import("@/pages/mobile/dashboard"));
 const MobileTasksPage = lazyWithRetry(() => import("@/pages/mobile/tasks"));
@@ -304,6 +305,12 @@ function Router() {
       <Route path="/register/:token">
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
           <RegisterPage />
+        </Suspense>
+      </Route>
+
+      <Route path="/reset-password/:token">
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+          <ResetPasswordPage />
         </Suspense>
       </Route>
 
