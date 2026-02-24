@@ -14,6 +14,8 @@ import {
   Share2,
   UserPlus,
   X,
+  Trash2,
+  MoreVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +39,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -48,6 +56,7 @@ interface KbChatProps {
   conversations: KbConversation[];
   selectedProjectId: string | null;
   onBack: () => void;
+  onDeleteConvo?: (convoId: string) => void;
 }
 
 export function KbChat({
@@ -55,6 +64,7 @@ export function KbChat({
   conversations,
   selectedProjectId,
   onBack,
+  onDeleteConvo,
 }: KbChatProps) {
   const { toast } = useToast();
   const [chatInput, setChatInput] = useState("");
@@ -246,20 +256,44 @@ export function KbChat({
 
         <div className="flex items-center gap-1.5 shrink-0">
           {selectedConvoId && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  onClick={() => setShowShareDialog(true)}
-                  data-testid="btn-share-convo"
-                >
-                  <Share2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Share this conversation</TooltipContent>
-            </Tooltip>
+            <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => setShowShareDialog(true)}
+                    data-testid="btn-share-convo"
+                  >
+                    <Share2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Share this conversation</TooltipContent>
+              </Tooltip>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    data-testid="btn-convo-menu"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => onDeleteConvo?.(selectedConvoId)}
+                    data-testid="btn-delete-convo-from-chat"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Chat
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
           )}
           <Tooltip>
             <TooltipTrigger asChild>

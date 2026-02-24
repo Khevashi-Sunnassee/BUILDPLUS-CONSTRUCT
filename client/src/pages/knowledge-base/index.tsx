@@ -125,6 +125,7 @@ export default function KnowledgeBasePage() {
             conversations={conversations}
             selectedProjectId={selectedProjectId}
             onBack={() => setSelectedConvoId(null)}
+            onDeleteConvo={(id) => setShowDeleteConvo(id)}
           />
         )}
       </div>
