@@ -299,7 +299,7 @@ function SupplierSearchField({ invoice, onSupplierSelect, onFocus }: {
             data-testid="input-supplierName"
           />
           {showDropdown && (
-            <div className="absolute top-8 left-0 right-0 border rounded-md shadow-lg max-h-48 overflow-y-auto bg-card text-card-foreground" style={{ zIndex: 9999 }} data-testid="dropdown-supplier-results">
+            <div className="absolute top-8 left-0 right-0 border border-border rounded-md shadow-lg max-h-48 overflow-y-auto bg-popover text-popover-foreground backdrop-blur-none" style={{ zIndex: 9999, backgroundColor: 'hsl(var(--popover))' }} data-testid="dropdown-supplier-results">
               {filtered.map((s) => (
                 <button
                   type="button"
