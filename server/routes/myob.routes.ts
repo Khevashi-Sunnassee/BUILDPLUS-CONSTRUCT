@@ -69,13 +69,23 @@ router.get("/api/myob/callback", async (req: Request, res: Response) => {
     );
   };
 
+  const error = req.query.error as string | undefined;
+  const errorDescription = req.query.error_description as string | undefined;
+
   logger.info({ 
     hasCode: !!code, 
     hasBusinessId: !!businessId, 
     hasState: !!stateNonce,
+    error,
+    errorDescription,
     queryKeys: Object.keys(req.query),
     fullUrl: req.originalUrl
   }, "MYOB OAuth callback received");
+
+  if (error) {
+    logger.warn({ error, errorDescription }, "MYOB OAuth returned error");
+    return sendHtml("MYOB Connection Error", `${error}: ${errorDescription || 'Unknown error'}`, true);
+  }
 
   if (!code || !businessId || !stateNonce) {
     logger.warn({ code: !!code, businessId: !!businessId, state: !!stateNonce, query: req.query }, "MYOB callback missing parameters");
