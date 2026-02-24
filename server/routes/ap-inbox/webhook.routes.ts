@@ -514,15 +514,16 @@ Return your response as valid JSON with this exact structure:
 
     const totalInc = parseFloat(updateData.totalInc || "0");
     if (totalInc > 0) {
-      const gstAmount = parseFloat(updateData.totalTax || "0");
+      const gstAmountVal = parseFloat(updateData.totalTax || "0");
       const subtotal = parseFloat(updateData.totalEx || String(totalInc));
-      const taxCodeLabel = gstAmount > 0 ? "GST" : "FRE";
+      const taxCodeLabel = gstAmountVal > 0 ? "GST" : "FRE";
 
       await db.insert(apInvoiceSplits).values({
         invoiceId,
         description: fieldMap.description || "Invoice total",
         percentage: "100",
         amount: subtotal > 0 ? subtotal.toFixed(2) : totalInc.toFixed(2),
+        gstAmount: gstAmountVal > 0 ? gstAmountVal.toFixed(2) : "0",
         taxCodeId: taxCodeLabel,
         sortOrder: 0,
       });

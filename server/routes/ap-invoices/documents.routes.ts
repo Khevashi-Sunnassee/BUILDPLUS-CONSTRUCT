@@ -338,10 +338,11 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
         const acctMap = split.costCodeId ? accountMapByCostCode.get(split.costCodeId) : null;
         const taxMap = split.taxCodeId ? taxMapByCode.get(split.taxCodeId) : null;
         const myobJobUid = split.jobId ? jobMyobMap.get(split.jobId) : undefined;
+        const lineTotal = parseFloat(split.amount) + parseFloat(split.gstAmount || "0");
         return {
           Type: "Transaction" as const,
           Description: split.description || invoice.description || "AP Invoice",
-          Total: parseFloat(split.amount),
+          Total: lineTotal,
           Account: acctMap ? { UID: acctMap.myobAccountUid } : undefined,
           Job: myobJobUid ? { UID: myobJobUid } : undefined,
           TaxCode: taxMap ? { UID: taxMap.myobTaxCodeUid } : undefined,

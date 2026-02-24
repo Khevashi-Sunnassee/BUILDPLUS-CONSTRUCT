@@ -64,6 +64,7 @@ interface InvoiceSplit {
   description: string | null;
   percentage: string | null;
   amount: string;
+  gstAmount: string;
   costCodeId: string | null;
   jobId: string | null;
   taxCodeId: string | null;
@@ -409,7 +410,7 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplier
     queryKey: ["/api/cost-codes-with-children"],
   });
 
-  const totalAmount = useMemo(() => splits.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0), [splits]);
+  const totalAmount = useMemo(() => splits.reduce((sum, s) => sum + (parseFloat(s.amount) || 0) + (parseFloat(s.gstAmount) || 0), 0), [splits]);
   const variance = useMemo(() => invoiceTotal - totalAmount, [invoiceTotal, totalAmount]);
   const allocatedPercent = useMemo(() => invoiceTotal > 0 ? (totalAmount / invoiceTotal) * 100 : 0, [invoiceTotal, totalAmount]);
 
@@ -423,6 +424,7 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplier
         description: s.description || null,
         percentage: s.percentage || null,
         amount: s.amount,
+        gstAmount: s.gstAmount || "0",
         costCodeId: s.costCodeId || null,
         jobId: s.jobId || null,
         taxCodeId: s.taxCodeId || null,
@@ -445,19 +447,35 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplier
     (updated[index] as any)[field] = value;
     if (field === "percentage" && value) {
       const pct = parseFloat(value) || 0;
-      updated[index].amount = (invoiceTotal * pct / 100).toFixed(2);
+      const lineTotal = invoiceTotal * pct / 100;
+      const exGst = lineTotal / 1.1;
+      const gst = lineTotal - exGst;
+      updated[index].amount = exGst.toFixed(2);
+      updated[index].gstAmount = gst.toFixed(2);
     }
-    if (field === "amount" && value && invoiceTotal > 0) {
-      updated[index].percentage = ((parseFloat(value) / invoiceTotal) * 100).toFixed(2);
+    if (field === "amount" && value) {
+      const amt = parseFloat(value) || 0;
+      const gst = amt * 0.1;
+      updated[index].gstAmount = gst.toFixed(2);
+      if (invoiceTotal > 0) {
+        updated[index].percentage = (((amt + gst) / invoiceTotal) * 100).toFixed(2);
+      }
+    }
+    if (field === "gstAmount" && invoiceTotal > 0) {
+      const amt = parseFloat(updated[index].amount) || 0;
+      const gst = parseFloat(value || "0") || 0;
+      updated[index].percentage = (((amt + gst) / invoiceTotal) * 100).toFixed(2);
     }
     onSplitsChange(updated);
   };
 
   const addSplit = () => {
     const remaining = invoiceTotal - totalAmount;
+    const remainingExGst = remaining > 0 ? remaining / 1.1 : 0;
+    const remainingGst = remaining > 0 ? remaining - remainingExGst : 0;
     onSplitsChange([
       ...splits,
-      { description: null, percentage: invoiceTotal > 0 ? ((remaining / invoiceTotal) * 100).toFixed(2) : "0", amount: remaining > 0 ? remaining.toFixed(2) : "0.00", costCodeId: null, jobId: null, taxCodeId: null, sortOrder: splits.length },
+      { description: null, percentage: invoiceTotal > 0 ? ((remaining / invoiceTotal) * 100).toFixed(2) : "0", amount: remainingExGst > 0 ? remainingExGst.toFixed(2) : "0.00", gstAmount: remainingGst > 0 ? remainingGst.toFixed(2) : "0.00", costCodeId: null, jobId: null, taxCodeId: null, sortOrder: splits.length },
     ]);
   };
 
@@ -496,22 +514,26 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplier
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10">#</TableHead>
-                <TableHead className="w-40">Job</TableHead>
-                <TableHead className="w-40">Cost Code</TableHead>
-                <TableHead className="w-20">%</TableHead>
-                <TableHead className="w-28 text-right">Amount</TableHead>
+                <TableHead className="w-36">Job</TableHead>
+                <TableHead className="w-36">Cost Code</TableHead>
+                <TableHead className="w-16">%</TableHead>
+                <TableHead className="w-24 text-right">Ex GST</TableHead>
+                <TableHead className="w-20 text-right">GST</TableHead>
+                <TableHead className="w-24 text-right">Total</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {splits.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-6">
+                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-6">
                     No splits added yet
                   </TableCell>
                 </TableRow>
               ) : (
-                splits.map((split, i) => (
+                splits.map((split, i) => {
+                  const lineTotal = (parseFloat(split.amount) || 0) + (parseFloat(split.gstAmount) || 0);
+                  return (
                   <TableRow key={i} data-testid={`row-split-${i}`}>
                     <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
                     <TableCell>
@@ -548,7 +570,7 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplier
                         step="0.01"
                         value={split.percentage || ""}
                         onChange={(e) => updateSplit(i, "percentage", e.target.value)}
-                        className="h-7 text-sm border-0 bg-transparent p-0 w-16 focus-visible:ring-1"
+                        className="h-7 text-sm border-0 bg-transparent p-0 w-14 focus-visible:ring-1"
                         data-testid={`input-split-percent-${i}`}
                       />
                     </TableCell>
@@ -559,9 +581,23 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplier
                         step="0.01"
                         value={split.amount}
                         onChange={(e) => updateSplit(i, "amount", e.target.value)}
-                        className="h-7 text-sm border-0 bg-transparent p-0 w-24 text-right focus-visible:ring-1"
+                        className="h-7 text-sm border-0 bg-transparent p-0 w-20 text-right focus-visible:ring-1"
                         data-testid={`input-split-amount-${i}`}
                       />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={split.gstAmount}
+                        onChange={(e) => updateSplit(i, "gstAmount", e.target.value)}
+                        className="h-7 text-sm border-0 bg-transparent p-0 w-16 text-right focus-visible:ring-1"
+                        data-testid={`input-split-gst-${i}`}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-medium" data-testid={`text-split-total-${i}`}>
+                      {formatCurrency(lineTotal)}
                     </TableCell>
                     <TableCell>
                       <Button size="icon" variant="ghost" onClick={() => removeSplit(i)} aria-label={`Remove split ${i + 1}`} data-testid={`button-remove-split-${i}`}>
@@ -569,7 +605,8 @@ function SplitsTable({ invoiceId, invoiceTotal, splits, onSplitsChange, supplier
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -1214,7 +1251,7 @@ export default function ApInvoiceDetailPage() {
   const invoiceTotal = useMemo(() => parseFloat(String(invoice?.totalInc || "0")), [invoice?.totalInc]);
 
   if (splitsData && !splitsInitialized) {
-    setSplits(splitsData);
+    setSplits(splitsData.map(s => ({ ...s, gstAmount: s.gstAmount || "0" })));
     setSplitsInitialized(true);
   }
 

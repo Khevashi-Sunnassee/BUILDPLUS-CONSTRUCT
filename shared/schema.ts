@@ -5386,6 +5386,7 @@ export const apInvoiceSplits = pgTable("ap_invoice_splits", {
   description: text("description"),
   percentage: numeric("percentage", { precision: 8, scale: 4 }),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  gstAmount: numeric("gst_amount", { precision: 12, scale: 2 }).default("0"),
   costCodeId: varchar("cost_code_id", { length: 36 }).references(() => costCodes.id, { onDelete: "set null" }),
   jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "cascade" }),
   taxCodeId: varchar("tax_code_id", { length: 36 }),

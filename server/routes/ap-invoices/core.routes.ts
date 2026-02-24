@@ -300,6 +300,7 @@ export function registerCoreRoutes(router: Router, deps: SharedDeps): void {
             description: apInvoiceSplits.description,
             percentage: apInvoiceSplits.percentage,
             amount: apInvoiceSplits.amount,
+            gstAmount: apInvoiceSplits.gstAmount,
             costCodeId: apInvoiceSplits.costCodeId,
             jobId: apInvoiceSplits.jobId,
             taxCodeId: apInvoiceSplits.taxCodeId,

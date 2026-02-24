@@ -14,6 +14,7 @@ const splitSchema = z.object({
   description: z.string().nullable().optional(),
   percentage: z.string().nullable().optional(),
   amount: z.string(),
+  gstAmount: z.string().nullable().optional(),
   costCodeId: z.string().nullable().optional(),
   jobId: z.string().nullable().optional(),
   taxCodeId: z.string().nullable().optional(),
@@ -75,6 +76,7 @@ export function registerSplitsRoutes(router: Router, deps: SharedDeps): void {
           description: apInvoiceSplits.description,
           percentage: apInvoiceSplits.percentage,
           amount: apInvoiceSplits.amount,
+          gstAmount: apInvoiceSplits.gstAmount,
           costCodeId: apInvoiceSplits.costCodeId,
           jobId: apInvoiceSplits.jobId,
           taxCodeId: apInvoiceSplits.taxCodeId,
@@ -124,7 +126,7 @@ export function registerSplitsRoutes(router: Router, deps: SharedDeps): void {
 
       if (existing.totalInc) {
         const totalInc = parseFloat(existing.totalInc);
-        const splitSum = body.reduce((sum, s) => sum + parseFloat(s.amount), 0);
+        const splitSum = body.reduce((sum, s) => sum + parseFloat(s.amount) + parseFloat(s.gstAmount || "0"), 0);
         const tolerance = 0.02;
         if (Math.abs(totalInc - splitSum) > tolerance) {
           return res.status(400).json({
@@ -142,6 +144,7 @@ export function registerSplitsRoutes(router: Router, deps: SharedDeps): void {
             description: s.description || null,
             percentage: s.percentage || null,
             amount: s.amount,
+            gstAmount: s.gstAmount || "0",
             costCodeId: s.costCodeId || null,
             jobId: s.jobId || null,
             taxCodeId: s.taxCodeId || null,
