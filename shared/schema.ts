@@ -6381,3 +6381,52 @@ export const markupCredentials = pgTable("markup_credentials", {
 export const insertMarkupCredentialSchema = createInsertSchema(markupCredentials).omit({ id: true, createdAt: true, updatedAt: true, lastUsedAt: true });
 export type InsertMarkupCredential = z.infer<typeof insertMarkupCredentialSchema>;
 export type MarkupCredential = typeof markupCredentials.$inferSelect;
+
+export const emailQueueStatusEnum = pgEnum("email_queue_status", [
+  "PENDING", "PROCESSING", "COMPLETED", "FAILED", "DEAD"
+]);
+
+export const emailQueueJobs = pgTable("email_queue_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 50 }).notNull(),
+  referenceId: varchar("reference_id", { length: 255 }).notNull(),
+  payload: jsonb("payload").notNull(),
+  status: emailQueueStatusEnum("status").notNull().default("PENDING"),
+  priority: integer("priority").notNull().default(0),
+  attempts: integer("attempts").notNull().default(0),
+  maxAttempts: integer("max_attempts").notNull().default(3),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  nextRetryAt: timestamp("next_retry_at"),
+}, (table) => ({
+  statusIdx: index("email_queue_status_idx").on(table.status),
+  companyIdx: index("email_queue_company_idx").on(table.companyId),
+  statusPriorityIdx: index("email_queue_status_priority_idx").on(table.status, table.priority),
+  nextRetryIdx: index("email_queue_next_retry_idx").on(table.nextRetryAt),
+  referenceIdx: index("email_queue_reference_idx").on(table.referenceId),
+}));
+
+export type EmailQueueJob = typeof emailQueueJobs.$inferSelect;
+
+export const emailDeadLetters = pgTable("email_dead_letters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  originalJobId: varchar("original_job_id", { length: 255 }).notNull(),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 50 }).notNull(),
+  referenceId: varchar("reference_id", { length: 255 }).notNull(),
+  payload: jsonb("payload").notNull(),
+  error: text("error").notNull(),
+  attempts: integer("attempts").notNull(),
+  failedAt: timestamp("failed_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by").references(() => users.id),
+}, (table) => ({
+  companyIdx: index("email_dead_letters_company_idx").on(table.companyId),
+  resolvedIdx: index("email_dead_letters_resolved_idx").on(table.resolvedAt),
+  failedAtIdx: index("email_dead_letters_failed_at_idx").on(table.failedAt),
+}));
+
+export type EmailDeadLetter = typeof emailDeadLetters.$inferSelect;

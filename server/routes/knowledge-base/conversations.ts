@@ -194,6 +194,17 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
       return res.status(429).json({ error: `Daily AI request limit reached (${MAX_DAILY_REQUESTS}). Try again tomorrow.` });
     }
 
+    const monthStart = today.slice(0, 7) + "-01";
+    const MAX_MONTHLY_TOKENS_PER_COMPANY = 1_000_000;
+    const [monthlyUsage] = await db.execute(sql`
+      SELECT COALESCE(SUM(total_tokens), 0)::int AS total_tokens
+      FROM ai_usage_tracking
+      WHERE company_id = ${companyId} AND usage_date >= ${monthStart}
+    `) as any[];
+    if (monthlyUsage && monthlyUsage.total_tokens >= MAX_MONTHLY_TOKENS_PER_COMPANY) {
+      return res.status(429).json({ error: "Monthly AI token budget exceeded for your company. Contact your administrator." });
+    }
+
     try {
       await db.execute(sql`
         INSERT INTO ai_usage_tracking (id, company_id, user_id, usage_date, request_count, total_tokens, last_request_at)
@@ -261,10 +272,13 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
           model: "gpt-4o-mini",
           messages: chatMessages,
           stream: true,
+          stream_options: { include_usage: true },
           max_completion_tokens: 4096,
           temperature: 0.3,
         });
       });
+
+      let streamUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
       for await (const chunk of stream as any) {
         if (clientDisconnected) break;
@@ -272,6 +286,22 @@ router.post("/api/kb/conversations/:id/messages", requireAuth, async (req: Reque
         if (delta) {
           fullResponse += delta;
           res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+        }
+        if (chunk.usage) {
+          streamUsage = chunk.usage;
+        }
+      }
+
+      const tokensUsed = streamUsage?.total_tokens || (fullResponse.length > 0 ? Math.ceil(fullResponse.length / 3.5) : 0);
+      if (tokensUsed > 0) {
+        try {
+          await db.execute(sql`
+            UPDATE ai_usage_tracking
+            SET total_tokens = ai_usage_tracking.total_tokens + ${tokensUsed}
+            WHERE user_id = ${userId} AND usage_date = ${today}
+          `);
+        } catch (tokenErr) {
+          logger.error({ err: tokenErr }, "[KB] Failed to update token usage");
         }
       }
 

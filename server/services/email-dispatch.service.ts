@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { mailRegister, emailSendLogs, broadcastDeliveries, broadcastMessages } from "@shared/schema";
+import { mailRegister, emailSendLogs, broadcastDeliveries, broadcastMessages, emailQueueJobs, emailDeadLetters } from "@shared/schema";
 import { eq, and, or, sql, lt, inArray } from "drizzle-orm";
 import { emailService, isRetryableError } from "./email.service";
 import { emailQueue } from "../lib/job-queue";
@@ -22,6 +22,7 @@ interface EmailJobPayload {
   attempt: number;
   maxAttempts: number;
   userId?: string;
+  dbJobId?: string;
 }
 
 const companyDailyCountCache = new Map<string, { count: number; resetAt: number }>();
@@ -62,7 +63,122 @@ class EmailDispatchService {
       await this.processEmailJob(payload);
     });
 
+    this.recoverStaleJobs().catch(err => {
+      logger.error({ err }, "[EmailDispatch] Failed to recover stale jobs on startup");
+    });
+
     logger.info("[EmailDispatch] Email dispatch service initialized with queue handler");
+  }
+
+  private async recoverStaleJobs(): Promise<void> {
+    const STALE_THRESHOLD_MS = 5 * 60 * 1000;
+    const staleThreshold = new Date(Date.now() - STALE_THRESHOLD_MS);
+
+    const recovered = await db.update(emailQueueJobs)
+      .set({ status: "PENDING", startedAt: null })
+      .where(
+        and(
+          eq(emailQueueJobs.status, "PROCESSING"),
+          sql`${emailQueueJobs.startedAt} < ${staleThreshold}`
+        )
+      )
+      .returning({ id: emailQueueJobs.id });
+
+    if (recovered.length > 0) {
+      logger.info({ count: recovered.length }, "[EmailDispatch] Recovered stale PROCESSING jobs to PENDING");
+    }
+
+    const pendingJobs = await db.select()
+      .from(emailQueueJobs)
+      .where(
+        and(
+          eq(emailQueueJobs.status, "PENDING"),
+          or(
+            sql`${emailQueueJobs.nextRetryAt} IS NULL`,
+            sql`${emailQueueJobs.nextRetryAt} <= NOW()`
+          )
+        )
+      )
+      .orderBy(sql`${emailQueueJobs.priority} DESC, ${emailQueueJobs.createdAt} ASC`)
+      .limit(100);
+
+    for (const job of pendingJobs) {
+      try {
+        const payload = job.payload as EmailJobPayload;
+        payload.dbJobId = job.id;
+        payload.attempt = job.attempts + 1;
+        payload.maxAttempts = job.maxAttempts;
+        emailQueue.enqueue("send-email", payload, job.priority);
+      } catch (err) {
+        logger.error({ err, jobId: job.id }, "[EmailDispatch] Failed to re-enqueue recovered job");
+      }
+    }
+
+    if (pendingJobs.length > 0) {
+      logger.info({ count: pendingJobs.length }, "[EmailDispatch] Re-enqueued pending jobs from database");
+    }
+  }
+
+  private async persistJob(payload: EmailJobPayload, priority: number): Promise<string> {
+    const [row] = await db.insert(emailQueueJobs).values({
+      companyId: payload.companyId,
+      type: payload.type,
+      referenceId: payload.referenceId,
+      payload: payload as any,
+      status: "PENDING",
+      priority,
+      attempts: 0,
+      maxAttempts: payload.maxAttempts,
+    }).returning({ id: emailQueueJobs.id });
+    return row.id;
+  }
+
+  private async markJobProcessing(dbJobId: string): Promise<void> {
+    await db.update(emailQueueJobs)
+      .set({ status: "PROCESSING", startedAt: new Date() })
+      .where(eq(emailQueueJobs.id, dbJobId));
+  }
+
+  private async markJobCompleted(dbJobId: string): Promise<void> {
+    await db.update(emailQueueJobs)
+      .set({ status: "COMPLETED", completedAt: new Date(), error: null })
+      .where(eq(emailQueueJobs.id, dbJobId));
+  }
+
+  private async markJobFailed(dbJobId: string, error: string, attempts: number): Promise<void> {
+    const retryDelay = 5000 * Math.pow(2, attempts);
+    const nextRetryAt = new Date(Date.now() + retryDelay);
+    await db.update(emailQueueJobs)
+      .set({
+        status: "FAILED",
+        error,
+        attempts,
+        nextRetryAt,
+      })
+      .where(eq(emailQueueJobs.id, dbJobId));
+  }
+
+  private async markJobDead(dbJobId: string, payload: EmailJobPayload, error: string, attempts: number): Promise<void> {
+    await db.update(emailQueueJobs)
+      .set({ status: "DEAD", error, attempts, completedAt: new Date() })
+      .where(eq(emailQueueJobs.id, dbJobId));
+
+    await db.insert(emailDeadLetters).values({
+      originalJobId: dbJobId,
+      companyId: payload.companyId,
+      type: payload.type,
+      referenceId: payload.referenceId,
+      payload: payload as any,
+      error,
+      attempts,
+    });
+
+    logger.error({
+      dbJobId,
+      type: payload.type,
+      referenceId: payload.referenceId,
+      attempts,
+    }, "[EmailDispatch] Email moved to dead letter queue");
   }
 
   async enqueueMailRegister(params: {
@@ -105,8 +221,10 @@ class EmailDispatchService {
     };
 
     try {
+      const dbJobId = await this.persistJob(payload, 5);
+      payload.dbJobId = dbJobId;
       const jobId = emailQueue.enqueue("send-email", payload, 5);
-      logger.info({ jobId, mailRegisterId: params.mailRegisterId, to: params.to }, "[EmailDispatch] Mail register email enqueued");
+      logger.info({ jobId, dbJobId, mailRegisterId: params.mailRegisterId, to: params.to }, "[EmailDispatch] Mail register email enqueued");
       return jobId;
     } catch (err: any) {
       await db.update(mailRegister)
@@ -137,6 +255,8 @@ class EmailDispatchService {
     };
 
     try {
+      const dbJobId = await this.persistJob(payload, 1);
+      payload.dbJobId = dbJobId;
       const jobId = emailQueue.enqueue("send-email", payload, 1);
       return jobId;
     } catch (err: any) {
@@ -181,12 +301,19 @@ class EmailDispatchService {
       userId: params.userId,
     };
 
+    const dbJobId = await this.persistJob(payload, 3);
+    payload.dbJobId = dbJobId;
     const jobId = emailQueue.enqueue("send-email", payload, 3);
     return { jobId };
   }
 
   private async processEmailJob(payload: EmailJobPayload): Promise<void> {
     const startTime = Date.now();
+    const dbJobId = payload.dbJobId;
+
+    if (dbJobId) {
+      await this.markJobProcessing(dbJobId);
+    }
 
     const attachments = payload.attachments?.map((a) => ({
       filename: a.filename,
@@ -210,6 +337,10 @@ class EmailDispatchService {
 
     if (result.success) {
       this.incrementCompanyCount(payload.companyId);
+
+      if (dbJobId) {
+        await this.markJobCompleted(dbJobId);
+      }
 
       if (payload.type === "mail_register") {
         await db.update(mailRegister)
@@ -251,6 +382,17 @@ class EmailDispatchService {
           error: errorMsg,
         }, "[EmailDispatch] Email send failed — will retry via queue");
 
+        if (dbJobId) {
+          await db.update(emailQueueJobs)
+            .set({
+              status: "FAILED",
+              error: errorMsg,
+              attempts: sql`${emailQueueJobs.attempts} + 1`,
+              nextRetryAt: new Date(Date.now() + 5000 * Math.pow(2, payload.attempt)),
+            })
+            .where(eq(emailQueueJobs.id, dbJobId));
+        }
+
         if (payload.type === "mail_register") {
           await db.update(mailRegister)
             .set({
@@ -263,6 +405,10 @@ class EmailDispatchService {
         }
 
         throw new Error(errorMsg);
+      }
+
+      if (dbJobId) {
+        await this.markJobDead(dbJobId, payload, errorMsg, payload.attempt);
       }
 
       if (payload.type === "mail_register") {
@@ -295,6 +441,42 @@ class EmailDispatchService {
   }
 
   async retryFailedEmails(): Promise<{ retried: number; errors: number }> {
+    const failedDbJobs = await db.select()
+      .from(emailQueueJobs)
+      .where(
+        and(
+          eq(emailQueueJobs.status, "FAILED"),
+          sql`${emailQueueJobs.attempts} < ${emailQueueJobs.maxAttempts}`,
+          or(
+            sql`${emailQueueJobs.nextRetryAt} IS NULL`,
+            sql`${emailQueueJobs.nextRetryAt} <= NOW()`
+          )
+        )
+      )
+      .orderBy(sql`${emailQueueJobs.priority} DESC`)
+      .limit(50);
+
+    let retried = 0;
+    let errors = 0;
+
+    for (const job of failedDbJobs) {
+      try {
+        await db.update(emailQueueJobs)
+          .set({ status: "PENDING" })
+          .where(eq(emailQueueJobs.id, job.id));
+
+        const payload = job.payload as EmailJobPayload;
+        payload.dbJobId = job.id;
+        payload.attempt = job.attempts + 1;
+        payload.maxAttempts = job.maxAttempts;
+        emailQueue.enqueue("send-email", payload, job.priority);
+        retried++;
+      } catch (err) {
+        errors++;
+        logger.error({ err, jobId: job.id }, "[EmailDispatch] Failed to re-enqueue DB job");
+      }
+    }
+
     const failedEntries = await db
       .select({
         id: mailRegister.id,
@@ -324,9 +506,6 @@ class EmailDispatchService {
       )
       .limit(50);
 
-    let retried = 0;
-    let errors = 0;
-
     for (const entry of failedEntries) {
       try {
         await db.update(mailRegister)
@@ -345,6 +524,8 @@ class EmailDispatchService {
           maxAttempts: entry.maxRetries || 3,
         };
 
+        const dbJobId = await this.persistJob(payload, 2);
+        payload.dbJobId = dbJobId;
         emailQueue.enqueue("send-email", payload, 2);
         retried++;
       } catch (err) {
@@ -358,6 +539,53 @@ class EmailDispatchService {
     }
 
     return { retried, errors };
+  }
+
+  async getDeadLetters(companyId?: string): Promise<any[]> {
+    const query = db.select().from(emailDeadLetters);
+    if (companyId) {
+      return query.where(
+        and(
+          eq(emailDeadLetters.companyId, companyId),
+          sql`${emailDeadLetters.resolvedAt} IS NULL`
+        )
+      ).orderBy(sql`${emailDeadLetters.failedAt} DESC`).limit(100);
+    }
+    return query.where(sql`${emailDeadLetters.resolvedAt} IS NULL`)
+      .orderBy(sql`${emailDeadLetters.failedAt} DESC`).limit(100);
+  }
+
+  async resolveDeadLetter(deadLetterId: string, resolvedBy: string): Promise<void> {
+    await db.update(emailDeadLetters)
+      .set({ resolvedAt: new Date(), resolvedBy })
+      .where(eq(emailDeadLetters.id, deadLetterId));
+  }
+
+  async retryDeadLetter(deadLetterId: string): Promise<string | null> {
+    const [dl] = await db.select().from(emailDeadLetters)
+      .where(
+        and(
+          eq(emailDeadLetters.id, deadLetterId),
+          sql`${emailDeadLetters.resolvedAt} IS NULL`
+        )
+      ).limit(1);
+
+    if (!dl) return null;
+
+    const payload = dl.payload as EmailJobPayload;
+    payload.attempt = 1;
+    payload.maxAttempts = 3;
+
+    const dbJobId = await this.persistJob(payload, 5);
+    payload.dbJobId = dbJobId;
+    emailQueue.enqueue("send-email", payload, 5);
+
+    await db.update(emailDeadLetters)
+      .set({ resolvedAt: new Date() })
+      .where(eq(emailDeadLetters.id, deadLetterId));
+
+    logger.info({ deadLetterId, newJobId: dbJobId }, "[EmailDispatch] Dead letter retried");
+    return dbJobId;
   }
 
   private async checkCompanyQuota(companyId: string): Promise<{ allowed: boolean; count: number }> {
