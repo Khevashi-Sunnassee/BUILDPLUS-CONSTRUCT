@@ -370,6 +370,221 @@
   }
 }
 
+.print-filter-summary {
+  display: none !important;
+}
+
+.printing-financial-report #financial-analysis-report .print-header {
+  display: block !important;
+}
+
+@media print {
+  .printing-financial-report {
+    background: white !important;
+    color: black !important;
+  }
+
+
+  .printing-financial-report [data-sidebar],
+  .printing-financial-report header,
+  .printing-financial-report nav,
+  .printing-financial-report .no-print {
+    display: none !important;
+  }
+
+  .printing-financial-report .print-header {
+    display: block !important;
+  }
+
+  .printing-financial-report #financial-analysis-report {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .printing-financial-report main,
+  .printing-financial-report [role="main"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .printing-financial-report .recharts-wrapper {
+    display: block !important;
+  }
+
+  .printing-financial-report .recharts-surface {
+    overflow: visible !important;
+  }
+
+  .printing-financial-report svg {
+    shape-rendering: geometricPrecision !important;
+    text-rendering: geometricPrecision !important;
+  }
+
+  .printing-financial-report .recharts-cartesian-grid line,
+  .printing-financial-report .recharts-cartesian-grid-horizontal line,
+  .printing-financial-report .recharts-cartesian-grid-vertical line {
+    stroke: #e0e0e0 !important;
+  }
+
+  .printing-financial-report .recharts-text,
+  .printing-financial-report .recharts-label {
+    fill: #333 !important;
+  }
+
+  .printing-financial-report .recharts-legend-item-text {
+    color: #333 !important;
+  }
+
+  .printing-financial-report .recharts-tooltip-wrapper {
+    display: none !important;
+  }
+
+  .printing-financial-report [class*="Card"],
+  .printing-financial-report [data-testid*="card-"],
+  .printing-financial-report [data-testid*="chart-"] {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    border: 1px solid #d4d4d8 !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+
+  .printing-financial-report [data-testid*="card-kpi-"],
+  .printing-financial-report [data-testid="card-total-income"],
+  .printing-financial-report [data-testid="card-total-expenses"],
+  .printing-financial-report [data-testid="card-gross-profit"],
+  .printing-financial-report [data-testid="card-net-profit"],
+  .printing-financial-report [data-testid="card-adjusted-net"],
+  .printing-financial-report [data-testid="card-mom-change"] {
+    border: 1px solid #d4d4d8 !important;
+    background: white !important;
+  }
+
+  .printing-financial-report [class*="border-amber"] {
+    border-color: #f59e0b !important;
+    background: #fffbeb !important;
+  }
+
+  .printing-financial-report [class*="border-blue"] {
+    border-color: #3b82f6 !important;
+    background: #eff6ff !important;
+  }
+
+  .printing-financial-report [class*="border-teal"] {
+    border-color: #14b8a6 !important;
+    background: #f0fdfa !important;
+  }
+
+  .printing-financial-report [class*="border-purple"] {
+    border-color: #a855f7 !important;
+    background: #faf5ff !important;
+  }
+
+  .printing-financial-report p,
+  .printing-financial-report span,
+  .printing-financial-report h1,
+  .printing-financial-report h2,
+  .printing-financial-report h3,
+  .printing-financial-report td,
+  .printing-financial-report th {
+    color: #111 !important;
+  }
+
+  .printing-financial-report .text-muted-foreground {
+    color: #666 !important;
+  }
+
+  .printing-financial-report .text-green-600,
+  .printing-financial-report .dark\:text-green-400 {
+    color: #16a34a !important;
+  }
+
+  .printing-financial-report .text-red-600,
+  .printing-financial-report .dark\:text-red-400 {
+    color: #dc2626 !important;
+  }
+
+  .printing-financial-report .text-amber-600,
+  .printing-financial-report .dark\:text-amber-400 {
+    color: #d97706 !important;
+  }
+
+  .printing-financial-report .text-blue-600,
+  .printing-financial-report .dark\:text-blue-400 {
+    color: #2563eb !important;
+  }
+
+  .printing-financial-report .text-teal-600,
+  .printing-financial-report .dark\:text-teal-400 {
+    color: #0d9488 !important;
+  }
+
+  .printing-financial-report .text-purple-600,
+  .printing-financial-report .dark\:text-purple-400 {
+    color: #9333ea !important;
+  }
+
+  .printing-financial-report table {
+    border-collapse: collapse !important;
+  }
+
+  .printing-financial-report th {
+    background: #f4f4f5 !important;
+    font-weight: 600 !important;
+    border-bottom: 2px solid #d4d4d8 !important;
+  }
+
+  .printing-financial-report td {
+    border-bottom: 1px solid #e4e4e7 !important;
+  }
+
+  .printing-financial-report .max-h-64,
+  .printing-financial-report .max-h-52,
+  .printing-financial-report .max-h-36 {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .printing-financial-report .bg-muted\/30 {
+    background: #f9f9fa !important;
+  }
+
+  .printing-financial-report .bg-green-500,
+  .printing-financial-report .bg-red-500,
+  .printing-financial-report .bg-blue-500,
+  .printing-financial-report .bg-amber-500,
+  .printing-financial-report .bg-teal-500,
+  .printing-financial-report .bg-purple-500 {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .printing-financial-report .overflow-auto,
+  .printing-financial-report .overflow-hidden {
+    overflow: visible !important;
+  }
+
+  .printing-financial-report .print-filter-summary {
+    display: block !important;
+    padding: 6px 0;
+    border-bottom: 1px solid #e4e4e7;
+    margin-bottom: 8px;
+  }
+
+  .printing-financial-report .recharts-responsive-container {
+    width: 100% !important;
+    min-height: 200px !important;
+  }
+
+  .printing-financial-report .grid {
+    display: grid !important;
+  }
+}
+
 .ql-toolbar.ql-snow {
   border-color: hsl(var(--border)) !important;
   border-radius: 0.375rem 0.375rem 0 0;

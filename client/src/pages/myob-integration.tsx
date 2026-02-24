@@ -899,7 +899,7 @@ export function ProfitAndLossTab() {
               <BarChart3 className="h-5 w-5" />
               Financial Dashboard
             </CardTitle>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap no-print">
               <div className="flex gap-1 border rounded-md p-0.5">
                 <Button
                   variant={dashboardView === "dashboard" ? "default" : "ghost"}
@@ -934,7 +934,15 @@ export function ProfitAndLossTab() {
           </div>
         </CardHeader>
         <CardContent className="space-y-3 pt-0">
-          <div className="flex flex-wrap items-end gap-3">
+          <div className="print-filter-summary text-xs text-gray-600">
+            <span className="font-medium">Period:</span> {selectedFY ? selectedFY.label : `Last ${monthCount} months`}
+            {" · "}
+            <span className="font-medium">Basis:</span> {reportingBasis}
+            {yearEndAdjust ? " · Year-end adjustments included" : ""}
+            {" · "}
+            <span className="font-medium">View:</span> {dashboardView === "dashboard" ? "Dashboard" : "Detailed P&L"}
+          </div>
+          <div className="flex flex-wrap items-end gap-3 no-print">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Period</Label>
               <Select value={monthCount} onValueChange={setMonthCount}>
