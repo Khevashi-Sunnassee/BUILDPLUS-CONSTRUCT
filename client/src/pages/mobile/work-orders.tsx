@@ -20,10 +20,10 @@ import {
 interface WorkOrder {
   id: string;
   companyId: string;
-  checklistInstanceId: string;
-  fieldId: string;
-  fieldName: string;
-  sectionName: string;
+  checklistInstanceId: string | null;
+  fieldId: string | null;
+  fieldName: string | null;
+  sectionName: string | null;
   triggerValue: string | null;
   result: string | null;
   details: string | null;
@@ -45,6 +45,21 @@ interface WorkOrder {
   instanceStatus: string | null;
   assignedUserName: string | null;
   assignedUserEmail: string | null;
+  workOrderNumber: string | null;
+  title: string | null;
+  issueDescription: string | null;
+  assetId: string | null;
+  assetName: string | null;
+  assetTag: string | null;
+  assetLocation: string | null;
+  assetConditionBefore: string | null;
+  assetConditionAfter: string | null;
+  estimatedCost: string | null;
+  actualCost: string | null;
+  vendorNotes: string | null;
+  requestedById: string | null;
+  requestedDate: string | null;
+  desiredServiceDate: string | null;
 }
 
 interface WorkOrderStats {
@@ -100,6 +115,7 @@ const TYPE_CONFIG: Record<string, { label: string; color: string; icon: typeof W
   inspection: { label: "Inspection", color: "text-teal-400", icon: ClipboardList },
   warranty: { label: "Warranty", color: "text-indigo-400", icon: FileText },
   general: { label: "General", color: "text-gray-400", icon: Tag },
+  service_request: { label: "Service Request", color: "text-cyan-400", icon: Wrench },
 };
 
 type TabId = "all_open" | "mine";
@@ -120,6 +136,19 @@ function PriorityBadge({ priority }: { priority: string }) {
       {config.label}
     </span>
   );
+}
+
+function getOrderDisplayTitle(order: WorkOrder): string {
+  return order.title || order.workOrderNumber || order.fieldName || "Work Order";
+}
+
+function getOrderSubtitle(order: WorkOrder): string {
+  const parts: string[] = [];
+  if (order.workOrderNumber && order.title) parts.push(order.workOrderNumber);
+  if (order.sectionName) parts.push(order.sectionName);
+  if (order.templateName) parts.push(order.templateName);
+  if (order.assetName) parts.push(order.assetName);
+  return parts.join(" \u00B7 ");
 }
 
 function OrderCard({ order, onClick }: { order: WorkOrder; onClick: () => void }) {
@@ -143,11 +172,17 @@ function OrderCard({ order, onClick }: { order: WorkOrder; onClick: () => void }
             <PriorityBadge priority={order.priority} />
           </div>
           <p className="text-sm font-semibold text-white truncate" data-testid={`text-field-${order.id}`}>
-            {order.fieldName}
+            {getOrderDisplayTitle(order)}
           </p>
           <p className="text-xs text-white/50 mt-0.5 truncate">
-            {order.sectionName} {order.templateName ? `\u00B7 ${order.templateName}` : ""}
+            {getOrderSubtitle(order)}
           </p>
+          {order.estimatedCost && (
+            <p className="text-[11px] text-white/40 mt-1">
+              Est. ${parseFloat(order.estimatedCost).toLocaleString()}
+              {order.actualCost ? ` \u00B7 Actual $${parseFloat(order.actualCost).toLocaleString()}` : ""}
+            </p>
+          )}
           <div className="flex items-center gap-3 mt-2 text-[11px] text-white/40 flex-wrap">
             {order.assignedUserName && (
               <span className="flex items-center gap-1">
@@ -192,7 +227,7 @@ function OrderDetail({
 
   const [emailOpen, setEmailOpen] = useState(false);
   const [emailTo, setEmailTo] = useState(order.supplierName || "");
-  const [emailSubject, setEmailSubject] = useState(`Work Order: ${order.fieldName}`);
+  const [emailSubject, setEmailSubject] = useState(`Work Order: ${getOrderDisplayTitle(order)}`);
   const [emailBody, setEmailBody] = useState("");
 
   const updateMutation = useMutation({
@@ -311,13 +346,18 @@ function OrderDetail({
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h2 className="text-base font-semibold text-white truncate">{order.fieldName}</h2>
-          <p className="text-xs text-white/50 truncate">{order.sectionName}</p>
+          <h2 className="text-base font-semibold text-white truncate">{getOrderDisplayTitle(order)}</h2>
+          <p className="text-xs text-white/50 truncate">{getOrderSubtitle(order)}</p>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-40">
         <div className="flex items-center gap-2 flex-wrap">
+          {order.workOrderNumber && (
+            <span className="text-xs font-mono text-white/60 bg-white/10 px-2 py-0.5 rounded" data-testid="text-wo-number">
+              {order.workOrderNumber}
+            </span>
+          )}
           <span className={`flex items-center gap-1 text-xs font-semibold ${typeConfig.color}`}>
             <TypeIcon className="h-3.5 w-3.5" />
             {typeConfig.label}
@@ -325,6 +365,57 @@ function OrderDetail({
           <StatusBadge status={order.status} />
           <PriorityBadge priority={order.priority} />
         </div>
+
+        {order.issueDescription && (
+          <div>
+            <label className="text-[10px] font-medium text-white/40 uppercase tracking-wide">Issue Description</label>
+            <p className="text-sm text-white/70 mt-0.5" data-testid="text-issue-description">{order.issueDescription}</p>
+          </div>
+        )}
+
+        {order.assetId && (
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3 space-y-1.5" data-testid="section-asset-info">
+            <label className="text-[10px] font-medium text-white/40 uppercase tracking-wide">Asset</label>
+            <p className="text-sm font-medium text-white" data-testid="text-asset-name">
+              {order.assetName || "\u2014"}{order.assetTag ? ` (${order.assetTag})` : ""}
+            </p>
+            {order.assetLocation && (
+              <p className="text-xs text-white/50">Location: {order.assetLocation}</p>
+            )}
+            {order.assetConditionBefore && (
+              <p className="text-xs text-white/50">Condition (before): {order.assetConditionBefore}</p>
+            )}
+            {order.assetConditionAfter && (
+              <p className="text-xs text-white/50">Condition (after): {order.assetConditionAfter}</p>
+            )}
+          </div>
+        )}
+
+        {(order.estimatedCost || order.actualCost) && (
+          <div className="grid grid-cols-2 gap-3" data-testid="section-cost-info">
+            {order.estimatedCost && (
+              <div>
+                <label className="text-[10px] font-medium text-white/40 uppercase tracking-wide">Estimated Cost</label>
+                <p className="text-sm font-medium text-white" data-testid="text-est-cost">${parseFloat(order.estimatedCost).toLocaleString()}</p>
+              </div>
+            )}
+            {order.actualCost && (
+              <div>
+                <label className="text-[10px] font-medium text-white/40 uppercase tracking-wide">Actual Cost</label>
+                <p className="text-sm font-medium text-white" data-testid="text-act-cost">${parseFloat(order.actualCost).toLocaleString()}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {order.desiredServiceDate && (
+          <div>
+            <label className="text-[10px] font-medium text-white/40 uppercase tracking-wide">Desired Service Date</label>
+            <p className="text-sm text-white/70 flex items-center gap-1 mt-0.5">
+              <Calendar className="h-3.5 w-3.5" /> {formatDate(order.desiredServiceDate)}
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -342,6 +433,13 @@ function OrderDetail({
             </div>
           )}
         </div>
+
+        {order.vendorNotes && (
+          <div>
+            <label className="text-[10px] font-medium text-white/40 uppercase tracking-wide">Vendor Notes</label>
+            <p className="text-sm text-white/70 mt-0.5" data-testid="text-vendor-notes">{order.vendorNotes}</p>
+          </div>
+        )}
 
         <Separator className="bg-white/10" />
 
@@ -488,11 +586,14 @@ export default function MobileWorkOrders() {
     if (!searchQuery.trim()) return workOrders;
     const q = searchQuery.toLowerCase();
     return workOrders.filter(o =>
-      o.fieldName.toLowerCase().includes(q) ||
-      o.sectionName.toLowerCase().includes(q) ||
+      (o.fieldName || "").toLowerCase().includes(q) ||
+      (o.sectionName || "").toLowerCase().includes(q) ||
       (o.templateName || "").toLowerCase().includes(q) ||
       (o.assignedUserName || "").toLowerCase().includes(q) ||
-      (o.supplierName || "").toLowerCase().includes(q)
+      (o.supplierName || "").toLowerCase().includes(q) ||
+      (o.title || "").toLowerCase().includes(q) ||
+      (o.workOrderNumber || "").toLowerCase().includes(q) ||
+      (o.assetName || "").toLowerCase().includes(q)
     );
   }, [workOrders, searchQuery]);
 

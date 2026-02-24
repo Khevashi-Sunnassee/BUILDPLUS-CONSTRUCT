@@ -1045,18 +1045,6 @@ router.delete("/api/myob/supplier-mappings/:id", requireAuth, async (req: Reques
   }
 });
 
-router.get("/api/myob/customers", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const myob = createMyobClient(companyId);
-    const data = await myob.getCustomers();
-    res.json(data);
-  } catch (err) {
-    handleMyobError(err, res, "customers");
-  }
-});
-
 router.get("/api/myob/customer-mappings", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
@@ -1578,71 +1566,86 @@ router.post("/api/myob/bulk-import-and-relink-suppliers", requireAuth, async (re
 
     logger.info({ created, linked, skipped }, "[MYOB Bulk Import] Supplier import complete");
 
-    const recordMap = await db.execute(sql`SELECT record_id, old_supplier_name, table_name FROM _temp_record_supplier_map ORDER BY old_supplier_name`);
     const relinkResults: Array<{ supplierName: string; recordId: string; table: string; matched: boolean; newSupplierId?: string }> = [];
     let apUpdated = 0, assetUpdated = 0, hireUpdated = 0, capexUpdated = 0;
 
     const supplierNameCache = new Map<string, string>();
 
-    for (const row of recordMap.rows as any[]) {
-      const { record_id, old_supplier_name, table_name } = row;
-      if (!old_supplier_name) continue;
+    const tempTableExists = await db.execute(sql`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '_temp_record_supplier_map') AS exists`);
+    const hasTempRecordMap = (tempTableExists.rows[0] as any)?.exists === true;
 
-      const normalizedName = old_supplier_name.trim().toUpperCase();
-      let newSupplierId = supplierNameCache.get(normalizedName);
+    if (hasTempRecordMap) {
+      const recordMap = await db.execute(sql`SELECT record_id, old_supplier_name, table_name FROM _temp_record_supplier_map ORDER BY old_supplier_name`);
 
-      if (!newSupplierId) {
-        newSupplierId = nameToSupplierMap.get(normalizedName);
-      }
+      for (const row of recordMap.rows as any[]) {
+        const { record_id, old_supplier_name, table_name } = row;
+        if (!old_supplier_name) continue;
 
-      if (!newSupplierId) {
-        const matchedSupplier = await db.select().from(suppliers)
-          .where(and(eq(suppliers.companyId, companyId), sql`UPPER(TRIM(${suppliers.name})) = ${normalizedName}`))
-          .limit(1);
-        if (matchedSupplier.length > 0) {
-          newSupplierId = matchedSupplier[0].id;
+        const normalizedName = old_supplier_name.trim().toUpperCase();
+        let newSupplierId = supplierNameCache.get(normalizedName);
+
+        if (!newSupplierId) {
+          newSupplierId = nameToSupplierMap.get(normalizedName);
         }
+
+        if (!newSupplierId) {
+          const matchedSupplier = await db.select().from(suppliers)
+            .where(and(eq(suppliers.companyId, companyId), sql`UPPER(TRIM(${suppliers.name})) = ${normalizedName}`))
+            .limit(1);
+          if (matchedSupplier.length > 0) {
+            newSupplierId = matchedSupplier[0].id;
+          }
+        }
+
+        if (!newSupplierId) {
+          const [newSupplier] = await db.insert(suppliers).values({ companyId, name: old_supplier_name.trim() }).returning();
+          newSupplierId = newSupplier.id;
+          logger.info({ supplierName: old_supplier_name }, "[MYOB Bulk Import] Created non-MYOB supplier for re-linking");
+        }
+
+        supplierNameCache.set(normalizedName, newSupplierId);
+
+        if (table_name === "ap_invoices") {
+          await db.execute(sql`UPDATE ap_invoices SET supplier_id = ${newSupplierId} WHERE id = ${record_id}`);
+          apUpdated++;
+        } else if (table_name === "assets") {
+          await db.execute(sql`UPDATE assets SET supplier_id = ${newSupplierId} WHERE id = ${record_id}`);
+          assetUpdated++;
+        } else if (table_name === "hire_bookings") {
+          await db.execute(sql`UPDATE hire_bookings SET supplier_id = ${newSupplierId} WHERE id = ${record_id}`);
+          hireUpdated++;
+        } else if (table_name === "capex_requests") {
+          await db.execute(sql`UPDATE capex_requests SET preferred_supplier_id = ${newSupplierId} WHERE id = ${record_id}`);
+          capexUpdated++;
+        }
+
+        relinkResults.push({ supplierName: old_supplier_name, recordId: record_id, table: table_name, matched: true, newSupplierId });
       }
-
-      if (!newSupplierId) {
-        const [newSupplier] = await db.insert(suppliers).values({ companyId, name: old_supplier_name.trim() }).returning();
-        newSupplierId = newSupplier.id;
-        logger.info({ supplierName: old_supplier_name }, "[MYOB Bulk Import] Created non-MYOB supplier for re-linking");
-      }
-
-      supplierNameCache.set(normalizedName, newSupplierId);
-
-      if (table_name === "ap_invoices") {
-        await db.execute(sql`UPDATE ap_invoices SET supplier_id = ${newSupplierId} WHERE id = ${record_id}`);
-        apUpdated++;
-      } else if (table_name === "assets") {
-        await db.execute(sql`UPDATE assets SET supplier_id = ${newSupplierId} WHERE id = ${record_id}`);
-        assetUpdated++;
-      } else if (table_name === "hire_bookings") {
-        await db.execute(sql`UPDATE hire_bookings SET supplier_id = ${newSupplierId} WHERE id = ${record_id}`);
-        hireUpdated++;
-      } else if (table_name === "capex_requests") {
-        await db.execute(sql`UPDATE capex_requests SET preferred_supplier_id = ${newSupplierId} WHERE id = ${record_id}`);
-        capexUpdated++;
-      }
-
-      relinkResults.push({ supplierName: old_supplier_name, recordId: record_id, table: table_name, matched: true, newSupplierId });
+    } else {
+      logger.info("[MYOB Bulk Import] _temp_record_supplier_map table not found, skipping re-link phase");
     }
 
-    const assetSupplierNames = await db.execute(sql`SELECT DISTINCT old_supplier_id, supplier_name FROM _temp_supplier_names WHERE supplier_name IS NOT NULL AND supplier_name != '' AND table_name = 'assets' ORDER BY supplier_name`);
-    for (const row of assetSupplierNames.rows as any[]) {
-      const { supplier_name } = row;
-      if (!supplier_name) continue;
-      const normalizedName = supplier_name.trim().toUpperCase();
-      if (!supplierNameCache.has(normalizedName) && !nameToSupplierMap.has(normalizedName)) {
-        const matchedSupplier = await db.select().from(suppliers)
-          .where(and(eq(suppliers.companyId, companyId), sql`UPPER(TRIM(${suppliers.name})) = ${normalizedName}`))
-          .limit(1);
-        if (matchedSupplier.length === 0) {
-          const [newSupplier] = await db.insert(suppliers).values({ companyId, name: supplier_name.trim() }).returning();
-          supplierNameCache.set(normalizedName, newSupplier.id);
+    const tempNamesExists = await db.execute(sql`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '_temp_supplier_names') AS exists`);
+    const hasTempNames = (tempNamesExists.rows[0] as any)?.exists === true;
+
+    if (hasTempNames) {
+      const assetSupplierNames = await db.execute(sql`SELECT DISTINCT old_supplier_id, supplier_name FROM _temp_supplier_names WHERE supplier_name IS NOT NULL AND supplier_name != '' AND table_name = 'assets' ORDER BY supplier_name`);
+      for (const row of assetSupplierNames.rows as any[]) {
+        const { supplier_name } = row;
+        if (!supplier_name) continue;
+        const normalizedName = supplier_name.trim().toUpperCase();
+        if (!supplierNameCache.has(normalizedName) && !nameToSupplierMap.has(normalizedName)) {
+          const matchedSupplier = await db.select().from(suppliers)
+            .where(and(eq(suppliers.companyId, companyId), sql`UPPER(TRIM(${suppliers.name})) = ${normalizedName}`))
+            .limit(1);
+          if (matchedSupplier.length === 0) {
+            const [newSupplier] = await db.insert(suppliers).values({ companyId, name: supplier_name.trim() }).returning();
+            supplierNameCache.set(normalizedName, newSupplier.id);
+          }
         }
       }
+    } else {
+      logger.info("[MYOB Bulk Import] _temp_supplier_names table not found, skipping asset supplier name phase");
     }
 
     res.json({
