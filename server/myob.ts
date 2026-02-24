@@ -167,7 +167,16 @@ export async function myobFetch<T = unknown>(
     throw new Error(`MYOB API error ${res.status}: ${text}`);
   }
 
-  return (text ? JSON.parse(text) : {}) as T;
+  const location = res.headers.get("location");
+  if (method === "POST" && location) {
+    logger.info({ status: res.status, location }, "[MYOB API] Created resource");
+  }
+
+  const parsed = (text ? JSON.parse(text) : {}) as any;
+  if (method === "POST" && location && typeof parsed === "object" && !parsed.UID) {
+    parsed._location = location;
+  }
+  return parsed as T;
 }
 
 export function createMyobClient(companyId: string) {
@@ -184,6 +193,7 @@ export function createMyobClient(companyId: string) {
       method: "POST",
       body: JSON.stringify(bill),
     }),
+    getPurchaseBills: (query?: string) => myobFetch(companyId, `Purchase/Bill/Service/${query ? `?${query}` : ""}`),
     getProfitAndLoss: (params: string) => myobFetch(companyId, `Report/ProfitAndLossSummary?${params}`),
   };
 }
