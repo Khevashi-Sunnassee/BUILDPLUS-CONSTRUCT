@@ -176,14 +176,14 @@ function enforceStringLengths(obj: unknown, path: string = ""): string | null {
 }
 
 const EXEMPT_BODY_LIMIT_PATHS = [
-  "/api/checklist/templates",
-  "/api/checklist/instances",
-  "/api/knowledge-base",
-  "/api/email-templates",
-  "/api/broadcast",
-  "/api/documents",
-  "/api/scopes",
-  "/api/budgets",
+  "/checklist/templates",
+  "/checklist/instances",
+  "/knowledge-base",
+  "/email-templates",
+  "/broadcast",
+  "/documents",
+  "/scopes",
+  "/budgets",
 ];
 
 export function enforceBodyLimits(req: Request, res: Response, next: NextFunction) {
@@ -192,7 +192,8 @@ export function enforceBodyLimits(req: Request, res: Response, next: NextFunctio
     if (contentType && req.is("multipart/form-data")) {
       return next();
     }
-    if (EXEMPT_BODY_LIMIT_PATHS.some(p => req.path.startsWith(p))) {
+    const checkPath = req.originalUrl || req.path;
+    if (EXEMPT_BODY_LIMIT_PATHS.some(p => checkPath.includes(p))) {
       return next();
     }
     const error = enforceStringLengths(req.body);
