@@ -391,7 +391,41 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
       }
 
       try {
-        const result = await myob.createPurchaseBill(bill);
+        const result: any = await myob.createPurchaseBill(bill);
+
+        let attachmentResult: any = null;
+        const billLocation = result?._location;
+        const billUid = billLocation ? billLocation.split("/").pop() : null;
+
+        if (billUid) {
+          try {
+            const docs = await db.select().from(apInvoiceDocuments)
+              .where(eq(apInvoiceDocuments.invoiceId, id))
+              .orderBy(desc(apInvoiceDocuments.createdAt))
+              .limit(5);
+
+            for (const doc of docs) {
+              try {
+                const objectFile = await objectStorageService.getObjectEntityFile(doc.storageKey);
+                const [buffer] = await objectFile.download();
+                const fileSizeMB = buffer.length / (1024 * 1024);
+
+                if (fileSizeMB > 3) {
+                  logger.warn({ fileName: doc.fileName, sizeMB: fileSizeMB.toFixed(2) }, "[MYOB Export] Skipping attachment - file exceeds 3MB MYOB limit");
+                  continue;
+                }
+
+                const fileBase64 = buffer.toString("base64");
+                attachmentResult = await myob.attachFileToBill(billUid, doc.fileName, fileBase64);
+                logger.info({ fileName: doc.fileName, billUid }, "[MYOB Export] Attached invoice document to MYOB bill");
+              } catch (attachErr: any) {
+                logger.warn({ err: attachErr?.message, fileName: doc.fileName, billUid }, "[MYOB Export] Failed to attach document to MYOB bill (non-fatal)");
+              }
+            }
+          } catch (docErr: any) {
+            logger.warn({ err: docErr?.message }, "[MYOB Export] Failed to fetch documents for attachment (non-fatal)");
+          }
+        }
 
         await db.update(apInvoices)
           .set({ status: "EXPORTED", updatedAt: new Date() })
@@ -408,9 +442,9 @@ export function registerDocumentsRoutes(router: Router, deps: SharedDeps): void 
           myobResponse: result || null,
         });
 
-        await logActivity(id, "exported", "Invoice exported to MYOB", userId, { myobResult: result });
+        await logActivity(id, "exported", "Invoice exported to MYOB" + (attachmentResult ? " with attachment" : ""), userId, { myobResult: result });
 
-        sendSuccess(res, { success: true, myobResult: result });
+        sendSuccess(res, { success: true, myobResult: result, attachmentResult });
       } catch (myobError: any) {
         await db.update(apInvoices)
           .set({ status: "FAILED_EXPORT", updatedAt: new Date() })

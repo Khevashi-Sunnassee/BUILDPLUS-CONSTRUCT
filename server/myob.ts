@@ -195,6 +195,12 @@ export function createMyobClient(companyId: string) {
     }),
     getPurchaseBills: (query?: string) => myobFetch(companyId, `Purchase/Bill/Service/${query ? `?${query}` : ""}`),
     getProfitAndLoss: (params: string) => myobFetch(companyId, `Report/ProfitAndLossSummary?${params}`),
+    attachFileToBill: (billUid: string, fileName: string, fileBase64: string) => myobFetch(companyId, `Purchase/Bill/Service/${billUid}/Attachment`, {
+      method: "POST",
+      body: JSON.stringify({
+        Attachments: [{ OriginalFileName: fileName, FileBase64Content: fileBase64 }],
+      }),
+    }),
   };
 }
 
