@@ -175,10 +175,24 @@ function enforceStringLengths(obj: unknown, path: string = ""): string | null {
   return null;
 }
 
+const EXEMPT_BODY_LIMIT_PATHS = [
+  "/api/checklist/templates",
+  "/api/checklist/instances",
+  "/api/knowledge-base",
+  "/api/email-templates",
+  "/api/broadcast",
+  "/api/documents",
+  "/api/scopes",
+  "/api/budgets",
+];
+
 export function enforceBodyLimits(req: Request, res: Response, next: NextFunction) {
   if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
     const contentType = req.headers["content-type"];
     if (contentType && req.is("multipart/form-data")) {
+      return next();
+    }
+    if (EXEMPT_BODY_LIMIT_PATHS.some(p => req.path.startsWith(p))) {
       return next();
     }
     const error = enforceStringLengths(req.body);
