@@ -69,8 +69,17 @@ router.get("/api/myob/callback", async (req: Request, res: Response) => {
     );
   };
 
+  logger.info({ 
+    hasCode: !!code, 
+    hasBusinessId: !!businessId, 
+    hasState: !!stateNonce,
+    queryKeys: Object.keys(req.query),
+    fullUrl: req.originalUrl
+  }, "MYOB OAuth callback received");
+
   if (!code || !businessId || !stateNonce) {
-    return sendHtml("OAuth Error", "Missing code, businessId, or state in callback.", true);
+    logger.warn({ code: !!code, businessId: !!businessId, state: !!stateNonce, query: req.query }, "MYOB callback missing parameters");
+    return sendHtml("OAuth Error", `Missing parameters: ${!code ? 'code ' : ''}${!businessId ? 'businessId ' : ''}${!stateNonce ? 'state' : ''}`, true);
   }
 
   const stateData = pendingOAuthStates.get(stateNonce);
