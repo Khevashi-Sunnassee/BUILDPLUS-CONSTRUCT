@@ -773,11 +773,35 @@ router.post("/api/myob/import-customers", requireAuth, async (req: Request, res:
         }
         linked++;
       } else if (action === "create") {
-        const [newCustomer] = await db.insert(customers).values({ companyId, name: myobName }).returning();
-        await db.insert(myobCustomerMappings).values({
-          companyId, customerId: newCustomer.id, myobCustomerUid: myobUid, myobCustomerName: myobName, myobCustomerDisplayId: myobDisplayId || null,
-        });
-        created++;
+        try {
+          const existingCustomer = await db.select().from(customers)
+            .where(and(eq(customers.name, myobName), eq(customers.companyId, companyId)))
+            .limit(1);
+          let customerId: string;
+          if (existingCustomer.length > 0) {
+            customerId = existingCustomer[0].id;
+            linked++;
+          } else {
+            const [newCustomer] = await db.insert(customers).values({ companyId, name: myobName }).returning();
+            customerId = newCustomer.id;
+            created++;
+          }
+          const existingMapping = await db.select().from(myobCustomerMappings)
+            .where(and(eq(myobCustomerMappings.companyId, companyId), eq(myobCustomerMappings.customerId, customerId)))
+            .limit(1);
+          if (existingMapping.length > 0) {
+            await db.update(myobCustomerMappings)
+              .set({ myobCustomerUid: myobUid, myobCustomerName: myobName, myobCustomerDisplayId: myobDisplayId || null, updatedAt: new Date() })
+              .where(eq(myobCustomerMappings.id, existingMapping[0].id));
+          } else {
+            await db.insert(myobCustomerMappings).values({
+              companyId, customerId, myobCustomerUid: myobUid, myobCustomerName: myobName, myobCustomerDisplayId: myobDisplayId || null,
+            });
+          }
+        } catch (itemErr) {
+          logger.warn({ err: itemErr, myobName, myobUid }, "[MYOB Import] Failed to import customer, skipping");
+          skipped++;
+        }
       } else {
         skipped++;
       }
@@ -824,11 +848,35 @@ router.post("/api/myob/import-suppliers", requireAuth, async (req: Request, res:
         }
         linked++;
       } else if (action === "create") {
-        const [newSupplier] = await db.insert(suppliers).values({ companyId, name: myobName }).returning();
-        await db.insert(myobSupplierMappings).values({
-          companyId, supplierId: newSupplier.id, myobSupplierUid: myobUid, myobSupplierName: myobName, myobSupplierDisplayId: myobDisplayId || null,
-        });
-        created++;
+        try {
+          const existingSupplier = await db.select().from(suppliers)
+            .where(and(eq(suppliers.name, myobName), eq(suppliers.companyId, companyId)))
+            .limit(1);
+          let supplierId: string;
+          if (existingSupplier.length > 0) {
+            supplierId = existingSupplier[0].id;
+            linked++;
+          } else {
+            const [newSupplier] = await db.insert(suppliers).values({ companyId, name: myobName }).returning();
+            supplierId = newSupplier.id;
+            created++;
+          }
+          const existingMapping = await db.select().from(myobSupplierMappings)
+            .where(and(eq(myobSupplierMappings.companyId, companyId), eq(myobSupplierMappings.supplierId, supplierId)))
+            .limit(1);
+          if (existingMapping.length > 0) {
+            await db.update(myobSupplierMappings)
+              .set({ myobSupplierUid: myobUid, myobSupplierName: myobName, myobSupplierDisplayId: myobDisplayId || null, updatedAt: new Date() })
+              .where(eq(myobSupplierMappings.id, existingMapping[0].id));
+          } else {
+            await db.insert(myobSupplierMappings).values({
+              companyId, supplierId, myobSupplierUid: myobUid, myobSupplierName: myobName, myobSupplierDisplayId: myobDisplayId || null,
+            });
+          }
+        } catch (itemErr) {
+          logger.warn({ err: itemErr, myobName, myobUid }, "[MYOB Import] Failed to import supplier, skipping");
+          skipped++;
+        }
       } else {
         skipped++;
       }
