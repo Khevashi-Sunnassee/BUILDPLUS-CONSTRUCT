@@ -702,6 +702,7 @@ function ProfitAndLossTab() {
     retention: {
       summary: { totalRetention: string; totalRetentionHeld: string; claimCount: number };
       byJob: { jobId: string; jobName: string | null; totalRetention: string; totalRetentionHeld: string; claimCount: number }[];
+      byMonth: { month: string; totalRetention: string; totalRetentionHeld: string; claimCount: number }[];
     };
   }>({
     queryKey: [MYOB_ROUTES.BUILDPLUS_ADJUSTMENTS, monthCount],
@@ -734,13 +735,41 @@ function ProfitAndLossTab() {
   const grossMarginPct = totalsAgg.income > 0 ? (totalsAgg.grossProfit / totalsAgg.income) * 100 : 0;
   const netMarginPct = totalsAgg.income > 0 ? (totalsAgg.netProfit / totalsAgg.income) * 100 : 0;
 
-  const chartData = monthlyTotals.map((m) => ({
-    name: m.label,
-    Income: Math.round(m.income),
-    Expenses: Math.round(m.cos + m.expenses),
-    "Net Profit": Math.round(m.netProfit),
-    "Gross Profit": Math.round(m.grossProfit),
-  }));
+  const adjByMonth = new Map<string, { unprocessedEx: number; retentionHeld: number }>();
+  if (adjustmentsData?.unprocessedInvoices?.byMonth) {
+    adjustmentsData.unprocessedInvoices.byMonth.forEach((m) => {
+      const existing = adjByMonth.get(m.month) || { unprocessedEx: 0, retentionHeld: 0 };
+      existing.unprocessedEx = parseFloat(m.totalEx);
+      adjByMonth.set(m.month, existing);
+    });
+  }
+  if (adjustmentsData?.retention?.byMonth) {
+    adjustmentsData.retention.byMonth.forEach((m) => {
+      const existing = adjByMonth.get(m.month) || { unprocessedEx: 0, retentionHeld: 0 };
+      existing.retentionHeld = parseFloat(m.totalRetentionHeld);
+      adjByMonth.set(m.month, existing);
+    });
+  }
+
+  const chartData = months.map((m, idx) => {
+    const t = monthlyTotals[idx];
+    const key = m.start.slice(0, 7);
+    const adj = adjByMonth.get(key) || { unprocessedEx: 0, retentionHeld: 0 };
+    return {
+      name: t.label,
+      Income: Math.round(t.income),
+      Expenses: Math.round(t.cos + t.expenses),
+      "Net Profit": Math.round(t.netProfit),
+      "Gross Profit": Math.round(t.grossProfit),
+      Unprocessed: Math.round(adj.unprocessedEx),
+      Retention: Math.round(adj.retentionHeld),
+      "Adjusted Net": Math.round(t.netProfit + adj.retentionHeld - adj.unprocessedEx),
+    };
+  });
+
+  const totalUnprocessedEx = adjustmentsData ? parseFloat(adjustmentsData.unprocessedInvoices.summary.totalEx) : 0;
+  const totalRetentionHeld = adjustmentsData ? parseFloat(adjustmentsData.retention.summary.totalRetentionHeld) : 0;
+  const adjustedNetProfit = totalsAgg.netProfit + totalRetentionHeld - totalUnprocessedEx;
 
   const marginChartData = monthlyTotals.map((m) => ({
     name: m.label,
@@ -970,7 +999,7 @@ function ProfitAndLossTab() {
         </Card>
       ) : dashboardView === "dashboard" ? (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <Card data-testid="card-total-income">
               <CardContent className="pt-4 pb-3">
                 <p className="text-xs text-muted-foreground font-medium">Total Revenue</p>
@@ -1002,12 +1031,23 @@ function ProfitAndLossTab() {
             </Card>
             <Card data-testid="card-net-profit">
               <CardContent className="pt-4 pb-3">
-                <p className="text-xs text-muted-foreground font-medium">Net Profit</p>
+                <p className="text-xs text-muted-foreground font-medium">Net Profit (MYOB)</p>
                 <p className={`text-lg font-bold font-mono mt-1 ${totalsAgg.netProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                   {formatCurrency(totalsAgg.netProfit)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Margin: {netMarginPct.toFixed(1)}%
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="border-purple-500/30 bg-purple-500/5" data-testid="card-adjusted-net">
+              <CardContent className="pt-4 pb-3">
+                <p className="text-xs text-muted-foreground font-medium">Adjusted Net Profit</p>
+                <p className={`text-lg font-bold font-mono mt-1 ${adjustedNetProfit >= 0 ? "text-purple-600 dark:text-purple-400" : "text-red-600 dark:text-red-400"}`}>
+                  {formatCurrency(adjustedNetProfit)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  + Retention {formatCurrency(totalRetentionHeld)} &minus; Unprocessed {formatCurrency(totalUnprocessedEx)}
                 </p>
               </CardContent>
             </Card>
@@ -1055,6 +1095,8 @@ function ProfitAndLossTab() {
                       <Legend wrapperStyle={{ fontSize: "12px" }} />
                       <Bar dataKey="Income" fill="hsl(142, 60%, 45%)" radius={[2, 2, 0, 0]} />
                       <Bar dataKey="Expenses" fill="hsl(0, 65%, 50%)" radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="Unprocessed" fill="hsl(45, 90%, 50%)" radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="Retention" fill="hsl(210, 70%, 50%)" radius={[2, 2, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1074,6 +1116,10 @@ function ProfitAndLossTab() {
                           <stop offset="5%" stopColor="hsl(210, 70%, 50%)" stopOpacity={0.3} />
                           <stop offset="95%" stopColor="hsl(210, 70%, 50%)" stopOpacity={0} />
                         </linearGradient>
+                        <linearGradient id="gradAdjusted" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(270, 60%, 55%)" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="hsl(270, 60%, 55%)" stopOpacity={0} />
+                        </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
@@ -1086,6 +1132,7 @@ function ProfitAndLossTab() {
                       <Legend wrapperStyle={{ fontSize: "12px" }} />
                       <Area type="monotone" dataKey="Net Profit" stroke="hsl(210, 70%, 50%)" fill="url(#gradProfit)" strokeWidth={2} />
                       <Area type="monotone" dataKey="Gross Profit" stroke="hsl(142, 60%, 45%)" fill="none" strokeWidth={2} strokeDasharray="5 5" />
+                      <Area type="monotone" dataKey="Adjusted Net" stroke="hsl(270, 60%, 55%)" fill="url(#gradAdjusted)" strokeWidth={2} strokeDasharray="4 2" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>

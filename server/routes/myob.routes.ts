@@ -605,6 +605,23 @@ router.get("/api/myob/buildplus-adjustments", requireAuth, async (req: Request, 
     .groupBy(progressClaims.jobId, jobs.name)
     .orderBy(sql`sum(${progressClaims.retentionHeldToDate}) DESC`);
 
+    const retentionByMonth = await db.select({
+      month: sql<string>`to_char(${progressClaims.claimDate}, 'YYYY-MM')`,
+      totalRetention: sql<string>`COALESCE(sum(${progressClaims.retentionAmount}), 0)`,
+      totalRetentionHeld: sql<string>`COALESCE(sum(${progressClaims.retentionHeldToDate}), 0)`,
+      claimCount: sql<number>`count(*)::int`,
+    })
+    .from(progressClaims)
+    .where(
+      and(
+        eq(progressClaims.companyId, companyId),
+        ...(periodStart ? [gte(progressClaims.claimDate, new Date(periodStart))] : []),
+        ...(periodEnd ? [lte(progressClaims.claimDate, new Date(periodEnd + "T23:59:59"))] : [])
+      )
+    )
+    .groupBy(sql`to_char(${progressClaims.claimDate}, 'YYYY-MM')`)
+    .orderBy(sql`to_char(${progressClaims.claimDate}, 'YYYY-MM')`);
+
     res.json({
       period: { start: periodStart, end: periodEnd },
       unprocessedInvoices: {
@@ -615,6 +632,7 @@ router.get("/api/myob/buildplus-adjustments", requireAuth, async (req: Request, 
       retention: {
         summary: retentionData[0] || { totalRetention: "0", totalRetentionHeld: "0", claimCount: 0 },
         byJob: retentionByJob,
+        byMonth: retentionByMonth,
       },
     });
   } catch (err) {
