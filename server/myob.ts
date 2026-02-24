@@ -35,7 +35,6 @@ export async function exchangeCodeForToken(
   const body = new URLSearchParams({
     client_id: process.env.MYOB_CLIENT_ID ?? "",
     client_secret: process.env.MYOB_CLIENT_SECRET ?? "",
-    scope: "sme-company-file sme-company-settings sme-sales sme-purchases sme-contacts-customer sme-contacts-supplier sme-contacts-employee sme-inventory sme-general-ledger sme-banking sme-payroll",
     code,
     redirect_uri: redirectUri,
     grant_type: "authorization_code",
@@ -49,10 +48,13 @@ export async function exchangeCodeForToken(
 
   if (!res.ok) {
     const err = await res.text();
+    logger.error({ status: res.status, body: err.slice(0, 500) }, "[MYOB] Token exchange failed");
     throw new Error(`Token exchange failed: ${res.status} ${err}`);
   }
 
-  return (await res.json()) as MyobTokenResponse;
+  const tokenData = (await res.json()) as MyobTokenResponse;
+  logger.info({ hasAccessToken: !!tokenData.access_token, hasRefreshToken: !!tokenData.refresh_token, expiresIn: tokenData.expires_in, scope: tokenData.scope }, "[MYOB] Token exchange successful");
+  return tokenData;
 }
 
 async function refreshAccessToken(companyId: string): Promise<string> {
@@ -139,7 +141,7 @@ export async function myobFetch<T = unknown>(
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "x-myobapi-cftoken": cfToken,
-      "x-myobapi-key": process.env.MYOB_API_KEY ?? "",
+      "x-myobapi-key": process.env.MYOB_CLIENT_ID ?? "",
       "x-myobapi-version": "v2",
       "Content-Type": "application/json",
       ...options.headers,
