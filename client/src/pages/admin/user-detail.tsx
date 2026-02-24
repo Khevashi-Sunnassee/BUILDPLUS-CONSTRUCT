@@ -1,7 +1,12 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ArrowLeft, Edit2, User, Shield, KeyRound, CheckCircle2, EyeOff, Eye, Pencil } from "lucide-react";
+import {
+  ArrowLeft, Edit2, User, Shield, KeyRound,
+  EyeOff, Eye, Pencil, Minus,
+  Briefcase, Factory, Truck, DollarSign, BarChart3, Settings,
+  Smartphone, Users as UsersIcon
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { User as UserType } from "@shared/schema";
+import { FUNCTION_KEYS } from "@shared/schema";
 import { ADMIN_ROUTES } from "@shared/api-routes";
 
 const FUNCTION_LABELS: Record<string, string> = {
@@ -19,12 +25,18 @@ const FUNCTION_LABELS: Record<string, string> = {
   document_register: "Document Register",
   photo_gallery: "Photo Gallery",
   checklists: "Checklists",
+  work_orders: "Work Orders",
   weekly_job_logs: "Weekly Job Logs",
+  mail_register: "Mail Register",
   broadcast: "Broadcast",
+  help_center: "Help Center",
+  knowledge_base: "Knowledge Base",
   production_slots: "Production Slots",
-  production_report: "Production Schedule",
+  production_schedule: "Production Schedule",
+  production_report: "Production Booking",
   drafting_program: "Drafting Program",
   daily_reports: "Drafting Register",
+  drafting_emails: "Drafting Emails",
   reo_scheduling: "Reo Scheduling",
   pm_call_logs: "PM Call Logs",
   logistics: "Logistics",
@@ -32,12 +44,22 @@ const FUNCTION_LABELS: Record<string, string> = {
   contract_hub: "Contract Hub",
   progress_claims: "Progress Claims",
   purchase_orders: "Purchase Orders",
+  capex_requests: "CAPEX Requests",
   hire_bookings: "Hire Bookings",
+  tenders: "Tenders",
+  scopes: "Scope of Works",
   weekly_wages: "Weekly Wages",
   admin_assets: "Asset Register",
+  ap_invoices: "AP Invoices",
+  myob_integration: "MYOB Integration",
   kpi_dashboard: "KPI Dashboard",
   manager_review: "Manager Review",
   checklist_reports: "Checklist Reports",
+  reports: "Reports & Downloads",
+  job_activities: "Job Activities",
+  tender_emails: "Tender Emails",
+  email_processing: "Email Processing",
+  budgets: "Budgets",
   admin_settings: "Settings",
   admin_companies: "Companies",
   admin_factories: "Factories",
@@ -58,12 +80,86 @@ const FUNCTION_LABELS: Record<string, string> = {
   admin_trailer_types: "Trailer Types",
   admin_data_management: "Data Management",
   admin_cost_codes: "Cost Codes",
-  tenders: "Tenders",
-  budgets: "Budgets",
-  scopes: "Scopes",
+  admin_email_templates: "Email Templates",
+  admin_external_api: "External API",
+  mobile_qr_scanner: "QR Scanner (Mobile)",
+  mobile_dashboard: "Dashboard (Mobile)",
+  mobile_profile: "Profile (Mobile)",
 };
 
-function getPermissionBadge(level: string) {
+interface PermissionSection {
+  label: string;
+  icon: typeof Briefcase;
+  keys: string[];
+}
+
+const PERMISSION_SECTIONS: PermissionSection[] = [
+  {
+    label: "Core Features",
+    icon: Briefcase,
+    keys: [
+      "tasks", "chat", "jobs", "panel_register", "document_register",
+      "photo_gallery", "checklists", "work_orders", "weekly_job_logs",
+      "mail_register", "broadcast", "help_center", "knowledge_base",
+      "job_activities",
+    ],
+  },
+  {
+    label: "Production & Planning",
+    icon: Factory,
+    keys: [
+      "production_slots", "production_schedule", "production_report",
+      "drafting_program", "daily_reports", "drafting_emails",
+      "reo_scheduling", "pm_call_logs",
+    ],
+  },
+  {
+    label: "Logistics & Delivery",
+    icon: Truck,
+    keys: ["logistics"],
+  },
+  {
+    label: "Finance & Commercial",
+    icon: DollarSign,
+    keys: [
+      "sales_pipeline", "contract_hub", "progress_claims",
+      "purchase_orders", "capex_requests", "hire_bookings",
+      "tenders", "scopes", "budgets", "weekly_wages",
+      "admin_assets", "ap_invoices", "myob_integration",
+      "tender_emails", "email_processing",
+    ],
+  },
+  {
+    label: "Analytics & Reporting",
+    icon: BarChart3,
+    keys: [
+      "kpi_dashboard", "manager_review", "checklist_reports", "reports",
+    ],
+  },
+  {
+    label: "Administration",
+    icon: Settings,
+    keys: [
+      "admin_settings", "admin_companies", "admin_factories",
+      "admin_panel_types", "admin_document_config", "admin_checklist_templates",
+      "admin_item_catalog", "admin_devices", "admin_users", "admin_user_permissions",
+      "admin_job_types", "admin_jobs", "admin_customers", "admin_suppliers",
+      "admin_employees", "admin_zones", "admin_work_types", "admin_trailer_types",
+      "admin_data_management", "admin_cost_codes", "admin_email_templates",
+      "admin_external_api",
+    ],
+  },
+  {
+    label: "Mobile-Only Features",
+    icon: Smartphone,
+    keys: ["mobile_qr_scanner", "mobile_dashboard", "mobile_profile"],
+  },
+];
+
+function getPermissionBadge(level: string | null) {
+  if (!level) {
+    return <Badge variant="secondary" className="gap-1 opacity-50"><Minus className="h-3 w-3" />Not Set</Badge>;
+  }
   switch (level) {
     case "HIDDEN":
       return <Badge variant="secondary" className="gap-1"><EyeOff className="h-3 w-3" />Hidden</Badge>;
@@ -147,8 +243,15 @@ export default function UserDetailPage() {
     );
   }
 
-  const corePermissions = permissions.filter(p => !p.functionKey.startsWith("admin_"));
-  const adminPermissions = permissions.filter(p => p.functionKey.startsWith("admin_"));
+  const permMap = new Map(permissions.map(p => [p.functionKey, p.permissionLevel]));
+
+  const permissionStats = {
+    total: FUNCTION_KEYS.length,
+    configured: permissions.length,
+    fullAccess: permissions.filter(p => p.permissionLevel === "VIEW_AND_UPDATE").length,
+    viewOnly: permissions.filter(p => p.permissionLevel === "VIEW" || p.permissionLevel === "VIEW_OWN").length,
+    hidden: permissions.filter(p => p.permissionLevel === "HIDDEN").length,
+  };
 
   return (
     <div className="space-y-6" role="main" aria-label="User Detail" data-testid="user-detail-page">
@@ -260,83 +363,84 @@ export default function UserDetailPage() {
               <Skeleton className="h-[200px]" />
               <Skeleton className="h-[200px]" />
             </div>
-          ) : permissions.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground" data-testid="text-no-permissions">
-                <KeyRound className="h-8 w-8 mx-auto mb-3 opacity-50" />
-                <p>No permissions configured for this user.</p>
-                <p className="text-xs mt-1">Permissions can be initialized from the Users list page.</p>
-              </CardContent>
-            </Card>
           ) : (
             <>
-              <Card data-testid="card-core-permissions">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-primary" />
-                    Core Permissions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Function</TableHead>
-                          <TableHead className="text-right">Access Level</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {corePermissions.map((p) => (
-                          <TableRow key={p.functionKey} data-testid={`row-perm-${p.functionKey}`}>
-                            <TableCell className="font-medium">{FUNCTION_LABELS[p.functionKey] || p.functionKey}</TableCell>
-                            <TableCell className="text-right">{getPermissionBadge(p.permissionLevel)}</TableCell>
-                          </TableRow>
-                        ))}
-                        {corePermissions.length === 0 && (
-                          <TableRow>
-                            <TableCell colSpan={2} className="text-center text-muted-foreground py-4">No core permissions</TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card data-testid="stat-total-permissions">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="text-2xl font-bold">{permissionStats.configured}/{permissionStats.total}</div>
+                    <div className="text-xs text-muted-foreground">Configured</div>
+                  </CardContent>
+                </Card>
+                <Card data-testid="stat-full-access">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="text-2xl font-bold text-green-500">{permissionStats.fullAccess}</div>
+                    <div className="text-xs text-muted-foreground">Full Access</div>
+                  </CardContent>
+                </Card>
+                <Card data-testid="stat-view-only">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="text-2xl font-bold text-blue-500">{permissionStats.viewOnly}</div>
+                    <div className="text-xs text-muted-foreground">View Only</div>
+                  </CardContent>
+                </Card>
+                <Card data-testid="stat-hidden">
+                  <CardContent className="pt-4 pb-3 px-4">
+                    <div className="text-2xl font-bold text-muted-foreground">{permissionStats.hidden}</div>
+                    <div className="text-xs text-muted-foreground">Hidden</div>
+                  </CardContent>
+                </Card>
+              </div>
 
-              <Card data-testid="card-admin-permissions">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-amber-500" />
-                    Admin Permissions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Function</TableHead>
-                          <TableHead className="text-right">Access Level</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {adminPermissions.map((p) => (
-                          <TableRow key={p.functionKey} data-testid={`row-perm-${p.functionKey}`}>
-                            <TableCell className="font-medium">{FUNCTION_LABELS[p.functionKey] || p.functionKey}</TableCell>
-                            <TableCell className="text-right">{getPermissionBadge(p.permissionLevel)}</TableCell>
-                          </TableRow>
-                        ))}
-                        {adminPermissions.length === 0 && (
-                          <TableRow>
-                            <TableCell colSpan={2} className="text-center text-muted-foreground py-4">No admin permissions</TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
+              {PERMISSION_SECTIONS.map((section) => {
+                const SectionIcon = section.icon;
+                return (
+                  <Card key={section.label} data-testid={`card-perm-section-${section.label.toLowerCase().replace(/\s+/g, "-")}`}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <SectionIcon className="h-5 w-5 text-primary" />
+                        {section.label}
+                        <Badge variant="outline" className="ml-auto text-xs">{section.keys.length}</Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Function</TableHead>
+                              <TableHead>Platform</TableHead>
+                              <TableHead className="text-right">Access Level</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {section.keys.map((key) => {
+                              const level = permMap.get(key) || null;
+                              const isMobile = key.startsWith("mobile_");
+                              const isAdmin = key.startsWith("admin_");
+                              return (
+                                <TableRow key={key} data-testid={`row-perm-${key}`}>
+                                  <TableCell className="font-medium">{FUNCTION_LABELS[key] || key}</TableCell>
+                                  <TableCell>
+                                    {isMobile ? (
+                                      <Badge variant="outline" className="text-xs gap-1"><Smartphone className="h-3 w-3" />Mobile</Badge>
+                                    ) : isAdmin ? (
+                                      <Badge variant="outline" className="text-xs gap-1"><Settings className="h-3 w-3" />Admin</Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-xs gap-1"><UsersIcon className="h-3 w-3" />Web + Mobile</Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right">{getPermissionBadge(level)}</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </>
           )}
         </TabsContent>

@@ -82,12 +82,18 @@ const FUNCTION_LABELS: Record<string, string> = {
   document_register: "Document Register",
   photo_gallery: "Photo Gallery",
   checklists: "Checklists",
+  work_orders: "Work Orders",
   weekly_job_logs: "Weekly Job Logs",
+  mail_register: "Mail Register",
   broadcast: "Broadcast",
+  help_center: "Help Center",
+  knowledge_base: "Knowledge Base",
   production_slots: "Production Slots",
-  production_report: "Production Schedule",
+  production_schedule: "Production Schedule",
+  production_report: "Production Booking",
   drafting_program: "Drafting Program",
   daily_reports: "Drafting Register",
+  drafting_emails: "Drafting Emails",
   reo_scheduling: "Reo Scheduling",
   pm_call_logs: "PM Call Logs",
   logistics: "Logistics",
@@ -95,12 +101,22 @@ const FUNCTION_LABELS: Record<string, string> = {
   contract_hub: "Contract Hub",
   progress_claims: "Progress Claims",
   purchase_orders: "Purchase Orders",
+  capex_requests: "CAPEX Requests",
   hire_bookings: "Hire Bookings",
+  tenders: "Tenders",
+  scopes: "Scope of Works",
   weekly_wages: "Weekly Wages",
   admin_assets: "Asset Register",
+  ap_invoices: "AP Invoices",
+  myob_integration: "MYOB Integration",
   kpi_dashboard: "KPI Dashboard",
   manager_review: "Manager Review",
   checklist_reports: "Checklist Reports",
+  reports: "Reports & Downloads",
+  job_activities: "Job Activities",
+  tender_emails: "Tender Emails",
+  email_processing: "Email Processing",
+  budgets: "Budgets",
   admin_settings: "Settings",
   admin_companies: "Companies",
   admin_factories: "Factories",
@@ -120,6 +136,12 @@ const FUNCTION_LABELS: Record<string, string> = {
   admin_work_types: "Work Types",
   admin_trailer_types: "Trailer Types",
   admin_data_management: "Data Management",
+  admin_cost_codes: "Cost Codes",
+  admin_email_templates: "Email Templates",
+  admin_external_api: "External API",
+  mobile_qr_scanner: "QR Scanner (Mobile)",
+  mobile_dashboard: "Dashboard (Mobile)",
+  mobile_profile: "Profile (Mobile)",
 };
 
 interface PermissionSection {
@@ -129,24 +151,24 @@ interface PermissionSection {
 
 const PERMISSION_SECTIONS: PermissionSection[] = [
   {
-    label: "Main Navigation",
-    keys: ["tasks", "chat", "jobs", "panel_register", "document_register", "photo_gallery", "checklists", "weekly_job_logs", "broadcast"],
+    label: "Core Features",
+    keys: ["tasks", "chat", "jobs", "panel_register", "document_register", "photo_gallery", "checklists", "work_orders", "weekly_job_logs", "mail_register", "broadcast", "help_center", "knowledge_base", "job_activities"],
   },
   {
     label: "Production & Scheduling",
-    keys: ["production_slots", "production_report", "drafting_program", "daily_reports", "reo_scheduling", "pm_call_logs", "logistics"],
+    keys: ["production_slots", "production_schedule", "production_report", "drafting_program", "daily_reports", "drafting_emails", "reo_scheduling", "pm_call_logs", "logistics"],
   },
   {
     label: "Finance & Commercial",
-    keys: ["sales_pipeline", "contract_hub", "progress_claims", "purchase_orders", "hire_bookings", "weekly_wages", "admin_assets"],
+    keys: ["sales_pipeline", "contract_hub", "progress_claims", "purchase_orders", "capex_requests", "hire_bookings", "tenders", "scopes", "budgets", "weekly_wages", "admin_assets", "ap_invoices", "myob_integration", "tender_emails", "email_processing"],
   },
   {
-    label: "Management & Reporting",
-    keys: ["kpi_dashboard", "manager_review", "checklist_reports"],
+    label: "Analytics & Reporting",
+    keys: ["kpi_dashboard", "manager_review", "checklist_reports", "reports"],
   },
   {
     label: "Administration",
-    keys: ["admin_settings", "admin_companies", "admin_factories", "admin_panel_types", "admin_document_config", "admin_checklist_templates", "admin_item_catalog", "admin_devices", "admin_users", "admin_user_permissions", "admin_job_types", "admin_jobs", "admin_data_management"],
+    keys: ["admin_settings", "admin_companies", "admin_factories", "admin_panel_types", "admin_document_config", "admin_checklist_templates", "admin_item_catalog", "admin_devices", "admin_users", "admin_user_permissions", "admin_job_types", "admin_jobs", "admin_data_management", "admin_cost_codes", "admin_email_templates", "admin_external_api"],
   },
   {
     label: "Contacts",
@@ -155,6 +177,10 @@ const PERMISSION_SECTIONS: PermissionSection[] = [
   {
     label: "Other",
     keys: ["admin_zones", "admin_work_types", "admin_trailer_types"],
+  },
+  {
+    label: "Mobile-Only Features",
+    keys: ["mobile_qr_scanner", "mobile_dashboard", "mobile_profile"],
   },
 ];
 
