@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Search, Link2, Unlink, Building2, Users, Truck, FileText, Package, DollarSign, RefreshCw, Loader2, ExternalLink, CheckCircle2, XCircle, AlertTriangle, ClipboardList, TrendingUp, TrendingDown, BarChart3, Calendar, Briefcase, Trash2 } from "lucide-react";
+import { Search, Link2, Unlink, Building2, Users, Truck, FileText, Package, DollarSign, RefreshCw, Loader2, ExternalLink, CheckCircle2, XCircle, AlertTriangle, ClipboardList, TrendingUp, TrendingDown, BarChart3, Calendar, Briefcase, Trash2, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, LineChart, Line, Legend, Cell } from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -1330,6 +1331,9 @@ function CodeMappingTab() {
   const { toast } = useToast();
   const [mappingSubTab, setMappingSubTab] = useState<"accounts" | "suppliers" | "tax" | "jobs">("accounts");
   const [searchFilter, setSearchFilter] = useState("");
+  const [importSupplierOpen, setImportSupplierOpen] = useState(false);
+  const [importJobOpen, setImportJobOpen] = useState(false);
+  const [importAccountOpen, setImportAccountOpen] = useState(false);
 
   const { data: myobAccounts } = useQuery<any>({
     queryKey: [MYOB_ROUTES.ACCOUNTS],
@@ -1568,29 +1572,55 @@ function CodeMappingTab() {
         </div>
 
         {mappingSubTab === "accounts" && (
-          <AccountMappingTable
-            mappings={acctMappingList}
-            myobAccounts={myobAccountItems}
-            bpCostCodes={bpCostCodes || []}
-            isLoading={acctLoading}
-            searchFilter={searchFilter}
-            onSave={(data) => saveAccountMappingMutation.mutate(data)}
-            onDelete={(id) => deleteAccountMappingMutation.mutate(id)}
-            isSaving={saveAccountMappingMutation.isPending}
-          />
+          <>
+            <div className="flex justify-end mb-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setImportAccountOpen(true)}
+                data-testid="button-import-accounts"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Import from MYOB
+              </Button>
+            </div>
+            <AccountMappingTable
+              mappings={acctMappingList}
+              myobAccounts={myobAccountItems}
+              bpCostCodes={bpCostCodes || []}
+              isLoading={acctLoading}
+              searchFilter={searchFilter}
+              onSave={(data) => saveAccountMappingMutation.mutate(data)}
+              onDelete={(id) => deleteAccountMappingMutation.mutate(id)}
+              isSaving={saveAccountMappingMutation.isPending}
+            />
+          </>
         )}
 
         {mappingSubTab === "suppliers" && (
-          <SupplierMappingTable
-            mappings={supMappingList}
-            myobSuppliers={myobSupplierItems}
-            bpSuppliers={bpSuppliers || []}
-            isLoading={supLoading}
-            searchFilter={searchFilter}
-            onSave={(data) => saveSupplierMappingMutation.mutate(data)}
-            onDelete={(id) => deleteSupplierMappingMutation.mutate(id)}
-            isSaving={saveSupplierMappingMutation.isPending}
-          />
+          <>
+            <div className="flex justify-end mb-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setImportSupplierOpen(true)}
+                data-testid="button-import-suppliers"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Import from MYOB
+              </Button>
+            </div>
+            <SupplierMappingTable
+              mappings={supMappingList}
+              myobSuppliers={myobSupplierItems}
+              bpSuppliers={bpSuppliers || []}
+              isLoading={supLoading}
+              searchFilter={searchFilter}
+              onSave={(data) => saveSupplierMappingMutation.mutate(data)}
+              onDelete={(id) => deleteSupplierMappingMutation.mutate(id)}
+              isSaving={saveSupplierMappingMutation.isPending}
+            />
+          </>
         )}
 
         {mappingSubTab === "tax" && (
@@ -1606,17 +1636,68 @@ function CodeMappingTab() {
         )}
 
         {mappingSubTab === "jobs" && (
-          <JobMappingTable
-            bpJobs={jobMappingList}
-            myobJobs={myobJobItems}
-            isLoading={jobMappingsLoading}
-            searchFilter={searchFilter}
-            onLink={(data) => saveJobMappingMutation.mutate(data)}
-            onUnlink={(jobId) => deleteJobMappingMutation.mutate(jobId)}
-            isSaving={saveJobMappingMutation.isPending}
-          />
+          <>
+            <div className="flex justify-end mb-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setImportJobOpen(true)}
+                data-testid="button-import-jobs"
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Import from MYOB
+              </Button>
+            </div>
+            <JobMappingTable
+              bpJobs={jobMappingList}
+              myobJobs={myobJobItems}
+              isLoading={jobMappingsLoading}
+              searchFilter={searchFilter}
+              onLink={(data) => saveJobMappingMutation.mutate(data)}
+              onUnlink={(jobId) => deleteJobMappingMutation.mutate(jobId)}
+              isSaving={saveJobMappingMutation.isPending}
+            />
+          </>
         )}
       </CardContent>
+
+      <ImportFromMyobDialog
+        open={importSupplierOpen}
+        onOpenChange={setImportSupplierOpen}
+        type="suppliers"
+        myobItems={myobSupplierItems}
+        bpItems={(bpSuppliers || []).map((s: any) => ({ id: s.id, name: s.name }))}
+        alreadyMappedMyobUids={new Set(supMappingList.map((m: any) => m.mapping?.myobSupplierUid).filter(Boolean))}
+        onImportComplete={() => {
+          queryClient.invalidateQueries({ queryKey: [MYOB_ROUTES.SUPPLIER_MAPPINGS] });
+          queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+        }}
+      />
+
+      <ImportFromMyobDialog
+        open={importJobOpen}
+        onOpenChange={setImportJobOpen}
+        type="jobs"
+        myobItems={myobJobItems}
+        bpItems={jobMappingList.map((j: any) => ({ id: j.id, name: j.name, jobNumber: j.jobNumber }))}
+        alreadyMappedMyobUids={new Set(jobMappingList.filter((j: any) => j.myobJobUid).map((j: any) => j.myobJobUid))}
+        onImportComplete={() => {
+          queryClient.invalidateQueries({ queryKey: [MYOB_ROUTES.JOB_MAPPINGS] });
+        }}
+      />
+
+      <ImportFromMyobDialog
+        open={importAccountOpen}
+        onOpenChange={setImportAccountOpen}
+        type="accounts"
+        myobItems={myobAccountItems}
+        bpItems={(bpCostCodes || []).map((cc: any) => ({ id: cc.id, name: cc.name, code: cc.code }))}
+        alreadyMappedMyobUids={new Set(acctMappingList.map((m: any) => m.mapping?.myobAccountUid).filter(Boolean))}
+        onImportComplete={() => {
+          queryClient.invalidateQueries({ queryKey: [MYOB_ROUTES.ACCOUNT_MAPPINGS] });
+          queryClient.invalidateQueries({ queryKey: ["/api/cost-codes"] });
+        }}
+      />
     </Card>
   );
 }
@@ -2590,5 +2671,266 @@ function JobMappingTable({ bpJobs, myobJobs, isLoading, searchFilter, onLink, on
         )}
       </div>
     </div>
+  );
+}
+
+function ImportFromMyobDialog({
+  open,
+  onOpenChange,
+  type,
+  myobItems,
+  bpItems,
+  alreadyMappedMyobUids,
+  onImportComplete,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  type: "suppliers" | "jobs" | "accounts";
+  myobItems: any[];
+  bpItems: any[];
+  alreadyMappedMyobUids: Set<string>;
+  onImportComplete: () => void;
+}) {
+  const { toast } = useToast();
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ created: number; linked: number; skipped: number } | null>(null);
+  const [actions, setActions] = useState<Record<string, { action: string; existingBpId?: string }>>({});
+
+  const unlinkedItems = myobItems.filter((item) => !alreadyMappedMyobUids.has(item.UID));
+
+  const getMyobName = (item: any): string => {
+    if (type === "suppliers") return item.CompanyName || item.Name || `${item.FirstName || ""} ${item.LastName || ""}`.trim();
+    return item.Name || "";
+  };
+
+  const getMyobId = (item: any): string => {
+    if (type === "jobs") return item.Number || "";
+    return item.DisplayID || "";
+  };
+
+  const findMatch = (myobItem: any): any | null => {
+    const myobName = getMyobName(myobItem).trim().toLowerCase();
+    if (!myobName) return null;
+    return bpItems.find((bp) => {
+      const bpName = (bp.name || "").trim().toLowerCase();
+      if (!bpName) return false;
+      return bpName.includes(myobName) || myobName.includes(bpName);
+    }) || null;
+  };
+
+  const getDefaultAction = (myobItem: any): { action: string; existingBpId?: string } => {
+    const match = findMatch(myobItem);
+    if (match) return { action: "link", existingBpId: match.id };
+    return { action: "create" };
+  };
+
+  const getAction = (uid: string, myobItem: any) => {
+    return actions[uid] || getDefaultAction(myobItem);
+  };
+
+  const setItemAction = (uid: string, action: string, existingBpId?: string) => {
+    setActions((prev) => ({ ...prev, [uid]: { action, existingBpId } }));
+  };
+
+  const handleSetAll = (action: string) => {
+    const newActions: Record<string, { action: string; existingBpId?: string }> = {};
+    unlinkedItems.forEach((item) => {
+      if (action === "link") {
+        const match = findMatch(item);
+        if (match) {
+          newActions[item.UID] = { action: "link", existingBpId: match.id };
+        } else {
+          newActions[item.UID] = { action: "create" };
+        }
+      } else {
+        newActions[item.UID] = { action };
+      }
+    });
+    setActions(newActions);
+  };
+
+  const importUrl = type === "suppliers" ? MYOB_ROUTES.IMPORT_SUPPLIERS
+    : type === "jobs" ? MYOB_ROUTES.IMPORT_JOBS
+    : MYOB_ROUTES.IMPORT_ACCOUNTS;
+
+  const handleImport = async () => {
+    setImporting(true);
+    try {
+      const items = unlinkedItems.map((item) => {
+        const { action, existingBpId } = getAction(item.UID, item);
+        const base: any = {
+          myobUid: item.UID,
+          myobName: getMyobName(item),
+          action,
+        };
+        if (type === "jobs") {
+          base.myobNumber = item.Number || "";
+        } else {
+          base.myobDisplayId = getMyobId(item);
+        }
+        if (existingBpId && action === "link") {
+          base.existingBpId = existingBpId;
+        }
+        return base;
+      });
+
+      const res = await apiRequest("POST", importUrl, { items });
+      const result = await res.json();
+
+      const { created = 0, linked = 0, skipped = 0 } = result;
+      setImportResult({ created, linked, skipped });
+      onImportComplete();
+      toast({
+        title: "Import complete",
+        description: `${created} created, ${linked} linked, ${skipped} skipped`,
+      });
+    } catch (err: any) {
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleClose = () => {
+    setImportResult(null);
+    setActions({});
+    onOpenChange(false);
+  };
+
+  const typeLabel = type === "suppliers" ? "Suppliers" : type === "jobs" ? "Jobs" : "Accounts";
+  const idLabel = type === "jobs" ? "Number" : "Display ID";
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle data-testid="text-import-dialog-title">Import {typeLabel} from MYOB</DialogTitle>
+          <DialogDescription>
+            Review unlinked MYOB {typeLabel.toLowerCase()} and choose to link them to existing BuildPlus records or create new ones.
+          </DialogDescription>
+        </DialogHeader>
+
+        {importResult ? (
+          <div className="flex-1 flex flex-col items-center justify-center py-8 space-y-4">
+            <CheckCircle2 className="h-12 w-12 text-green-500" />
+            <p className="text-lg font-semibold" data-testid="text-import-summary">Import Complete</p>
+            <div className="flex gap-4">
+              <Badge variant="default" data-testid="badge-import-created">{importResult.created} Created</Badge>
+              <Badge variant="secondary" data-testid="badge-import-linked">{importResult.linked} Linked</Badge>
+              <Badge variant="outline" data-testid="badge-import-skipped">{importResult.skipped} Skipped</Badge>
+            </div>
+            <Button onClick={handleClose} data-testid="button-import-done">Done</Button>
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-auto">
+              {unlinkedItems.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-sm text-muted-foreground" data-testid="text-no-unlinked">
+                    All MYOB {typeLabel.toLowerCase()} are already linked.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                    <p className="text-sm text-muted-foreground" data-testid="text-unlinked-count">
+                      {unlinkedItems.length} unlinked {typeLabel.toLowerCase()} found
+                    </p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleSetAll("link")} data-testid="button-link-all">
+                        Link All Matches
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleSetAll("create")} data-testid="button-create-all">
+                        Create All New
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleSetAll("skip")} data-testid="button-skip-all">
+                        Skip All
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="rounded-md border overflow-auto max-h-[400px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>MYOB Name</TableHead>
+                          <TableHead>MYOB {idLabel}</TableHead>
+                          <TableHead>Match Found</TableHead>
+                          <TableHead>Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {unlinkedItems.map((item) => {
+                          const match = findMatch(item);
+                          const currentAction = getAction(item.UID, item);
+                          return (
+                            <TableRow key={item.UID} data-testid={`row-import-${item.UID}`}>
+                              <TableCell className="text-sm" data-testid={`text-import-name-${item.UID}`}>
+                                {getMyobName(item)}
+                              </TableCell>
+                              <TableCell className="font-mono text-sm">
+                                {getMyobId(item) || "-"}
+                              </TableCell>
+                              <TableCell>
+                                {match ? (
+                                  <Badge variant="default" className="gap-1" data-testid={`badge-match-${item.UID}`}>
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    {match.name}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" data-testid={`badge-no-match-${item.UID}`}>
+                                    No match
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={currentAction.action}
+                                  onValueChange={(val) => {
+                                    if (val === "link" && match) {
+                                      setItemAction(item.UID, "link", match.id);
+                                    } else {
+                                      setItemAction(item.UID, val);
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger className="w-[200px]" data-testid={`select-action-${item.UID}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {match && (
+                                      <SelectItem value="link">Link to {match.name}</SelectItem>
+                                    )}
+                                    <SelectItem value="create">Create New</SelectItem>
+                                    <SelectItem value="skip">Skip</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={handleClose} data-testid="button-import-cancel">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleImport}
+                disabled={importing || unlinkedItems.length === 0}
+                data-testid="button-import-execute"
+              >
+                {importing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+                Import All ({unlinkedItems.length})
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

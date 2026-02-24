@@ -667,6 +667,171 @@ router.delete("/api/myob/supplier-mappings/:id", requireAuth, async (req: Reques
   }
 });
 
+router.post("/api/myob/import-suppliers", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: "items array required" });
+
+    let created = 0, linked = 0, skipped = 0;
+
+    for (const item of items) {
+      const { myobUid, myobName, myobDisplayId, action, existingBpId } = item;
+      if (!myobUid || !myobName) { skipped++; continue; }
+
+      if (action === "skip") { skipped++; continue; }
+
+      if (action === "link" && existingBpId) {
+        const bpSupplier = await db.select().from(suppliers)
+          .where(and(eq(suppliers.id, existingBpId), eq(suppliers.companyId, companyId)))
+          .limit(1);
+        if (bpSupplier.length === 0) { skipped++; continue; }
+        const existing = await db.select().from(myobSupplierMappings)
+          .where(and(eq(myobSupplierMappings.companyId, companyId), eq(myobSupplierMappings.supplierId, existingBpId)))
+          .limit(1);
+        if (existing.length > 0) {
+          await db.update(myobSupplierMappings)
+            .set({ myobSupplierUid: myobUid, myobSupplierName: myobName, myobSupplierDisplayId: myobDisplayId || null, updatedAt: new Date() })
+            .where(eq(myobSupplierMappings.id, existing[0].id));
+        } else {
+          await db.insert(myobSupplierMappings).values({
+            companyId, supplierId: existingBpId, myobSupplierUid: myobUid, myobSupplierName: myobName, myobSupplierDisplayId: myobDisplayId || null,
+          });
+        }
+        linked++;
+      } else if (action === "create") {
+        const [newSupplier] = await db.insert(suppliers).values({ companyId, name: myobName }).returning();
+        await db.insert(myobSupplierMappings).values({
+          companyId, supplierId: newSupplier.id, myobSupplierUid: myobUid, myobSupplierName: myobName, myobSupplierDisplayId: myobDisplayId || null,
+        });
+        created++;
+      } else {
+        skipped++;
+      }
+    }
+
+    res.json({ created, linked, skipped });
+  } catch (err) {
+    handleMyobError(err, res, "import-suppliers");
+  }
+});
+
+router.post("/api/myob/import-jobs", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: "items array required" });
+
+    let created = 0, linked = 0, skipped = 0;
+
+    for (const item of items) {
+      const { myobUid, myobName, myobNumber, action, existingBpId } = item;
+      if (!myobUid || !myobName) { skipped++; continue; }
+
+      if (action === "skip") { skipped++; continue; }
+
+      if (action === "link" && existingBpId) {
+        await db.update(jobs)
+          .set({ myobJobUid: myobUid, updatedAt: new Date() })
+          .where(and(eq(jobs.id, existingBpId), eq(jobs.companyId, companyId)));
+        linked++;
+      } else if (action === "create") {
+        const jobNumber = myobNumber || `MYOB-${myobName.substring(0, 20)}`;
+        const existingJob = await db.select().from(jobs)
+          .where(and(eq(jobs.jobNumber, jobNumber), eq(jobs.companyId, companyId)))
+          .limit(1);
+        if (existingJob.length > 0) {
+          await db.update(jobs)
+            .set({ myobJobUid: myobUid, updatedAt: new Date() })
+            .where(eq(jobs.id, existingJob[0].id));
+          linked++;
+        } else {
+          await db.insert(jobs).values({
+            companyId, jobNumber, name: myobName, myobJobUid: myobUid, status: "ACTIVE",
+          });
+          created++;
+        }
+      } else {
+        skipped++;
+      }
+    }
+
+    res.json({ created, linked, skipped });
+  } catch (err) {
+    handleMyobError(err, res, "import-jobs");
+  }
+});
+
+router.post("/api/myob/import-accounts", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const { items } = req.body;
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: "items array required" });
+
+    let created = 0, linked = 0, skipped = 0;
+
+    for (const item of items) {
+      const { myobUid, myobName, myobDisplayId, action, existingBpId } = item;
+      if (!myobUid || !myobName) { skipped++; continue; }
+
+      if (action === "skip") { skipped++; continue; }
+
+      if (action === "link" && existingBpId) {
+        const bpCostCode = await db.select().from(costCodes)
+          .where(and(eq(costCodes.id, existingBpId), eq(costCodes.companyId, companyId)))
+          .limit(1);
+        if (bpCostCode.length === 0) { skipped++; continue; }
+        const existing = await db.select().from(myobAccountMappings)
+          .where(and(eq(myobAccountMappings.companyId, companyId), eq(myobAccountMappings.costCodeId, existingBpId)))
+          .limit(1);
+        if (existing.length > 0) {
+          await db.update(myobAccountMappings)
+            .set({ myobAccountUid: myobUid, myobAccountName: myobName, myobAccountDisplayId: myobDisplayId || null, updatedAt: new Date() })
+            .where(eq(myobAccountMappings.id, existing[0].id));
+        } else {
+          await db.insert(myobAccountMappings).values({
+            companyId, costCodeId: existingBpId, myobAccountUid: myobUid, myobAccountName: myobName, myobAccountDisplayId: myobDisplayId || null,
+          });
+        }
+        linked++;
+      } else if (action === "create") {
+        const code = myobDisplayId || myobName.substring(0, 20);
+        const existingCode = await db.select().from(costCodes)
+          .where(and(eq(costCodes.code, code), eq(costCodes.companyId, companyId)))
+          .limit(1);
+        let costCodeId: string;
+        if (existingCode.length > 0) {
+          costCodeId = existingCode[0].id;
+        } else {
+          const [newCostCode] = await db.insert(costCodes).values({ companyId, code, name: myobName }).returning();
+          costCodeId = newCostCode.id;
+        }
+        const existingMapping = await db.select().from(myobAccountMappings)
+          .where(and(eq(myobAccountMappings.companyId, companyId), eq(myobAccountMappings.costCodeId, costCodeId)))
+          .limit(1);
+        if (existingMapping.length === 0) {
+          await db.insert(myobAccountMappings).values({
+            companyId, costCodeId, myobAccountUid: myobUid, myobAccountName: myobName, myobAccountDisplayId: myobDisplayId || null,
+          });
+        }
+        created++;
+      } else {
+        skipped++;
+      }
+    }
+
+    res.json({ created, linked, skipped });
+  } catch (err) {
+    handleMyobError(err, res, "import-accounts");
+  }
+});
+
 router.post("/api/myob/auto-map", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
