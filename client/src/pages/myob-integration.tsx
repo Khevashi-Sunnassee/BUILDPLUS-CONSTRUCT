@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Search, Link2, Unlink, Building2, Users, Truck, FileText, Package, DollarSign, RefreshCw, Loader2, ExternalLink, CheckCircle2, XCircle, AlertTriangle, ClipboardList, TrendingUp, TrendingDown, BarChart3, Calendar } from "lucide-react";
+import { Search, Link2, Unlink, Building2, Users, Truck, FileText, Package, DollarSign, RefreshCw, Loader2, ExternalLink, CheckCircle2, XCircle, AlertTriangle, ClipboardList, TrendingUp, TrendingDown, BarChart3, Calendar, Briefcase, Trash2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, LineChart, Line, Legend, Cell } from "recharts";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -1288,7 +1288,7 @@ interface ExportLogEntry {
 
 function CodeMappingTab() {
   const { toast } = useToast();
-  const [mappingSubTab, setMappingSubTab] = useState<"accounts" | "suppliers" | "tax">("accounts");
+  const [mappingSubTab, setMappingSubTab] = useState<"accounts" | "suppliers" | "tax" | "jobs">("accounts");
   const [searchFilter, setSearchFilter] = useState("");
 
   const { data: myobAccounts } = useQuery<any>({
@@ -1321,6 +1321,14 @@ function CodeMappingTab() {
 
   const { data: bpSuppliers } = useQuery<any[]>({
     queryKey: ["/api/suppliers"],
+  });
+
+  const { data: myobJobs } = useQuery<any>({
+    queryKey: [MYOB_ROUTES.JOBS],
+  });
+
+  const { data: bpJobMappings, isLoading: jobMappingsLoading } = useQuery<any[]>({
+    queryKey: [MYOB_ROUTES.JOB_MAPPINGS],
   });
 
   const autoMapMutation = useMutation({
@@ -1398,17 +1406,40 @@ function CodeMappingTab() {
     },
   });
 
+  const saveJobMappingMutation = useMutation({
+    mutationFn: (data: { jobId: string; myobJobUid: string }) =>
+      apiRequest("POST", MYOB_ROUTES.JOB_MAPPINGS, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [MYOB_ROUTES.JOB_MAPPINGS] });
+      toast({ title: "Job linked to MYOB" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to link job", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteJobMappingMutation = useMutation({
+    mutationFn: (jobId: string) => apiRequest("DELETE", `${MYOB_ROUTES.JOB_MAPPINGS}/${jobId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [MYOB_ROUTES.JOB_MAPPINGS] });
+      toast({ title: "Job MYOB link removed" });
+    },
+  });
+
   const myobAccountItems: any[] = myobAccounts?.Items || [];
   const myobSupplierItems: any[] = myobSuppliers?.Items || [];
   const myobTaxCodeItems: any[] = myobTaxCodes?.Items || [];
+  const myobJobItems: any[] = myobJobs?.Items || [];
 
   const acctMappingList: any[] = accountMappings || [];
   const supMappingList: any[] = supplierMappings || [];
   const taxMappingList: any[] = taxCodeMappings || [];
+  const jobMappingList: any[] = bpJobMappings || [];
 
   const mappedAccountCount = acctMappingList.length;
   const mappedSupplierCount = supMappingList.length;
   const mappedTaxCount = taxMappingList.length;
+  const mappedJobCount = jobMappingList.filter((j: any) => j.myobJobUid).length;
 
   return (
     <Card>
@@ -1444,6 +1475,9 @@ function CodeMappingTab() {
           <Badge variant="outline" className="gap-1">
             <DollarSign className="h-3 w-3" /> Tax Codes: {mappedTaxCount} mapped
           </Badge>
+          <Badge variant="outline" className="gap-1">
+            <Briefcase className="h-3 w-3" /> Jobs: {mappedJobCount} linked
+          </Badge>
         </div>
       </CardHeader>
       <CardContent>
@@ -1471,6 +1505,14 @@ function CodeMappingTab() {
             data-testid="button-mapping-tax"
           >
             Tax Code Mapping ({mappedTaxCount})
+          </Button>
+          <Button
+            variant={mappingSubTab === "jobs" ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setMappingSubTab("jobs"); setSearchFilter(""); }}
+            data-testid="button-mapping-jobs"
+          >
+            Job Mapping ({mappedJobCount})
           </Button>
         </div>
 
@@ -1520,6 +1562,18 @@ function CodeMappingTab() {
             onSave={(data) => saveTaxMappingMutation.mutate(data)}
             onDelete={(id) => deleteTaxMappingMutation.mutate(id)}
             isSaving={saveTaxMappingMutation.isPending}
+          />
+        )}
+
+        {mappingSubTab === "jobs" && (
+          <JobMappingTable
+            bpJobs={jobMappingList}
+            myobJobs={myobJobItems}
+            isLoading={jobMappingsLoading}
+            searchFilter={searchFilter}
+            onLink={(data) => saveJobMappingMutation.mutate(data)}
+            onUnlink={(jobId) => deleteJobMappingMutation.mutate(jobId)}
+            isSaving={saveJobMappingMutation.isPending}
           />
         )}
       </CardContent>
@@ -2272,5 +2326,176 @@ function ExportLogTable() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function JobMappingTable({ bpJobs, myobJobs, isLoading, searchFilter, onLink, onUnlink, isSaving }: {
+  bpJobs: any[];
+  myobJobs: any[];
+  isLoading: boolean;
+  searchFilter: string;
+  onLink: (data: { jobId: string; myobJobUid: string }) => void;
+  onUnlink: (jobId: string) => void;
+  isSaving: boolean;
+}) {
+  const [selectedMyobJob, setSelectedMyobJob] = useState<string>("");
+  const [linkingJobId, setLinkingJobId] = useState<string | null>(null);
+
+  const filtered = bpJobs.filter((j) => {
+    const term = searchFilter.toLowerCase();
+    if (!term) return true;
+    return (
+      (j.jobNumber || "").toLowerCase().includes(term) ||
+      (j.name || "").toLowerCase().includes(term) ||
+      (j.myobJobUid || "").toLowerCase().includes(term)
+    );
+  });
+
+  const linkedJobs = filtered.filter((j) => j.myobJobUid);
+  const unlinkedJobs = filtered.filter((j) => !j.myobJobUid);
+
+  const usedMyobUids = new Set(bpJobs.filter((j) => j.myobJobUid).map((j) => j.myobJobUid));
+  const availableMyobJobs = myobJobs.filter((mj: any) => !usedMyobUids.has(mj.UID));
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-sm font-medium mb-2">Linked Jobs ({linkedJobs.length})</p>
+        {linkedJobs.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">No BuildPlus jobs are linked to MYOB jobs yet. Use the table below to link them.</p>
+        ) : (
+          <div className="rounded-md border overflow-auto max-h-[300px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Job Number</TableHead>
+                  <TableHead>Job Name</TableHead>
+                  <TableHead>MYOB Job</TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {linkedJobs.map((j) => {
+                  const myobJob = myobJobs.find((mj: any) => mj.UID === j.myobJobUid);
+                  return (
+                    <TableRow key={j.id} data-testid={`row-job-linked-${j.id}`}>
+                      <TableCell className="font-mono text-sm">{j.jobNumber}</TableCell>
+                      <TableCell>{j.name}</TableCell>
+                      <TableCell className="text-sm">
+                        {myobJob ? `${myobJob.Number || ""} - ${myobJob.Name || ""}` : j.myobJobUid}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onUnlink(j.id)}
+                          data-testid={`button-unlink-job-${j.id}`}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="text-sm font-medium mb-2">Unlinked BuildPlus Jobs ({unlinkedJobs.length})</p>
+        {unlinkedJobs.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">All jobs are linked to MYOB.</p>
+        ) : (
+          <div className="rounded-md border overflow-auto max-h-[400px]">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Job Number</TableHead>
+                  <TableHead>Job Name</TableHead>
+                  <TableHead>Link to MYOB Job</TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {unlinkedJobs.map((j) => (
+                  <TableRow key={j.id} data-testid={`row-job-unlinked-${j.id}`}>
+                    <TableCell className="font-mono text-sm">{j.jobNumber}</TableCell>
+                    <TableCell>{j.name}</TableCell>
+                    <TableCell>
+                      {linkingJobId === j.id ? (
+                        <Select value={selectedMyobJob} onValueChange={setSelectedMyobJob}>
+                          <SelectTrigger className="w-[280px]" data-testid={`select-myob-job-${j.id}`}>
+                            <SelectValue placeholder="Select MYOB job..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableMyobJobs.map((mj: any) => (
+                              <SelectItem key={mj.UID} value={mj.UID}>
+                                {mj.Number ? `${mj.Number} - ` : ""}{mj.Name || mj.UID}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setLinkingJobId(j.id); setSelectedMyobJob(""); }}
+                          data-testid={`button-start-link-${j.id}`}
+                        >
+                          <Link2 className="h-4 w-4 mr-1" /> Link
+                        </Button>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {linkingJobId === j.id && (
+                        <div className="flex gap-1">
+                          <Button
+                            size="icon"
+                            variant="default"
+                            disabled={!selectedMyobJob || isSaving}
+                            onClick={() => {
+                              onLink({ jobId: j.id, myobJobUid: selectedMyobJob });
+                              setLinkingJobId(null);
+                              setSelectedMyobJob("");
+                            }}
+                            data-testid={`button-confirm-link-${j.id}`}
+                          >
+                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => { setLinkingJobId(null); setSelectedMyobJob(""); }}
+                            data-testid={`button-cancel-link-${j.id}`}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      {myobJobs.length === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-4">
+          No MYOB jobs found. Make sure your MYOB connection is active and you have jobs in MYOB.
+        </p>
+      )}
+    </div>
   );
 }

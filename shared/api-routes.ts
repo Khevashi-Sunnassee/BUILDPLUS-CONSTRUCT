@@ -984,6 +984,8 @@ export const MYOB_ROUTES = {
   TAX_CODE_MAPPINGS: '/api/myob/tax-code-mappings',
   SUPPLIER_MAPPINGS: '/api/myob/supplier-mappings',
   AUTO_MAP: '/api/myob/auto-map',
+  JOBS: '/api/myob/jobs',
+  JOB_MAPPINGS: '/api/myob/job-mappings',
 } as const;
 export type MyobRoutes = typeof MYOB_ROUTES;
 

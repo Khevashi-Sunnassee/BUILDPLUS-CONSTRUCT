@@ -11,7 +11,7 @@ import {
 } from "../myob";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { myobTokens, myobExportLogs, users, myobAccountMappings, myobTaxCodeMappings, myobSupplierMappings, costCodes, suppliers } from "@shared/schema";
+import { myobTokens, myobExportLogs, users, myobAccountMappings, myobTaxCodeMappings, myobSupplierMappings, costCodes, suppliers, jobs } from "@shared/schema";
 import { eq, desc, and, asc } from "drizzle-orm";
 
 const router = Router();
@@ -256,6 +256,70 @@ router.get("/api/myob/jobs", requireAuth, async (req: Request, res: Response) =>
     res.json(data);
   } catch (err) {
     handleMyobError(err, res, "jobs");
+  }
+});
+
+router.get("/api/myob/job-mappings", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const bpJobs = await db.select({
+      id: jobs.id,
+      jobNumber: jobs.jobNumber,
+      name: jobs.name,
+      myobJobUid: jobs.myobJobUid,
+    })
+      .from(jobs)
+      .where(eq(jobs.companyId, companyId))
+      .orderBy(asc(jobs.jobNumber))
+      .limit(500);
+
+    res.json(bpJobs);
+  } catch (err) {
+    handleMyobError(err, res, "job-mappings-list");
+  }
+});
+
+router.post("/api/myob/job-mappings", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const { jobId, myobJobUid } = req.body;
+    if (!jobId || !myobJobUid) return res.status(400).json({ error: "jobId and myobJobUid are required" });
+
+    const [job] = await db.select().from(jobs)
+      .where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId))).limit(1);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    const [updated] = await db.update(jobs)
+      .set({ myobJobUid, updatedAt: new Date() })
+      .where(eq(jobs.id, jobId))
+      .returning();
+
+    res.json(updated);
+  } catch (err) {
+    handleMyobError(err, res, "job-mappings-link");
+  }
+});
+
+router.delete("/api/myob/job-mappings/:jobId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const [job] = await db.select().from(jobs)
+      .where(and(eq(jobs.id, req.params.jobId), eq(jobs.companyId, companyId))).limit(1);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+
+    await db.update(jobs)
+      .set({ myobJobUid: null, updatedAt: new Date() })
+      .where(eq(jobs.id, req.params.jobId));
+
+    res.json({ ok: true });
+  } catch (err) {
+    handleMyobError(err, res, "job-mappings-unlink");
   }
 });
 
