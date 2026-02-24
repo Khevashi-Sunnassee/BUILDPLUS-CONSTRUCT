@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ComponentType } from "react";
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
@@ -177,8 +177,12 @@ const PmCallLogFormPage = lazyWithRetry(() => import("@/pages/pm-call-log-form")
 const PmCallLogDetailPage = lazyWithRetry(() => import("@/pages/pm-call-log-detail"));
 const KnowledgeBasePage = lazyWithRetry(() => import("@/pages/knowledge-base"));
 
-function ProtectedRoute({ children, requiredRole, requireSuperAdmin }: { children: React.ReactNode; requiredRole?: string[]; requireSuperAdmin?: boolean }) {
+function ProtectedRoute({ children, requiredRole, requireSuperAdmin, permissionKey }: { children: React.ReactNode; requiredRole?: string[]; requireSuperAdmin?: boolean; permissionKey?: string }) {
   const { user, isLoading } = useAuth();
+  const { data: myPermissions = [], isLoading: permissionsLoading } = useQuery<Array<{ functionKey: string; permissionLevel: string }>>({
+    queryKey: ['/api/my-permissions'],
+    enabled: !!user && !!permissionKey,
+  });
 
   if (isLoading) {
     return (
@@ -198,6 +202,23 @@ function ProtectedRoute({ children, requiredRole, requireSuperAdmin }: { childre
 
   if (requiredRole && !requiredRole.includes(user.role)) {
     return <Redirect to="/dashboard" />;
+  }
+
+  if (permissionKey) {
+    if (user.role === "ADMIN" || user.role === "MANAGER") {
+      return <>{children}</>;
+    }
+    if (permissionsLoading) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <Skeleton className="h-12 w-48" />
+        </div>
+      );
+    }
+    const permission = myPermissions.find(p => p.functionKey === permissionKey);
+    if (!permission || permission.permissionLevel === "HIDDEN") {
+      return <Redirect to="/dashboard" />;
+    }
   }
 
   return <>{children}</>;
@@ -651,7 +672,7 @@ function Router() {
       </Route>
 
       <Route path="/procurement-reo">
-        <ProtectedRoute requiredRole={["ADMIN", "MANAGER"]}>
+        <ProtectedRoute permissionKey="reo_scheduling">
           <AuthenticatedLayout>
             <ProcurementReoSchedulingPage />
           </AuthenticatedLayout>
@@ -659,7 +680,7 @@ function Router() {
       </Route>
 
       <Route path="/procurement/reo-scheduling">
-        <ProtectedRoute requiredRole={["ADMIN", "MANAGER"]}>
+        <ProtectedRoute permissionKey="reo_scheduling">
           <AuthenticatedLayout>
             <ProcurementReoSchedulingPage />
           </AuthenticatedLayout>
@@ -723,7 +744,7 @@ function Router() {
       </Route>
 
       <Route path="/manager/review">
-        <ProtectedRoute requiredRole={["MANAGER", "ADMIN"]}>
+        <ProtectedRoute permissionKey="manager_review">
           <AuthenticatedLayout>
             <ManagerReviewPage />
           </AuthenticatedLayout>
@@ -775,7 +796,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/panels">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="panel_register">
           <AuthenticatedLayout>
             <AdminPanelsPage />
           </AuthenticatedLayout>
@@ -783,7 +804,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/panel-types">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_panel_types">
           <AuthenticatedLayout>
             <AdminPanelTypesPage />
           </AuthenticatedLayout>
@@ -791,7 +812,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/document-config">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_document_config">
           <AuthenticatedLayout>
             <AdminDocumentConfigPage />
           </AuthenticatedLayout>
@@ -815,7 +836,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/zones">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_panel_types">
           <AuthenticatedLayout>
             <AdminZonesPage />
           </AuthenticatedLayout>
@@ -824,7 +845,7 @@ function Router() {
 
 
       <Route path="/admin/customers/:id">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_customers">
           <AuthenticatedLayout>
             <CustomerDetailPage />
           </AuthenticatedLayout>
@@ -832,7 +853,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/customers">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_customers">
           <AuthenticatedLayout>
             <AdminCustomersPage />
           </AuthenticatedLayout>
@@ -840,7 +861,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/suppliers/:id">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_suppliers">
           <AuthenticatedLayout>
             <SupplierDetailPage />
           </AuthenticatedLayout>
@@ -848,7 +869,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/suppliers">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_suppliers">
           <AuthenticatedLayout>
             <AdminSuppliersPage />
           </AuthenticatedLayout>
@@ -856,7 +877,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/employees/:id">
-        <ProtectedRoute requiredRole={["ADMIN", "MANAGER"]}>
+        <ProtectedRoute permissionKey="admin_employees">
           <AuthenticatedLayout>
             <EmployeeDetailPage />
           </AuthenticatedLayout>
@@ -864,7 +885,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/employees">
-        <ProtectedRoute requiredRole={["ADMIN", "MANAGER"]}>
+        <ProtectedRoute permissionKey="admin_employees">
           <AuthenticatedLayout>
             <AdminEmployeesPage />
           </AuthenticatedLayout>
@@ -872,7 +893,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/items">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_item_catalog">
           <AuthenticatedLayout>
             <AdminItemsPage />
           </AuthenticatedLayout>
@@ -880,7 +901,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/asset-register">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_assets">
           <AuthenticatedLayout>
             <AssetRegisterPage />
           </AuthenticatedLayout>
@@ -888,7 +909,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/assets/:id">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_assets">
           <AuthenticatedLayout>
             <AssetDetailPage />
           </AuthenticatedLayout>
@@ -896,7 +917,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/asset-repair/new">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_assets">
           <AuthenticatedLayout>
             <AssetRepairFormPage />
           </AuthenticatedLayout>
@@ -904,7 +925,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/job-types">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_settings">
           <AuthenticatedLayout>
             <AdminJobTypesPage />
           </AuthenticatedLayout>
@@ -912,7 +933,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/cost-codes">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_settings">
           <AuthenticatedLayout>
             <AdminCostCodesPage />
           </AuthenticatedLayout>
@@ -920,7 +941,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/job-types/:id/workflow">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_settings">
           <AuthenticatedLayout>
             <WorkflowBuilderPage />
           </AuthenticatedLayout>
@@ -936,7 +957,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/checklist-templates">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_checklist_templates">
           <AuthenticatedLayout>
             <AdminChecklistTemplatesPage />
           </AuthenticatedLayout>
@@ -944,7 +965,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/email-templates">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_settings">
           <AuthenticatedLayout>
             <AdminEmailTemplatesPage />
           </AuthenticatedLayout>
@@ -960,7 +981,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/checklist-templates/:id/edit">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute permissionKey="admin_checklist_templates">
           <AuthenticatedLayout>
             <TemplateEditorPage />
           </AuthenticatedLayout>
