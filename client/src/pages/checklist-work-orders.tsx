@@ -217,7 +217,7 @@ function ChecklistPreviewPanel({ workOrderId }: { workOrderId: string }) {
             <div key={section.id} className="space-y-2">
               <h5 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">{section.name}</h5>
               <div className="space-y-1.5">
-                {section.fields.map((field) => {
+                {(section.fields || section.items || []).map((field: any) => {
                   const response = responses[field.id];
                   const isFailed = field.id === failedFieldId;
                   const displayValue = response?.value ?? response ?? "\u2014";
