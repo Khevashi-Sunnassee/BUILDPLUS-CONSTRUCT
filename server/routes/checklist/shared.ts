@@ -27,6 +27,20 @@ export type { ChecklistSection, ChecklistField } from "@shared/schema";
 export { requireAuth, requireRole } from "../middleware/auth.middleware";
 export { default as logger } from "../../lib/logger";
 
+const AUTO_TRIGGER_FAILURE_VALUES: Record<string, string[]> = {
+  pass_fail_flag: ["fail"],
+  yes_no_na: ["no"],
+  condition_option: ["poor"],
+};
+
+function isAutoTriggerFailure(fieldType: string, responseValue: unknown): boolean {
+  const failureValues = AUTO_TRIGGER_FAILURE_VALUES[fieldType];
+  if (!failureValues) return false;
+  const valueStr = responseValue !== undefined && responseValue !== null && responseValue !== ""
+    ? String(responseValue).toLowerCase() : "";
+  return failureValues.includes(valueStr);
+}
+
 export async function processWorkOrderTriggers(
   companyId: string,
   instanceId: string,
@@ -45,14 +59,21 @@ export async function processWorkOrderTriggers(
 
     for (const section of sections) {
       for (const field of (section.items || []) as ChecklistField[]) {
-        if (!field.workOrderEnabled) continue;
-
         const responseValue = responses[field.id];
-        const triggerVal = (field.workOrderTriggerValue || "").toLowerCase();
         const valueStr = responseValue !== undefined && responseValue !== null && responseValue !== ""
           ? String(responseValue).toLowerCase() : "";
 
-        const triggerMatches = valueStr !== "" && (!triggerVal || valueStr === triggerVal);
+        let triggerMatches = false;
+
+        if (field.workOrderEnabled) {
+          const triggerVal = (field.workOrderTriggerValue || "").toLowerCase();
+          triggerMatches = valueStr !== "" && (!triggerVal || valueStr === triggerVal);
+        } else {
+          triggerMatches = isAutoTriggerFailure(field.type, responseValue);
+        }
+
+        const isAutoTriggerType = field.type in AUTO_TRIGGER_FAILURE_VALUES;
+        if (!triggerMatches && !field.workOrderEnabled && !isAutoTriggerType) continue;
 
         const existing = await db.select().from(checklistWorkOrders)
           .where(and(
@@ -68,15 +89,18 @@ export async function processWorkOrderTriggers(
               .set({ result: String(responseValue), updatedAt: new Date() })
               .where(eq(checklistWorkOrders.id, existing[0].id));
           } else {
+            const isAutoTriggered = !field.workOrderEnabled;
             await db.insert(checklistWorkOrders).values({
               companyId,
               checklistInstanceId: instanceId,
               fieldId: field.id,
               fieldName: field.name,
               sectionName: section.name,
-              triggerValue: field.workOrderTriggerValue || null,
+              triggerValue: field.workOrderTriggerValue || (isAutoTriggered ? String(responseValue) : null),
               result: String(responseValue),
-              details: `${field.name} reported "${responseValue}" during inspection`,
+              details: isAutoTriggered
+                ? `${field.name} auto-detected failure: "${responseValue}" during inspection`
+                : `${field.name} reported "${responseValue}" during inspection`,
             });
           }
         } else if (existing.length > 0 && existing[0].status === "open") {
