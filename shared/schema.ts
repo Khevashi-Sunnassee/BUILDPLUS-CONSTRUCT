@@ -443,6 +443,7 @@ export const jobs = pgTable("jobs", {
   comments: text("comments"),
   jobTypeId: varchar("job_type_id", { length: 36 }),
   defectLiabilityEndDate: timestamp("defect_liability_end_date"),
+  myobJobUid: text("myob_job_uid"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
