@@ -34,16 +34,21 @@ import {
   ChevronsUpDown,
   Workflow,
   ListFilter,
+  LayoutGrid,
+  User as UserIcon,
 } from "lucide-react";
 import { Link } from "wouter";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { TaskGroupComponent } from "./TaskGroupComponent";
+import { PersonView } from "./PersonView";
 import { TaskSidebar } from "./TaskSidebar";
 import { SendTasksEmailDialog } from "./SendTasksEmailDialog";
 import type { Task, TaskGroup, User, Job, TaskTypeFilter } from "./types";
 import { STATUS_CONFIG } from "./types";
 import { exportTasksToPDF } from "./export-pdf";
 import { ErrorBoundary } from "@/components/error-boundary";
+
+type ViewMode = "group" | "person";
 
 function TasksPageContent() {
   useDocumentTitle("Tasks");
@@ -64,6 +69,8 @@ function TasksPageContent() {
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [collapseAllVersion, setCollapseAllVersion] = useState(0);
   const [expandAllVersion, setExpandAllVersion] = useState(0);
+  const [viewMode, setViewMode] = useState<ViewMode>("group");
+  const [personFilter, setPersonFilter] = useState<string>("all");
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -148,6 +155,14 @@ function TasksPageContent() {
           if (jobFilter === "none" && task.jobId) return false;
           if (jobFilter !== "none" && task.jobId !== jobFilter) return false;
         }
+        if (personFilter !== "all") {
+          if (personFilter === "unassigned") {
+            if (task.assignees.length > 0) return false;
+          } else {
+            const hasAssignee = task.assignees.some(a => a.userId === personFilter);
+            if (!hasAssignee) return false;
+          }
+        }
         if (statusFilter !== "all" && task.status !== statusFilter) return false;
         if (dueDateFilter !== "all") {
           const today = new Date();
@@ -170,11 +185,11 @@ function TasksPageContent() {
         return true;
       }),
     })).filter((group) => {
-      const hasNarrowingFilter = taskTypeFilter !== "all" || jobFilter !== "all" || statusFilter !== "all" || dueDateFilter !== "all";
+      const hasNarrowingFilter = taskTypeFilter !== "all" || jobFilter !== "all" || personFilter !== "all" || statusFilter !== "all" || dueDateFilter !== "all";
       if (hasNarrowingFilter && group.tasks.length === 0) return false;
       return true;
     });
-  }, [groups, showCompleted, taskTypeFilter, jobFilter, statusFilter, dueDateFilter]);
+  }, [groups, showCompleted, taskTypeFilter, jobFilter, personFilter, statusFilter, dueDateFilter]);
 
   const toggleTaskSelected = useCallback((taskId: string) => {
     setSelectedTaskIds((prev) => {
@@ -430,6 +445,18 @@ function TasksPageContent() {
   const activeTask = activeId ? findTaskById(activeId)?.task : null;
   const activeGroupDrag = activeGroupDragId ? groups.find(g => g.id === activeGroupDragId) : null;
 
+  const personFilterOptions = useMemo(() => {
+    const userIdsInTasks = new Set<string>();
+    groups.forEach(g => {
+      g.tasks.forEach(t => {
+        t.assignees.forEach(a => userIdsInTasks.add(a.userId));
+      });
+    });
+    return users
+      .filter(u => userIdsInTasks.has(u.id))
+      .sort((a, b) => (a.name || a.email || "").localeCompare(b.name || b.email || ""));
+  }, [groups, users]);
+
   const jobFilterOptions = useMemo(() => {
     const jobIdsInTasks = new Set<string>();
     groups.forEach(g => {
@@ -524,6 +551,45 @@ function TasksPageContent() {
               <SelectItem value="no-date">No Due Date</SelectItem>
             </SelectContent>
           </Select>
+          <div className="flex items-center gap-1 border rounded-md overflow-hidden">
+            <Button
+              variant={viewMode === "group" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("group")}
+              className="rounded-none gap-1 h-8"
+              data-testid="btn-view-group"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Groups
+            </Button>
+            <Button
+              variant={viewMode === "person" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("person")}
+              className="rounded-none gap-1 h-8"
+              data-testid="btn-view-person"
+            >
+              <UserIcon className="h-3.5 w-3.5" />
+              Person
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <UserIcon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <Select value={personFilter} onValueChange={setPersonFilter}>
+              <SelectTrigger className="w-[160px]" data-testid="select-person-filter">
+                <SelectValue placeholder="Filter by person" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All People</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {personFilterOptions.map((user) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.name || user.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -644,70 +710,83 @@ function TasksPageContent() {
         </div>
       )}
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={customCollisionDetection}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-      >
-        {groups.length === 0 ? (
-          <div className="text-center py-16 border rounded-lg bg-muted/30">
-            <div className="max-w-md mx-auto">
-              <h3 className="text-lg font-semibold mb-2">No task groups yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Create your first group to start organizing tasks. Groups help you categorize and manage related work items.
-              </p>
-              <Button onClick={() => setShowNewGroupInput(true)} data-testid="btn-create-first-group">
-                <Plus className="h-4 w-4 mr-2" />
-                Create First Group
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <SortableContext items={filteredGroups.map(g => `${GROUP_SORTABLE_PREFIX}${g.id}`)} strategy={verticalListSortingStrategy}>
-            <div className="border rounded-lg overflow-visible bg-card">
-              {filteredGroups.map((group, index) => (
-                <TaskGroupComponent
-                  key={group.id}
-                  group={group}
-                  users={users}
-                  jobs={jobs}
-                  onOpenSidebar={setSelectedTask}
-                  allGroups={filteredGroups}
-                  showCompleted={showCompleted}
-                  selectedTaskIds={selectedTaskIds}
-                  onToggleTaskSelected={toggleTaskSelected}
-                  isDropTarget={overGroupId === group.id}
-                  collapseAllVersion={collapseAllVersion}
-                  expandAllVersion={expandAllVersion}
-                  onMoveGroup={handleMoveGroup}
-                  groupIndex={groups.findIndex(g => g.id === group.id)}
-                  totalGroups={groups.length}
-                  sortableGroupId={`${GROUP_SORTABLE_PREFIX}${group.id}`}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        )}
-
-        <DragOverlay>
-          {activeTask && (
-            <div className="bg-card border shadow-lg rounded-md p-2 opacity-90">
-              <span className="text-sm font-medium">{activeTask.title}</span>
-            </div>
-          )}
-          {activeGroupDrag && (
-            <div className="bg-card border shadow-lg rounded-md p-3 opacity-90">
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: activeGroupDrag.color }} />
-                <span className="font-semibold text-sm" style={{ color: activeGroupDrag.color }}>{activeGroupDrag.name}</span>
-                <span className="text-xs text-muted-foreground ml-1">{activeGroupDrag.tasks.length} items</span>
+      {viewMode === "person" ? (
+        <PersonView
+          groups={filteredGroups}
+          users={users}
+          jobs={jobs}
+          onOpenSidebar={setSelectedTask}
+          showCompleted={showCompleted}
+          selectedTaskIds={selectedTaskIds}
+          onToggleTaskSelected={toggleTaskSelected}
+          personFilter={personFilter}
+        />
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={customCollisionDetection}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          {groups.length === 0 ? (
+            <div className="text-center py-16 border rounded-lg bg-muted/30">
+              <div className="max-w-md mx-auto">
+                <h3 className="text-lg font-semibold mb-2">No task groups yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Create your first group to start organizing tasks. Groups help you categorize and manage related work items.
+                </p>
+                <Button onClick={() => setShowNewGroupInput(true)} data-testid="btn-create-first-group">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create First Group
+                </Button>
               </div>
             </div>
+          ) : (
+            <SortableContext items={filteredGroups.map(g => `${GROUP_SORTABLE_PREFIX}${g.id}`)} strategy={verticalListSortingStrategy}>
+              <div className="border rounded-lg overflow-visible bg-card">
+                {filteredGroups.map((group, index) => (
+                  <TaskGroupComponent
+                    key={group.id}
+                    group={group}
+                    users={users}
+                    jobs={jobs}
+                    onOpenSidebar={setSelectedTask}
+                    allGroups={filteredGroups}
+                    showCompleted={showCompleted}
+                    selectedTaskIds={selectedTaskIds}
+                    onToggleTaskSelected={toggleTaskSelected}
+                    isDropTarget={overGroupId === group.id}
+                    collapseAllVersion={collapseAllVersion}
+                    expandAllVersion={expandAllVersion}
+                    onMoveGroup={handleMoveGroup}
+                    groupIndex={groups.findIndex(g => g.id === group.id)}
+                    totalGroups={groups.length}
+                    sortableGroupId={`${GROUP_SORTABLE_PREFIX}${group.id}`}
+                  />
+                ))}
+              </div>
+            </SortableContext>
           )}
-        </DragOverlay>
-      </DndContext>
+
+          <DragOverlay>
+            {activeTask && (
+              <div className="bg-card border shadow-lg rounded-md p-2 opacity-90">
+                <span className="text-sm font-medium">{activeTask.title}</span>
+              </div>
+            )}
+            {activeGroupDrag && (
+              <div className="bg-card border shadow-lg rounded-md p-3 opacity-90">
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full" style={{ backgroundColor: activeGroupDrag.color }} />
+                  <span className="font-semibold text-sm" style={{ color: activeGroupDrag.color }}>{activeGroupDrag.name}</span>
+                  <span className="text-xs text-muted-foreground ml-1">{activeGroupDrag.tasks.length} items</span>
+                </div>
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
+      )}
 
       <TaskSidebar task={selectedTask} onClose={() => setSelectedTask(null)} />
 
