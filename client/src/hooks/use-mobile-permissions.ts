@@ -20,6 +20,7 @@ const mobileFunctionKeyMap: Record<string, string> = {
   "new-opportunity": "sales_pipeline",
   "photo-capture": "document_register",
   "hire-bookings": "hire_bookings",
+  "financial-analysis": "financial_analysis",
 };
 
 export function useMobilePermissions() {

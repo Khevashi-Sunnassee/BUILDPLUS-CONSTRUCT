@@ -17,6 +17,7 @@ import {
   Phone,
   DollarSign,
   CheckSquare,
+  TrendingUp,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -64,6 +65,7 @@ export default function MobileMore() {
   const showDocuments = !isHidden("documents");
   const showChecklists = !isHidden("checklists");
   const showBroadcast = !isHidden("broadcast");
+  const showFinancialAnalysis = !isHidden("financial-analysis");
 
   return (
     <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile More">
@@ -174,6 +176,14 @@ export default function MobileMore() {
           label="AP Approvals"
           href="/mobile/ap-approvals"
         />
+        {showFinancialAnalysis && (
+          <MenuItem
+            icon={<TrendingUp className="h-5 w-5 text-purple-400" />}
+            iconBg="bg-purple-500/20"
+            label="Financial Analysis"
+            href="/mobile/financial-analysis"
+          />
+        )}
         {showWeeklyReport && (
           <MenuItem
             icon={<FileText className="h-5 w-5 text-indigo-400" />}

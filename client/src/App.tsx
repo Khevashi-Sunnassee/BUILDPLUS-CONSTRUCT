@@ -166,6 +166,7 @@ const MobileDraftingEmailDetailPage = lazyWithRetry(() => import("@/pages/mobile
 const MobileTenderEmailDetailPage = lazyWithRetry(() => import("@/pages/mobile/tender-email-detail"));
 const MobileApInvoiceDetailPage = lazyWithRetry(() => import("@/pages/mobile/ap-invoice-detail"));
 const MobileWorkOrdersPage = lazyWithRetry(() => import("@/pages/mobile/work-orders"));
+const MobileFinancialAnalysisPage = lazyWithRetry(() => import("@/pages/mobile/financial-analysis"));
 const PhotoGalleryPage = lazyWithRetry(() => import("@/pages/photo-gallery"));
 const SalesPipelinePage = lazyWithRetry(() => import("@/pages/sales-pipeline"));
 const HelpCenterPage = lazyWithRetry(() => import("@/pages/help-center"));
@@ -221,6 +222,7 @@ function getMobileEquivalentRoute(desktopPath: string): string {
     '/ap-invoices': '/mobile/ap-approvals',
     '/jobs': '/mobile/jobs',
     '/sales-pipeline': '/mobile/more',
+    '/financial-analysis': '/mobile/financial-analysis',
     '/profile': '/mobile/profile',
   };
   if (routeMap[desktopPath]) return routeMap[desktopPath];
@@ -1161,6 +1163,11 @@ function Router() {
       <Route path="/mobile/ap-approvals">
         <ProtectedRoute>
           <MobileApApprovalsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/financial-analysis">
+        <ProtectedRoute>
+          <MobileFinancialAnalysisPage />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/more">
