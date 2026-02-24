@@ -386,6 +386,12 @@ export default function MobileDashboard() {
               href="/mobile/checklists"
             />
           )}
+          <NavRow
+            icon={<ClipboardList className="h-5 w-5 text-red-400" />}
+            iconBg="bg-red-500/20"
+            label="Work Orders"
+            href="/mobile/work-orders"
+          />
         </nav>
       </div>
 

@@ -163,6 +163,7 @@ const MobileEmailProcessingPage = lazyWithRetry(() => import("@/pages/mobile/ema
 const MobileDraftingEmailDetailPage = lazyWithRetry(() => import("@/pages/mobile/drafting-email-detail"));
 const MobileTenderEmailDetailPage = lazyWithRetry(() => import("@/pages/mobile/tender-email-detail"));
 const MobileApInvoiceDetailPage = lazyWithRetry(() => import("@/pages/mobile/ap-invoice-detail"));
+const MobileWorkOrdersPage = lazyWithRetry(() => import("@/pages/mobile/work-orders"));
 const PhotoGalleryPage = lazyWithRetry(() => import("@/pages/photo-gallery"));
 const SalesPipelinePage = lazyWithRetry(() => import("@/pages/sales-pipeline"));
 const HelpCenterPage = lazyWithRetry(() => import("@/pages/help-center"));
@@ -1242,6 +1243,11 @@ function Router() {
       <Route path="/mobile/ap-invoices/:id">
         <ProtectedRoute>
           <MobileApInvoiceDetailPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/work-orders">
+        <ProtectedRoute>
+          <MobileWorkOrdersPage />
         </ProtectedRoute>
       </Route>
 

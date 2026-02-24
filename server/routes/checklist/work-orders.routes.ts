@@ -123,6 +123,8 @@ router.get("/api/checklist/work-orders", requireAuth, async (req: Request, res: 
       conditions.push(isNull(checklistWorkOrders.assignedTo));
     } else if (tab === "assigned") {
       conditions.push(isNotNull(checklistWorkOrders.assignedTo));
+    } else if (tab === "mine") {
+      conditions.push(eq(checklistWorkOrders.assignedTo, req.session.userId!));
     }
 
     if (typeFilter && typeFilter !== "all") {

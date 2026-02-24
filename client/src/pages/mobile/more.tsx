@@ -206,6 +206,12 @@ export default function MobileMore() {
             href="/mobile/checklists"
           />
         )}
+        <MenuItem
+          icon={<ClipboardList className="h-5 w-5 text-red-400" />}
+          iconBg="bg-red-500/20"
+          label="Work Orders"
+          href="/mobile/work-orders"
+        />
         {showBroadcast && (
           <MenuItem
             icon={<Radio className="h-5 w-5 text-rose-400" />}
