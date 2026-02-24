@@ -176,7 +176,12 @@ const createUserSchema = z.object({
   name: z.string().optional(),
   phone: z.string().min(1, "Phone number is required"),
   address: z.string().min(1, "Address is required"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string()
+    .min(8, "Password must be at least 8 characters")
+    .refine((val) => /[A-Z]/.test(val), { message: "Password must contain at least one uppercase letter" })
+    .refine((val) => /[a-z]/.test(val), { message: "Password must contain at least one lowercase letter" })
+    .refine((val) => /[0-9]/.test(val), { message: "Password must contain at least one number" })
+    .refine((val) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(val), { message: "Password must contain at least one special character" }),
   role: z.enum(["USER", "MANAGER", "ADMIN"]),
   userType: z.enum(["EMPLOYEE", "EXTERNAL"]),
   departmentId: z.string().nullable().optional(),
@@ -191,8 +196,16 @@ const editUserSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   password: z.string().refine(
-    (val) => val === "" || val.length >= 6,
-    { message: "Password must be at least 6 characters" }
+    (val) => {
+      if (val === "") return true;
+      if (val.length < 8) return false;
+      if (!/[A-Z]/.test(val)) return false;
+      if (!/[a-z]/.test(val)) return false;
+      if (!/[0-9]/.test(val)) return false;
+      if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(val)) return false;
+      return true;
+    },
+    { message: "Password must be at least 8 characters with uppercase, lowercase, number, and special character" }
   ),
   role: z.enum(["USER", "MANAGER", "ADMIN"]),
   userType: z.enum(["EMPLOYEE", "EXTERNAL"]),
@@ -855,8 +868,8 @@ export default function AdminUsersPage() {
         form.setError("address", { message: "Address is required for new users" });
         hasErrors = true;
       }
-      if (!data.password || data.password.length < 6) {
-        form.setError("password", { message: "Password must be at least 6 characters" });
+      if (!data.password || data.password.length < 8) {
+        form.setError("password", { message: "Password must be at least 8 characters with uppercase, lowercase, number, and special character" });
         hasErrors = true;
       }
       if (hasErrors) return;
@@ -1312,7 +1325,7 @@ export default function AdminUsersPage() {
                         </FormControl>
                         {editingUser && (
                           <FormDescription>
-                            Leave blank to keep current password
+                            Leave blank to keep current password. Must include uppercase, lowercase, number, and special character.
                           </FormDescription>
                         )}
                         <FormMessage />
