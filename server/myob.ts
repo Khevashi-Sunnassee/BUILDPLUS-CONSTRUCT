@@ -21,7 +21,7 @@ export function getAuthorizationUrl(redirectUri: string): string {
     client_id: process.env.MYOB_CLIENT_ID ?? "",
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "sme-company-file sme-company-settings sme-sales sme-purchases sme-contacts sme-inventory sme-reports sme-generalledger sme-banking",
+    scope: "CompanyFile",
     prompt: "consent",
   });
   return `${MYOB_AUTH_URL}?${params.toString()}`;
@@ -35,7 +35,7 @@ export async function exchangeCodeForToken(
   const body = new URLSearchParams({
     client_id: process.env.MYOB_CLIENT_ID ?? "",
     client_secret: process.env.MYOB_CLIENT_SECRET ?? "",
-    scope: "sme-company-file sme-company-settings sme-sales sme-purchases sme-contacts sme-inventory sme-reports sme-generalledger sme-banking",
+    scope: "CompanyFile",
     code,
     redirect_uri: redirectUri,
     grant_type: "authorization_code",
