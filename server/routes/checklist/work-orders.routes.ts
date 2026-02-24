@@ -81,6 +81,7 @@ router.get("/api/checklist/work-orders/stats", requireAuth, async (req: Request,
       .where(eq(checklistWorkOrders.companyId, companyId))
       .limit(5000);
 
+    const userId = req.session.userId;
     const stats = {
       total: orders.length,
       open: orders.filter(o => o.status === "open").length,
@@ -92,6 +93,7 @@ router.get("/api/checklist/work-orders/stats", requireAuth, async (req: Request,
       high: orders.filter(o => o.priority === "high").length,
       unassigned: orders.filter(o => !o.assignedTo).length,
       assigned: orders.filter(o => !!o.assignedTo).length,
+      assignedToMe: userId ? orders.filter(o => o.assignedTo === userId && o.status !== "closed" && o.status !== "cancelled").length : 0,
       byType: {} as Record<string, number>,
     };
 

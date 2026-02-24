@@ -215,6 +215,10 @@ export default function MobileDashboard() {
     queryKey: [DRAFTING_INBOX_ROUTES.COUNTS],
   });
 
+  const { data: workOrderStats } = useQuery<{ open: number; assignedToMe: number }>({
+    queryKey: ["/api/checklist/work-orders/stats"],
+  });
+
   const isLoading = (showChat && loadingConversations) || (showTasks && loadingTasks) || (showJobs && loadingJobs) || (showPanels && loadingPanels);
 
   const unreadMessages = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
@@ -231,6 +235,7 @@ export default function MobileDashboard() {
   if (showJobs) statCards.push(<StatCard key="jobs" value={activeJobs} title="Jobs" subtitle="Active" accent="green" />);
   statCards.push(<StatCard key="emails" value={emailsToProcess} title="Emails" subtitle="To Process" accent="yellow" />);
   if (showPanels) statCards.push(<StatCard key="critical" value={criticalIssues} title="Critical" subtitle="Issues" accent="red" />);
+  statCards.push(<StatCard key="work-orders" value={workOrderStats?.open ?? 0} title="Work Orders" subtitle={`${workOrderStats?.assignedToMe ?? 0} assigned to me`} accent="red" />);
 
   return (
     <div className="flex flex-col h-screen-safe bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Dashboard">
