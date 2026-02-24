@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -8,16 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
   AlertTriangle, CheckCircle2, Clock, ClipboardList,
-  Loader2, Search, User, ArrowLeft, XCircle,
-  PanelRightClose, PanelRightOpen, AlertCircle, Wrench,
-  ChevronDown, ChevronUp, Save
+  Loader2, Search, User, XCircle, AlertCircle, Wrench,
+  Save, Calendar, Building2, Tag, FileText, MessageSquare,
+  Paperclip, Info, UserCheck, UserX,
 } from "lucide-react";
+import { EntitySidebar } from "@/components/EntitySidebar";
+import type { EntitySidebarRoutes } from "@/lib/sidebar-utils";
 
 interface WorkOrder {
   id: string;
@@ -32,7 +35,11 @@ interface WorkOrder {
   photos: unknown[];
   status: string;
   priority: string;
+  workOrderType: string | null;
   assignedTo: string | null;
+  supplierId: string | null;
+  supplierName: string | null;
+  dueDate: string | null;
   resolvedBy: string | null;
   resolvedAt: string | null;
   resolutionNotes: string | null;
@@ -54,12 +61,9 @@ interface WorkOrderStats {
   cancelled: number;
   critical: number;
   high: number;
-}
-
-interface ChecklistDetail {
-  workOrder: any;
-  instance: any;
-  template: any;
+  unassigned: number;
+  assigned: number;
+  byType: Record<string, number>;
 }
 
 interface CompanyUser {
@@ -67,6 +71,14 @@ interface CompanyUser {
   name: string | null;
   email: string;
 }
+
+const WORK_ORDER_ROUTES: EntitySidebarRoutes = {
+  UPDATES: (id) => `/api/checklist/work-orders/${id}/updates`,
+  UPDATE_BY_ID: (id) => `/api/work-order-updates/${id}`,
+  FILES: (id) => `/api/checklist/work-orders/${id}/files`,
+  FILE_BY_ID: (id) => `/api/work-order-files/${id}`,
+  EMAIL_DROP: (id) => `/api/checklist/work-orders/${id}/email-drop`,
+};
 
 function formatDate(date: string | null | undefined): string {
   if (!date) return "\u2014";
@@ -93,6 +105,16 @@ const PRIORITY_CONFIG: Record<string, { label: string; className: string }> = {
   critical: { label: "Critical", className: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" },
 };
 
+const TYPE_CONFIG: Record<string, { label: string; color: string; icon: typeof Wrench }> = {
+  defect: { label: "Defect", color: "text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-950 dark:border-red-800", icon: AlertCircle },
+  maintenance: { label: "Maintenance", color: "text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-950 dark:border-blue-800", icon: Wrench },
+  safety: { label: "Safety", color: "text-orange-600 bg-orange-50 border-orange-200 dark:text-orange-400 dark:bg-orange-950 dark:border-orange-800", icon: AlertTriangle },
+  corrective_action: { label: "Corrective Action", color: "text-purple-600 bg-purple-50 border-purple-200 dark:text-purple-400 dark:bg-purple-950 dark:border-purple-800", icon: CheckCircle2 },
+  inspection: { label: "Inspection", color: "text-teal-600 bg-teal-50 border-teal-200 dark:text-teal-400 dark:bg-teal-950 dark:border-teal-800", icon: ClipboardList },
+  warranty: { label: "Warranty", color: "text-indigo-600 bg-indigo-50 border-indigo-200 dark:text-indigo-400 dark:bg-indigo-950 dark:border-indigo-800", icon: FileText },
+  general: { label: "General", color: "text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-950 dark:border-gray-800", icon: Tag },
+};
+
 function StatusBadge({ status }: { status: string }) {
   const config = STATUS_CONFIG[status] || { label: status, variant: "secondary" as const, icon: Clock };
   return (
@@ -106,6 +128,17 @@ function PriorityBadge({ priority }: { priority: string }) {
   const config = PRIORITY_CONFIG[priority] || { label: priority, className: "" };
   return (
     <Badge variant="outline" className={config.className} data-testid={`badge-priority-${priority}`}>
+      {config.label}
+    </Badge>
+  );
+}
+
+function TypeBadge({ type }: { type: string }) {
+  const config = TYPE_CONFIG[type] || TYPE_CONFIG.general;
+  const Icon = config.icon;
+  return (
+    <Badge variant="outline" className={`${config.color} text-[10px] px-1.5 py-0 gap-1`} data-testid={`badge-type-${type}`}>
+      <Icon className="h-2.5 w-2.5" />
       {config.label}
     </Badge>
   );
@@ -129,9 +162,7 @@ function DashboardTiles({ stats, isLoading, activeFilter, onFilterClick }: {
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3" data-testid="loader-stats">
-        {tiles.map((t) => (
-          <Skeleton key={t.key} className="h-20 rounded-lg" />
-        ))}
+        {tiles.map((t) => <Skeleton key={t.key} className="h-20 rounded-lg" />)}
       </div>
     );
   }
@@ -164,112 +195,250 @@ function DashboardTiles({ stats, isLoading, activeFilter, onFilterClick }: {
   );
 }
 
-function ChecklistPreviewPanel({ workOrderId }: { workOrderId: string }) {
-  const { data, isLoading } = useQuery<ChecklistDetail>({
-    queryKey: ["/api/checklist/work-orders", workOrderId, "checklist-detail"],
-    queryFn: () => fetch(`/api/checklist/work-orders/${workOrderId}/checklist-detail`, { credentials: "include" }).then(r => r.json()),
-    enabled: !!workOrderId,
-  });
+function DetailTabContent({
+  order,
+  companyUsers,
+  onSave,
+  isPending,
+}: {
+  order: WorkOrder;
+  companyUsers: CompanyUser[];
+  onSave: (updates: Record<string, unknown>) => void;
+  isPending: boolean;
+}) {
+  const [editDetails, setEditDetails] = useState(order.details || "");
+  const [editAssignedTo, setEditAssignedTo] = useState(order.assignedTo || "");
+  const [editStatus, setEditStatus] = useState(order.status);
+  const [editPriority, setEditPriority] = useState(order.priority);
+  const [editResolutionNotes, setEditResolutionNotes] = useState(order.resolutionNotes || "");
+  const [editType, setEditType] = useState(order.workOrderType || "general");
+  const [editSupplierName, setEditSupplierName] = useState(order.supplierName || "");
+  const [editDueDate, setEditDueDate] = useState(order.dueDate ? new Date(order.dueDate).toISOString().slice(0, 10) : "");
+  const [isDirty, setIsDirty] = useState(false);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-48" data-testid="loader-checklist-preview">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    setEditDetails(order.details || "");
+    setEditAssignedTo(order.assignedTo || "");
+    setEditStatus(order.status);
+    setEditPriority(order.priority);
+    setEditResolutionNotes(order.resolutionNotes || "");
+    setEditType(order.workOrderType || "general");
+    setEditSupplierName(order.supplierName || "");
+    setEditDueDate(order.dueDate ? new Date(order.dueDate).toISOString().slice(0, 10) : "");
+    setIsDirty(false);
+  }, [order.id]);
 
-  if (!data?.instance || !data?.template) {
-    return (
-      <div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-2" data-testid="empty-checklist-preview">
-        <ClipboardList className="h-10 w-10 opacity-30" />
-        <p className="text-sm">Checklist data not available</p>
-      </div>
-    );
-  }
+  const handleFieldChange = useCallback((setter: (v: string) => void) => {
+    return (value: string) => {
+      setter(value);
+      setIsDirty(true);
+    };
+  }, []);
 
-  const { instance, template, workOrder } = data;
-  const responses = (instance.responses || {}) as Record<string, any>;
-  const sections = (template.sections || []) as Array<{ id: string; name: string; fields: Array<{ id: string; label: string; type: string; options?: string[] }> }>;
-
-  const failedFieldId = workOrder?.fieldId;
+  const handleSave = useCallback(() => {
+    onSave({
+      details: editDetails,
+      assignedTo: editAssignedTo || null,
+      status: editStatus,
+      priority: editPriority,
+      resolutionNotes: editResolutionNotes || null,
+      workOrderType: editType,
+      supplierName: editSupplierName || null,
+      dueDate: editDueDate || null,
+    });
+    setIsDirty(false);
+  }, [editDetails, editAssignedTo, editStatus, editPriority, editResolutionNotes, editType, editSupplierName, editDueDate, onSave]);
 
   return (
-    <div className="space-y-4" data-testid="panel-checklist-preview">
-      <div className="space-y-1">
-        <h4 className="font-semibold text-sm">{template.name}</h4>
-        <p className="text-xs text-muted-foreground">
-          Instance: {instance.instanceNumber || instance.id.slice(0, 8)}
-        </p>
-        <div className="flex gap-2 mt-1">
-          <Badge variant="outline" className="text-xs">{instance.status?.replace(/_/g, " ")}</Badge>
-          {instance.completionRate && (
-            <Badge variant="secondary" className="text-xs">{Number(instance.completionRate).toFixed(0)}% complete</Badge>
-          )}
+    <div className="p-4 space-y-4 overflow-y-auto" data-testid="tab-details">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold">Details</h4>
+        <Button
+          variant="default"
+          size="sm"
+          disabled={!isDirty || isPending}
+          onClick={handleSave}
+          data-testid="button-save-details"
+        >
+          {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+          Save
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Field</label>
+          <p className="text-sm font-medium" data-testid="text-detail-field">{order.fieldName}</p>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Section</label>
+          <p className="text-sm" data-testid="text-detail-section">{order.sectionName}</p>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Result</label>
+          <p className="text-sm font-medium text-red-600 dark:text-red-400" data-testid="text-detail-result">{order.result || "\u2014"}</p>
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Created</label>
+          <p className="text-sm" data-testid="text-detail-created">{formatDateTime(order.createdAt)}</p>
         </div>
       </div>
 
       <Separator />
 
-      <ScrollArea className="h-[calc(100vh-420px)]">
-        <div className="space-y-4 pr-2">
-          {sections.map((section) => (
-            <div key={section.id} className="space-y-2">
-              <h5 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">{section.name}</h5>
-              <div className="space-y-1.5">
-                {(section.fields || section.items || []).map((field: any) => {
-                  const response = responses[field.id];
-                  const isFailed = field.id === failedFieldId;
-                  const displayValue = response?.value ?? response ?? "\u2014";
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          <Tag className="h-3 w-3" /> Type
+        </label>
+        <Select value={editType} onValueChange={handleFieldChange(setEditType)}>
+          <SelectTrigger className="h-8 text-xs" data-testid="select-type">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(TYPE_CONFIG).map(([key, cfg]) => (
+              <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-                  return (
-                    <div
-                      key={field.id}
-                      className={`flex items-start justify-between gap-2 p-2 rounded text-sm ${isFailed ? "bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 ring-1 ring-red-300 dark:ring-red-700" : "bg-muted/30"}`}
-                      data-testid={`checklist-field-${field.id}`}
-                    >
-                      <span className={`flex-1 ${isFailed ? "font-medium text-red-700 dark:text-red-300" : "text-muted-foreground"}`}>
-                        {field.label}
-                      </span>
-                      <span className={`font-medium text-right max-w-[120px] truncate ${isFailed ? "text-red-700 dark:text-red-300" : ""}`}>
-                        {typeof displayValue === "object" ? JSON.stringify(displayValue) : String(displayValue)}
-                      </span>
-                      {isFailed && (
-                        <AlertTriangle className="h-3.5 w-3.5 text-red-500 shrink-0 mt-0.5" />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Status</label>
+          <Select value={editStatus} onValueChange={handleFieldChange(setEditStatus)}>
+            <SelectTrigger className="h-8 text-xs" data-testid="select-status">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="open">Open</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="resolved">Resolved</SelectItem>
+              <SelectItem value="closed">Closed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      </ScrollArea>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Priority</label>
+          <Select value={editPriority} onValueChange={handleFieldChange(setEditPriority)}>
+            <SelectTrigger className="h-8 text-xs" data-testid="select-priority">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          <User className="h-3 w-3" /> Assigned To
+        </label>
+        <Select value={editAssignedTo || "unassigned"} onValueChange={(v) => handleFieldChange(setEditAssignedTo)(v === "unassigned" ? "" : v)}>
+          <SelectTrigger className="h-8 text-xs" data-testid="select-assigned-to">
+            <SelectValue placeholder="Unassigned" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
+            {companyUsers.map((u) => (
+              <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          <Building2 className="h-3 w-3" /> Supplier
+        </label>
+        <Input
+          value={editSupplierName}
+          onChange={(e) => handleFieldChange(setEditSupplierName)(e.target.value)}
+          placeholder="Enter supplier name"
+          className="h-8 text-xs"
+          data-testid="input-supplier"
+        />
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+          <Calendar className="h-3 w-3" /> Due Date
+        </label>
+        <Input
+          type="date"
+          value={editDueDate}
+          onChange={(e) => handleFieldChange(setEditDueDate)(e.target.value)}
+          className="h-8 text-xs"
+          data-testid="input-due-date"
+        />
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-muted-foreground">Details / Notes</label>
+        <Textarea
+          value={editDetails}
+          onChange={(e) => handleFieldChange(setEditDetails)(e.target.value)}
+          placeholder="Add details..."
+          className="min-h-[60px] text-xs"
+          data-testid="textarea-details"
+        />
+      </div>
+
+      {(editStatus === "resolved" || editStatus === "closed") && (
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Resolution Notes</label>
+          <Textarea
+            value={editResolutionNotes}
+            onChange={(e) => handleFieldChange(setEditResolutionNotes)(e.target.value)}
+            placeholder="How was this resolved?"
+            className="min-h-[60px] text-xs"
+            data-testid="textarea-resolution"
+          />
+        </div>
+      )}
+
+      {order.templateName && (
+        <>
+          <Separator />
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Source Checklist</label>
+            <p className="text-sm">{order.templateName}</p>
+            {order.instanceNumber && <p className="text-xs text-muted-foreground">Instance: {order.instanceNumber}</p>}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 export default function ChecklistWorkOrdersPage() {
-  useDocumentTitle("Work Orders");
+  useDocumentTitle("Work Orders Hub");
 
   const { toast } = useToast();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [showPanel, setShowPanel] = useState(true);
-  const [editDetails, setEditDetails] = useState("");
-  const [editAssignedTo, setEditAssignedTo] = useState<string>("");
-  const [editStatus, setEditStatus] = useState("");
-  const [editPriority, setEditPriority] = useState("");
-  const [editResolutionNotes, setEditResolutionNotes] = useState("");
-  const [isDirty, setIsDirty] = useState(false);
+  const [assignmentTab, setAssignmentTab] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useQuery<WorkOrderStats>({
     queryKey: ["/api/checklist/work-orders/stats"],
   });
 
   const { data: workOrders = [], isLoading: ordersLoading } = useQuery<WorkOrder[]>({
-    queryKey: ["/api/checklist/work-orders"],
+    queryKey: ["/api/checklist/work-orders", { tab: assignmentTab, type: typeFilter }],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (assignmentTab !== "all") params.set("tab", assignmentTab);
+      if (typeFilter !== "all") params.set("type", typeFilter);
+      const qs = params.toString();
+      return fetch(`/api/checklist/work-orders${qs ? `?${qs}` : ""}`, { credentials: "include" }).then(r => r.json());
+    },
   });
 
   const { data: companyUsers = [] } = useQuery<CompanyUser[]>({
@@ -284,7 +453,6 @@ export default function ChecklistWorkOrdersPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/checklist/work-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/checklist/work-orders/stats"] });
       toast({ title: "Work order updated" });
-      setIsDirty(false);
     },
     onError: () => {
       toast({ title: "Failed to update work order", variant: "destructive" });
@@ -307,46 +475,25 @@ export default function ChecklistWorkOrdersPage() {
         o.sectionName.toLowerCase().includes(q) ||
         (o.templateName || "").toLowerCase().includes(q) ||
         (o.instanceNumber || "").toLowerCase().includes(q) ||
-        (o.assignedUserName || "").toLowerCase().includes(q)
+        (o.assignedUserName || "").toLowerCase().includes(q) ||
+        (o.supplierName || "").toLowerCase().includes(q)
       );
     }
     return filtered;
   }, [workOrders, statusFilter, searchQuery]);
 
   const selectedOrder = useMemo(() => {
-    return filteredOrders.find(o => o.id === selectedId) || null;
-  }, [filteredOrders, selectedId]);
+    return workOrders.find(o => o.id === selectedId) || null;
+  }, [workOrders, selectedId]);
 
   const handleSelectOrder = useCallback((order: WorkOrder) => {
     setSelectedId(order.id);
-    setEditDetails(order.details || "");
-    setEditAssignedTo(order.assignedTo || "");
-    setEditStatus(order.status);
-    setEditPriority(order.priority);
-    setEditResolutionNotes(order.resolutionNotes || "");
-    setIsDirty(false);
-    if (!showPanel) setShowPanel(true);
-  }, [showPanel]);
+    setSidebarOpen(true);
+  }, []);
 
-  const handleSave = useCallback(() => {
-    if (!selectedId) return;
-    updateMutation.mutate({
-      id: selectedId,
-      updates: {
-        details: editDetails,
-        assignedTo: editAssignedTo || null,
-        status: editStatus,
-        priority: editPriority,
-        resolutionNotes: editResolutionNotes || null,
-      },
-    });
-  }, [selectedId, editDetails, editAssignedTo, editStatus, editPriority, editResolutionNotes, updateMutation]);
-
-  const handleFieldChange = useCallback((setter: (v: string) => void) => {
-    return (value: string) => {
-      setter(value);
-      setIsDirty(true);
-    };
+  const handleCloseSidebar = useCallback(() => {
+    setSidebarOpen(false);
+    setSelectedId(null);
   }, []);
 
   if (ordersLoading) {
@@ -368,18 +515,10 @@ export default function ChecklistWorkOrdersPage() {
           <div className="flex items-center gap-3">
             <Wrench className="h-6 w-6 text-primary" />
             <div>
-              <h1 className="text-xl font-semibold" data-testid="text-page-title">Work Orders</h1>
-              <p className="text-sm text-muted-foreground">Checklist-triggered work orders requiring action</p>
+              <h1 className="text-xl font-semibold" data-testid="text-page-title">Work Orders Hub</h1>
+              <p className="text-sm text-muted-foreground">Manage checklist-triggered work orders across all jobs</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowPanel(!showPanel)}
-            data-testid="button-toggle-panel"
-          >
-            {showPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
-          </Button>
         </div>
 
         <DashboardTiles
@@ -389,188 +528,154 @@ export default function ChecklistWorkOrdersPage() {
           onFilterClick={setStatusFilter}
         />
 
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search work orders..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-            data-testid="input-search"
-          />
+        <div className="flex items-center gap-3 flex-wrap">
+          <Tabs value={assignmentTab} onValueChange={setAssignmentTab} data-testid="tabs-assignment">
+            <TabsList>
+              <TabsTrigger value="all" className="gap-1.5" data-testid="tab-all">
+                <ClipboardList className="h-3.5 w-3.5" />
+                All
+                {stats && <Badge variant="secondary" className="ml-1 h-5 text-[10px] px-1.5">{stats.total}</Badge>}
+              </TabsTrigger>
+              <TabsTrigger value="unassigned" className="gap-1.5" data-testid="tab-unassigned">
+                <UserX className="h-3.5 w-3.5" />
+                Unassigned
+                {stats && <Badge variant="secondary" className="ml-1 h-5 text-[10px] px-1.5">{stats.unassigned}</Badge>}
+              </TabsTrigger>
+              <TabsTrigger value="assigned" className="gap-1.5" data-testid="tab-assigned">
+                <UserCheck className="h-3.5 w-3.5" />
+                Assigned
+                {stats && <Badge variant="secondary" className="ml-1 h-5 text-[10px] px-1.5">{stats.assigned}</Badge>}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="h-8 w-[160px] text-xs" data-testid="select-type-filter">
+              <Tag className="h-3 w-3 mr-1" />
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {Object.entries(TYPE_CONFIG).map(([key, cfg]) => (
+                <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search work orders..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-8"
+              data-testid="input-search"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className={`${showPanel && selectedOrder ? "w-1/2 lg:w-3/5" : "w-full"} border-r overflow-hidden flex flex-col`}>
-          <ScrollArea className="flex-1">
-            <div className="divide-y">
-              {filteredOrders.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-2" data-testid="empty-list">
-                  <ClipboardList className="h-10 w-10 opacity-30" />
-                  <p className="text-sm">No work orders found</p>
-                </div>
-              ) : (
-                filteredOrders.map((order) => {
-                  const isSelected = order.id === selectedId;
-                  return (
-                    <div
-                      key={order.id}
-                      className={`p-3 cursor-pointer transition-colors hover:bg-muted/50 ${isSelected ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
-                      onClick={() => handleSelectOrder(order)}
-                      data-testid={`work-order-row-${order.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-sm font-medium truncate" data-testid={`text-field-name-${order.id}`}>
-                              {order.fieldName}
-                            </p>
-                            <StatusBadge status={order.status} />
-                            <PriorityBadge priority={order.priority} />
-                          </div>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {order.sectionName} {order.templateName ? `\u00B7 ${order.templateName}` : ""}
+      <div className="flex-1 overflow-hidden">
+        <ScrollArea className="h-full">
+          <div className="divide-y">
+            {filteredOrders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-2" data-testid="empty-list">
+                <ClipboardList className="h-10 w-10 opacity-30" />
+                <p className="text-sm">No work orders found</p>
+                {assignmentTab !== "all" && (
+                  <p className="text-xs">Try switching to the "All" tab</p>
+                )}
+              </div>
+            ) : (
+              filteredOrders.map((order) => {
+                const isSelected = order.id === selectedId;
+                const typeConfig = TYPE_CONFIG[order.workOrderType || "general"] || TYPE_CONFIG.general;
+                return (
+                  <div
+                    key={order.id}
+                    className={`p-3 cursor-pointer transition-colors hover:bg-muted/50 ${isSelected ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
+                    onClick={() => handleSelectOrder(order)}
+                    data-testid={`work-order-row-${order.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <p className="text-sm font-medium truncate" data-testid={`text-field-name-${order.id}`}>
+                            {order.fieldName}
                           </p>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                            <span>Result: <span className="font-medium text-foreground">{order.result || "\u2014"}</span></span>
-                            {order.assignedUserName && (
-                              <span className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {order.assignedUserName}
-                              </span>
-                            )}
-                            <span>{formatDate(order.createdAt)}</span>
-                          </div>
+                          <StatusBadge status={order.status} />
+                          <PriorityBadge priority={order.priority} />
+                          <TypeBadge type={order.workOrderType || "general"} />
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {order.sectionName} {order.templateName ? `\u00B7 ${order.templateName}` : ""}
+                        </p>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+                          <span>Result: <span className="font-medium text-foreground">{order.result || "\u2014"}</span></span>
+                          {order.assignedUserName && (
+                            <span className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {order.assignedUserName}
+                            </span>
+                          )}
+                          {order.supplierName && (
+                            <span className="flex items-center gap-1">
+                              <Building2 className="h-3 w-3" />
+                              {order.supplierName}
+                            </span>
+                          )}
+                          {order.dueDate && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Due: {formatDate(order.dueDate)}
+                            </span>
+                          )}
+                          <span>{formatDate(order.createdAt)}</span>
                         </div>
                       </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-
-        {showPanel && selectedOrder && (
-          <div className="w-1/2 lg:w-2/5 flex flex-col overflow-hidden bg-background" data-testid="panel-detail">
-            <div className="p-4 border-b space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-sm" data-testid="text-detail-title">Work Order Details</h3>
-                <Button
-                  variant="default"
-                  size="sm"
-                  disabled={!isDirty || updateMutation.isPending}
-                  onClick={handleSave}
-                  data-testid="button-save"
-                >
-                  {updateMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Save className="h-3.5 w-3.5 mr-1" />}
-                  Save
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Field</label>
-                  <p className="text-sm font-medium" data-testid="text-detail-field">{selectedOrder.fieldName}</p>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Section</label>
-                  <p className="text-sm" data-testid="text-detail-section">{selectedOrder.sectionName}</p>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Result</label>
-                  <p className="text-sm font-medium text-red-600 dark:text-red-400" data-testid="text-detail-result">{selectedOrder.result || "\u2014"}</p>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Created</label>
-                  <p className="text-sm" data-testid="text-detail-created">{formatDateTime(selectedOrder.createdAt)}</p>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Status</label>
-                  <Select value={editStatus} onValueChange={handleFieldChange(setEditStatus)}>
-                    <SelectTrigger className="h-8 text-xs" data-testid="select-status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="open">Open</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="resolved">Resolved</SelectItem>
-                      <SelectItem value="closed">Closed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Priority</label>
-                  <Select value={editPriority} onValueChange={handleFieldChange(setEditPriority)}>
-                    <SelectTrigger className="h-8 text-xs" data-testid="select-priority">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Assigned To</label>
-                <Select value={editAssignedTo || "unassigned"} onValueChange={(v) => handleFieldChange(setEditAssignedTo)(v === "unassigned" ? "" : v)}>
-                  <SelectTrigger className="h-8 text-xs" data-testid="select-assigned-to">
-                    <SelectValue placeholder="Unassigned" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {companyUsers.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Instructions / Details</label>
-                <Textarea
-                  value={editDetails}
-                  onChange={(e) => { setEditDetails(e.target.value); setIsDirty(true); }}
-                  placeholder="Add instructions for the assignee..."
-                  className="min-h-[60px] text-sm resize-none"
-                  data-testid="textarea-details"
-                />
-              </div>
-
-              {(editStatus === "resolved" || editStatus === "closed") && (
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Resolution Notes</label>
-                  <Textarea
-                    value={editResolutionNotes}
-                    onChange={(e) => { setEditResolutionNotes(e.target.value); setIsDirty(true); }}
-                    placeholder="Describe the resolution..."
-                    className="min-h-[60px] text-sm resize-none"
-                    data-testid="textarea-resolution"
-                  />
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
-            <div className="p-4 flex-1 overflow-auto">
-              <h4 className="text-xs font-semibold uppercase text-muted-foreground tracking-wide mb-3">Checklist Reference</h4>
-              <ChecklistPreviewPanel workOrderId={selectedOrder.id} />
-            </div>
+                  </div>
+                );
+              })
+            )}
           </div>
-        )}
+        </ScrollArea>
       </div>
+
+      {selectedOrder && sidebarOpen && (
+        <EntitySidebar
+          entityId={selectedId}
+          entityName={`WO: ${selectedOrder.fieldName}`}
+          routes={WORK_ORDER_ROUTES}
+          invalidationKeys={[["/api/checklist/work-orders"], ["/api/checklist/work-orders/stats"]]}
+          onClose={handleCloseSidebar}
+          initialTab="details"
+          testIdPrefix="wo"
+          extraTabs={[
+            { id: "details", label: "Details", icon: <Info className="h-4 w-4" /> },
+          ]}
+          renderExtraTab={(tabId) => {
+            if (tabId === "details" && selectedOrder) {
+              return (
+                <DetailTabContent
+                  key={selectedOrder.id}
+                  order={selectedOrder}
+                  companyUsers={companyUsers}
+                  onSave={(updates) => {
+                    if (selectedId) {
+                      updateMutation.mutate({ id: selectedId, updates });
+                    }
+                  }}
+                  isPending={updateMutation.isPending}
+                />
+              );
+            }
+            return null;
+          }}
+          emptyUpdatesMessage="No communication yet. Add a comment or drop an email."
+          emptyFilesMessage="No files attached to this work order."
+        />
+      )}
     </div>
   );
 }

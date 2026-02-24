@@ -726,8 +726,16 @@ export const CHECKLIST_ROUTES = {
   
   // Work Orders
   WORK_ORDERS: '/api/checklist/work-orders',
+  WORK_ORDER_STATS: '/api/checklist/work-orders/stats',
   WORK_ORDER_BY_ID: (id: string) => `/api/checklist/work-orders/${id}`,
   WORK_ORDERS_BY_INSTANCE: (instanceId: string) => `/api/checklist/instances/${instanceId}/work-orders`,
+  WORK_ORDER_CHECKLIST_DETAIL: (id: string) => `/api/checklist/work-orders/${id}/checklist-detail`,
+  WORK_ORDER_UPDATES: (id: string | number) => `/api/checklist/work-orders/${id}/updates`,
+  WORK_ORDER_UPDATE_BY_ID: (id: string | number) => `/api/work-order-updates/${id}`,
+  WORK_ORDER_FILES: (id: string | number) => `/api/checklist/work-orders/${id}/files`,
+  WORK_ORDER_FILE_BY_ID: (id: string | number) => `/api/work-order-files/${id}`,
+  WORK_ORDER_EMAIL_DROP: (id: string | number) => `/api/checklist/work-orders/${id}/email-drop`,
+  WORK_ORDER_SEND_EMAIL: '/api/checklist/work-orders/send-email',
 } as const;
 
 // ============================================================================

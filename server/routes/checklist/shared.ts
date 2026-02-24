@@ -90,6 +90,11 @@ export async function processWorkOrderTriggers(
               .where(eq(checklistWorkOrders.id, existing[0].id));
           } else {
             const isAutoTriggered = !field.workOrderEnabled;
+            const inferredType = field.defaultWorkOrderTypeId
+              || (field.type === "pass_fail_flag" ? "defect"
+                : field.type === "condition_option" ? "defect"
+                : field.type === "yes_no_na" ? "safety"
+                : "general");
             await db.insert(checklistWorkOrders).values({
               companyId,
               checklistInstanceId: instanceId,
@@ -101,6 +106,7 @@ export async function processWorkOrderTriggers(
               details: isAutoTriggered
                 ? `${field.name} auto-detected failure: "${responseValue}" during inspection`
                 : `${field.name} reported "${responseValue}" during inspection`,
+              workOrderType: inferredType as any,
             });
           }
         } else if (existing.length > 0 && existing[0].status === "open") {

@@ -200,6 +200,7 @@ export default function TemplateEditorPage() {
   const [editingFieldAutoPopulateSourceFieldId, setEditingFieldAutoPopulateSourceFieldId] = useState<string>("");
   const [editingFieldWorkOrderEnabled, setEditingFieldWorkOrderEnabled] = useState(false);
   const [editingFieldWorkOrderTriggerValue, setEditingFieldWorkOrderTriggerValue] = useState<string>("");
+  const [editingFieldDefaultWorkOrderTypeId, setEditingFieldDefaultWorkOrderTypeId] = useState<string>("");
 
   const [showVersionHistory, setShowVersionHistory] = useState(false);
 
@@ -318,6 +319,7 @@ export default function TemplateEditorPage() {
       setEditingFieldAutoPopulateSourceFieldId(field.autoPopulateSourceFieldId || "");
       setEditingFieldWorkOrderEnabled(field.workOrderEnabled || false);
       setEditingFieldWorkOrderTriggerValue(field.workOrderTriggerValue || "");
+      setEditingFieldDefaultWorkOrderTypeId(field.defaultWorkOrderTypeId || "");
       fieldForm.reset({
         name: field.name,
         type: field.type,
@@ -404,6 +406,7 @@ export default function TemplateEditorPage() {
       autoPopulateSourceFieldId: editingFieldAutoPopulateSourceFieldId || undefined,
       workOrderEnabled: editingFieldWorkOrderEnabled || undefined,
       workOrderTriggerValue: editingFieldWorkOrderTriggerValue || undefined,
+      defaultWorkOrderTypeId: editingFieldDefaultWorkOrderTypeId || undefined,
     };
 
     setSections((prev) =>
@@ -1449,6 +1452,25 @@ export default function TemplateEditorPage() {
                         />
                       );
                     })()}
+                  </div>
+                )}
+                {editingFieldWorkOrderEnabled && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Default Work Order Type</label>
+                    <Select value={editingFieldDefaultWorkOrderTypeId || "general"} onValueChange={setEditingFieldDefaultWorkOrderTypeId}>
+                      <SelectTrigger data-testid="select-work-order-type">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="defect">Defect</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                        <SelectItem value="safety">Safety</SelectItem>
+                        <SelectItem value="corrective_action">Corrective Action</SelectItem>
+                        <SelectItem value="inspection">Inspection</SelectItem>
+                        <SelectItem value="warranty">Warranty</SelectItem>
+                        <SelectItem value="general">General</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
               </div>

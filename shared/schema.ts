@@ -2776,6 +2776,7 @@ export type ChecklistInstance = typeof checklistInstances.$inferSelect;
 // ==================== CHECKLIST WORK ORDERS ====================
 export const workOrderStatusEnum = pgEnum("work_order_status", ["open", "in_progress", "resolved", "closed", "cancelled"]);
 export const workOrderPriorityEnum = pgEnum("work_order_priority", ["low", "medium", "high", "critical"]);
+export const workOrderTypeEnum = pgEnum("work_order_type", ["defect", "maintenance", "safety", "corrective_action", "inspection", "warranty", "general"]);
 
 export const checklistWorkOrders = pgTable("checklist_work_orders", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -2790,10 +2791,14 @@ export const checklistWorkOrders = pgTable("checklist_work_orders", {
   photos: jsonb("photos").default([]),
   status: workOrderStatusEnum("status").default("open").notNull(),
   priority: workOrderPriorityEnum("priority").default("medium").notNull(),
+  workOrderType: workOrderTypeEnum("work_order_type").default("general"),
   assignedTo: varchar("assigned_to", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+  supplierId: varchar("supplier_id", { length: 36 }),
+  supplierName: varchar("supplier_name", { length: 255 }),
   resolvedBy: varchar("resolved_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
   resolvedAt: timestamp("resolved_at"),
   resolutionNotes: text("resolution_notes"),
+  dueDate: timestamp("due_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2801,11 +2806,56 @@ export const checklistWorkOrders = pgTable("checklist_work_orders", {
   instanceIdx: index("checklist_wo_instance_idx").on(table.checklistInstanceId),
   fieldIdx: index("checklist_wo_field_idx").on(table.checklistInstanceId, table.fieldId),
   statusIdx: index("checklist_wo_status_idx").on(table.status),
+  typeIdx: index("checklist_wo_type_idx").on(table.workOrderType),
 }));
 
 export const insertChecklistWorkOrderSchema = createInsertSchema(checklistWorkOrders).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertChecklistWorkOrder = z.infer<typeof insertChecklistWorkOrderSchema>;
 export type ChecklistWorkOrder = typeof checklistWorkOrders.$inferSelect;
+
+// ==================== WORK ORDER UPDATES & FILES ====================
+export const workOrderUpdates = pgTable("work_order_updates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  workOrderId: varchar("work_order_id", { length: 36 }).references(() => checklistWorkOrders.id, { onDelete: "cascade" }).notNull(),
+  companyId: varchar("company_id", { length: 36 }).references(() => companies.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+  content: text("content").notNull(),
+  contentType: varchar("content_type", { length: 50 }).default("text"),
+  emailSubject: varchar("email_subject", { length: 500 }),
+  emailFrom: varchar("email_from", { length: 255 }),
+  emailTo: varchar("email_to", { length: 255 }),
+  emailDate: timestamp("email_date"),
+  emailBody: text("email_body"),
+  emailMessageId: varchar("email_message_id", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  workOrderIdx: index("wo_update_work_order_idx").on(table.workOrderId),
+  companyIdx: index("wo_update_company_idx").on(table.companyId),
+}));
+
+export const insertWorkOrderUpdateSchema = createInsertSchema(workOrderUpdates).omit({ id: true, createdAt: true });
+export type InsertWorkOrderUpdate = z.infer<typeof insertWorkOrderUpdateSchema>;
+export type WorkOrderUpdate = typeof workOrderUpdates.$inferSelect;
+
+export const workOrderFiles = pgTable("work_order_files", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  workOrderId: varchar("work_order_id", { length: 36 }).references(() => checklistWorkOrders.id, { onDelete: "cascade" }).notNull(),
+  companyId: varchar("company_id", { length: 36 }).references(() => companies.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+  updateId: varchar("update_id", { length: 36 }).references(() => workOrderUpdates.id, { onDelete: "set null" }),
+  fileName: varchar("file_name", { length: 500 }).notNull(),
+  fileSize: integer("file_size"),
+  mimeType: varchar("mime_type", { length: 255 }),
+  filePath: text("file_path").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  workOrderIdx: index("wo_file_work_order_idx").on(table.workOrderId),
+  companyIdx: index("wo_file_company_idx").on(table.companyId),
+}));
+
+export const insertWorkOrderFileSchema = createInsertSchema(workOrderFiles).omit({ id: true, createdAt: true });
+export type InsertWorkOrderFile = z.infer<typeof insertWorkOrderFileSchema>;
+export type WorkOrderFile = typeof workOrderFiles.$inferSelect;
 
 // Extended Types with Relations
 export type ChecklistTemplateWithDetails = ChecklistTemplate & {
