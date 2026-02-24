@@ -2,6 +2,9 @@ import { Router } from "express";
 import { storage } from "../../storage";
 import { requireAuth, requireRole } from "../middleware/auth.middleware";
 import logger from "../../lib/logger";
+import { db } from "../../db";
+import { documents } from "@shared/schema";
+import { eq, count } from "drizzle-orm";
 import { 
   insertDocumentTypeSchema, 
   insertDocumentTypeStatusSchema,
@@ -96,7 +99,16 @@ router.patch("/api/document-types/:id", requireRole("ADMIN"), async (req, res) =
 
 router.delete("/api/document-types/:id", requireRole("ADMIN"), async (req, res) => {
   try {
-    await storage.deleteDocumentType(String(req.params.id));
+    const typeId = String(req.params.id);
+    const [usage] = await db.select({ total: count() }).from(documents).where(eq(documents.typeId, typeId));
+    if (usage && usage.total > 0) {
+      return res.status(409).json({
+        error: `This document type is used by ${usage.total} document(s) and cannot be deleted. Deactivate it instead.`,
+        code: "IN_USE",
+        count: usage.total,
+      });
+    }
+    await storage.deleteDocumentType(typeId);
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document type");
@@ -226,7 +238,16 @@ router.patch("/api/document-disciplines/:id", requireRole("ADMIN"), async (req, 
 
 router.delete("/api/document-disciplines/:id", requireRole("ADMIN"), async (req, res) => {
   try {
-    await storage.deleteDocumentDiscipline(String(req.params.id));
+    const discId = String(req.params.id);
+    const [usage] = await db.select({ total: count() }).from(documents).where(eq(documents.disciplineId, discId));
+    if (usage && usage.total > 0) {
+      return res.status(409).json({
+        error: `This discipline is used by ${usage.total} document(s) and cannot be deleted. Deactivate it instead.`,
+        code: "IN_USE",
+        count: usage.total,
+      });
+    }
+    await storage.deleteDocumentDiscipline(discId);
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document discipline");
@@ -299,7 +320,16 @@ router.patch("/api/document-categories/:id", requireRole("ADMIN"), async (req, r
 
 router.delete("/api/document-categories/:id", requireRole("ADMIN"), async (req, res) => {
   try {
-    await storage.deleteDocumentCategory(String(req.params.id));
+    const catId = String(req.params.id);
+    const [usage] = await db.select({ total: count() }).from(documents).where(eq(documents.categoryId, catId));
+    if (usage && usage.total > 0) {
+      return res.status(409).json({
+        error: `This category is used by ${usage.total} document(s) and cannot be deleted. Deactivate it instead.`,
+        code: "IN_USE",
+        count: usage.total,
+      });
+    }
+    await storage.deleteDocumentCategory(catId);
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document category");
