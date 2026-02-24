@@ -184,6 +184,7 @@ const EXEMPT_BODY_LIMIT_PATHS = [
   "/documents",
   "/scopes",
   "/budgets",
+  "/myob/import-",
 ];
 
 export function enforceBodyLimits(req: Request, res: Response, next: NextFunction) {
