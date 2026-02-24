@@ -1,9 +1,10 @@
+import { useState, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   ArrowLeft, Edit2, User, Shield, KeyRound,
-  EyeOff, Eye, Pencil, Minus,
+  EyeOff, Eye, Pencil, Minus, Loader2, Save,
   Briefcase, Factory, Truck, DollarSign, BarChart3, Settings,
   Smartphone, Users as UsersIcon
 } from "lucide-react";
@@ -13,9 +14,27 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { User as UserType } from "@shared/schema";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { User as UserType, PermissionType } from "@shared/schema";
 import { FUNCTION_KEYS } from "@shared/schema";
+import type { PermissionLevel } from "@shared/schema";
 import { ADMIN_ROUTES } from "@shared/api-routes";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 const FUNCTION_LABELS: Record<string, string> = {
   tasks: "Tasks",
@@ -156,6 +175,8 @@ const PERMISSION_SECTIONS: PermissionSection[] = [
   },
 ];
 
+const SUPPORTS_OWN = ["purchase_orders", "tasks", "weekly_job_logs", "pm_call_logs"];
+
 function getPermissionBadge(level: string | null) {
   if (!level) {
     return <Badge variant="secondary" className="gap-1 opacity-50"><Minus className="h-3 w-3" />Not Set</Badge>;
@@ -207,6 +228,8 @@ export default function UserDetailPage() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/admin/users/:id");
   const id = params?.id || "";
+  const { toast } = useToast();
+  const [applyTypeOpen, setApplyTypeOpen] = useState(false);
 
   const { data: user, isLoading } = useQuery<UserType>({
     queryKey: [ADMIN_ROUTES.USER_BY_ID(id)],
@@ -217,6 +240,52 @@ export default function UserDetailPage() {
     queryKey: [`/api/admin/user-permissions/${id}`],
     enabled: !!id,
   });
+
+  const initializeMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", ADMIN_ROUTES.USER_PERMISSION_INITIALIZE(id), {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/user-permissions/${id}`] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USER_PERMISSIONS] });
+      toast({ title: "Permissions initialized", description: "All permissions have been set to default values." });
+    },
+    onError: () => {
+      toast({ title: "Failed to initialize permissions", variant: "destructive" });
+    },
+  });
+
+  const updatePermissionMutation = useMutation({
+    mutationFn: async ({ functionKey, permissionLevel }: { functionKey: string; permissionLevel: PermissionLevel }) => {
+      return apiRequest("PUT", ADMIN_ROUTES.USER_PERMISSION_UPDATE(id, functionKey), { permissionLevel });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/user-permissions/${id}`] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USER_PERMISSIONS] });
+      toast({ title: "Permission updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update permission", variant: "destructive" });
+    },
+  });
+
+  const permMap = useMemo(() => new Map(permissions.map(p => [p.functionKey, p.permissionLevel])), [permissions]);
+
+  const getPermLevel = (functionKey: string): PermissionLevel | null => {
+    return (permMap.get(functionKey) as PermissionLevel) || null;
+  };
+
+  const hasUnset = useMemo(() => {
+    return FUNCTION_KEYS.some(k => !permMap.has(k));
+  }, [permMap]);
+
+  const permissionStats = {
+    total: FUNCTION_KEYS.length,
+    configured: permissions.length,
+    fullAccess: permissions.filter(p => p.permissionLevel === "VIEW_AND_UPDATE").length,
+    viewOnly: permissions.filter(p => p.permissionLevel === "VIEW" || p.permissionLevel === "VIEW_OWN").length,
+    hidden: permissions.filter(p => p.permissionLevel === "HIDDEN").length,
+  };
 
   if (isLoading) {
     return (
@@ -242,16 +311,6 @@ export default function UserDetailPage() {
       </div>
     );
   }
-
-  const permMap = new Map(permissions.map(p => [p.functionKey, p.permissionLevel]));
-
-  const permissionStats = {
-    total: FUNCTION_KEYS.length,
-    configured: permissions.length,
-    fullAccess: permissions.filter(p => p.permissionLevel === "VIEW_AND_UPDATE").length,
-    viewOnly: permissions.filter(p => p.permissionLevel === "VIEW" || p.permissionLevel === "VIEW_OWN").length,
-    hidden: permissions.filter(p => p.permissionLevel === "HIDDEN").length,
-  };
 
   return (
     <div className="space-y-6" role="main" aria-label="User Detail" data-testid="user-detail-page">
@@ -365,6 +424,36 @@ export default function UserDetailPage() {
             </div>
           ) : (
             <>
+              <div className="flex items-center gap-2 flex-wrap">
+                {hasUnset && (
+                  <Button
+                    size="sm"
+                    onClick={() => initializeMutation.mutate()}
+                    disabled={initializeMutation.isPending}
+                    data-testid="button-initialize-permissions"
+                  >
+                    {initializeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                    Initialize All
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setApplyTypeOpen(true)}
+                  data-testid="button-apply-type"
+                >
+                  <Shield className="h-4 w-4 mr-2" />
+                  Apply Permission Type
+                </Button>
+              </div>
+
+              {hasUnset && (
+                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-sm">
+                  <p className="font-medium text-amber-800 dark:text-amber-200">Some permissions are not set</p>
+                  <p className="text-amber-700 dark:text-amber-300">Click "Initialize All" to set defaults, or apply a permission type.</p>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <Card data-testid="stat-total-permissions">
                   <CardContent className="pt-4 pb-3 px-4">
@@ -401,6 +490,37 @@ export default function UserDetailPage() {
                         <SectionIcon className="h-5 w-5 text-primary" />
                         {section.label}
                         <Badge variant="outline" className="ml-auto text-xs">{section.keys.length}</Badge>
+                        <Select
+                          onValueChange={(value) => {
+                            for (const key of section.keys) {
+                              updatePermissionMutation.mutate({ functionKey: key, permissionLevel: value as PermissionLevel });
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="w-40 h-8 text-xs" data-testid={`select-set-all-${section.label.replace(/\s+/g, '-').toLowerCase()}`}>
+                            <SelectValue placeholder="Set all..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="HIDDEN">
+                              <div className="flex items-center gap-2">
+                                <EyeOff className="h-3 w-3 text-red-500" />
+                                Hidden
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="VIEW">
+                              <div className="flex items-center gap-2">
+                                <Eye className="h-3 w-3 text-yellow-500" />
+                                View All
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="VIEW_AND_UPDATE">
+                              <div className="flex items-center gap-2">
+                                <Pencil className="h-3 w-3 text-green-500" />
+                                View & Edit All
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -415,7 +535,7 @@ export default function UserDetailPage() {
                           </TableHeader>
                           <TableBody>
                             {section.keys.map((key) => {
-                              const level = permMap.get(key) || null;
+                              const level = getPermLevel(key);
                               const isMobile = key.startsWith("mobile_");
                               const isAdmin = key.startsWith("admin_");
                               return (
@@ -430,7 +550,57 @@ export default function UserDetailPage() {
                                       <Badge variant="outline" className="text-xs gap-1"><UsersIcon className="h-3 w-3" />Web + Mobile</Badge>
                                     )}
                                   </TableCell>
-                                  <TableCell className="text-right">{getPermissionBadge(level)}</TableCell>
+                                  <TableCell className="text-right">
+                                    <Select
+                                      value={level || ""}
+                                      onValueChange={(value) => {
+                                        updatePermissionMutation.mutate({ functionKey: key, permissionLevel: value as PermissionLevel });
+                                      }}
+                                      disabled={updatePermissionMutation.isPending}
+                                    >
+                                      <SelectTrigger className="w-48 ml-auto" data-testid={`select-perm-${key}`}>
+                                        <SelectValue placeholder="Not set">
+                                          {level ? getPermissionBadge(level) : <span className="text-muted-foreground">Not set</span>}
+                                        </SelectValue>
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="HIDDEN">
+                                          <div className="flex items-center gap-2">
+                                            <EyeOff className="h-4 w-4 text-red-500" />
+                                            Hidden
+                                          </div>
+                                        </SelectItem>
+                                        {SUPPORTS_OWN.includes(key) && (
+                                          <SelectItem value="VIEW_OWN">
+                                            <div className="flex items-center gap-2">
+                                              <Eye className="h-4 w-4 text-blue-500" />
+                                              View Own Only
+                                            </div>
+                                          </SelectItem>
+                                        )}
+                                        <SelectItem value="VIEW">
+                                          <div className="flex items-center gap-2">
+                                            <Eye className="h-4 w-4 text-yellow-500" />
+                                            View All
+                                          </div>
+                                        </SelectItem>
+                                        {SUPPORTS_OWN.includes(key) && (
+                                          <SelectItem value="VIEW_AND_UPDATE_OWN">
+                                            <div className="flex items-center gap-2">
+                                              <Pencil className="h-4 w-4 text-cyan-500" />
+                                              View & Edit Own
+                                            </div>
+                                          </SelectItem>
+                                        )}
+                                        <SelectItem value="VIEW_AND_UPDATE">
+                                          <div className="flex items-center gap-2">
+                                            <Pencil className="h-4 w-4 text-green-500" />
+                                            View & Edit All
+                                          </div>
+                                        </SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
                                 </TableRow>
                               );
                             })}
@@ -476,6 +646,87 @@ export default function UserDetailPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {applyTypeOpen && (
+        <ApplyPermissionTypeDialog
+          open={applyTypeOpen}
+          onOpenChange={setApplyTypeOpen}
+          userId={id}
+          userName={user.name || user.email}
+        />
+      )}
     </div>
+  );
+}
+
+function ApplyPermissionTypeDialog({ open, onOpenChange, userId, userName }: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  userId: string;
+  userName: string;
+}) {
+  const { toast } = useToast();
+  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
+
+  const { data: permissionTypes } = useQuery<PermissionType[]>({
+    queryKey: [ADMIN_ROUTES.PERMISSION_TYPES],
+  });
+
+  const applyMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", ADMIN_ROUTES.USER_PERMISSION_APPLY_TYPE(userId), { permissionTypeId: selectedTypeId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/user-permissions/${userId}`] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USER_PERMISSIONS] });
+      toast({ title: "Permission type applied", description: `Permissions updated for ${userName}.` });
+      setSelectedTypeId("");
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to apply permission type", variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Apply Permission Type</DialogTitle>
+          <DialogDescription>
+            Select a permission type to apply to <strong>{userName}</strong>. This will overwrite all existing permissions.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Select value={selectedTypeId} onValueChange={setSelectedTypeId}>
+            <SelectTrigger data-testid="select-apply-perm-type">
+              <SelectValue placeholder="Select a permission type..." />
+            </SelectTrigger>
+            <SelectContent>
+              {permissionTypes?.map(pt => (
+                <SelectItem key={pt.id} value={pt.id}>{pt.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={applyMutation.isPending}>Cancel</Button>
+          <Button
+            onClick={() => {
+              if (!selectedTypeId) {
+                toast({ title: "Select a type first", variant: "destructive" });
+                return;
+              }
+              applyMutation.mutate();
+            }}
+            disabled={applyMutation.isPending || !selectedTypeId}
+            data-testid="button-confirm-apply-perm-type"
+          >
+            {applyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            Apply
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
