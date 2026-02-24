@@ -850,21 +850,19 @@ export default function AdminChecklistTemplatesPage() {
               <Copy className="h-3.5 w-3.5 mr-1.5" />
               Duplicate
             </Button>
-            {!template.isSystem && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeletingTemplateId(template.id);
-                  setDeleteTemplateDialogOpen(true);
-                }}
-                data-testid={`button-delete-template-${template.id}`}
-              >
-                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                Delete
-              </Button>
-            )}
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeletingTemplateId(template.id);
+                setDeleteTemplateDialogOpen(true);
+              }}
+              data-testid={`button-delete-template-${template.id}`}
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              Delete
+            </Button>
           </div>
         </CardContent>
       </Card>

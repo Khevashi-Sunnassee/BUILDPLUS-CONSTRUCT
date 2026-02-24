@@ -362,12 +362,8 @@ router.delete("/api/checklist/templates/:id", requireAuth, requireRole("ADMIN"),
       return res.status(404).json({ error: "Template not found" });
     }
 
-    if (existing.isSystem) {
-      return res.status(403).json({ error: "System templates cannot be deleted" });
-    }
-
     const [deleted] = await db.update(checklistTemplates)
-      .set({ isActive: false, updatedAt: new Date() })
+      .set({ isActive: false, isSystem: false, updatedAt: new Date() })
       .where(and(eq(checklistTemplates.id, templateId), eq(checklistTemplates.companyId, companyId!)))
       .returning();
 
