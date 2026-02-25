@@ -1,0 +1,65 @@
+Build offline-first capability for our Next.js mobile web app for:
+1) Tasks (create/update/close, comments, attachments)
+2) Checklists (templates, instances, submit pending sync)
+3) Photo Gallery (capture/view/tag, attach to tasks/checklists)
+
+Core principle:
+- Local-first writes with IndexedDB + Outbox Queue for sync.
+- App must function with zero connectivity (concrete core).
+
+Implement:
+A) PWA + Service Worker
+- Cache app shell assets (/_next/static/*) so app loads offline once visited.
+- Runtime cache GET template endpoints (network-first fallback cache).
+
+B) IndexedDB schema
+- tasks
+- checklistTemplates
+- checklists
+- photos (store Blob + metadata)
+- outboxActions
+- idMap (localTempId -> serverId)
+
+C) Offline Outbox Action pattern
+- Every user change must:
+  1) Update local IndexedDB state immediately (optimistic UI)
+  2) Enqueue an action in outboxActions with actionId UUID
+- Actions include:
+  TASK_CREATE, TASK_UPDATE, TASK_STATUS_CHANGE, TASK_COMMENT_ADD, TASK_ATTACH_PHOTO
+  CHECKLIST_CREATE, CHECKLIST_SET_ITEM, CHECKLIST_ADD_COMMENT, CHECKLIST_ADD_SIGNATURE, CHECKLIST_SUBMIT
+  PHOTO_UPLOAD, PHOTO_TAG_UPDATE, PHOTO_LINK_TO_TASK, PHOTO_LINK_TO_CHECKLIST
+
+D) Sync engine
+- Triggers:
+  - on online event
+  - on app load
+  - timer while online (e.g., every 30s)
+- Sync order:
+  1) Create entities (tasks/checklists) that have temp IDs -> store idMap
+  2) Upload photos (required photos first)
+  3) Apply remaining actions
+- Retries with exponential backoff.
+- Never delete local data until server confirms.
+
+E) Server
+- Create POST /api/sync batch endpoint (or per module) that:
+  - Accepts deviceId + actions[]
+  - Is idempotent using actionId (store processed actionIds)
+  - Returns:
+    - syncedActionIds[]
+    - idMappings[] (tempId->serverId)
+    - conflicts[] (if any)
+- Implement last-write-wins using updatedAt.
+
+F) UI
+- Add connection/sync status badge (Online/Offline/Syncing/Failed)
+- Show per-item sync state and upload pending counts.
+- Provide “Retry sync” button.
+
+Acceptance test:
+- Load app online
+- Go airplane mode
+- Create tasks, complete checklist, capture photos + tag them
+- Close tab/reopen (data still there)
+- Restore connection
+- Confirm all items upload + sync and become visible on server.

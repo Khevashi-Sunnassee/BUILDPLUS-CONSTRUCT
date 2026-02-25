@@ -18,6 +18,7 @@ import LoginPage from "@/pages/login";
 import { HelpProvider } from "@/components/help/help-provider";
 import { HelpDrawer } from "@/components/help/help-drawer";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { OfflineStatusBadge } from "@/components/mobile/OfflineStatusBadge";
 import { initGlobalErrorTracking } from "@/lib/error-tracker";
 
 initGlobalErrorTracking();
@@ -1120,11 +1121,13 @@ function Router() {
       </Route>
       <Route path="/mobile/dashboard">
         <ProtectedRoute>
+          <OfflineStatusBadge />
           <MobileDashboard />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/tasks">
         <ProtectedRoute>
+          <OfflineStatusBadge />
           <MobileTasksPage />
         </ProtectedRoute>
       </Route>
@@ -1220,21 +1223,25 @@ function Router() {
       </Route>
       <Route path="/mobile/photo-gallery">
         <ProtectedRoute>
+          <OfflineStatusBadge />
           <MobilePhotoGalleryPage />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/photo-capture">
         <ProtectedRoute>
+          <OfflineStatusBadge />
           <MobilePhotoCapturePage />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/checklists/:id">
         <ProtectedRoute>
+          <OfflineStatusBadge />
           <MobileChecklistFillPage />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/checklists">
         <ProtectedRoute>
+          <OfflineStatusBadge />
           <MobileChecklistsPage />
         </ProtectedRoute>
       </Route>

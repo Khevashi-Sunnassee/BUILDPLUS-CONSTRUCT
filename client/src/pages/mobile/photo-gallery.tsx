@@ -25,6 +25,7 @@ import {
   User,
   FolderOpen,
   Hash,
+  CloudUpload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +49,9 @@ import { apiUpload } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { useAuth } from "@/lib/auth";
+import { useOfflineQuery } from "@/lib/offline/hooks";
+import { getOfflinePhotos } from "@/lib/offline/store";
+import type { OfflinePhoto } from "@/lib/offline/db";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
 const PHOTO_SUBJECTS = [
@@ -356,19 +360,31 @@ export default function MobilePhotoGallery() {
 
   const canSubmitPhoto = photoJobId !== "" && photoSubject !== "";
 
-  const { data: photosResult, isLoading } = useQuery<{ documents: Photo[]; total: number }>({
-    queryKey: [DOCUMENT_ROUTES.LIST, "mobile-photos", { search: searchQuery, jobId: selectedJobId, typeId: selectedTypeId, excludeChat }],
-    queryFn: async () => {
-      const params = new URLSearchParams({ showLatestOnly: "true", limit: "100", mimeTypePrefix: "image/" });
-      if (searchQuery) params.set("search", searchQuery);
-      if (selectedJobId) params.set("jobId", selectedJobId);
-      if (selectedTypeId) params.set("typeId", selectedTypeId);
-      if (excludeChat) params.set("excludeChat", "true");
-      const res = await fetch(`${DOCUMENT_ROUTES.LIST}?${params}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch photos");
-      return res.json();
+  const [offlinePhotos, setOfflinePhotos] = useState<OfflinePhoto[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getOfflinePhotos('pending').then(photos => {
+      if (!cancelled) setOfflinePhotos(photos);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const { data: photosResult, isLoading } = useOfflineQuery<{ documents: Photo[]; total: number }>(
+    [DOCUMENT_ROUTES.LIST, "mobile-photos", { search: searchQuery, jobId: selectedJobId, typeId: selectedTypeId, excludeChat }],
+    {
+      queryFn: async () => {
+        const params = new URLSearchParams({ showLatestOnly: "true", limit: "100", mimeTypePrefix: "image/" });
+        if (searchQuery) params.set("search", searchQuery);
+        if (selectedJobId) params.set("jobId", selectedJobId);
+        if (selectedTypeId) params.set("typeId", selectedTypeId);
+        if (excludeChat) params.set("excludeChat", "true");
+        const res = await fetch(`${DOCUMENT_ROUTES.LIST}?${params}`, { credentials: "include" });
+        if (!res.ok) throw new Error("Failed to fetch photos");
+        return res.json();
+      },
     },
-  });
+  );
 
   const { data: docTypes = [] } = useQuery<DocumentType[]>({
     queryKey: [DOCUMENT_ROUTES.TYPES_ACTIVE],
@@ -387,7 +403,39 @@ export default function MobilePhotoGallery() {
 
   const isUnauthorizedJob = !isPrivileged && selectedJobId && !myJobMemberships.includes(selectedJobId);
 
-  const photos = photosResult?.documents || [];
+  const serverPhotos = photosResult?.documents || [];
+
+  const offlinePhotoItems: Photo[] = useMemo(() => {
+    return offlinePhotos.map((op) => {
+      const meta = op.metadata || {};
+      return {
+        id: op.photoId,
+        documentNumber: null,
+        title: (meta.title as string) || 'Offline Photo',
+        description: (meta.description as string) || null,
+        fileName: op.photoId,
+        originalName: 'offline-photo.jpg',
+        mimeType: 'image/jpeg',
+        fileSize: op.blob?.size || 0,
+        status: 'pending_upload',
+        version: '1',
+        revision: '0',
+        tags: null,
+        createdAt: new Date(op.createdAt).toISOString(),
+        typeId: null,
+        jobId: (meta.jobId as string) || null,
+        conversationId: null,
+        messageId: null,
+        uploadedBy: null,
+        _isOffline: true,
+        _offlineBlob: op.blob,
+      } as Photo & { _isOffline?: boolean; _offlineBlob?: Blob };
+    });
+  }, [offlinePhotos]);
+
+  const photos = useMemo(() => {
+    return [...offlinePhotoItems, ...serverPhotos];
+  }, [offlinePhotoItems, serverPhotos]);
 
   const handleShare = async (photo: Photo) => {
     const viewUrl = `${window.location.origin}/api/documents/${photo.id}/view`;
@@ -773,29 +821,41 @@ export default function MobilePhotoGallery() {
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-2">
-            {photos.map((photo) => (
-              <button
-                key={photo.id}
-                onClick={() => { setSelectedPhoto(photo); setViewingPhoto(true); }}
-                className="relative aspect-square rounded-xl overflow-hidden bg-white/5 border border-white/10 active:scale-[0.99]"
-                data-testid={`photo-thumb-${photo.id}`}
-              >
-                <img
-                  src={`/api/documents/${photo.id}/thumbnail`}
-                  alt={photo.title}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-                {photo.conversationId && (
-                  <div className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60">
-                    <MessageSquare className="h-3 w-3 text-blue-400" />
+            {photos.map((photo) => {
+              const isOffline = (photo as any)._isOffline;
+              const offlineBlob = (photo as any)._offlineBlob as Blob | undefined;
+              const thumbSrc = isOffline && offlineBlob
+                ? URL.createObjectURL(offlineBlob)
+                : `/api/documents/${photo.id}/thumbnail`;
+              return (
+                <button
+                  key={photo.id}
+                  onClick={() => { if (!isOffline) { setSelectedPhoto(photo); setViewingPhoto(true); } }}
+                  className="relative aspect-square rounded-xl overflow-hidden bg-white/5 border border-white/10 active:scale-[0.99]"
+                  data-testid={`photo-thumb-${photo.id}`}
+                >
+                  <img
+                    src={thumbSrc}
+                    alt={photo.title}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                  {isOffline && (
+                    <div className="absolute top-1 left-1 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500/80">
+                      <CloudUpload className="h-3 w-3 text-white" />
+                    </div>
+                  )}
+                  {photo.conversationId && (
+                    <div className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60">
+                      <MessageSquare className="h-3 w-3 text-blue-400" />
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5">
+                    <p className="text-[10px] text-white font-medium truncate">{photo.title}</p>
                   </div>
-                )}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-2 py-1.5">
-                  <p className="text-[10px] text-white font-medium truncate">{photo.title}</p>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

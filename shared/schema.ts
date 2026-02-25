@@ -6448,3 +6448,18 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
 }));
 
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+
+export const processedSyncActions = pgTable("processed_sync_actions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  actionId: varchar("action_id", { length: 255 }).notNull().unique(),
+  companyId: varchar("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  result: jsonb("result").default({}),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
+}, (table) => ({
+  actionIdIdx: index("processed_sync_action_id_idx").on(table.actionId),
+  companyIdx: index("processed_sync_company_idx").on(table.companyId),
+  processedAtIdx: index("processed_sync_processed_at_idx").on(table.processedAt),
+}));
+
+export type ProcessedSyncAction = typeof processedSyncActions.$inferSelect;

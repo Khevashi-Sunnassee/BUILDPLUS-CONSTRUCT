@@ -1,0 +1,23 @@
+{
+  "name": "BuildPlus AI",
+  "short_name": "BuildPlus",
+  "description": "Construction panel management system",
+  "start_url": "/mobile/dashboard",
+  "display": "standalone",
+  "background_color": "#070B12",
+  "theme_color": "#070B12",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["business", "productivity"]
+}

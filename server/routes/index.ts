@@ -71,6 +71,7 @@ import { companyEmailInboxesRouter } from "./company-email-inboxes.routes";
 import { systemDefaultsRouter } from "./system-defaults.routes";
 import { reviewModeRouter } from "./review-mode.routes";
 import { externalApiRouter } from "./external-api.routes";
+import syncRouter from "./sync.routes";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
@@ -204,6 +205,7 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(systemDefaultsRouter);
   app.use(reviewModeRouter);
   app.use(externalApiRouter);
+  app.use(syncRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);

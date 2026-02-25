@@ -5,6 +5,9 @@ import { useToast } from "@/hooks/use-toast";
 import { JOBS_ROUTES, DOCUMENT_ROUTES } from "@shared/api-routes";
 import { getCsrfToken } from "@/lib/queryClient";
 import { compressImage } from "@/lib/image-compress";
+import { saveOfflinePhoto, addOutboxAction } from "@/lib/offline/store";
+import { generateId } from "@/lib/offline/db";
+import { ACTION_TYPES, ENTITY_TYPES } from "@/lib/offline/action-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -107,35 +110,61 @@ export default function MobilePhotoCaptue() {
 
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("title", title.trim());
-      formData.append("jobId", selectedJobId);
-      formData.append("isPublic", String(isPublic));
-      if (selectedDisciplineId) {
-        formData.append("disciplineId", selectedDisciplineId);
-      }
-
       const now = new Date();
       const description = `Photo captured on ${now.toLocaleDateString()} at ${now.toLocaleTimeString()}`;
-      formData.append("description", description);
 
-      const response = await fetch(DOCUMENT_ROUTES.UPLOAD, {
-        method: "POST",
-        body: formData,
-        headers: {
-          "x-csrf-token": getCsrfToken(),
-        },
-        credentials: "include",
-      });
+      if (!navigator.onLine) {
+        const compressed = await compressImage(selectedFile);
+        const photoId = generateId();
+        const metadata: Record<string, unknown> = {
+          title: title.trim(),
+          jobId: selectedJobId,
+          isPublic: isPublic,
+          description,
+        };
+        if (selectedDisciplineId) {
+          metadata.disciplineId = selectedDisciplineId;
+        }
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Upload failed");
+        await saveOfflinePhoto(photoId, compressed, metadata, photoId);
+        await addOutboxAction({
+          actionType: ACTION_TYPES.PHOTO_UPLOAD,
+          entityType: ENTITY_TYPES.PHOTO,
+          entityId: photoId,
+          tempId: photoId,
+          payload: { ...metadata, photoId },
+        });
+
+        setUploadSuccess(true);
+        toast({ title: "Photo saved offline" });
+      } else {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("title", title.trim());
+        formData.append("jobId", selectedJobId);
+        formData.append("isPublic", String(isPublic));
+        if (selectedDisciplineId) {
+          formData.append("disciplineId", selectedDisciplineId);
+        }
+        formData.append("description", description);
+
+        const response = await fetch(DOCUMENT_ROUTES.UPLOAD, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "x-csrf-token": getCsrfToken(),
+          },
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Upload failed");
+        }
+
+        setUploadSuccess(true);
+        toast({ title: "Photo uploaded to document register" });
       }
-
-      setUploadSuccess(true);
-      toast({ title: "Photo uploaded to document register" });
     } catch (error: any) {
       toast({ variant: "destructive", title: "Upload failed", description: error.message });
     } finally {

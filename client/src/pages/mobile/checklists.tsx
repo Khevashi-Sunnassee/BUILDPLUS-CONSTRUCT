@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   ChevronLeft,
@@ -19,7 +19,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
+import { useOfflineQuery, useOfflineMutation } from "@/lib/offline/hooks";
+import { ACTION_TYPES, ENTITY_TYPES } from "@/lib/offline/action-types";
 import { CHECKLIST_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import type { EntityType, ChecklistTemplate, ChecklistInstance } from "@shared/schema";
@@ -72,22 +74,20 @@ export default function MobileChecklistsPage() {
   const [showNewInstanceSheet, setShowNewInstanceSheet] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
 
-  const { data: entityTypes = [], isLoading: typesLoading } = useQuery<EntityType[]>({
-    queryKey: [CHECKLIST_ROUTES.ENTITY_TYPES],
-    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
-  });
+  const { data: entityTypes = [], isLoading: typesLoading } = useOfflineQuery<EntityType[]>(
+    [CHECKLIST_ROUTES.ENTITY_TYPES],
+    { select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []) },
+  );
 
-  const { data: templates = [], isLoading: templatesLoading } = useQuery<ChecklistTemplate[]>({
-    queryKey: [CHECKLIST_ROUTES.TEMPLATES],
-    enabled: viewState !== "modules",
-    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
-  });
+  const { data: templates = [], isLoading: templatesLoading } = useOfflineQuery<ChecklistTemplate[]>(
+    [CHECKLIST_ROUTES.TEMPLATES],
+    { enabled: viewState !== "modules", select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []) },
+  );
 
-  const { data: instances = [], isLoading: instancesLoading } = useQuery<ChecklistInstance[]>({
-    queryKey: [CHECKLIST_ROUTES.INSTANCES],
-    enabled: viewState === "instances",
-    select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
-  });
+  const { data: instances = [], isLoading: instancesLoading } = useOfflineQuery<ChecklistInstance[]>(
+    [CHECKLIST_ROUTES.INSTANCES],
+    { enabled: viewState === "instances", select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []) },
+  );
 
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
@@ -95,8 +95,18 @@ export default function MobileChecklistsPage() {
     select: (raw: any) => Array.isArray(raw) ? raw : (raw?.data ?? []),
   });
 
-  const createInstanceMutation = useMutation({
-    mutationFn: async () => {
+  const createInstanceMutation = useOfflineMutation<void, any>({
+    actionType: ACTION_TYPES.CHECKLIST_CREATE,
+    entityType: ENTITY_TYPES.CHECKLIST_INSTANCE,
+    buildPayload: () => ({
+      templateId: selectedTemplate?.id,
+      entityTypeId: selectedTemplate?.entityTypeId,
+      entitySubtypeId: selectedTemplate?.entitySubtypeId,
+      jobId: selectedJobId || undefined,
+      status: "in_progress",
+      responses: {},
+    }),
+    onlineMutationFn: async () => {
       if (!selectedTemplate) throw new Error("No template selected");
       return apiRequest("POST", CHECKLIST_ROUTES.INSTANCES, {
         templateId: selectedTemplate.id,
@@ -107,14 +117,11 @@ export default function MobileChecklistsPage() {
         responses: {},
       });
     },
-    onSuccess: async (response: any) => {
-      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCES] });
+    invalidateKeys: [[CHECKLIST_ROUTES.INSTANCES]],
+    onSyncSuccess: async (response: any) => {
       setShowNewInstanceSheet(false);
       const data = await response.json();
       setLocation(`/mobile/checklists/${data.id}`);
-    },
-    onError: () => {
-      toast({ title: "Failed to create checklist", variant: "destructive" });
     },
   });
 
@@ -384,7 +391,17 @@ export default function MobileChecklistsPage() {
                 Cancel
               </button>
               <button
-                onClick={() => createInstanceMutation.mutate()}
+                onClick={() => createInstanceMutation.mutate(undefined, {
+                  onSuccess: (data) => {
+                    if (data && typeof data === 'object' && 'offline' in data) {
+                      setShowNewInstanceSheet(false);
+                      toast({ title: "Checklist queued for creation offline" });
+                    }
+                  },
+                  onError: () => {
+                    toast({ title: "Failed to create checklist", variant: "destructive" });
+                  },
+                })}
                 disabled={createInstanceMutation.isPending}
                 className="flex-1 h-12 rounded-xl bg-blue-500 text-white font-medium active:scale-[0.99] disabled:opacity-50"
                 data-testid="button-confirm-new-checklist"

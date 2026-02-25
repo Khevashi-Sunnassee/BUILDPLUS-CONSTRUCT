@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useOfflineQuery, useOfflineMutation } from "@/lib/offline/hooks";
+import { ACTION_TYPES, ENTITY_TYPES } from "@/lib/offline/action-types";
 import { dateInputProps } from "@/lib/validation";
 import { useToast } from "@/hooks/use-toast";
 import { TASKS_ROUTES, JOBS_ROUTES, PROJECT_ACTIVITIES_ROUTES, USER_ROUTES } from "@shared/api-routes";
@@ -146,9 +148,9 @@ export default function MobileTasksPage() {
   const [activityHideDone, setActivityHideDone] = useState(true);
   const [activitySearchQuery, setActivitySearchQuery] = useState("");
 
-  const { data: groups = [], isLoading, isError, refetch } = useQuery<TaskGroup[]>({
-    queryKey: [TASKS_ROUTES.GROUPS],
-  });
+  const { data: groups = [], isLoading, isError, refetch } = useOfflineQuery<TaskGroup[]>(
+    [TASKS_ROUTES.GROUPS],
+  );
 
   const { data: jobs = [], isLoading: jobsLoading } = useQuery<SimpleJob[]>({
     queryKey: [JOBS_ROUTES.LIST],
@@ -164,35 +166,36 @@ export default function MobileTasksPage() {
     enabled: !!selectedJobId,
   });
 
-  const updateTaskMutation = useMutation({
-    mutationFn: async ({ taskId, data }: { taskId: string; data: Partial<Task> }) => {
-      return apiRequest("PATCH", TASKS_ROUTES.BY_ID(taskId), data);
+  const updateTaskMutation = useOfflineMutation<{ taskId: string; data: Partial<Task> }>({
+    actionType: ACTION_TYPES.TASK_UPDATE,
+    entityType: ENTITY_TYPES.TASK,
+    getEntityId: (variables) => variables.taskId,
+    buildPayload: (variables) => ({ taskId: variables.taskId, ...variables.data }),
+    onlineMutationFn: async (variables) => {
+      return apiRequest("PATCH", TASKS_ROUTES.BY_ID(variables.taskId), variables.data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
-      if (selectedJobId) {
-        activities.forEach(a => {
-          queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.ACTIVITY_TASKS(a.id)] });
-        });
-      }
-    },
-    onError: () => {
-      toast({ title: "Failed to update task", variant: "destructive" });
-    },
+    invalidateKeys: [[TASKS_ROUTES.GROUPS]],
   });
 
-  const createTaskMutation = useMutation({
-    mutationFn: async ({ groupId, title }: { groupId: string; title: string }) => {
-      return apiRequest("POST", TASKS_ROUTES.LIST, { groupId, title, priority: "MEDIUM", status: "NOT_STARTED" });
+  const statusChangeMutation = useOfflineMutation<{ taskId: string; data: { status: TaskStatus } }>({
+    actionType: ACTION_TYPES.TASK_STATUS_CHANGE,
+    entityType: ENTITY_TYPES.TASK,
+    getEntityId: (variables) => variables.taskId,
+    buildPayload: (variables) => ({ taskId: variables.taskId, status: variables.data.status }),
+    onlineMutationFn: async (variables) => {
+      return apiRequest("PATCH", TASKS_ROUTES.BY_ID(variables.taskId), variables.data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
-      setNewTaskGroupId(null);
-      setNewTaskTitle("");
+    invalidateKeys: [[TASKS_ROUTES.GROUPS]],
+  });
+
+  const createTaskMutation = useOfflineMutation<{ groupId: string; title: string }>({
+    actionType: ACTION_TYPES.TASK_CREATE,
+    entityType: ENTITY_TYPES.TASK,
+    buildPayload: (variables) => ({ groupId: variables.groupId, title: variables.title, priority: "MEDIUM", status: "NOT_STARTED" }),
+    onlineMutationFn: async (variables) => {
+      return apiRequest("POST", TASKS_ROUTES.LIST, { groupId: variables.groupId, title: variables.title, priority: "MEDIUM", status: "NOT_STARTED" });
     },
-    onError: () => {
-      toast({ title: "Failed to create task", variant: "destructive" });
-    },
+    invalidateKeys: [[TASKS_ROUTES.GROUPS]],
   });
 
   const createGroupMutation = useMutation({
@@ -259,12 +262,20 @@ export default function MobileTasksPage() {
     const currentIndex = statusOrder.indexOf(task.status);
     const nextIndex = (currentIndex + 1) % statusOrder.length;
     const nextStatus = statusOrder[nextIndex];
-    updateTaskMutation.mutate({ taskId: task.id, data: { status: nextStatus } });
+    statusChangeMutation.mutate({ taskId: task.id, data: { status: nextStatus } });
   };
 
   const handleCreateTask = (groupId: string) => {
     if (newTaskTitle.trim()) {
-      createTaskMutation.mutate({ groupId, title: newTaskTitle.trim() });
+      createTaskMutation.mutate({ groupId, title: newTaskTitle.trim() }, {
+        onSuccess: () => {
+          setNewTaskGroupId(null);
+          setNewTaskTitle("");
+        },
+        onError: () => {
+          toast({ title: "Failed to create task", variant: "destructive" });
+        },
+      });
     }
   };
 
@@ -518,6 +529,9 @@ export default function MobileTasksPage() {
                   {
                     onSuccess: () => {
                       setSelectedTask({ ...selectedTask, ...data } as Task);
+                    },
+                    onError: () => {
+                      toast({ title: "Failed to update task", variant: "destructive" });
                     },
                   }
                 );
@@ -1084,7 +1098,7 @@ function ActivityTasksView({
   searchQuery: string;
   cycleStatus: (task: Task) => void;
   setSelectedTask: (task: Task) => void;
-  updateTaskMutation: ReturnType<typeof useMutation<Response, Error, { taskId: string; data: Partial<Task> }>>;
+  updateTaskMutation: { mutate: (variables: { taskId: string; data: Partial<Task> }, options?: any) => void; isPending: boolean };
 }) {
   if (!selectedJobId) {
     return (

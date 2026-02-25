@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import {
   ChevronLeft,
@@ -19,7 +19,9 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
+import { useOfflineQuery, useOfflineMutation } from "@/lib/offline/hooks";
+import { ACTION_TYPES, ENTITY_TYPES } from "@/lib/offline/action-types";
 import { dateInputProps } from "@/lib/validation";
 import { CHECKLIST_ROUTES, ASSET_ROUTES } from "@shared/api-routes";
 import { normalizeSections } from "@/components/checklist/normalize-sections";
@@ -85,19 +87,19 @@ export default function MobileChecklistFillPage() {
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
-  const { data: instance, isLoading: instanceLoading } = useQuery<ChecklistInstance>({
-    queryKey: [CHECKLIST_ROUTES.INSTANCE_BY_ID(id!)],
-    enabled: !!id,
-  });
+  const { data: instance, isLoading: instanceLoading } = useOfflineQuery<ChecklistInstance>(
+    [CHECKLIST_ROUTES.INSTANCE_BY_ID(id!)],
+    { enabled: !!id },
+  );
 
   const backPath = instance?.panelId
     ? `/mobile/panels/${instance.panelId}`
     : "/mobile/checklists";
 
-  const { data: template, isLoading: templateLoading } = useQuery<ChecklistTemplate>({
-    queryKey: [CHECKLIST_ROUTES.TEMPLATE_BY_ID(instance?.templateId || "")],
-    enabled: !!instance?.templateId,
-  });
+  const { data: template, isLoading: templateLoading } = useOfflineQuery<ChecklistTemplate>(
+    [CHECKLIST_ROUTES.TEMPLATE_BY_ID(instance?.templateId || "")],
+    { enabled: !!instance?.templateId },
+  );
 
   useEffect(() => {
     if (instance?.responses) {
@@ -105,8 +107,19 @@ export default function MobileChecklistFillPage() {
     }
   }, [instance]);
 
-  const saveMutation = useMutation({
-    mutationFn: async () => {
+  const saveMutation = useOfflineMutation<void, any>({
+    actionType: ACTION_TYPES.CHECKLIST_UPDATE,
+    entityType: ENTITY_TYPES.CHECKLIST_INSTANCE,
+    getEntityId: () => id,
+    buildPayload: () => {
+      const completionRate = template ? calculateCompletionRate(template, responses) : 0;
+      return {
+        responses,
+        completionRate: completionRate.toFixed(2),
+        status: instance?.status === "draft" ? "in_progress" : instance?.status,
+      };
+    },
+    onlineMutationFn: async () => {
       const completionRate = template ? calculateCompletionRate(template, responses) : 0;
       return apiRequest("PUT", CHECKLIST_ROUTES.INSTANCE_BY_ID(id!), {
         responses,
@@ -114,42 +127,36 @@ export default function MobileChecklistFillPage() {
         status: instance?.status === "draft" ? "in_progress" : instance?.status,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCES] });
-      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCE_BY_ID(id!)] });
+    invalidateKeys: [[CHECKLIST_ROUTES.INSTANCES], [CHECKLIST_ROUTES.INSTANCE_BY_ID(id!)]],
+    onSyncSuccess: () => {
       setHasChanges(false);
-    },
-    onError: (error: Error) => {
-      const msg = error.message?.includes("413")
-        ? "Data too large. Try removing some photos."
-        : "Failed to save progress";
-      toast({ title: msg, variant: "destructive" });
     },
   });
 
-  const completeMutation = useMutation({
-    mutationFn: async () => {
+  const completeMutation = useOfflineMutation<void, any>({
+    actionType: ACTION_TYPES.CHECKLIST_COMPLETE,
+    entityType: ENTITY_TYPES.CHECKLIST_INSTANCE,
+    getEntityId: () => id,
+    buildPayload: () => ({
+      responses,
+      completionRate: "100",
+    }),
+    onlineMutationFn: async () => {
       await apiRequest("PUT", CHECKLIST_ROUTES.INSTANCE_BY_ID(id!), {
         responses,
         completionRate: "100",
       });
       return apiRequest("PATCH", CHECKLIST_ROUTES.INSTANCE_COMPLETE(id!));
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCES] });
-      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCE_BY_ID(id!)] });
-      if (instance?.panelId) {
-        queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCES_BY_PANEL(instance.panelId)] });
-      }
+    invalidateKeys: [
+      [CHECKLIST_ROUTES.INSTANCES],
+      [CHECKLIST_ROUTES.INSTANCE_BY_ID(id!)],
+      ...(instance?.panelId ? [[CHECKLIST_ROUTES.INSTANCES_BY_PANEL(instance.panelId)]] : []),
+    ],
+    onSyncSuccess: () => {
       setHasChanges(false);
       setShowCompleteConfirm(false);
       navigate(backPath);
-    },
-    onError: (error: Error) => {
-      const msg = error.message?.includes("413")
-        ? "Data too large. Try removing some photos."
-        : "Failed to complete checklist";
-      toast({ title: msg, variant: "destructive" });
     },
   });
 
@@ -401,7 +408,20 @@ export default function MobileChecklistFillPage() {
         <div className="flex-shrink-0 border-t border-white/10 bg-[#0D1117] px-4 py-3 z-20" style={{ paddingBottom: 'env(safe-area-inset-bottom, 12px)' }}>
           <div className="flex gap-3">
             <button
-              onClick={() => saveMutation.mutate()}
+              onClick={() => saveMutation.mutate(undefined, {
+                onSuccess: (data) => {
+                  if (data && typeof data === 'object' && 'offline' in data) {
+                    setHasChanges(false);
+                    toast({ title: "Changes saved offline" });
+                  }
+                },
+                onError: (error: Error) => {
+                  const msg = error.message?.includes("413")
+                    ? "Data too large. Try removing some photos."
+                    : "Failed to save progress";
+                  toast({ title: msg, variant: "destructive" });
+                },
+              })}
               disabled={!hasChanges || saveMutation.isPending}
               className="flex-1 flex items-center justify-center gap-2 h-12 rounded-xl bg-white/10 text-white font-medium active:scale-[0.99] disabled:opacity-40"
               data-testid="button-save-checklist"
@@ -448,7 +468,22 @@ export default function MobileChecklistFillPage() {
                 Cancel
               </button>
               <button
-                onClick={() => completeMutation.mutate()}
+                onClick={() => completeMutation.mutate(undefined, {
+                  onSuccess: (data) => {
+                    if (data && typeof data === 'object' && 'offline' in data) {
+                      setHasChanges(false);
+                      setShowCompleteConfirm(false);
+                      toast({ title: "Completion queued for sync" });
+                      navigate(backPath);
+                    }
+                  },
+                  onError: (error: Error) => {
+                    const msg = error.message?.includes("413")
+                      ? "Data too large. Try removing some photos."
+                      : "Failed to complete checklist";
+                    toast({ title: msg, variant: "destructive" });
+                  },
+                })}
                 disabled={completeMutation.isPending}
                 className="flex-1 h-12 rounded-xl bg-blue-500 text-white font-medium active:scale-[0.99] disabled:opacity-50"
                 data-testid="button-confirm-complete"
