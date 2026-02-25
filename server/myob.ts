@@ -195,6 +195,10 @@ export function createMyobClient(companyId: string) {
     }),
     getPurchaseBills: (query?: string) => myobFetch(companyId, `Purchase/Bill/Service/${query ? `?${query}` : ""}`),
     getProfitAndLoss: (params: string) => myobFetch(companyId, `Report/ProfitAndLossSummary?${params}`),
+    getAgedPayablesSummary: () => myobFetch(companyId, `Report/AgedPayablesSummary`),
+    getAgedReceivablesSummary: () => myobFetch(companyId, `Report/AgedReceivablesSummary`),
+    getPurchaseOrders: (query?: string) => myobFetch(companyId, `Purchase/Order/${query ? `?${query}` : ""}`),
+    getSaleOrders: (query?: string) => myobFetch(companyId, `Sale/Order/${query ? `?${query}` : ""}`),
     attachFileToBill: (billUid: string, fileName: string, fileBase64: string) => myobFetch(companyId, `Purchase/Bill/Service/${billUid}/Attachment`, {
       method: "POST",
       body: JSON.stringify({

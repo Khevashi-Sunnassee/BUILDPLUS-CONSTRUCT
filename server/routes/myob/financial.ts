@@ -365,6 +365,32 @@ router.get("/api/myob/buildplus-adjustments", requireAuth, async (req: Request, 
   }
 });
 
+router.get("/api/myob/aged-payables", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const myob = createMyobClient(companyId);
+    const data = await myob.getAgedPayablesSummary();
+    res.json(data);
+  } catch (err) {
+    handleMyobError(err, res, "aged-payables");
+  }
+});
+
+router.get("/api/myob/aged-receivables", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const myob = createMyobClient(companyId);
+    const data = await myob.getAgedReceivablesSummary();
+    res.json(data);
+  } catch (err) {
+    handleMyobError(err, res, "aged-receivables");
+  }
+});
+
 router.get("/api/myob/supplier-bills/:supplierId", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;

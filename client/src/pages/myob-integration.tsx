@@ -178,6 +178,8 @@ export default function MyobIntegrationPage() {
               <TabsTrigger value="accounts" data-testid="tab-accounts">Accounts</TabsTrigger>
               <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
               <TabsTrigger value="items" data-testid="tab-items">Items</TabsTrigger>
+              <TabsTrigger value="payables" data-testid="tab-payables">Accounts Payable</TabsTrigger>
+              <TabsTrigger value="receivables" data-testid="tab-receivables">Accounts Receivable</TabsTrigger>
               <TabsTrigger value="code-mapping" data-testid="tab-code-mapping">Code Mapping</TabsTrigger>
               <TabsTrigger value="export-log" data-testid="tab-export-log">Export Log</TabsTrigger>
             </TabsList>
@@ -302,6 +304,14 @@ export default function MyobIntegrationPage() {
                 searchTerm={searchTerms.items || ""}
                 onSearchChange={(v) => setSearchTerms(prev => ({ ...prev, items: v }))}
               />
+            </TabsContent>
+
+            <TabsContent value="payables">
+              <AgedPayablesTab />
+            </TabsContent>
+
+            <TabsContent value="receivables">
+              <AgedReceivablesTab />
             </TabsContent>
 
             <TabsContent value="code-mapping">
@@ -1699,6 +1709,389 @@ interface ExportLogEntry {
   errorMessage: string | null;
   exportedAt: string;
   userName: string | null;
+}
+
+function AgedPayablesTab() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery<any>({
+    queryKey: [MYOB_ROUTES.AGED_PAYABLES],
+  });
+
+  const contacts: any[] = data?.ContactsBreakdown || data?.Items || [];
+
+  const totalCurrent = contacts.reduce((s: number, c: any) => s + (Number(c.Current) || 0), 0);
+  const totalThirty = contacts.reduce((s: number, c: any) => s + (Number(c.ThirtyDays) || 0), 0);
+  const totalSixty = contacts.reduce((s: number, c: any) => s + (Number(c.SixtyDays) || 0), 0);
+  const totalNinety = contacts.reduce((s: number, c: any) => s + (Number(c.NinetyDays) || 0), 0);
+  const totalOverNinety = contacts.reduce((s: number, c: any) => s + (Number(c.OverNinetyDays) || 0), 0);
+  const grandTotal = contacts.reduce((s: number, c: any) => s + (Number(c.Total) || 0), 0);
+
+  const filtered = contacts.filter((c: any) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    const name = c.Contact?.Name || "";
+    return name.toLowerCase().includes(term);
+  });
+
+  const fmtAmt = (val: number | null | undefined) => {
+    const n = Number(val) || 0;
+    if (n === 0) return "-";
+    return `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2 })}`;
+  };
+
+  const chartData = [
+    { name: "Current", value: totalCurrent },
+    { name: "30 Days", value: totalThirty },
+    { name: "60 Days", value: totalSixty },
+    { name: "90 Days", value: totalNinety },
+    { name: "90+ Days", value: totalOverNinety },
+  ].filter(d => d.value !== 0);
+
+  const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Current</p>
+            <p className="text-lg font-semibold" data-testid="text-ap-current">{fmtAmt(totalCurrent)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">30 Days</p>
+            <p className="text-lg font-semibold" data-testid="text-ap-30">{fmtAmt(totalThirty)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">60 Days</p>
+            <p className="text-lg font-semibold" data-testid="text-ap-60">{fmtAmt(totalSixty)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">90 Days</p>
+            <p className="text-lg font-semibold" data-testid="text-ap-90">{fmtAmt(totalNinety)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">90+ Days</p>
+            <p className="text-lg font-semibold text-destructive" data-testid="text-ap-over90">{fmtAmt(totalOverNinety)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Total Payable</p>
+            <p className="text-lg font-bold" data-testid="text-ap-total">{fmtAmt(grandTotal)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {chartData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Aging Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <RechartsTooltip formatter={(value: number) => [`$${value.toLocaleString("en-AU", { minimumFractionDigits: 2 })}`, "Amount"]} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {chartData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              Accounts Payable Detail
+              {contacts.length > 0 && (
+                <Badge variant="secondary" className="ml-1" data-testid="badge-count-payables">
+                  {contacts.length}
+                </Badge>
+              )}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search suppliers..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-48"
+                  data-testid="input-search-payables"
+                />
+              </div>
+              <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching} data-testid="button-refresh-payables">
+                <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : isError ? (
+            <div className="text-center py-8 space-y-2">
+              <XCircle className="h-8 w-8 mx-auto text-destructive" />
+              <p className="text-sm text-muted-foreground">{(error as Error)?.message || "Failed to load aged payables from MYOB"}</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-retry-payables">Retry</Button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">{searchTerm ? "No matching suppliers found" : "No payables data found in MYOB"}</p>
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-auto max-h-[500px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead className="text-right">Current</TableHead>
+                    <TableHead className="text-right">30 Days</TableHead>
+                    <TableHead className="text-right">60 Days</TableHead>
+                    <TableHead className="text-right">90 Days</TableHead>
+                    <TableHead className="text-right">90+ Days</TableHead>
+                    <TableHead className="text-right font-bold">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((c: any, idx: number) => (
+                    <TableRow key={c.Contact?.UID || idx}>
+                      <TableCell className="font-medium" data-testid={`text-payable-name-${idx}`}>{c.Contact?.Name || "Unknown"}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmtAmt(c.Current)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmtAmt(c.ThirtyDays)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmtAmt(c.SixtyDays)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmtAmt(c.NinetyDays)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmtAmt(c.OverNinetyDays)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm font-bold">{fmtAmt(c.Total)}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-muted/50 font-bold">
+                    <TableCell>Totals</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtAmt(totalCurrent)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtAmt(totalThirty)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtAmt(totalSixty)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtAmt(totalNinety)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtAmt(totalOverNinety)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtAmt(grandTotal)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function AgedReceivablesTab() {
+  const [searchTerm, setSearchTerm] = useState("");
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery<any>({
+    queryKey: [MYOB_ROUTES.AGED_RECEIVABLES],
+  });
+
+  const contacts: any[] = data?.ContactsBreakdown || data?.Items || [];
+
+  const totalCurrent = contacts.reduce((s: number, c: any) => s + (Number(c.Current) || 0), 0);
+  const totalThirty = contacts.reduce((s: number, c: any) => s + (Number(c.ThirtyDays) || 0), 0);
+  const totalSixty = contacts.reduce((s: number, c: any) => s + (Number(c.SixtyDays) || 0), 0);
+  const totalNinety = contacts.reduce((s: number, c: any) => s + (Number(c.NinetyDays) || 0), 0);
+  const totalOverNinety = contacts.reduce((s: number, c: any) => s + (Number(c.OverNinetyDays) || 0), 0);
+  const grandTotal = contacts.reduce((s: number, c: any) => s + (Number(c.Total) || 0), 0);
+
+  const fmtAmt = (val: number | null | undefined) => {
+    const n = Number(val) || 0;
+    if (n === 0) return "-";
+    return `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2 })}`;
+  };
+
+  const chartData = [
+    { name: "Current", value: totalCurrent },
+    { name: "30 Days", value: totalThirty },
+    { name: "60 Days", value: totalSixty },
+    { name: "90 Days", value: totalNinety },
+    { name: "90+ Days", value: totalOverNinety },
+  ].filter(d => d.value !== 0);
+
+  const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Current</p>
+            <p className="text-lg font-semibold" data-testid="text-ar-current">{fmtAmt(totalCurrent)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">30 Days</p>
+            <p className="text-lg font-semibold" data-testid="text-ar-30">{fmtAmt(totalThirty)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">60 Days</p>
+            <p className="text-lg font-semibold" data-testid="text-ar-60">{fmtAmt(totalSixty)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">90 Days</p>
+            <p className="text-lg font-semibold" data-testid="text-ar-90">{fmtAmt(totalNinety)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">90+ Days</p>
+            <p className="text-lg font-semibold text-destructive" data-testid="text-ar-over90">{fmtAmt(totalOverNinety)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 pb-3 px-4">
+            <p className="text-xs text-muted-foreground">Total Receivable</p>
+            <p className="text-lg font-bold" data-testid="text-ar-total">{fmtAmt(grandTotal)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {chartData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Aging Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[250px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <RechartsTooltip formatter={(value: number) => [`$${value.toLocaleString("en-AU", { minimumFractionDigits: 2 })}`, "Amount"]} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                    {chartData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Accounts Receivable Detail
+              {contacts.length > 0 && (
+                <Badge variant="secondary" className="ml-1" data-testid="badge-count-receivables">
+                  {contacts.length}
+                </Badge>
+              )}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search customers..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-48"
+                  data-testid="input-search-receivables"
+                />
+              </div>
+              <Button variant="outline" size="icon" onClick={() => refetch()} disabled={isFetching} data-testid="button-refresh-receivables">
+                <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : isError ? (
+            <div className="text-center py-8 space-y-2">
+              <XCircle className="h-8 w-8 mx-auto text-destructive" />
+              <p className="text-sm text-muted-foreground">{(error as Error)?.message || "Failed to load aged receivables from MYOB"}</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-retry-receivables">Retry</Button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-sm text-muted-foreground">{searchTerm ? "No matching customers found" : "No receivables data found in MYOB"}</p>
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-auto max-h-[500px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer</TableHead>
+                    <TableHead className="text-right">Current</TableHead>
+                    <TableHead className="text-right">30 Days</TableHead>
+                    <TableHead className="text-right">60 Days</TableHead>
+                    <TableHead className="text-right">90 Days</TableHead>
+                    <TableHead className="text-right">90+ Days</TableHead>
+                    <TableHead className="text-right font-bold">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((c: any, idx: number) => (
+                    <TableRow key={c.Contact?.UID || idx}>
+                      <TableCell className="font-medium" data-testid={`text-receivable-name-${idx}`}>{c.Contact?.Name || "Unknown"}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmtAmt(c.Current)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmtAmt(c.ThirtyDays)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmtAmt(c.SixtyDays)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmtAmt(c.NinetyDays)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{fmtAmt(c.OverNinetyDays)}</TableCell>
+                      <TableCell className="text-right font-mono text-sm font-bold">{fmtAmt(c.Total)}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-muted/50 font-bold">
+                    <TableCell>Totals</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtAmt(totalCurrent)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtAmt(totalThirty)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtAmt(totalSixty)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtAmt(totalNinety)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtAmt(totalOverNinety)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm">{fmtAmt(grandTotal)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 function CodeMappingTab() {
