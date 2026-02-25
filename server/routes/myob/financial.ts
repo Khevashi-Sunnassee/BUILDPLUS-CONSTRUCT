@@ -371,8 +371,57 @@ router.get("/api/myob/aged-payables", requireAuth, async (req: Request, res: Res
     if (!companyId) return res.status(400).json({ error: "Company context required" });
 
     const myob = createMyobClient(companyId);
-    const data = await myob.getAgedPayablesSummary();
-    res.json(data);
+
+    let reportData: any = null;
+    try {
+      reportData = await myob.getAgedPayablesSummary();
+    } catch (reportErr) {
+      logger.warn({ err: reportErr instanceof Error ? reportErr.message : reportErr }, "[MYOB] AgedPayablesSummary report not available, computing from purchase bills");
+    }
+
+    if (reportData && reportData.ContactsBreakdown) {
+      return res.json(reportData);
+    }
+
+    const result = await myob.getAllPurchaseBills("$filter=Status eq 'Open'&$top=1000&$orderby=Date desc");
+    const bills = result?.Items || [];
+    const now = new Date();
+
+    const supplierMap: Record<string, { Contact: { UID: string; Name: string }; Current: number; ThirtyDays: number; SixtyDays: number; NinetyDays: number; OverNinetyDays: number; Total: number }> = {};
+
+    for (const bill of bills) {
+      const balance = Number(bill.BalanceDueAmount) || 0;
+      if (balance <= 0) continue;
+
+      const supplierName = bill.Supplier?.Name || "Unknown";
+      const supplierUid = bill.Supplier?.UID || "unknown";
+      const billDate = new Date(bill.Date);
+      const daysOld = Math.floor((now.getTime() - billDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (!supplierMap[supplierUid]) {
+        supplierMap[supplierUid] = {
+          Contact: { UID: supplierUid, Name: supplierName },
+          Current: 0, ThirtyDays: 0, SixtyDays: 0, NinetyDays: 0, OverNinetyDays: 0, Total: 0,
+        };
+      }
+
+      const entry = supplierMap[supplierUid];
+      entry.Total += balance;
+
+      if (daysOld <= 30) entry.Current += balance;
+      else if (daysOld <= 60) entry.ThirtyDays += balance;
+      else if (daysOld <= 90) entry.SixtyDays += balance;
+      else if (daysOld <= 120) entry.NinetyDays += balance;
+      else entry.OverNinetyDays += balance;
+    }
+
+    const contactsBreakdown = Object.values(supplierMap).sort((a, b) => b.Total - a.Total);
+
+    res.json({
+      ContactsBreakdown: contactsBreakdown,
+      source: "computed",
+      billCount: bills.length,
+    });
   } catch (err) {
     handleMyobError(err, res, "aged-payables");
   }
@@ -384,8 +433,57 @@ router.get("/api/myob/aged-receivables", requireAuth, async (req: Request, res: 
     if (!companyId) return res.status(400).json({ error: "Company context required" });
 
     const myob = createMyobClient(companyId);
-    const data = await myob.getAgedReceivablesSummary();
-    res.json(data);
+
+    let reportData: any = null;
+    try {
+      reportData = await myob.getAgedReceivablesSummary();
+    } catch (reportErr) {
+      logger.warn({ err: reportErr instanceof Error ? reportErr.message : reportErr }, "[MYOB] AgedReceivablesSummary report not available, computing from sale invoices");
+    }
+
+    if (reportData && reportData.ContactsBreakdown) {
+      return res.json(reportData);
+    }
+
+    const result = await myob.getAllSaleInvoices("$filter=Status eq 'Open'&$top=1000&$orderby=Date desc");
+    const invoices = result?.Items || [];
+    const now = new Date();
+
+    const customerMap: Record<string, { Contact: { UID: string; Name: string }; Current: number; ThirtyDays: number; SixtyDays: number; NinetyDays: number; OverNinetyDays: number; Total: number }> = {};
+
+    for (const inv of invoices) {
+      const balance = Number(inv.BalanceDueAmount) || 0;
+      if (balance <= 0) continue;
+
+      const customerName = inv.Customer?.Name || inv.Contact?.Name || "Unknown";
+      const customerUid = inv.Customer?.UID || inv.Contact?.UID || "unknown";
+      const invDate = new Date(inv.Date);
+      const daysOld = Math.floor((now.getTime() - invDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (!customerMap[customerUid]) {
+        customerMap[customerUid] = {
+          Contact: { UID: customerUid, Name: customerName },
+          Current: 0, ThirtyDays: 0, SixtyDays: 0, NinetyDays: 0, OverNinetyDays: 0, Total: 0,
+        };
+      }
+
+      const entry = customerMap[customerUid];
+      entry.Total += balance;
+
+      if (daysOld <= 30) entry.Current += balance;
+      else if (daysOld <= 60) entry.ThirtyDays += balance;
+      else if (daysOld <= 90) entry.SixtyDays += balance;
+      else if (daysOld <= 120) entry.NinetyDays += balance;
+      else entry.OverNinetyDays += balance;
+    }
+
+    const contactsBreakdown = Object.values(customerMap).sort((a, b) => b.Total - a.Total);
+
+    res.json({
+      ContactsBreakdown: contactsBreakdown,
+      source: "computed",
+      invoiceCount: invoices.length,
+    });
   } catch (err) {
     handleMyobError(err, res, "aged-receivables");
   }

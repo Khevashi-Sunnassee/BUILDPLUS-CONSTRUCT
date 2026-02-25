@@ -21,7 +21,7 @@ export function getAuthorizationUrl(redirectUri: string): string {
     client_id: process.env.MYOB_CLIENT_ID ?? "",
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "sme-company-file sme-company-settings sme-sales sme-purchases sme-contacts-customer sme-contacts-supplier sme-contacts-employee sme-inventory sme-general-ledger sme-banking sme-payroll",
+    scope: "sme-company-file sme-company-settings sme-sales sme-purchases sme-contacts-customer sme-contacts-supplier sme-contacts-employee sme-inventory sme-general-ledger sme-banking sme-payroll sme-reports",
     prompt: "consent",
   });
   return `${MYOB_AUTH_URL}?${params.toString()}`;
@@ -197,8 +197,8 @@ export function createMyobClient(companyId: string) {
     getProfitAndLoss: (params: string) => myobFetch(companyId, `Report/ProfitAndLossSummary?${params}`),
     getAgedPayablesSummary: () => myobFetch(companyId, `Report/AgedPayablesSummary`),
     getAgedReceivablesSummary: () => myobFetch(companyId, `Report/AgedReceivablesSummary`),
-    getPurchaseOrders: (query?: string) => myobFetch(companyId, `Purchase/Order/${query ? `?${query}` : ""}`),
-    getSaleOrders: (query?: string) => myobFetch(companyId, `Sale/Order/${query ? `?${query}` : ""}`),
+    getAllPurchaseBills: (query?: string) => myobFetch(companyId, `Purchase/Bill/${query ? `?${query}` : ""}`),
+    getAllSaleInvoices: (query?: string) => myobFetch(companyId, `Sale/Invoice/${query ? `?${query}` : ""}`),
     attachFileToBill: (billUid: string, fileName: string, fileBase64: string) => myobFetch(companyId, `Purchase/Bill/Service/${billUid}/Attachment`, {
       method: "POST",
       body: JSON.stringify({
