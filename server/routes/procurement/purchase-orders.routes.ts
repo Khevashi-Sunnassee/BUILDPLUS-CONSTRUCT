@@ -21,7 +21,7 @@ router.get("/purchase-orders/:id/pdf", requireAuth, async (req, res) => {
     const settings = await storage.getGlobalSettings(companyId);
     const { generatePurchaseOrderPdf } = await import("../../services/po-pdf.service");
     const termsData = settings ? { poTermsHtml: settings.poTermsHtml, includePOTerms: settings.includePOTerms } : null;
-    const pdfBuffer = generatePurchaseOrderPdf(po, po.items || [], settings ? { logoBase64: settings.logoBase64, companyName: settings.companyName } : null, termsData);
+    const pdfBuffer = generatePurchaseOrderPdf(po, po.items || [], settings ? { logoBase64: settings.logoBase64, userLogoBase64: settings.userLogoBase64, companyName: settings.companyName } : null, termsData);
 
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${po.poNumber || "PurchaseOrder"}.pdf"`);
@@ -56,7 +56,7 @@ router.post("/purchase-orders/:id/send-with-pdf", requireAuth, async (req, res) 
     const settings = await storage.getGlobalSettings(companyId);
     const { generatePurchaseOrderPdf } = await import("../../services/po-pdf.service");
     const termsData = settings ? { poTermsHtml: settings.poTermsHtml, includePOTerms: settings.includePOTerms } : null;
-    const pdfBuffer = generatePurchaseOrderPdf(po, po.items || [], settings ? { logoBase64: settings.logoBase64, companyName: settings.companyName } : null, termsData);
+    const pdfBuffer = generatePurchaseOrderPdf(po, po.items || [], settings ? { logoBase64: settings.logoBase64, userLogoBase64: settings.userLogoBase64, companyName: settings.companyName } : null, termsData);
 
     const attachments = [{
       filename: `${po.poNumber || "PurchaseOrder"}.pdf`,

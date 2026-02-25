@@ -534,7 +534,7 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
     enabled: open && !!po?.id,
   });
 
-  const { data: settings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+  const { data: settings } = useQuery<{ logoBase64: string | null; userLogoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
 
@@ -568,11 +568,13 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
       setPdfLoading(true);
       (async () => {
         try {
+          const printLogo = settings?.userLogoBase64 || settings?.logoBase64 || null;
           let compressedLogo: string | null = null;
-          if (settings?.logoBase64) {
-            compressedLogo = await compressLogoForPdf(settings.logoBase64);
+          if (printLogo) {
+            compressedLogo = await compressLogoForPdf(printLogo);
           }
-          const pdf = await generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo, poTermsData);
+          const printSettings = settings ? { ...settings, logoBase64: printLogo } : settings;
+          const pdf = await generatePoPdf(poDetail, poDetail.items || [], printSettings, compressedLogo, poTermsData);
           const base64String = pdf.output("datauristring").split(",")[1] || "";
           setPdfBase64(base64String);
 
@@ -1015,7 +1017,7 @@ export default function PurchaseOrdersPage() {
     setEmailDialogOpen(true);
   }, []);
 
-  const { data: settings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+  const { data: settings } = useQuery<{ logoBase64: string | null; userLogoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
 
@@ -1043,11 +1045,13 @@ export default function PurchaseOrdersPage() {
       const detailRes = await fetch(PROCUREMENT_ROUTES.PURCHASE_ORDER_BY_ID(po.id), { credentials: "include" });
       if (!detailRes.ok) throw new Error("Failed to load purchase order details");
       const poDetail = await detailRes.json();
+      const printLogo = settings?.userLogoBase64 || settings?.logoBase64 || null;
       let compressedLogo: string | null = null;
-      if (settings?.logoBase64) {
-        compressedLogo = await compressLogoForPdf(settings.logoBase64);
+      if (printLogo) {
+        compressedLogo = await compressLogoForPdf(printLogo);
       }
-      const pdf = await generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo, poTermsData);
+      const printSettings = settings ? { ...settings, logoBase64: printLogo } : settings;
+      const pdf = await generatePoPdf(poDetail, poDetail.items || [], printSettings, compressedLogo, poTermsData);
       pdf.save(`${poDetail.poNumber || "PurchaseOrder"}.pdf`);
     } catch (error) {
       console.error("PDF generation error:", error);

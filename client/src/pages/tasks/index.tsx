@@ -106,7 +106,7 @@ function TasksPageContent() {
     queryKey: [JOBS_ROUTES.LIST],
   });
 
-  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; userLogoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
 
@@ -138,7 +138,7 @@ function TasksPageContent() {
   }, [groups, toast]);
 
   const [isExporting, setIsExporting] = useState(false);
-  const reportLogo = brandingSettings?.logoBase64 || null;
+  const reportLogo = brandingSettings?.userLogoBase64 || brandingSettings?.logoBase64 || null;
   const companyName = brandingSettings?.companyName || "BuildPlus Ai";
 
   const filteredGroups = useMemo(() => {

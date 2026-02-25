@@ -449,6 +449,7 @@ export const ADMIN_ROUTES = {
   SETTINGS: '/api/admin/settings',
   SETTINGS_COMPANY_NAME: '/api/admin/settings/company-name',
   SETTINGS_LOGO: '/api/admin/settings/logo',
+  SETTINGS_USER_LOGO: '/api/admin/settings/user-logo',
   
   // Work Types
   WORK_TYPES: '/api/admin/work-types',

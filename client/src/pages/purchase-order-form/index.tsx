@@ -126,7 +126,7 @@ export default function PurchaseOrderFormPage() {
     );
   }, [jobs, jobSearchTerm]);
 
-  const { data: settings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+  const { data: settings } = useQuery<{ logoBase64: string | null; userLogoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
 
@@ -777,9 +777,9 @@ export default function PurchaseOrderFormPage() {
         <CardHeader className="print:pb-2">
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-4">
-              {settings?.logoBase64 && (
+              {(settings?.userLogoBase64 || settings?.logoBase64) && (
                 <img 
-                  src={settings.logoBase64} 
+                  src={settings?.userLogoBase64 || settings?.logoBase64 || ""} 
                   alt="Company Logo" 
                   className="h-16 w-auto object-contain"
                   data-testid="img-company-logo"

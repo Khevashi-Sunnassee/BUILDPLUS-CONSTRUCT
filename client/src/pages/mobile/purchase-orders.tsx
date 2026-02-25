@@ -489,7 +489,7 @@ function SendPOView({
 }) {
   const { toast } = useToast();
 
-  const { data: settings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+  const { data: settings } = useQuery<{ logoBase64: string | null; userLogoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
 

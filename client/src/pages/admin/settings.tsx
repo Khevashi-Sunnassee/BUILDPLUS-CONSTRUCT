@@ -605,30 +605,30 @@ export default function AdminSettingsPage() {
 
   const uploadLogoMutation = useMutation({
     mutationFn: async (logoBase64: string) => {
-      return apiRequest("POST", ADMIN_ROUTES.SETTINGS_LOGO, { logoBase64 });
+      return apiRequest("POST", ADMIN_ROUTES.SETTINGS_USER_LOGO, { logoBase64 });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       queryClient.invalidateQueries({ queryKey: [SETTINGS_ROUTES.LOGO] });
-      toast({ title: "Logo uploaded successfully" });
+      toast({ title: "User logo uploaded successfully" });
     },
     onError: () => {
-      toast({ title: "Failed to upload logo", variant: "destructive" });
+      toast({ title: "Failed to upload user logo", variant: "destructive" });
     },
   });
 
   const removeLogoMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", ADMIN_ROUTES.SETTINGS_LOGO, { logoBase64: "" });
+      return apiRequest("POST", ADMIN_ROUTES.SETTINGS_USER_LOGO, { logoBase64: "" });
     },
     onSuccess: () => {
       setLogoPreview(null);
       queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       queryClient.invalidateQueries({ queryKey: [SETTINGS_ROUTES.LOGO] });
-      toast({ title: "Logo removed" });
+      toast({ title: "User logo removed" });
     },
     onError: () => {
-      toast({ title: "Failed to remove logo", variant: "destructive" });
+      toast({ title: "Failed to remove user logo", variant: "destructive" });
     },
   });
 

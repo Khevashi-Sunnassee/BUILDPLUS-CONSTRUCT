@@ -118,11 +118,14 @@ export function printPanelList(params: PrintPanelListParams): string | null {
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
       color: #1f2937;
+      line-height: 1.4;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
+    table { border-collapse: collapse; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }

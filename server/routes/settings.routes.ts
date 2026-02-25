@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { storage } from "../storage";
-import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import { requireAuth, requireRole, requireSuperAdmin } from "./middleware/auth.middleware";
 import { getDefaultTemplate, clearBrandingCache } from "../lib/email-template";
 import { sanitizeRichHtml } from "../utils/sanitize-html";
 import { db } from "../db";
@@ -92,7 +92,7 @@ router.put("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
   }
 });
 
-router.post("/api/admin/settings/logo", requireRole("ADMIN"), async (req, res) => {
+router.post("/api/admin/settings/logo", requireSuperAdmin, async (req, res) => {
   try {
     const companyId = req.companyId as string;
     const result = logoSchema.safeParse(req.body);
@@ -105,6 +105,28 @@ router.post("/api/admin/settings/logo", requireRole("ADMIN"), async (req, res) =
     }
     const settings = await storage.updateGlobalSettings({ logoBase64: logoBase64 || null }, companyId);
     res.json({ success: true, logoBase64: settings.logoBase64 });
+  } catch (error: unknown) {
+    res.status(400).json({ error: "An internal error occurred" });
+  }
+});
+
+const userLogoSchema = z.object({
+  logoBase64: z.string(),
+});
+
+router.post("/api/admin/settings/user-logo", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId as string;
+    const result = userLogoSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { logoBase64 } = result.data;
+    if (logoBase64 !== "" && !logoBase64.startsWith("data:image/")) {
+      return res.status(400).json({ error: "Invalid image format" });
+    }
+    const settings = await storage.updateGlobalSettings({ userLogoBase64: logoBase64 || null }, companyId);
+    res.json({ success: true, userLogoBase64: settings.userLogoBase64 });
   } catch (error: unknown) {
     res.status(400).json({ error: "An internal error occurred" });
   }
@@ -187,6 +209,7 @@ router.get("/api/settings/logo", async (req, res) => {
     const settings = await storage.getGlobalSettings(companyId);
     res.json({ 
       logoBase64: settings?.logoBase64 || null,
+      userLogoBase64: settings?.userLogoBase64 || null,
       companyName: settings?.companyName || "BuildPlus Ai"
     });
   } catch (error: unknown) {

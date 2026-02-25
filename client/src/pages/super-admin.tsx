@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo, Fragment } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Building2, BookOpen, Shield, Database, Monitor, Settings2, Star, StarOff, Loader2, FileSearch, Key, Plus, Copy, Trash2, ToggleLeft, ToggleRight, Clock, Activity, AlertTriangle, ChevronDown, ChevronRight, Layers } from "lucide-react";
+import { Building2, BookOpen, Shield, Database, Monitor, Settings2, Star, StarOff, Loader2, FileSearch, Key, Plus, Copy, Trash2, ToggleLeft, ToggleRight, Clock, Activity, AlertTriangle, ChevronDown, ChevronRight, Layers, Upload, Save, Image } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -940,6 +940,196 @@ function ApiKeysManager({ companyId }: { companyId: string }) {
   );
 }
 
+function SystemBrandingManager() {
+  const { toast } = useToast();
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState("");
+
+  const { data: logoData } = useQuery<{ logoBase64: string | null; companyName: string }>({
+    queryKey: ["/api/settings/logo"],
+  });
+
+  const currentLogo = logoPreview || logoData?.logoBase64 || null;
+  const currentCompanyName = logoData?.companyName || "BuildPlus Ai";
+
+  useEffect(() => {
+    if (logoData?.companyName) {
+      setCompanyName(logoData.companyName);
+    }
+  }, [logoData?.companyName]);
+
+  const uploadLogoMutation = useMutation({
+    mutationFn: async (base64: string) => {
+      await apiRequest("POST", "/api/admin/settings/logo", { logoBase64: base64 });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/logo"] });
+      setLogoPreview(null);
+      toast({ title: "System logo updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to upload logo", variant: "destructive" });
+    },
+  });
+
+  const removeLogoMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/admin/settings/logo", { logoBase64: "" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/logo"] });
+      setLogoPreview(null);
+      toast({ title: "System logo removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove logo", variant: "destructive" });
+    },
+  });
+
+  const saveCompanyNameMutation = useMutation({
+    mutationFn: async (name: string) => {
+      await apiRequest("POST", "/api/admin/settings/company-name", { companyName: name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/logo"] });
+      toast({ title: "Company name updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save company name", variant: "destructive" });
+    },
+  });
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum size is 2MB", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      setLogoPreview(base64);
+      uploadLogoMutation.mutate(base64);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Image className="h-5 w-5" aria-hidden="true" />
+          System Branding
+        </CardTitle>
+        <CardDescription>
+          Configure the system logo and company name used in sidebar, login page, and system notifications
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="systemCompanyName">Company Name</Label>
+          <Input
+            id="systemCompanyName"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            placeholder="Enter company name"
+            data-testid="input-system-company-name"
+          />
+          <p className="text-sm text-muted-foreground">
+            Displayed in sidebar, login page, and system-wide branding
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => saveCompanyNameMutation.mutate(companyName)}
+            disabled={saveCompanyNameMutation.isPending || !companyName || companyName === currentCompanyName}
+            data-testid="button-save-system-company-name"
+          >
+            {saveCompanyNameMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Save Company Name
+          </Button>
+        </div>
+
+        <div className="space-y-2">
+          <Label>System Logo</Label>
+          <div className="flex items-center gap-6">
+            <div className="flex-shrink-0">
+              <div className="w-24 h-24 rounded-lg border bg-background flex items-center justify-center overflow-hidden">
+                {currentLogo ? (
+                  <img
+                    src={currentLogo}
+                    alt="System Logo"
+                    className="max-w-full max-h-full object-contain"
+                    data-testid="img-system-logo-preview"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-1" data-testid="img-system-logo-preview">
+                    <Building2 className="h-8 w-8 text-primary" />
+                    <span className="text-xs font-semibold text-muted-foreground">BuildPlus Ai</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="file"
+                  ref={logoInputRef}
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                  data-testid="input-system-logo-file"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadLogoMutation.isPending}
+                  data-testid="button-upload-system-logo"
+                >
+                  {uploadLogoMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  Upload Logo
+                </Button>
+                {logoData?.logoBase64 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => removeLogoMutation.mutate()}
+                    disabled={removeLogoMutation.isPending}
+                    data-testid="button-remove-system-logo"
+                  >
+                    {removeLogoMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                    )}
+                    Remove
+                  </Button>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                PNG, JPG or SVG. Max 2MB. Used in sidebar, login page, and system notifications.
+              </p>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SuperAdminPage() {
   useDocumentTitle("Super Admin");
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
@@ -987,6 +1177,10 @@ export default function SuperAdminPage() {
           <TabsTrigger value="api-keys" data-testid="tab-super-api-keys">
             <Key className="h-4 w-4 mr-1.5" />
             API Keys
+          </TabsTrigger>
+          <TabsTrigger value="branding" data-testid="tab-super-branding">
+            <Image className="h-4 w-4 mr-1.5" />
+            System Branding
           </TabsTrigger>
           <TabsTrigger value="review-mode" data-testid="tab-super-review-mode">
             <FileSearch className="h-4 w-4 mr-1.5" />
@@ -1059,6 +1253,10 @@ export default function SuperAdminPage() {
           ) : (
             <CompanyRequiredPlaceholder icon={Key} message="Select a company to manage its API keys for external integrations" />
           )}
+        </TabsContent>
+
+        <TabsContent value="branding" className="space-y-6">
+          <SystemBrandingManager />
         </TabsContent>
 
         <TabsContent value="review-mode" className="space-y-6">

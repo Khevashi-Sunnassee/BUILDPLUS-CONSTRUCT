@@ -123,21 +123,24 @@ export function CompanyTab({
           </div>
 
           <div className="space-y-2">
-            <Label>Company Logo</Label>
+            <Label>User Logo</Label>
+            <p className="text-sm text-muted-foreground">
+              Used on all printed documents, PDFs, and outbound communications from your company
+            </p>
             <div className="flex items-center gap-6">
               <div className="flex-shrink-0">
                 <div className="w-24 h-24 rounded-lg border bg-background flex items-center justify-center overflow-hidden">
-                  {(logoPreview || settings?.logoBase64) ? (
+                  {(logoPreview || settings?.userLogoBase64) ? (
                     <img 
-                      src={logoPreview || settings?.logoBase64 || ""} 
-                      alt="Company Logo" 
+                      src={logoPreview || settings?.userLogoBase64 || ""} 
+                      alt="User Logo" 
                       className="max-w-full max-h-full object-contain"
-                      data-testid="img-logo-preview"
+                      data-testid="img-user-logo-preview"
                     />
                   ) : (
-                    <div className="flex flex-col items-center gap-1" data-testid="img-logo-preview">
+                    <div className="flex flex-col items-center gap-1" data-testid="img-user-logo-preview">
                       <Building2 className="h-8 w-8 text-primary" />
-                      <span className="text-xs font-semibold text-muted-foreground">BuildPlus Ai</span>
+                      <span className="text-xs font-semibold text-muted-foreground">No Logo</span>
                     </div>
                   )}
                 </div>
@@ -150,14 +153,14 @@ export function CompanyTab({
                     accept="image/*"
                     onChange={handleLogoUpload}
                     className="hidden"
-                    data-testid="input-logo-file"
+                    data-testid="input-user-logo-file"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => logoInputRef.current?.click()}
                     disabled={uploadLogoMutation.isPending}
-                    data-testid="button-upload-logo"
+                    data-testid="button-upload-user-logo"
                   >
                     {uploadLogoMutation.isPending ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -166,13 +169,13 @@ export function CompanyTab({
                     )}
                     Upload Logo
                   </Button>
-                  {settings?.logoBase64 && (
+                  {settings?.userLogoBase64 && (
                     <Button
                       type="button"
                       variant="ghost"
                       onClick={() => removeLogoMutation.mutate()}
                       disabled={removeLogoMutation.isPending}
-                      data-testid="button-remove-logo"
+                      data-testid="button-remove-user-logo"
                     >
                       {removeLogoMutation.isPending ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -184,7 +187,7 @@ export function CompanyTab({
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  PNG, JPG or SVG. Max 2MB. Displayed in sidebar and reports.
+                  PNG, JPG or SVG. Max 2MB.
                 </p>
               </div>
             </div>

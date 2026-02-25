@@ -241,10 +241,10 @@ export default function WeeklyWageReportsPage() {
     queryKey: [WEEKLY_REPORTS_ROUTES.WAGE_REPORTS],
   });
 
-  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; userLogoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
-  const reportLogo = brandingSettings?.logoBase64 || null;
+  const reportLogo = brandingSettings?.userLogoBase64 || brandingSettings?.logoBase64 || null;
   const companyName = brandingSettings?.companyName || "BuildPlus Ai";
 
   const { data: analysisData, isLoading: analysisLoading, refetch: refetchAnalysis } = useQuery<WageAnalysis>({

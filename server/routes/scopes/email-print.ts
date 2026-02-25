@@ -50,16 +50,16 @@ router.post("/api/scopes/email", requireAuth, requirePermission("scopes", "VIEW"
         .limit(1000);
 
       scopeBodyHtml += `
-        <h3>${row.scope.name} - ${row.tradeName || "Unknown Trade"}</h3>
-        <p>${row.scope.description || ""}</p>
-        <p><strong>Status:</strong> ${row.scope.status}</p>
-        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">
+        <h3 style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">${row.scope.name} - ${row.tradeName || "Unknown Trade"}</h3>
+        <p style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">${row.scope.description || ""}</p>
+        <p style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;"><strong>Status:</strong> ${row.scope.status}</p>
+        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; margin-bottom: 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
           <thead>
             <tr style="background-color: #f3f4f6;">
-              <th style="text-align: left;">Category</th>
-              <th style="text-align: left;">Description</th>
-              <th style="text-align: left;">Details</th>
-              <th style="text-align: center;">Status</th>
+              <th style="text-align: left; padding: 6px 8px; border: 1px solid #ddd;">Category</th>
+              <th style="text-align: left; padding: 6px 8px; border: 1px solid #ddd;">Description</th>
+              <th style="text-align: left; padding: 6px 8px; border: 1px solid #ddd;">Details</th>
+              <th style="text-align: center; padding: 6px 8px; border: 1px solid #ddd;">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -137,23 +137,23 @@ router.get("/api/scopes/:id/print", requireAuth, requirePermission("scopes", "VI
     let categoriesHtml = "";
     for (const [category, catItems] of categories) {
       categoriesHtml += `
-        <h3 style="margin-top: 20px; color: #1f2937; border-bottom: 2px solid #e5e7eb; padding-bottom: 4px;">${category}</h3>
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+        <h3 style="margin-top: 20px; color: #1f2937; border-bottom: 2px solid #e5e7eb; padding-bottom: 4px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">${category}</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; line-height: 1.4;">
           <thead>
-            <tr style="background-color: #f9fafb;">
-              <th style="text-align: left; padding: 8px; border: 1px solid #e5e7eb; width: 5%;">#</th>
-              <th style="text-align: left; padding: 8px; border: 1px solid #e5e7eb; width: 40%;">Description</th>
-              <th style="text-align: left; padding: 8px; border: 1px solid #e5e7eb; width: 40%;">Details</th>
-              <th style="text-align: center; padding: 8px; border: 1px solid #e5e7eb; width: 15%;">Status</th>
+            <tr style="background-color: #f3f4f6;">
+              <th style="text-align: left; padding: 6px 8px; border: 1px solid #ddd; width: 5%; font-weight: 600;">#</th>
+              <th style="text-align: left; padding: 6px 8px; border: 1px solid #ddd; width: 40%; font-weight: 600;">Description</th>
+              <th style="text-align: left; padding: 6px 8px; border: 1px solid #ddd; width: 40%; font-weight: 600;">Details</th>
+              <th style="text-align: center; padding: 6px 8px; border: 1px solid #ddd; width: 15%; font-weight: 600;">Status</th>
             </tr>
           </thead>
           <tbody>
             ${catItems.map((item, idx) => `
               <tr>
-                <td style="padding: 6px 8px; border: 1px solid #e5e7eb;">${idx + 1}</td>
-                <td style="padding: 6px 8px; border: 1px solid #e5e7eb;">${item.description}</td>
-                <td style="padding: 6px 8px; border: 1px solid #e5e7eb; color: #6b7280; font-size: 0.9em;">${item.details || "-"}</td>
-                <td style="padding: 6px 8px; border: 1px solid #e5e7eb; text-align: center;">
+                <td style="padding: 5px 8px; border: 1px solid #ddd;">${idx + 1}</td>
+                <td style="padding: 5px 8px; border: 1px solid #ddd;">${item.description}</td>
+                <td style="padding: 5px 8px; border: 1px solid #ddd; color: #6b7280; font-size: 0.9em;">${item.details || "-"}</td>
+                <td style="padding: 5px 8px; border: 1px solid #ddd; text-align: center;">
                   <span style="padding: 2px 8px; border-radius: 4px; font-size: 0.85em; background-color: ${item.status === "INCLUDED" ? "#dcfce7" : item.status === "EXCLUDED" ? "#fef2f2" : "#f3f4f6"}; color: ${item.status === "INCLUDED" ? "#166534" : item.status === "EXCLUDED" ? "#991b1b" : "#6b7280"};">
                     ${item.status}
                   </span>
@@ -171,8 +171,11 @@ router.get("/api/scopes/:id/print", requireAuth, requirePermission("scopes", "VI
   <meta charset="utf-8">
   <title>Scope of Works - ${scope.scope.name}</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; color: #1f2937; }
+    body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; color: #1f2937; line-height: 1.4; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     @media print { body { padding: 0; } }
+    table { border-collapse: collapse; }
+    th, td { page-break-inside: avoid; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
   </style>
 </head>
 <body>

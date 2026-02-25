@@ -6,7 +6,7 @@ import type { PurchaseOrderItem } from "@shared/schema";
 export function generatePurchaseOrderPdf(
   po: PurchaseOrderWithDetails,
   lineItems: PurchaseOrderItem[],
-  settings?: { logoBase64: string | null; companyName: string | null } | null,
+  settings?: { logoBase64: string | null; userLogoBase64?: string | null; companyName: string | null } | null,
   termsData?: { poTermsHtml: string | null; includePOTerms: boolean } | null,
 ): Buffer {
   const pdf = new jsPDF({
@@ -35,13 +35,14 @@ export function generatePurchaseOrderPdf(
   const maxLogoHeight = 20;
   const maxLogoWidth = 40;
 
-  if (settings?.logoBase64) {
+  const printLogo = settings?.userLogoBase64 || settings?.logoBase64 || null;
+  if (printLogo) {
     try {
-      const fmt = settings.logoBase64.includes("image/jpeg") ? "JPEG" : "PNG";
+      const fmt = printLogo.includes("image/jpeg") ? "JPEG" : "PNG";
       let logoW = maxLogoWidth;
       let logoH = maxLogoHeight;
       try {
-        const imgProps = pdf.getImageProperties(settings.logoBase64);
+        const imgProps = pdf.getImageProperties(printLogo);
         if (imgProps.width && imgProps.height) {
           const aspect = imgProps.width / imgProps.height;
           logoW = maxLogoHeight * aspect;
@@ -54,7 +55,7 @@ export function generatePurchaseOrderPdf(
       } catch (_dimErr) {
         // fallback to max dimensions
       }
-      pdf.addImage(settings.logoBase64, fmt, margin, 5, logoW, logoH);
+      pdf.addImage(printLogo, fmt, margin, 5, logoW, logoH);
       headerTextX = margin + logoW + 5;
     } catch (_e) {
       // skip logo

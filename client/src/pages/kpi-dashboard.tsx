@@ -298,10 +298,10 @@ export default function KPIDashboardPage() {
     enabled: !!startDate && !!endDate,
   });
 
-  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; userLogoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
-  const reportLogo = brandingSettings?.logoBase64 || null;
+  const reportLogo = brandingSettings?.userLogoBase64 || brandingSettings?.logoBase64 || null;
   const companyName = brandingSettings?.companyName || "BuildPlus Ai";
 
   // Reset component filter when component names change (e.g., date range changes)
